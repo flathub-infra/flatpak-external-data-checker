@@ -1,0 +1,72 @@
+{
+    "app-id": "org.externaldata.Checker",
+    "branch": "stable",
+    "runtime": "org.freedesktop.Platform",
+    "runtime-version": "1.6",
+    "sdk": "org.freedesktop.Sdk",
+    "command": "checker",
+    "modules": [
+        {
+            "name": "phony",
+            "sources": [
+                {
+                    "type": "archive",
+                    "url": "https://some-gibberish-phony-url.phony/phony-archive.tar.gz",
+                    "sha256": "000000000000000000000000000000000000000000000000000000000000000000"
+                },
+                {
+                    "type": "file",
+                    "only-arches": ["i386", "x86_64"],
+                    "dest-filename": "another-file.txt",
+                    "url": "https://some-gibberish-phony-url.phony/phony-text-file.txt",
+                    "sha256": "000000000000000000000000000000000000000000000000000000000000000000"
+                },
+                {
+                    "type": "extra-data",
+                    "filename": "flatpak",
+                    "only-arches": ["i386"],
+                    "url": "http://ftp.de.debian.org/some-broken-debian-pkg.deb",
+                    "sha256": "000000000000000000000000000000000000000000000000000000000000000000",
+                    "size": 1234567,
+                    "x-checker-data": {
+                        "type": "debian-repo",
+                        "package-name": "flatpak",
+                        "root": "http://ftp.debian.org/debian/",
+                        "dist": "stable",
+                        "component": "main"
+                    }
+                },
+                {
+                    "type": "extra-data",
+                    "filename": "flatpak",
+                    "only-arches": ["arm"],
+                    "url": "http://ftp.de.debian.org/some-broken-debian-pkg.deb",
+                    "sha256": "000000000000000000000000000000000000000000000000000000000000000000",
+                    "size": 1234567,
+                    "x-checker-data": {
+                        "type": "debian-repo",
+                        "package-name": "flatpak",
+                        "root": "http://ftp.debian.org/debian/",
+                        "dist": "stable",
+                        "component": "main"
+                    }
+                },
+		{
+                    "type": "extra-data",
+                    "filename": "flatpak",
+                    "only-arches": ["x86_64"],
+                    "url": "http://debian.org",
+                    "sha256": "just-a-valid-url-0000000000000000000000000000000000000000000000000",
+                    "size": 1234567,
+                    "x-checker-data": {
+                        "type": "debian-repo",
+                        "package-name": "flatpak",
+                        "root": "http://ftp.debian.org/debian/",
+                        "dist": "stable",
+                        "component": "main"
+                    }
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+#
+# flatpak-extra-data-checker: A tool for checking the status of
+# the extra data in a Flatpak manifest.
+#
+# Copyright (C) 2018 Endless Mobile, Inc.
+#
+# Authors:
+#       Joaquim Rocha <jrocha@endlessm.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+from lib.externaldata import ExternalData
+
+import argparse
+import checker
+import logging
+
+def print_outdated_external_data(manifest_checker):
+    ext_data = manifest_checker.get_outdated_external_data()
+    for data in ext_data:
+        if data.state == ExternalData.State.BROKEN:
+            print('BROKEN: {}\n'
+                  ' Unreachable URL: {}'.format(data.filename, data.url))
+        if data.new_version:
+            if data.state == ExternalData.State.VALID:
+                print('CHANGE SOON: {}\n'
+                      ' Has a new version:'.format(data.filename))
+            else:
+                print(' A new version is available:')
+            print('  URL:    {url}\n'
+                  '  SHA256: {checksum}\n'
+                  '  Size:   {size}'.format(url=data.new_version.url,
+                                            checksum=data.new_version.checksum,
+                                            size=data.new_version.size))
+        print('')
+
+    return len(ext_data) > 0
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('manifest', help='Flatpak manifest to check')
+    parser.add_argument('-v', '--verbose', help='Print debug messages',
+                        action="store_true")
+    args = parser.parse_args()
+
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+
+    manifest_checker = checker.ManifestChecker(args.manifest)
+    manifest_checker.check()
+
+    if print_outdated_external_data(manifest_checker):
+        exit(1)
+
+    exit(0)
