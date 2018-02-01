@@ -17,14 +17,23 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+from collections import OrderedDict
 from enum import Enum
 
+import json
 import os
 import pkgutil
 
 class ExternalData:
 
     Type = Enum('Type', 'EXTRA_DATA FILE ARCHIVE')
+
+    _TYPES_MANIFEST_MAP = {Type.EXTRA_DATA: 'extra-data',
+                           Type.FILE: 'file',
+                           Type.ARCHIVE: 'archive'}
+    _NAME_MANIFEST_MAP = {Type.EXTRA_DATA: 'filename',
+                          Type.FILE: 'dest-filename',
+                          Type.ARCHIVE: 'dest-filename'}
 
     class State(Enum):
         UNKNOWN = 0
@@ -60,6 +69,24 @@ class ExternalData:
                                                   arches=self.arches,
                                                   checker_data=self.checker_data)
         return info
+
+    def to_json(self):
+        json_data = OrderedDict()
+        json_data['type'] = __class__._TYPES_MANIFEST_MAP[self.type]
+        json_data[__class__._TYPES_MANIFEST_MAP[self.type]] = self.filename
+        json_data['url'] = self.url
+        json_data['sha256'] = self.checksum
+
+        if self.arches:
+            json_data['only-arches'] = self.arches
+
+        if self.size >= 0:
+            json_data['size'] = self.size
+
+        if self.checker_data:
+            json_data['x-checker-data'] = self.checker_data
+
+        return json.dumps(json_data, indent=4)
 
 class Checker:
 
