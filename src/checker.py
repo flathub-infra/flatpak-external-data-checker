@@ -24,6 +24,9 @@ import json
 import os
 import re
 
+class NoManifestCheckersFound(Exception):
+    pass
+
 class ManifestChecker:
 
     def __init__(self, manifest):
@@ -90,6 +93,9 @@ class ManifestChecker:
         It initializes an internal list of all the external data objects
         found in the manifest.
         '''
+        if not self._checkers:
+            raise NoManifestCheckersFound()
+
         for data in self._external_data:
             for checker in self._checkers:
                 checker.check(data)

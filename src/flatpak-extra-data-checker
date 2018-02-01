@@ -22,11 +22,12 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-from lib.externaldata import ExternalData
-
 import argparse
-import checker
 import logging
+import sys
+
+from lib.externaldata import ExternalData
+import checker
 
 def print_outdated_external_data(manifest_checker, as_json=False):
     ext_data = manifest_checker.get_outdated_external_data()
@@ -65,7 +66,11 @@ if __name__ == '__main__':
         logging.basicConfig(level=logging.DEBUG)
 
     manifest_checker = checker.ManifestChecker(args.manifest)
-    manifest_checker.check()
+    try:
+        manifest_checker.check()
+    except checker.NoManifestCheckersFound:
+        sys.stderr.write('No manifest checkers were found\n')
+        exit(2)
 
     if print_outdated_external_data(manifest_checker, as_json=args.json):
         exit(1)
