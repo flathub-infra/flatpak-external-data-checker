@@ -17,6 +17,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import hashlib
 import urllib.request
 
 def get_url_contents(url):
@@ -31,3 +32,22 @@ def check_url_reachable(url):
     request = urllib.request.Request(url, method='HEAD')
     response = urllib.request.urlopen(request)
     return response
+
+def get_extra_data_info_from_url(url):
+    request = urllib.request.Request(url)
+    data = None
+    checksum = ''
+    size = -1
+    real_url = None
+
+    with urllib.request.urlopen(request) as response:
+        real_url = response.geturl()
+        data = response.read()
+        size = response.info().get('Content-Length', -1)
+
+    if size == -1:
+        size = len(data)
+
+    checksum = hashlib.sha256(data).hexdigest()
+
+    return real_url, checksum, size

@@ -41,7 +41,7 @@ class TestExternalDataChecker(unittest.TestCase):
         self.checker.check()
         ext_data = self.checker.get_external_data()
 
-        self.assertEqual(len(ext_data), 5)
+        self.assertEqual(len(ext_data), 6)
 
         ext_data_with_new_version = 0
 
@@ -49,7 +49,7 @@ class TestExternalDataChecker(unittest.TestCase):
             if data.new_version:
                 ext_data_with_new_version += 1
 
-        self.assertEqual(ext_data_with_new_version, 3)
+        self.assertEqual(ext_data_with_new_version, 4)
 
         file_ext_data = self.checker.get_external_data(ExternalData.Type.FILE)
         self.assertEqual(len(file_ext_data), 1)
@@ -58,10 +58,10 @@ class TestExternalDataChecker(unittest.TestCase):
         self.assertEqual(len(archive_ext_data), 1)
 
         extra_data = self.checker.get_external_data(ExternalData.Type.EXTRA_DATA)
-        self.assertEqual(len(extra_data), 3)
+        self.assertEqual(len(extra_data), 4)
 
         outdated_ext_data = self.checker.get_outdated_external_data()
-        self.assertEqual(len(outdated_ext_data), 5)
+        self.assertEqual(len(outdated_ext_data), 6)
 
 if __name__ == '__main__':
     unittest.main()

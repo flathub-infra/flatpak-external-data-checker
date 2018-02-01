@@ -65,6 +65,18 @@
                         "dist": "stable",
                         "component": "main"
                     }
+                },
+                {
+                    "type": "extra-data",
+                    "filename": "dropbox.tgz",
+                    "only-arches": ["x86_64"],
+                    "url": "https://clientupdates.dropboxstatic.com/BROKEN_LINK",
+                    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "size": 1234567,
+                    "x-checker-data": {
+                        "type": "rotating-url",
+                        "url": "https://www.dropbox.com/download?plat=lnx.x86_64"
+                    }
                 }
             ]
         }
