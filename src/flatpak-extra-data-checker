@@ -28,7 +28,7 @@ import argparse
 import checker
 import logging
 
-def print_outdated_external_data(manifest_checker):
+def print_outdated_external_data(manifest_checker, as_json=False):
     ext_data = manifest_checker.get_outdated_external_data()
     for data in ext_data:
         if data.state == ExternalData.State.BROKEN:
@@ -40,11 +40,14 @@ def print_outdated_external_data(manifest_checker):
                       ' Has a new version:'.format(data.filename))
             else:
                 print(' A new version is available:')
-            print('  URL:    {url}\n'
-                  '  SHA256: {checksum}\n'
-                  '  Size:   {size}'.format(url=data.new_version.url,
-                                            checksum=data.new_version.checksum,
-                                            size=data.new_version.size))
+            if not as_json:
+                print('  URL:    {url}\n'
+                      '  SHA256: {checksum}\n'
+                      '  Size:   {size}'.format(url=data.new_version.url,
+                                                checksum=data.new_version.checksum,
+                                                size=data.new_version.size))
+            else:
+                print(data.new_version.to_json())
         print('')
 
     return len(ext_data) > 0
@@ -54,6 +57,8 @@ if __name__ == '__main__':
     parser.add_argument('manifest', help='Flatpak manifest to check')
     parser.add_argument('-v', '--verbose', help='Print debug messages',
                         action="store_true")
+    parser.add_argument('--json', help='Print the new versions of external '
+                        'data as json', action="store_true")
     args = parser.parse_args()
 
     if args.verbose:
@@ -62,7 +67,7 @@ if __name__ == '__main__':
     manifest_checker = checker.ManifestChecker(args.manifest)
     manifest_checker.check()
 
-    if print_outdated_external_data(manifest_checker):
+    if print_outdated_external_data(manifest_checker, as_json=args.json):
         exit(1)
 
     exit(0)
