@@ -60,14 +60,21 @@ if __name__ == '__main__':
                         action="store_true")
     parser.add_argument('--json', help='Print the new versions of external '
                         'data as json', action="store_true")
+    parser.add_argument('--filter-type', help='Only check external data of the given type',
+                        choices=['all', 'extra-data', 'file', 'archive'], default='all')
     args = parser.parse_args()
 
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
 
     manifest_checker = checker.ManifestChecker(args.manifest)
+
+    ext_data_types = {'all': None,
+                      'archive': ExternalData.Type.ARCHIVE,
+                      'extra-data': ExternalData.Type.EXTRA_DATA,
+                      'file': ExternalData.Type.FILE}
     try:
-        manifest_checker.check()
+        manifest_checker.check(ext_data_types.get(args.filter_type))
     except checker.NoManifestCheckersFound:
         sys.stderr.write('No manifest checkers were found\n')
         exit(2)

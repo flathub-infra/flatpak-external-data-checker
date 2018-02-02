@@ -63,7 +63,7 @@ class ManifestChecker:
 
                 data_type = source.get('type')
                 data_type = self._translate_data_type(data_type)
-                if not data_type:
+                if data_type is None:
                     continue
 
                 sha256sum = source.get('sha256', None)
@@ -87,18 +87,27 @@ class ManifestChecker:
         for data in self._external_data:
             print(data)
 
-    def check(self):
+    def check(self, filter_type=None):
         '''Perform the check for all the external data in the manifest
 
         It initializes an internal list of all the external data objects
         found in the manifest.
         '''
+
         if not self._checkers:
             raise NoManifestCheckersFound()
 
+        ext_data_checked = []
         for data in self._external_data:
+            # Ignore if the type is not the one we care about
+            if filter_type is not None and filter_type != data.type:
+                continue;
+
             for checker in self._checkers:
                 checker.check(data)
+            ext_data_checked.append(data)
+
+        return ext_data_checked
 
     def get_external_data(self, only_type=None):
         '''Returns the list of the external data found in the manifest
