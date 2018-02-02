@@ -45,7 +45,25 @@ class ManifestChecker:
         self._collect_external_data()
 
     def _collect_external_data(self):
-        self._external_data = self._get_module_data_from_json(self._json_data)
+        self._external_data = self._get_module_data_from_json(self._json_data) + \
+                              self._get_finish_args_extra_data_from_json(self._json_data)
+
+    def _get_finish_args_extra_data_from_json(self, json_data):
+        extra_data_prefix = '--extra-data='
+        external_data = []
+        extra_data_str = [arg for arg in json_data.get('finish-args', []) \
+                          if arg.startswith(extra_data_prefix)]
+
+        for extra_data in extra_data_str:
+            # discard '--extra-data=' prefix from the string
+            extra_data = extra_data[len(extra_data_prefix) + 1:]
+            info, url = extra_data.split('::')
+            name, sha256sum, size = info.split(':')
+            data_type = ExternalData.Type.EXTRA_DATA
+            ext_data = ExternalData(data_type, name, url, sha256sum, size, [])
+            external_data.append(ext_data)
+
+        return external_data
 
     def _get_module_data_from_json(self, json_data):
         external_data = []

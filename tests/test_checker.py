@@ -32,7 +32,7 @@ import checker
 TEST_MANIFEST = os.path.join(tests_dir, 'org.externaldatachecker.Manifest.json')
 NUM_ARCHIVE_IN_MANIFEST = 1
 NUM_FILE_IN_MANIFEST = 1
-NUM_EXTRA_DATA_IN_MANIFEST = 4
+NUM_EXTRA_DATA_IN_MANIFEST = 5
 NUM_ALL_EXT_DATA = NUM_ARCHIVE_IN_MANIFEST + NUM_FILE_IN_MANIFEST + \
                    NUM_EXTRA_DATA_IN_MANIFEST
 
