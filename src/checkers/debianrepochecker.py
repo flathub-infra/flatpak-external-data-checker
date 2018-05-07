@@ -44,6 +44,7 @@ DEB_PACKAGES_DISTRO_URL = '{root}/dists/{dist}/{comp}/binary-{arch}/Packages'
 DEB_PACKAGES_EXACT_URL = '{root}/{dist}Packages'
 DEB_PACKAGES_URL_SUFFIX = ['.xz', '.bz2', '']
 
+
 class PkgInfo:
     '''Represents a package in Debian's Packages repo file'''
 
@@ -73,7 +74,9 @@ class PkgInfo:
         size = _get_value(data, 'Size')
         installed_size = _get_value(data, 'Installed-Size')
 
-        return PkgInfo(name, arch, version, filename, checksum, size, installed_size)
+        return PkgInfo(name, arch, version, filename, checksum, size,
+                       installed_size)
+
 
 class DebianRepoChecker(Checker):
 
@@ -87,7 +90,8 @@ class DebianRepoChecker(Checker):
     def check(self, external_data):
         # Only process external data of the debian-repo
         if not self._should_check(external_data):
-            logging.debug('%s is not a debian-repo type ext data', external_data.filename)
+            logging.debug('%s is not a debian-repo type ext data',
+                          external_data.filename)
             return
 
         logging.debug('Checking %s', external_data.filename)
@@ -188,5 +192,6 @@ class DebianRepoChecker(Checker):
                 return package
 
         return None
+
 
 CheckerRegistry.register_checker(DebianRepoChecker)

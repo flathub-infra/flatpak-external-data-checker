@@ -24,14 +24,16 @@
 from lib.externaldata import ExternalData, CheckerRegistry, Checker
 from lib import utils
 
+
 class URLChecker(Checker):
 
     def check(self, external_data):
         try:
             utils.check_url_reachable(external_data.url)
-        except:
+        except Exception:
             external_data.state = ExternalData.State.BROKEN
         else:
             external_data.state = ExternalData.State.VALID
+
 
 CheckerRegistry.register_checker(URLChecker)

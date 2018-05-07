@@ -24,6 +24,7 @@ import json
 import os
 import pkgutil
 
+
 class ExternalData:
 
     Type = Enum('Type', 'EXTRA_DATA FILE ARCHIVE')
@@ -37,8 +38,8 @@ class ExternalData:
 
     class State(Enum):
         UNKNOWN = 0
-        VALID = 1 << 1 # URL is reachable
-        BROKEN = 1 << 2 # URL couldn't be reached
+        VALID = 1 << 1  # URL is reachable
+        BROKEN = 1 << 2  # URL couldn't be reached
 
     def __init__(self, data_type, filename, url, checksum, size=-1, arches=[],
                  checker_data=None):
@@ -53,27 +54,28 @@ class ExternalData:
         self.state = ExternalData.State.UNKNOWN
 
     def __str__(self):
-        info = '{filename}:\n' \
-               '  State:   {state}\n' \
-               '  Type:    {type}\n' \
-               '  URL:     {url}\n' \
-               '  SHA256:  {checksum}\n' \
-               '  Size:    {size}\n' \
-               '  Arches:  {arches}\n' \
-               '  Checker: {checker_data}'.format(state=self.state.name,
-                                                  filename=self.filename,
-                                                  type=self.type.name,
-                                                  url=self.url,
-                                                  checksum=self.checksum,
-                                                  size=self.size,
-                                                  arches=self.arches,
-                                                  checker_data=self.checker_data)
+        info = (
+            '{filename}:\n'
+            '  State:   {state}\n'
+            '  Type:    {type}\n'
+            '  URL:     {url}\n'
+            '  SHA256:  {checksum}\n'
+            '  Size:    {size}\n'
+            '  Arches:  {arches}\n'
+            '  Checker: {checker_data}'.format(
+                state=self.state.name, filename=self.filename,
+                type=self.type.name, url=self.url, checksum=self.checksum,
+                size=self.size, arches=self.arches,
+                checker_data=self.checker_data
+            )
+        )
+
         return info
 
     def to_json(self):
         json_data = OrderedDict()
-        json_data['type'] = __class__._TYPES_MANIFEST_MAP[self.type]
-        json_data[__class__._TYPES_MANIFEST_MAP[self.type]] = self.filename
+        json_data['type'] = self._TYPES_MANIFEST_MAP[self.type]
+        json_data[self._TYPES_MANIFEST_MAP[self.type]] = self.filename
         json_data['url'] = self.url
         json_data['sha256'] = self.checksum
 
@@ -88,10 +90,12 @@ class ExternalData:
 
         return json.dumps(json_data, indent=4)
 
+
 class Checker:
 
     def check(self, external_data):
         raise NotImplementedError()
+
 
 class CheckerRegistry:
 
@@ -99,7 +103,8 @@ class CheckerRegistry:
 
     @staticmethod
     def load(checkers_folder):
-        for _unused, modname, _unused in pkgutil.walk_packages([checkers_folder]):
+        for _unused, modname, _unused in pkgutil.walk_packages(
+                [checkers_folder]):
             pkg_name = os.path.basename(checkers_folder)
             __import__(pkg_name + '.' + modname)
 
