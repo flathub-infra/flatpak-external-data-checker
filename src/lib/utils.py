@@ -20,6 +20,7 @@
 import hashlib
 import urllib.request
 
+
 def get_url_contents(url):
     request = urllib.request.Request(url)
 
@@ -28,10 +29,12 @@ def get_url_contents(url):
 
     return None
 
+
 def check_url_reachable(url):
     request = urllib.request.Request(url, method='HEAD')
     response = urllib.request.urlopen(request)
     return response
+
 
 def get_extra_data_info_from_url(url):
     request = urllib.request.Request(url)
