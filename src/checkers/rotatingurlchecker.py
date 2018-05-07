@@ -31,8 +31,7 @@
 
 import logging
 
-from lib.externaldata import ExternalData, CheckerRegistry, Checker
-from lib import utils
+from lib import CheckerRegistry, Checker, ExternalData, utils
 
 class RotatingURLChecker(Checker):
 

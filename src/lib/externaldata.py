@@ -1,6 +1,7 @@
 # Copyright (C) 2018 Endless Mobile, Inc.
 #
 # Authors:
+#       Andrew Hayzen <ahayzen@gmail.com>
 #       Joaquim Rocha <jrocha@endlessm.com>
 #
 # This program is free software; you can redistribute it and/or modify
@@ -22,7 +23,6 @@ from enum import Enum
 
 import json
 import os
-import pkgutil
 
 class ExternalData:
 
@@ -70,6 +70,71 @@ class ExternalData:
                                                   checker_data=self.checker_data)
         return info
 
+    @staticmethod
+    def collect_external_data(json_data):
+        return ExternalData._get_module_data_from_json(json_data) + \
+            ExternalData._get_finish_args_extra_data_from_json(json_data)
+
+    @staticmethod
+    def _get_finish_args_extra_data_from_json(json_data):
+        extra_data_prefix = '--extra-data='
+        external_data = []
+        extra_data_str = [arg for arg in json_data.get('finish-args', []) \
+                          if arg.startswith(extra_data_prefix)]
+
+        for extra_data in extra_data_str:
+            # discard '--extra-data=' prefix from the string
+            extra_data = extra_data[len(extra_data_prefix) + 1:]
+            info, url = extra_data.split('::')
+            name, sha256sum, size = info.split(':')
+            data_type = ExternalData.Type.EXTRA_DATA
+            ext_data = ExternalData(data_type, name, url, sha256sum, size, [])
+            external_data.append(ext_data)
+
+        return external_data
+
+    @staticmethod
+    def _get_module_data_from_json(json_data):
+        external_data = []
+        for module in json_data.get('modules', []):
+            if type(module) is str:
+                continue  # FIXME: already upstream
+
+            for source in module.get('sources', []):
+                url = source.get('url', None)
+                if not url:
+                    continue
+
+                name = source.get('filename')
+                if not name:
+                    name = source.get('dest-filename')
+                if not name:
+                    name = os.path.basename(url)
+
+                data_type = source.get('type')
+                data_type = ExternalData._translate_data_type(data_type)
+                if data_type is None:
+                    continue
+
+                sha256sum = source.get('sha256', None)
+                arches = source.get('only-arches', [])
+                size = source.get('size', -1)
+                checker_data = source.get('x-checker-data')
+
+                ext_data = ExternalData(data_type, name, url, sha256sum, size,
+                                        arches, checker_data)
+                external_data.append(ext_data)
+
+        return external_data
+
+    @staticmethod
+    def _translate_data_type(data_type):
+        # FIXME: reverse map of _TYPES_MANIFEST_MAP
+        types = { 'file': ExternalData.Type.FILE,
+                  'archive': ExternalData.Type.ARCHIVE,
+                  'extra-data': ExternalData.Type.EXTRA_DATA}
+        return types.get(data_type)
+
     def to_json(self):
         json_data = OrderedDict()
         json_data['type'] = __class__._TYPES_MANIFEST_MAP[self.type]
@@ -87,28 +152,3 @@ class ExternalData:
             json_data['x-checker-data'] = self.checker_data
 
         return json.dumps(json_data, indent=4)
-
-class Checker:
-
-    def check(self, external_data):
-        raise NotImplementedError()
-
-class CheckerRegistry:
-
-    _checkers = []
-
-    @staticmethod
-    def load(checkers_folder):
-        for _unused, modname, _unused in pkgutil.walk_packages([checkers_folder]):
-            pkg_name = os.path.basename(checkers_folder)
-            __import__(pkg_name + '.' + modname)
-
-    @classmethod
-    def register_checker(class_, checker):
-        if not issubclass(checker, Checker):
-            raise TypeError('{} is not a of type {}'.format(checker, Checker))
-        class_._checkers.append(checker)
-
-    @classmethod
-    def get_checkers(class_):
-        return class_._checkers

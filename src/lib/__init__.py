@@ -1,7 +1,3 @@
-# URL Checker: A simple checker that just verifies if an external data
-# URL is still accessible. Does not need an x-checker-data entry and
-# works with all external data types (that have a URL).
-#
 # Copyright (C) 2018 Endless Mobile, Inc.
 #
 # Authors:
@@ -21,16 +17,37 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-from lib import CheckerRegistry, Checker, ExternalData, utils
+import os
+import pkgutil
 
-class URLChecker(Checker):
+
+class Checker:
 
     def check(self, external_data):
-        try:
-            utils.check_url_reachable(external_data.url)
-        except:
-            external_data.state = ExternalData.State.BROKEN
-        else:
-            external_data.state = ExternalData.State.VALID
+        raise NotImplementedError()
 
-CheckerRegistry.register_checker(URLChecker)
+
+class CheckerRegistry:
+
+    _checkers = []
+
+    @staticmethod
+    def load(checkers_folder):
+        for _unused, modname, _unused in pkgutil.walk_packages([checkers_folder]):
+            pkg_name = os.path.basename(checkers_folder)
+            __import__(pkg_name + '.' + modname)
+
+    @classmethod
+    def register_checker(class_, checker):
+        if not issubclass(checker, Checker):
+            raise TypeError('{} is not a of type {}'.format(checker, Checker))
+
+        class_._checkers.append(checker)
+
+    @classmethod
+    def get_checkers(class_):
+        return class_._checkers
+
+
+from lib.cvedata import CVEData
+from lib.externaldata import ExternalData
