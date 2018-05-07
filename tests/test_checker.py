@@ -26,7 +26,7 @@ tests_dir = os.path.dirname(__file__)
 checker_path = os.path.join(tests_dir, '..', 'src')
 sys.path.append(checker_path)
 
-from lib.externaldata import ExternalData, Checker
+from lib import ExternalData, Checker
 import checker
 
 TEST_MANIFEST = os.path.join(tests_dir, 'org.externaldatachecker.Manifest.json')

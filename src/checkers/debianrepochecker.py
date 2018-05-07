@@ -36,8 +36,7 @@ import os
 import re
 import urllib
 
-from lib.externaldata import ExternalData, CheckerRegistry, Checker
-from lib import utils
+from lib import CheckerRegistry, Checker, ExternalData, utils
 
 DEB_PACKAGES_URL = '{root}/dists/{dist}/{comp}/binary-{arch}/Packages'
 DEB_PACKAGES_XZ_URL = '{root}/dists/{dist}/{comp}/binary-{arch}/Packages.xz'

@@ -6,6 +6,7 @@
 # Copyright (C) 2018 Endless Mobile, Inc.
 #
 # Authors:
+#       Andrew Hayzen <ahayzen@gmail.com>
 #       Joaquim Rocha <jrocha@endlessm.com>
 #
 # This program is free software; you can redistribute it and/or modify
@@ -62,12 +63,15 @@ if __name__ == '__main__':
                         'data as json', action="store_true")
     parser.add_argument('--filter-type', help='Only check external data of the given type',
                         choices=['all', 'extra-data', 'file', 'archive'], default='all')
+    parser.add_argument("--experimental-cve-checker",
+                        help="Experimental: CVE checker", action="store_true")
     args = parser.parse_args()
 
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
 
-    manifest_checker = checker.ManifestChecker(args.manifest)
+    manifest_checker = checker.ManifestChecker(args.manifest,
+                                               args.experimental_cve_checker)
 
     ext_data_types = {'all': None,
                       'archive': ExternalData.Type.ARCHIVE,
@@ -78,6 +82,9 @@ if __name__ == '__main__':
     except checker.NoManifestCheckersFound:
         sys.stderr.write('No manifest checkers were found\n')
         exit(2)
+
+    if args.experimental_cve_checker:
+        manifest_checker.print_cve_data()
 
     if print_outdated_external_data(manifest_checker, as_json=args.json):
         exit(1)
