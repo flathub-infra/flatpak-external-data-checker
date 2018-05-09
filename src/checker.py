@@ -1,6 +1,7 @@
 # Copyright (C) 2018 Endless Mobile, Inc.
 #
 # Authors:
+#       Andrew Hayzen <ahayzen@gmail.com>
 #       Joaquim Rocha <jrocha@endlessm.com>
 #
 # This program is free software; you can redistribute it and/or modify
@@ -68,6 +69,10 @@ class ManifestChecker:
     def _get_module_data_from_json(self, json_data):
         external_data = []
         for module in json_data.get('modules', []):
+            # This is a guess at the package name from the name the author
+            # has given to the module block
+            pkg_name = module.get('name', None)
+
             for source in module.get('sources', []):
                 url = source.get('url', None)
                 if not url:
@@ -89,8 +94,8 @@ class ManifestChecker:
                 size = source.get('size', -1)
                 checker_data = source.get('x-checker-data')
 
-                ext_data = ExternalData(data_type, name, url, sha256sum, size,
-                                        arches, checker_data)
+                ext_data = ExternalData(data_type, pkg_name, name, url,
+                                        sha256sum, size, arches, checker_data)
                 external_data.append(ext_data)
 
         return external_data
