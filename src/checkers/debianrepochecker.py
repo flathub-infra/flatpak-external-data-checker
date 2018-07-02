@@ -40,7 +40,8 @@ import urllib
 from lib.externaldata import ExternalData, CheckerRegistry, Checker
 from lib import utils
 
-DEB_PACKAGES_URL = '{root}/dists/{dist}/{comp}/binary-{arch}/Packages'
+DEB_PACKAGES_DISTRO_URL = '{root}/dists/{dist}/{comp}/binary-{arch}/Packages'
+DEB_PACKAGES_EXACT_URL = '{root}/{dist}Packages'
 DEB_PACKAGES_URL_SUFFIX = ['.xz', '.bz2', '']
 
 class PkgInfo:
@@ -93,7 +94,7 @@ class DebianRepoChecker(Checker):
         package_name = external_data.checker_data['package-name']
         root = external_data.checker_data['root']
         dist = external_data.checker_data['dist']
-        component = external_data.checker_data['component']
+        component = external_data.checker_data.get('component', None)
         arch = self._translate_arch(external_data.arches[0])
         package = self._get_package_from_url(package_name, root, dist,
                                              component, arch)
@@ -155,8 +156,12 @@ class DebianRepoChecker(Checker):
         return packages
 
     def _get_package_from_url(self, package_name, root, dist, component, arch):
-        packages_url = DEB_PACKAGES_URL.format(root=root, dist=dist,
-                                               comp=component, arch=arch)
+        if dist[-1:] == '/' and component is None:
+            packages_url = DEB_PACKAGES_EXACT_URL.format(root=root, dist=dist)
+        else:
+            packages_url = DEB_PACKAGES_DISTRO_URL.format(root=root, dist=dist,
+                                                          comp=component, arch=arch)
+
         for suffix in DEB_PACKAGES_URL_SUFFIX:
             url = packages_url + suffix
             packages_page = self._load_url(url)
