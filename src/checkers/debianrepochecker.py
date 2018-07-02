@@ -30,6 +30,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import bz2
 import logging
 import lzma
 import os
@@ -40,7 +41,7 @@ from lib.externaldata import ExternalData, CheckerRegistry, Checker
 from lib import utils
 
 DEB_PACKAGES_URL = '{root}/dists/{dist}/{comp}/binary-{arch}/Packages'
-DEB_PACKAGES_XZ_URL = '{root}/dists/{dist}/{comp}/binary-{arch}/Packages.xz'
+DEB_PACKAGES_URL_SUFFIX = ['.xz', '.bz2', '']
 
 class PkgInfo:
     '''Represents a package in Debian's Packages repo file'''
@@ -128,6 +129,8 @@ class DebianRepoChecker(Checker):
             return None
         if packages_url.endswith('.xz'):
             packages_page = lzma.decompress(packages_page)
+        elif packages_url.endswith('.bz2'):
+            packages_page = bz2.decompress(packages_page)
 
         packages_page = packages_page.decode('utf-8')
 
@@ -154,10 +157,8 @@ class DebianRepoChecker(Checker):
     def _get_package_from_url(self, package_name, root, dist, component, arch):
         packages_url = DEB_PACKAGES_URL.format(root=root, dist=dist,
                                                comp=component, arch=arch)
-        packages_xz_url = DEB_PACKAGES_XZ_URL.format(root=root, dist=dist,
-                                                  comp=component, arch=arch)
-        urls = [packages_url, packages_xz_url]
-        for url in urls:
+        for suffix in DEB_PACKAGES_URL_SUFFIX:
+            url = packages_url + suffix
             packages_page = self._load_url(url)
             if packages_page is not None:
                 break
