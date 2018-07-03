@@ -95,6 +95,12 @@ class DebianRepoChecker(Checker):
         root = external_data.checker_data['root']
         dist = external_data.checker_data['dist']
         component = external_data.checker_data.get('component', None)
+
+        if not component and not dist.endswith('/'):
+            logging.warning('%s is missing Debian repo "component", for an ' \
+                            'exact URL "dist" must end with /', package_name)
+            return
+
         arch = self._translate_arch(external_data.arches[0])
         package = self._get_package_from_url(package_name, root, dist,
                                              component, arch)
@@ -156,9 +162,10 @@ class DebianRepoChecker(Checker):
         return packages
 
     def _get_package_from_url(self, package_name, root, dist, component, arch):
-        if dist[-1:] == '/' and component is None:
+        if dist.endswith('/') and component is None:
             packages_url = DEB_PACKAGES_EXACT_URL.format(root=root, dist=dist)
         else:
+            assert(component)
             packages_url = DEB_PACKAGES_DISTRO_URL.format(root=root, dist=dist,
                                                           comp=component, arch=arch)
 
