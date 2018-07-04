@@ -45,6 +45,7 @@ DEB_PACKAGES_EXACT_URL = '{root}/{dist}Packages'
 DEB_PACKAGES_URL_SUFFIX = ['.xz', '.bz2', '']
 
 
+
 class PkgInfo:
     '''Represents a package in Debian's Packages repo file'''
 
