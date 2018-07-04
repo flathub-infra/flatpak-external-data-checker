@@ -99,7 +99,7 @@ class DebianRepoChecker(Checker):
         component = external_data.checker_data.get('component', None)
 
         if not component and not dist.endswith('/'):
-            logging.warning('%s is missing Debian repo "component", for an ' \
+            logging.warning('%s is missing Debian repo "component", for an '
                             'exact URL "dist" must end with /', package_name)
             return
 
