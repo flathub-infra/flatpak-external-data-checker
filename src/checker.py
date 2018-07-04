@@ -40,8 +40,7 @@ class ManifestChecker:
         self._checkers = [checker() for checker in CheckerRegistry.get_checkers()]
 
         with open(self._manifest, 'r') as manifest_file:
-            # Strip manifest of c-style comments
-            # (happens in some Flatpak manifests)
+            # Strip manifest of c-style comments (happens in some Flatpak manifests)
             clean_manifest = re.sub(r'(^|\s)/\*.*?\*/', '', manifest_file.read())
             self._json_data = json.loads(clean_manifest, object_pairs_hook=OrderedDict)
 
