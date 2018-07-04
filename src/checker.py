@@ -36,26 +36,20 @@ class ManifestChecker:
         self._external_data = []
 
         # Load and initialize checkers
-        CheckerRegistry.load(os.path.join(os.path.dirname(__file__),
-                                          'checkers'))
-        self._checkers = [checker() for checker in
-                          CheckerRegistry.get_checkers()]
+        CheckerRegistry.load(os.path.join(os.path.dirname(__file__), 'checkers'))
+        self._checkers = [checker() for checker in CheckerRegistry.get_checkers()]
 
         with open(self._manifest, 'r') as manifest_file:
             # Strip manifest of c-style comments
             # (happens in some Flatpak manifests)
-            clean_manifest = re.sub(r'(^|\s)/\*.*?\*/', '',
-                                    manifest_file.read())
-            self._json_data = json.loads(clean_manifest,
-                                         object_pairs_hook=OrderedDict)
+            clean_manifest = re.sub(r'(^|\s)/\*.*?\*/', '', manifest_file.read())
+            self._json_data = json.loads(clean_manifest, object_pairs_hook=OrderedDict)
 
         self._collect_external_data()
 
     def _collect_external_data(self):
-        self._external_data = (
-            self._get_module_data_from_json(self._json_data) +
-            self._get_finish_args_extra_data_from_json(self._json_data)
-        )
+        self._external_data = self._get_module_data_from_json(self._json_data) \
+            + self._get_finish_args_extra_data_from_json(self._json_data)
 
     def _get_finish_args_extra_data_from_json(self, json_data):
         extra_data_prefix = '--extra-data='
