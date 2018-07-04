@@ -25,8 +25,7 @@ from lib.externaldata import ExternalData, Checker
 import checker
 
 TESTS_DIR = os.path.dirname(__file__)
-TEST_MANIFEST = os.path.join(TESTS_DIR,
-                             'org.externaldatachecker.Manifest.json')
+TEST_MANIFEST = os.path.join(TESTS_DIR, 'org.externaldatachecker.Manifest.json')
 NUM_ARCHIVE_IN_MANIFEST = 1
 NUM_FILE_IN_MANIFEST = 1
 NUM_EXTRA_DATA_IN_MANIFEST = 5
@@ -37,8 +36,8 @@ NUM_ALL_EXT_DATA = NUM_ARCHIVE_IN_MANIFEST + NUM_FILE_IN_MANIFEST + \
 class DummyChecker(Checker):
 
     def check(self, external_data):
-        logging.debug('Phony checker checking external data %s and all is '
-                      'always good', external_data.filename)
+        logging.debug('Phony checker checking external data %s and all is always good',
+                      external_data.filename)
 
 
 class TestExternalDataChecker(unittest.TestCase):
@@ -83,12 +82,10 @@ class TestExternalDataChecker(unittest.TestCase):
         file_ext_data = self.checker.get_external_data(ExternalData.Type.FILE)
         self.assertEqual(len(file_ext_data), NUM_FILE_IN_MANIFEST)
 
-        archive_ext_data = self.checker.get_external_data(
-            ExternalData.Type.ARCHIVE)
+        archive_ext_data = self.checker.get_external_data(ExternalData.Type.ARCHIVE)
         self.assertEqual(len(archive_ext_data), NUM_ARCHIVE_IN_MANIFEST)
 
-        extra_data = self.checker.get_external_data(
-            ExternalData.Type.EXTRA_DATA)
+        extra_data = self.checker.get_external_data(ExternalData.Type.EXTRA_DATA)
         self.assertEqual(len(extra_data), NUM_EXTRA_DATA_IN_MANIFEST)
 
         outdated_ext_data = self.checker.get_outdated_external_data()

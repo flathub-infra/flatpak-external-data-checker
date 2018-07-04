@@ -72,8 +72,7 @@ class PkgInfo:
         size = _get_value(data, 'Size')
         installed_size = _get_value(data, 'Installed-Size')
 
-        return PkgInfo(name, arch, version, filename, checksum, size,
-                       installed_size)
+        return PkgInfo(name, arch, version, filename, checksum, size, installed_size)
 
 
 class DebianRepoChecker(Checker):
@@ -88,8 +87,7 @@ class DebianRepoChecker(Checker):
     def check(self, external_data):
         # Only process external data of the debian-repo
         if not self._should_check(external_data):
-            logging.debug('%s is not a debian-repo type ext data',
-                          external_data.filename)
+            logging.debug('%s is not a debian-repo type ext data', external_data.filename)
             return
 
         logging.debug('Checking %s', external_data.filename)

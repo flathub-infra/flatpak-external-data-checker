@@ -44,8 +44,7 @@ class RotatingURLChecker(Checker):
     def check(self, external_data):
         # Only process external data of the rotating-url
         if not self._should_check(external_data):
-            logging.debug('%s is not a rotating-url type ext data',
-                          external_data.filename)
+            logging.debug('%s is not a rotating-url type ext data', external_data.filename)
             return
 
         url = external_data.checker_data['url']
