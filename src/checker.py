@@ -2,6 +2,7 @@
 #
 # Authors:
 #       Joaquim Rocha <jrocha@endlessm.com>
+#       Andrew Hayzen <ahayzen@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -68,6 +69,9 @@ class ManifestChecker:
     def _get_module_data_from_json(self, json_data):
         external_data = []
         for module in json_data.get('modules', []):
+            if type(module) is str:
+                continue
+
             for source in module.get('sources', []):
                 url = source.get('url', None)
                 if not url:
