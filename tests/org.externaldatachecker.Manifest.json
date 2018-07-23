@@ -9,6 +9,7 @@
         "--extra-data=phonyextdata.tgz:000000000000000000000000000000000000000000000000000000000000000000:1234567::https://some-gibberish-phony-url.phony/phony-ext-data.tar.gz"
     ],
     "modules": [
+        "shared-modules/fake.json",
         {
             "name": "phony",
             "sources": [
