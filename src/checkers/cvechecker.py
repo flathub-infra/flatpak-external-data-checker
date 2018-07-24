@@ -28,12 +28,23 @@ from lib.externaldata import ExternalData, CheckerRegistry, Checker
 class CVEChecker(Checker):
 
     def check(self, external_data):
+        # TODO: if checker_data or package-name are None
+        # attempt to guess package name from url if archive
+
+        if external_data.checker_data is None:
+            external_data.state = ExternalData.State.BROKEN
+            return
+
+        pkg_name = external_data.checker_data.get("package-name", None)
+
+        if pkg_name is None:
+            logging.debug('CVEChecker: No package-name given')
+            external_data.state = ExternalData.State.BROKEN
+            return
+
         try:
-            version = CVEChecker.extract_version_from_url(
-                external_data.url, external_data.type,
-            )
-            logging.debug('CVEChecker: Found %s of the version %s' %
-                          (external_data.pkg_name, version))
+            version = CVEChecker.extract_version_from_url(external_data.url, external_data.type)
+            logging.debug('CVEChecker: Found {} of the version {}'.format(pkg_name, version))
         except ValueError:
             external_data.state = ExternalData.State.BROKEN
         else:
@@ -54,7 +65,7 @@ class CVEChecker(Checker):
                 logging.debug('CVEChecker: Version not found in {}'.format(url))
                 raise ValueError
         else:
-            logging.debug('CVEChecker: Unknown type %s' % data_type)
+            logging.debug('CVEChecker: Unknown type {}'.format(data_type))
             raise ValueError
 
 

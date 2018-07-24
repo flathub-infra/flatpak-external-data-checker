@@ -41,9 +41,8 @@ class ExternalData:
         VALID = 1 << 1 # URL is reachable
         BROKEN = 1 << 2 # URL couldn't be reached
 
-    def __init__(self, data_type, pkg_name, filename, url, checksum, size=-1,
+    def __init__(self, data_type, filename, url, checksum, size=-1,
                  arches=[], checker_data=None):
-        self.pkg_name = pkg_name
         self.filename = filename
         self.url = url
         self.checksum = checksum
@@ -56,7 +55,6 @@ class ExternalData:
 
     def __str__(self):
         info = '{filename}:\n' \
-               '  PkgName: {pkg_name}\n' \
                '  State:   {state}\n' \
                '  Type:    {type}\n' \
                '  URL:     {url}\n' \

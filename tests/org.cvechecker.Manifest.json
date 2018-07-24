@@ -1,0 +1,31 @@
+{
+    "app-id": "org.cvechecker.Checker",
+    "branch": "stable",
+    "runtime": "org.freedesktop.Platform",
+    "runtime-version": "1.6",
+    "sdk": "org.freedesktop.Sdk",
+    "command": "checker",
+    "finish-args": [
+    ],
+    "modules": [
+        {
+            "name": "phony",
+            "sources": [
+                {
+                    "type": "archive",
+                    "url": "https://some-gibberish-phony-url.phony/releases/pkga-1.2.3.tar.bz2",
+                    "sha256": "000000000000000000000000000000000000000000000000000000000000000000",
+                    "x-checker-data": {
+                        "package-name": "pkga"
+                    }
+                },
+                {
+                    "type": "archive",
+                    "url": "https://some-gibberish-phony-url.phony/releases/pkgb-4.5.6.tar.bz2",
+                    "sha256": "000000000000000000000000000000000000000000000000000000000000000000"
+                }
+            ]
+        }
+    ]
+}
+
