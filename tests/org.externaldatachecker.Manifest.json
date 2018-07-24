@@ -1,4 +1,5 @@
 {
+    /* A comment, as accepted by json-glib and hence flatpak-builder */
     "app-id": "org.externaldata.Checker",
     "branch": "stable",
     "runtime": "org.freedesktop.Platform",
