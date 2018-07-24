@@ -28,7 +28,6 @@ class NoManifestCheckersFound(Exception):
     pass
 
 class ManifestChecker:
-
     def __init__(self, manifest):
         self._manifest = manifest
         self._external_data = []
@@ -37,12 +36,17 @@ class ManifestChecker:
         CheckerRegistry.load(os.path.join(os.path.dirname(__file__), 'checkers'))
         self._checkers = [checker() for checker in CheckerRegistry.get_checkers()]
 
-        with open(self._manifest, 'r') as manifest_file:
+        self._json_data = self._read_manifest(self._manifest)
+        self._collect_external_data()
+
+    @staticmethod
+    def _read_manifest(manifest_path):
+        '''Read manifest from 'manifest_path', which may contain C-style comments (accepted by
+        json-glib and hence flatpak-builder, but not Python's json module).'''
+        with open(manifest_path, 'r') as manifest_file:
             # Strip manifest of c-style comments (happens in some Flatpak manifests)
             clean_manifest = re.sub(r'(^|\s)/\*.*?\*/', '', manifest_file.read())
-            self._json_data = json.loads(clean_manifest, object_pairs_hook=OrderedDict)
-
-        self._collect_external_data()
+            return json.loads(clean_manifest, object_pairs_hook=OrderedDict)
 
     def _collect_external_data(self):
         self._external_data = self._get_module_data_from_json(self._json_data) + \
@@ -68,6 +72,11 @@ class ManifestChecker:
     def _get_module_data_from_json(self, json_data):
         external_data = []
         for module in json_data.get('modules', []):
+            if isinstance(module, str):
+                module_path = os.path.join(os.path.dirname(self._manifest),
+                                           module)
+                module = self._read_manifest(module_path)
+
             for source in module.get('sources', []):
                 url = source.get('url', None)
                 if not url:
