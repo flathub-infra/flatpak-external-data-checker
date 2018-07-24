@@ -1,7 +1,6 @@
 # Copyright (C) 2018 Endless Mobile, Inc.
 #
 # Authors:
-#       Andrew Hayzen <ahayzen@gmail.com>
 #       Joaquim Rocha <jrocha@endlessm.com>
 #
 # This program is free software; you can redistribute it and/or modify
@@ -41,8 +40,8 @@ class ExternalData:
         VALID = 1 << 1 # URL is reachable
         BROKEN = 1 << 2 # URL couldn't be reached
 
-    def __init__(self, data_type, filename, url, checksum, size=-1,
-                 arches=[], checker_data=None):
+    def __init__(self, data_type, filename, url, checksum, size=-1, arches=[],
+                 checker_data=None):
         self.filename = filename
         self.url = url
         self.checksum = checksum
@@ -62,7 +61,6 @@ class ExternalData:
                '  Size:    {size}\n' \
                '  Arches:  {arches}\n' \
                '  Checker: {checker_data}'.format(state=self.state.name,
-                                                  pkg_name=self.pkg_name,
                                                   filename=self.filename,
                                                   type=self.type.name,
                                                   url=self.url,
