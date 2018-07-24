@@ -22,7 +22,11 @@ from lib.externaldata import CheckerRegistry, ExternalData
 
 import json
 import os
-import re
+
+import gi
+gi.require_version('Json', '1.0')
+from gi.repository import Json  # noqa: E402
+
 
 class NoManifestCheckersFound(Exception):
     pass
@@ -41,12 +45,18 @@ class ManifestChecker:
 
     @staticmethod
     def _read_manifest(manifest_path):
-        '''Read manifest from 'manifest_path', which may contain C-style comments (accepted by
-        json-glib and hence flatpak-builder, but not Python's json module).'''
-        with open(manifest_path, 'r') as manifest_file:
-            # Strip manifest of c-style comments (happens in some Flatpak manifests)
-            clean_manifest = re.sub(r'(^|\s)/\*.*?\*/', '', manifest_file.read())
-            return json.loads(clean_manifest, object_pairs_hook=OrderedDict)
+        '''Read manifest from 'manifest_path', which may contain C-style
+        comments or multi-line strings (accepted by json-glib and hence
+        flatpak-builder, but not Python's json module).'''
+
+        # Round-trip through json-glib to get rid of comments, multi-line
+        # strings, and any other invalid JSON
+        parser = Json.Parser()
+        parser.load_from_file(manifest_path)
+        root = parser.get_root()
+        clean_manifest = Json.to_string(root, False)
+
+        return json.loads(clean_manifest, object_pairs_hook=OrderedDict)
 
     def _collect_external_data(self):
         self._external_data = self._get_module_data_from_json(self._json_data) + \
