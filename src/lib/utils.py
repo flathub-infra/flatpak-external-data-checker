@@ -21,8 +21,9 @@ import hashlib
 import urllib.request
 
 # With the default urllib User-Agent, dl.discordapp.net returns 403
-USER_AGENT = 'flatpak-external-data-checker (+https://github.com/joaquimrocha/flatpak-external-data-checker)'
+USER_AGENT = 'flatpak-external-data-checker (+https://github.com/joaquimrocha/flatpak-external-data-checker)'  # noqa: E501
 HEADERS = {'User-Agent': USER_AGENT}
+
 
 def get_url_contents(url):
     request = urllib.request.Request(url, headers=HEADERS)
@@ -32,10 +33,12 @@ def get_url_contents(url):
 
     return None
 
+
 def check_url_reachable(url):
     request = urllib.request.Request(url, method='HEAD', headers=HEADERS)
     response = urllib.request.urlopen(request)
     return response
+
 
 def get_extra_data_info_from_url(url):
     request = urllib.request.Request(url, headers=HEADERS)
