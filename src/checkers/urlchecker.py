@@ -20,18 +20,28 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+import logging
+import urllib.error
 
 from lib.externaldata import ExternalData, CheckerRegistry, Checker
 from lib import utils
 
-class URLChecker(Checker):
+log = logging.getLogger(__name__)
 
+
+class URLChecker(Checker):
     def check(self, external_data):
         try:
             utils.check_url_reachable(external_data.url)
+        except urllib.error.HTTPError as e:
+            log.warning('%s returned %s', external_data.url, e)
+            external_data.state = ExternalData.State.BROKEN
         except:
+            log.exception('Unexpected exception while checking %s',
+                          external_data.url, exc_info=True)
             external_data.state = ExternalData.State.BROKEN
         else:
             external_data.state = ExternalData.State.VALID
+
 
 CheckerRegistry.register_checker(URLChecker)
