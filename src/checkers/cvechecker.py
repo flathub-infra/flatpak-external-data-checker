@@ -48,6 +48,8 @@ class CVEChecker(Checker):
         except ValueError:
             external_data.state = ExternalData.State.BROKEN
         else:
+            # TODO: we should probably provide the pkg_name as a hint here?
+            external_data.current_version = version
             external_data.state = ExternalData.State.VALID
 
         # TODO: need similar to new_version but for cve_vuln

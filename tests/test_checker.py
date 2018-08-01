@@ -30,6 +30,7 @@ from lib.externaldata import ExternalData, Checker
 import checker
 
 TEST_MANIFEST = os.path.join(tests_dir, 'org.externaldatachecker.Manifest.json')
+CVE_TEST_MANIFEST = os.path.join(tests_dir, 'org.cvechecker.Manifest.json')
 NUM_ARCHIVE_IN_MANIFEST = 1
 NUM_FILE_IN_MANIFEST = 1
 NUM_EXTRA_DATA_IN_MANIFEST = 5
@@ -41,6 +42,30 @@ class DummyChecker(Checker):
     def check(self, external_data):
         logging.debug('Phony checker checking external data %s and all is always good',
                       external_data.filename)
+
+
+class TestCVEChecker(unittest.TestCase):
+    def setUp(self):
+        logging.basicConfig(level=logging.DEBUG)
+        self.checker = checker.ManifestChecker(CVE_TEST_MANIFEST)
+
+    def test_check(self):
+        ext_data = self.checker.check()
+
+        self.assertEqual(len(ext_data), 2)
+
+        external_data_with_current_version = 0
+        for data in ext_data:
+            if data.current_version:
+                external_data_with_current_version += 1
+
+        # For now expect only 1 as pkg names aren't detected from URL
+        self.assertEqual(external_data_with_current_version, 1)
+
+        # For now just check the current version is correct
+        # later we will supply a new version and plg_name
+        self.assertEqual(ext_data[0].current_version, "1.2.3")
+
 
 class TestExternalDataChecker(unittest.TestCase):
 
