@@ -19,28 +19,26 @@
 
 import logging
 import os
-import sys
 import unittest
-
-tests_dir = os.path.dirname(__file__)
-checker_path = os.path.join(tests_dir, '..', 'src')
-sys.path.append(checker_path)
 
 from lib.externaldata import ExternalData, Checker
 import checker
 
-TEST_MANIFEST = os.path.join(tests_dir, 'org.externaldatachecker.Manifest.json')
+TESTS_DIR = os.path.dirname(__file__)
+TEST_MANIFEST = os.path.join(TESTS_DIR, 'org.externaldatachecker.Manifest.json')
 NUM_ARCHIVE_IN_MANIFEST = 1
 NUM_FILE_IN_MANIFEST = 1
 NUM_EXTRA_DATA_IN_MANIFEST = 5
 NUM_ALL_EXT_DATA = NUM_ARCHIVE_IN_MANIFEST + NUM_FILE_IN_MANIFEST + \
                    NUM_EXTRA_DATA_IN_MANIFEST
 
+
 class DummyChecker(Checker):
 
     def check(self, external_data):
         logging.debug('Phony checker checking external data %s and all is always good',
                       external_data.filename)
+
 
 class TestExternalDataChecker(unittest.TestCase):
 
@@ -92,6 +90,7 @@ class TestExternalDataChecker(unittest.TestCase):
 
         outdated_ext_data = self.checker.get_outdated_external_data()
         self.assertEqual(len(outdated_ext_data), NUM_ALL_EXT_DATA)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -34,6 +34,7 @@ import logging
 from lib.externaldata import ExternalData, CheckerRegistry, Checker
 from lib import utils
 
+
 class RotatingURLChecker(Checker):
 
     def _should_check(self, external_data):
@@ -65,5 +66,6 @@ class RotatingURLChecker(Checker):
                                     external_data.arches)
         new_ext_data.checker_data = external_data.checker_data
         external_data.new_version = new_ext_data
+
 
 CheckerRegistry.register_checker(RotatingURLChecker)

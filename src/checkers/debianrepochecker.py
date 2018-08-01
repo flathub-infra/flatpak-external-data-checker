@@ -44,6 +44,7 @@ DEB_PACKAGES_DISTRO_URL = '{root}/dists/{dist}/{comp}/binary-{arch}/Packages'
 DEB_PACKAGES_EXACT_URL = '{root}/{dist}Packages'
 DEB_PACKAGES_URL_SUFFIX = ['.xz', '.bz2', '']
 
+
 class PkgInfo:
     '''Represents a package in Debian's Packages repo file'''
 
@@ -75,6 +76,7 @@ class PkgInfo:
 
         return PkgInfo(name, arch, version, filename, checksum, size, installed_size)
 
+
 class DebianRepoChecker(Checker):
 
     def __init__(self):
@@ -97,7 +99,7 @@ class DebianRepoChecker(Checker):
         component = external_data.checker_data.get('component', None)
 
         if not component and not dist.endswith('/'):
-            logging.warning('%s is missing Debian repo "component", for an ' \
+            logging.warning('%s is missing Debian repo "component", for an '
                             'exact URL "dist" must end with /', package_name)
             return
 
@@ -188,5 +190,6 @@ class DebianRepoChecker(Checker):
                 return package
 
         return None
+
 
 CheckerRegistry.register_checker(DebianRepoChecker)
