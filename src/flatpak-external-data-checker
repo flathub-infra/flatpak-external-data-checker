@@ -64,8 +64,8 @@ if __name__ == '__main__':
                         choices=['all', 'extra-data', 'file', 'archive'], default='all')
     args = parser.parse_args()
 
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG)
+    level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(level=level)
 
     manifest_checker = checker.ManifestChecker(args.manifest)
 
