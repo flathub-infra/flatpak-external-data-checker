@@ -135,10 +135,6 @@ class ManifestChecker:
                   'extra-data': ExternalData.Type.EXTRA_DATA}
         return types.get(data_type)
 
-    def print_external_data(self):
-        for data in self._external_data:
-            print(data)
-
     def check(self, filter_type=None):
         '''Perform the check for all the external data in the manifest
 
