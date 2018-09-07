@@ -23,10 +23,13 @@ from lib.externaldata import CheckerRegistry, ExternalData
 import json
 import os
 import yaml
+import logging
 
 import gi
 gi.require_version('Json', '1.0')
 from gi.repository import Json  # noqa: E402
+
+log = logging.getLogger(__name__)
 
 
 class NoManifestCheckersFound(Exception):
@@ -146,10 +149,13 @@ class ManifestChecker:
             raise NoManifestCheckersFound()
 
         ext_data_checked = []
-        for data in self._external_data:
+        n = len(self._external_data)
+        for i, data in enumerate(self._external_data, 1):
             # Ignore if the type is not the one we care about
             if filter_type is not None and filter_type != data.type:
                 continue;
+
+            log.debug('[%d/%d] checking %s', i, n, data.filename)
 
             for checker in self._checkers:
                 checker.check(data)

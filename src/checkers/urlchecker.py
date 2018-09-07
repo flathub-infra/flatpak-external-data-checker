@@ -31,6 +31,7 @@ log = logging.getLogger(__name__)
 
 class URLChecker(Checker):
     def check(self, external_data):
+        log.debug('Checking %s is reachable', external_data.url)
         try:
             utils.check_url_reachable(external_data.url)
         except urllib.error.HTTPError as e:
