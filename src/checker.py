@@ -22,6 +22,7 @@ from lib.externaldata import CheckerRegistry, ExternalData
 
 import json
 import os
+import yaml
 
 import gi
 gi.require_version('Json', '1.0')
@@ -43,8 +44,8 @@ class ManifestChecker:
         self._json_data = self._read_manifest(self._manifest)
         self._collect_external_data()
 
-    @staticmethod
-    def _read_manifest(manifest_path):
+    @classmethod
+    def _read_json_manifest(cls, manifest_path):
         '''Read manifest from 'manifest_path', which may contain C-style
         comments or multi-line strings (accepted by json-glib and hence
         flatpak-builder, but not Python's json module).'''
@@ -57,6 +58,20 @@ class ManifestChecker:
         clean_manifest = Json.to_string(root, False)
 
         return json.loads(clean_manifest, object_pairs_hook=OrderedDict)
+
+    @classmethod
+    def _read_yaml_manifest(cls, manifest_path):
+        '''Read a YAML manifest from 'manifest_path'.'''
+        with open(manifest_path, 'r') as f:
+            return yaml.load(f)
+
+    @classmethod
+    def _read_manifest(cls, manifest_path):
+        _, ext = os.path.splitext(manifest_path)
+        if ext in ('.yaml', '.yml'):
+            return cls._read_yaml_manifest(manifest_path)
+        else:
+            return cls._read_json_manifest(manifest_path)
 
     def _collect_external_data(self):
         self._external_data = self._get_module_data_from_json(self._json_data) + \
