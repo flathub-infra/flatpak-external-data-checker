@@ -35,6 +35,7 @@ log = logging.getLogger(__name__)
 class NoManifestCheckersFound(Exception):
     pass
 
+
 class ManifestChecker:
     def __init__(self, manifest):
         self._manifest = manifest
@@ -117,7 +118,7 @@ class ManifestChecker:
                     name = os.path.basename(url)
 
                 data_type = source.get('type')
-                data_type = self._translate_data_type(data_type)
+                data_type = ExternalData.TYPES.get(data_type)
                 if data_type is None:
                     continue
 
@@ -131,12 +132,6 @@ class ManifestChecker:
                 external_data.append(ext_data)
 
         return external_data
-
-    def _translate_data_type(self, data_type):
-        types = { 'file': ExternalData.Type.FILE,
-                  'archive': ExternalData.Type.ARCHIVE,
-                  'extra-data': ExternalData.Type.EXTRA_DATA}
-        return types.get(data_type)
 
     def check(self, filter_type=None):
         '''Perform the check for all the external data in the manifest

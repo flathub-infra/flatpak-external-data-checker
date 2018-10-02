@@ -28,6 +28,11 @@ class ExternalData:
 
     Type = Enum('Type', 'EXTRA_DATA FILE ARCHIVE')
 
+    TYPES = {
+        'file': Type.FILE,
+        'archive': Type.ARCHIVE,
+        'extra-data': Type.EXTRA_DATA,
+    }
     _TYPES_MANIFEST_MAP = {Type.EXTRA_DATA: 'extra-data',
                            Type.FILE: 'file',
                            Type.ARCHIVE: 'archive'}
