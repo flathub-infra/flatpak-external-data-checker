@@ -153,7 +153,7 @@ class ManifestChecker:
         for i, data in enumerate(self._external_data, 1):
             # Ignore if the type is not the one we care about
             if filter_type is not None and filter_type != data.type:
-                continue;
+                continue
 
             log.debug('[%d/%d] checking %s', i, n, data.filename)
 
