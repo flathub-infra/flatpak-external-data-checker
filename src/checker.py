@@ -18,7 +18,9 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 from collections import OrderedDict
-from lib.externaldata import CheckerRegistry, ExternalData
+from lib.externaldata import (
+    CheckerRegistry, ExternalData, ExternalDataSource, ExternalDataFinishArg,
+)
 
 import json
 import os
@@ -82,21 +84,8 @@ class ManifestChecker:
                               self._get_finish_args_extra_data_from_json(self._json_data)
 
     def _get_finish_args_extra_data_from_json(self, json_data):
-        extra_data_prefix = '--extra-data='
-        external_data = []
-        extra_data_str = [arg for arg in json_data.get('finish-args', []) \
-                          if arg.startswith(extra_data_prefix)]
-
-        for extra_data in extra_data_str:
-            # discard '--extra-data=' prefix from the string
-            extra_data = extra_data[len(extra_data_prefix) + 1:]
-            info, url = extra_data.split('::')
-            name, sha256sum, size = info.split(':')
-            data_type = ExternalData.Type.EXTRA_DATA
-            ext_data = ExternalData(data_type, name, url, sha256sum, size, [])
-            external_data.append(ext_data)
-
-        return external_data
+        finish_args = json_data.get('finish-args', [])
+        return ExternalDataFinishArg.from_args(finish_args)
 
     def _get_module_data_from_json(self, json_data):
         external_data = []
@@ -106,30 +95,8 @@ class ManifestChecker:
                                            module)
                 module = self._read_manifest(module_path)
 
-            for source in module.get('sources', []):
-                url = source.get('url', None)
-                if not url:
-                    continue
-
-                name = source.get('filename')
-                if not name:
-                    name = source.get('dest-filename')
-                if not name:
-                    name = os.path.basename(url)
-
-                data_type = source.get('type')
-                data_type = ExternalData.TYPES.get(data_type)
-                if data_type is None:
-                    continue
-
-                sha256sum = source.get('sha256', None)
-                arches = source.get('only-arches', [])
-                size = source.get('size', -1)
-                checker_data = source.get('x-checker-data')
-
-                ext_data = ExternalData(data_type, name, url, sha256sum, size,
-                                        arches, checker_data)
-                external_data.append(ext_data)
+            sources = module.get('sources', [])
+            external_data.extend(ExternalDataSource.from_sources(sources))
 
         return external_data
 

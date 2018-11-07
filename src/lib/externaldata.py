@@ -17,6 +17,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import abc
 from collections import OrderedDict
 from enum import Enum
 
@@ -24,8 +25,8 @@ import json
 import os
 import pkgutil
 
-class ExternalData:
 
+class ExternalData(abc.ABC):
     Type = Enum('Type', 'EXTRA_DATA FILE ARCHIVE')
 
     TYPES = {
@@ -77,8 +78,8 @@ class ExternalData:
 
     def to_json(self):
         json_data = OrderedDict()
-        json_data['type'] = __class__._TYPES_MANIFEST_MAP[self.type]
-        json_data[__class__._TYPES_MANIFEST_MAP[self.type]] = self.filename
+        json_data['type'] = self._TYPES_MANIFEST_MAP[self.type]
+        json_data[self._TYPES_MANIFEST_MAP[self.type]] = self.filename
         json_data['url'] = self.url
         json_data['sha256'] = self.checksum
 
@@ -92,6 +93,64 @@ class ExternalData:
             json_data['x-checker-data'] = self.checker_data
 
         return json.dumps(json_data, indent=4)
+
+
+class ExternalDataSource(ExternalData):
+    def __init__(self, source, data_type, url):
+        name = (
+            source.get('filename') or
+            source.get('dest-filename') or
+            os.path.basename(url)
+        )
+
+        sha256sum = source.get('sha256', None)
+        arches = source.get('only-arches', [])
+        size = source.get('size', -1)
+        checker_data = source.get('x-checker-data')
+        super().__init__(
+            data_type, name, url, sha256sum, size, arches, checker_data,
+        )
+        self.source = source
+
+    @classmethod
+    def from_sources(cls, sources):
+        external_data = []
+
+        for source in sources:
+            url = source.get('url')
+            data_type = cls.TYPES.get(source.get('type'))
+            if url is None or data_type is None:
+                continue
+
+            external_data.append(cls(source, data_type, url))
+
+        return external_data
+
+
+class ExternalDataFinishArg(ExternalData):
+    PREFIX = '--extra-data='
+
+    def __init__(self, finish_args, index):
+        arg = finish_args[index]
+        # discard '--extra-data=' prefix from the string
+        extra_data = arg[len(self.PREFIX) + 1:]
+        info, url = extra_data.split('::')
+        name, sha256sum, size = info.split(':')
+        data_type = ExternalData.Type.EXTRA_DATA
+
+        super().__init__(data_type, name, url, sha256sum, size, [])
+
+        self.finish_args = finish_args
+        self.index = index
+
+    @classmethod
+    def from_args(cls, finish_args):
+        return [
+            cls(finish_args, i)
+            for i, arg in enumerate(finish_args)
+            if arg.startswith(cls.PREFIX)
+        ]
+
 
 class Checker:
 
