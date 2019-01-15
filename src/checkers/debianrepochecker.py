@@ -30,53 +30,28 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import bz2
+import apt
+import apt_pkg
+import contextlib
 import logging
-import lzma
 import os
-import re
-import urllib
+import sys
+import tempfile
 
 from lib.externaldata import ExternalData, CheckerRegistry, Checker
-from lib import utils
 
-DEB_PACKAGES_DISTRO_URL = '{root}/dists/{dist}/{comp}/binary-{arch}/Packages'
-DEB_PACKAGES_EXACT_URL = '{root}/{dist}Packages'
-DEB_PACKAGES_URL_SUFFIX = ['.xz', '.bz2', '']
+apt_pkg.init()
 
-class PkgInfo:
-    '''Represents a package in Debian's Packages repo file'''
+APT_NEEDED_DIRS = (
+    'etc/apt/apt.conf.d', 'etc/apt/preferences.d',
+    'etc/apt/trusted.gpg.d', 'var/lib/apt/lists/partial',
+    'var/cache/apt/archives/partial', 'var/log/apt',
+    'var/lib/dpkg', 'var/lib/dpkg/updates',
+    'var/lib/dpkg/info'
+)
 
-    def __init__(self, name, arch, version, filename, checksum, size,
-                 installed_size=None):
-        self.name = name
-        self.arch = arch
-        self.version = version
-        self.filename = filename
-        self.checksum = checksum
-        self.size = size
-        self.installed_size = installed_size
-
-    @staticmethod
-    def create_from_text(data):
-        def _get_value(data, key):
-            lines = data.splitlines()
-            for line in lines:
-                if line.startswith(key + ':'):
-                    return line.split(': ', 1)[1]
-
-        name = _get_value(data, 'Package')
-        arch = _get_value(data, 'Architecture')
-        version = _get_value(data, 'Version')
-        filename = _get_value(data, 'Filename')
-        checksum = _get_value(data, 'SHA256')
-        size = _get_value(data, 'Size')
-        installed_size = _get_value(data, 'Installed-Size')
-
-        return PkgInfo(name, arch, version, filename, checksum, size, installed_size)
 
 class DebianRepoChecker(Checker):
-
     def __init__(self):
         self._pkgs_cache = {}
 
@@ -87,34 +62,33 @@ class DebianRepoChecker(Checker):
     def check(self, external_data):
         # Only process external data of the debian-repo
         if not self._should_check(external_data):
-            logging.debug('%s is not a debian-repo type ext data', external_data.filename)
+            logging.debug('%s is not a debian-repo type ext data',
+                          external_data.filename)
             return
 
         logging.debug('Checking %s', external_data.filename)
         package_name = external_data.checker_data['package-name']
         root = external_data.checker_data['root']
         dist = external_data.checker_data['dist']
-        component = external_data.checker_data.get('component', None)
+        component = external_data.checker_data.get('component', '')
 
         if not component and not dist.endswith('/'):
-            logging.warning('%s is missing Debian repo "component", for an ' \
-                            'exact URL "dist" must end with /', package_name)
+            logging.warning('%s is missing Debian repo "component"; for an '
+                            'exact URL, "dist" must end with /', package_name)
             return
 
         arch = self._translate_arch(external_data.arches[0])
-        package = self._get_package_from_url(package_name, root, dist,
-                                             component, arch)
+        with self._load_repo(root, dist, component, arch) as cache:
+            package = cache[package_name]
+            candidate = package.candidate
 
-        if not package:
-            return
-
-        if package.checksum != external_data.checksum:
-            url = os.path.join(root, package.filename)
-            new_ext_data = ExternalData(external_data.type, package.name,
-                                        url, package.checksum,
-                                        package.size, external_data.arches)
-            new_ext_data.checker_data = external_data.checker_data
-            external_data.new_version = new_ext_data
+            if candidate.sha256 != external_data.checksum:
+                new_ext_data = ExternalData(external_data.type, package_name,
+                                            candidate.uri, candidate.sha256,
+                                            candidate.size,
+                                            external_data.arches)
+                new_ext_data.checker_data = external_data.checker_data
+                external_data.new_version = new_ext_data
 
     def _translate_arch(self, arch):
         # Because architecture names in Debian differ from Flatpak's
@@ -122,71 +96,42 @@ class DebianRepoChecker(Checker):
                   'arm': 'armel'}
         return arches.get(arch, arch)
 
-    def _load_url(self, packages_url):
-        if packages_url in self._pkgs_cache.keys():
-            return self._pkgs_cache[packages_url]
+    @contextlib.contextmanager
+    def _load_repo(self, deb_root, dist, component, arch):
+        with tempfile.TemporaryDirectory() as root:
+            logging.debug('Setting up apt directory structure in %s', root)
 
-        logging.debug('Loading contents from URL %s; '
-                      'this may take a while...', packages_url)
-        try:
-            packages_page = utils.get_url_contents(packages_url)
-        except urllib.error.HTTPError as e:
-            logging.debug('Failed to load %s (%s): %s', packages_url, e.code,
-                          e.reason)
-            return None
-        if packages_url.endswith('.xz'):
-            packages_page = lzma.decompress(packages_page)
-        elif packages_url.endswith('.bz2'):
-            packages_page = bz2.decompress(packages_page)
+            for path in APT_NEEDED_DIRS:
+                os.makedirs(os.path.join(root, path), exist_ok=True)
 
-        packages_page = packages_page.decode('utf-8')
+            # Create sources.list
+            sources_list = os.path.join(root, 'etc/apt/sources.list')
+            with open(sources_list, 'w') as f:
+                # FIXME: import GPG key, remove 'trusted=yes' which skips GPG
+                # verification
+                f.write('deb [arch={arch} trusted=yes] '
+                        '{deb_root} {dist} {component}\n'.format(**locals()))
 
-        # cache the contents of the URL
-        self._pkgs_cache[packages_url] = packages_page
-        return packages_page
+            # Create empty dpkg status
+            dpkg_status = os.path.join(root, 'var/lib/dpkg/status')
+            with open(dpkg_status, 'w') as f:
+                pass
 
-    def _split_packages_from_page(self, packages_page):
-        # The packages are written in the packages_page starting by a
-        # 'Package:' key and preceded by two newlines (unless it's the
-        # first package). So we find all occurrences of that keyword and
-        # divide the string by those indexes. This minimizes the number
-        # of string divisions since the contents can be quite large.
-        packages = []
-        packages_indexes = [match.start() for match in
-                            re.finditer('\nPackage: ', packages_page)]
-        prev_index = 0
-        for i in packages_indexes:
-            packages.append(packages_page[prev_index:i])
-            prev_index = i
+            # Setup generic configuration
+            apt_pkg.config.set('Dir', root)
+            apt_pkg.config.set('Dir::State::status', dpkg_status)
+            apt_pkg.config.set('Acquire::Languages', 'none')
+            # FIXME: wire up progress reporting to logger, not stderr
+            progress = apt.progress.text.AcquireProgress(outfile=sys.stderr)
 
-        return packages
+            # Create a new cache with the appropriate architecture
+            apt_pkg.config.set('APT::Architecture', arch)
+            apt_pkg.config.set('APT::Architectures', arch)
+            cache = apt.Cache()
+            cache.update(progress)
+            cache.open()
 
-    def _get_package_from_url(self, package_name, root, dist, component, arch):
-        if dist.endswith('/') and component is None:
-            packages_url = DEB_PACKAGES_EXACT_URL.format(root=root, dist=dist)
-        else:
-            assert(component)
-            packages_url = DEB_PACKAGES_DISTRO_URL.format(root=root, dist=dist,
-                                                          comp=component, arch=arch)
+            yield cache
 
-        for suffix in DEB_PACKAGES_URL_SUFFIX:
-            url = packages_url + suffix
-            packages_page = self._load_url(url)
-            if packages_page is not None:
-                break
-
-        if not packages_page:
-            return []
-
-        packages_data = self._split_packages_from_page(packages_page)
-
-        logging.debug('Looking for the ext data %s in %s '
-                      'packages...', package_name, len(packages_data))
-        for data in packages_data:
-            package = PkgInfo.create_from_text(data)
-            if package.name == package_name:
-                return package
-
-        return None
 
 CheckerRegistry.register_checker(DebianRepoChecker)
