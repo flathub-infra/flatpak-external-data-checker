@@ -31,7 +31,7 @@
 
 import logging
 
-from lib.externaldata import ExternalData, CheckerRegistry, Checker
+from lib.externaldata import CheckerRegistry, Checker, ExternalFile
 from lib import utils
 
 class RotatingURLChecker(Checker):
@@ -55,15 +55,11 @@ class RotatingURLChecker(Checker):
             logging.debug(e)
             return
 
-        if checksum == external_data.checksum:
+        if checksum == external_data.current_version.checksum:
             logging.debug('URL %s still valid', url)
             return
 
-        new_ext_data = ExternalData(external_data.type,
-                                    external_data.filename,
-                                    new_url, checksum, size,
-                                    external_data.arches)
-        new_ext_data.checker_data = external_data.checker_data
-        external_data.new_version = new_ext_data
+        external_data.new_version = ExternalFile(new_url, checksum, size)
+
 
 CheckerRegistry.register_checker(RotatingURLChecker)

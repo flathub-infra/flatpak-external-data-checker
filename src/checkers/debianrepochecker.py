@@ -38,7 +38,7 @@ import os
 import sys
 import tempfile
 
-from lib.externaldata import ExternalData, CheckerRegistry, Checker
+from lib.externaldata import CheckerRegistry, Checker, ExternalFile
 
 apt_pkg.init()
 
@@ -82,13 +82,10 @@ class DebianRepoChecker(Checker):
             package = cache[package_name]
             candidate = package.candidate
 
-            if candidate.sha256 != external_data.checksum:
-                new_ext_data = ExternalData(external_data.type, package_name,
-                                            candidate.uri, candidate.sha256,
-                                            candidate.size,
-                                            external_data.arches)
-                new_ext_data.checker_data = external_data.checker_data
-                external_data.new_version = new_ext_data
+            if candidate.sha256 != external_data.current_version.checksum:
+                external_data.new_version = ExternalFile(
+                    candidate.uri, candidate.sha256, candidate.size,
+                )
 
     def _translate_arch(self, arch):
         # Because architecture names in Debian differ from Flatpak's

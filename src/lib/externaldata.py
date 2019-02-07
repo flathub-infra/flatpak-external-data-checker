@@ -18,12 +18,15 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import abc
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from enum import Enum
 
 import json
 import os
 import pkgutil
+
+
+ExternalFile = namedtuple('ExternalFile', ('url', 'checksum', 'size'))
 
 
 class ExternalData(abc.ABC):
@@ -49,12 +52,10 @@ class ExternalData(abc.ABC):
     def __init__(self, data_type, filename, url, checksum, size=-1, arches=[],
                  checker_data=None):
         self.filename = filename
-        self.url = url
-        self.checksum = checksum
-        self.size = int(size)
         self.arches = arches
         self.type = data_type
         self.checker_data = checker_data
+        self.current_version = ExternalFile(url, checksum, int(size))
         self.new_version = None
         self.state = ExternalData.State.UNKNOWN
 
@@ -80,14 +81,15 @@ class ExternalData(abc.ABC):
         json_data = OrderedDict()
         json_data['type'] = self._TYPES_MANIFEST_MAP[self.type]
         json_data[self._TYPES_MANIFEST_MAP[self.type]] = self.filename
-        json_data['url'] = self.url
-        json_data['sha256'] = self.checksum
+
+        external_file = self.new_version or self.current_version
+        json_data['url'] = external_file.url
+        json_data['sha256'] = external_file.checksum
+        if external_file.size >= 0:
+            json_data['size'] = external_file.size
 
         if self.arches:
             json_data['only-arches'] = self.arches
-
-        if self.size >= 0:
-            json_data['size'] = self.size
 
         if self.checker_data:
             json_data['x-checker-data'] = self.checker_data

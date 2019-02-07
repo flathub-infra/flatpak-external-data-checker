@@ -31,15 +31,16 @@ log = logging.getLogger(__name__)
 
 class URLChecker(Checker):
     def check(self, external_data):
-        log.debug('Checking %s is reachable', external_data.url)
+        url = external_data.current_version.url
+        log.debug('Checking %s is reachable', url)
         try:
-            utils.check_url_reachable(external_data.url)
+            utils.check_url_reachable(url)
         except urllib.error.HTTPError as e:
-            log.warning('%s returned %s', external_data.url, e)
+            log.warning('%s returned %s', url, e)
             external_data.state = ExternalData.State.BROKEN
         except:
             log.exception('Unexpected exception while checking %s',
-                          external_data.url, exc_info=True)
+                          url, exc_info=True)
             external_data.state = ExternalData.State.BROKEN
         else:
             external_data.state = ExternalData.State.VALID
