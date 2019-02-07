@@ -179,10 +179,8 @@ class ManifestChecker:
         Outdated external data are the ones that either are broken
         (unreachable URL) or have a new version.
         '''
-        external_data = []
-        for data in self._external_data:
-            if data.state == ExternalData.State.BROKEN or \
-               data.new_version:
-                external_data.append(data)
-
-        return external_data
+        return [
+            data
+            for data in self._external_data
+            if data.state == ExternalData.State.BROKEN or data.new_version
+        ]
