@@ -37,8 +37,8 @@ class ExternalData:
 
     class State(Enum):
         UNKNOWN = 0
-        VALID = 1 << 1 # URL is reachable
-        BROKEN = 1 << 2 # URL couldn't be reached
+        VALID = 1 << 1  # URL is reachable
+        BROKEN = 1 << 2  # URL couldn't be reached
 
     def __init__(self, data_type, filename, url, checksum, size=-1, arches=[],
                  checker_data=None):
