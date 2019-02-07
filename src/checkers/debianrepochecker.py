@@ -118,6 +118,7 @@ class DebianRepoChecker(Checker):
                 pass
 
             # Setup generic configuration
+            apt_pkg.init()
             apt_pkg.config.set('Dir', root)
             apt_pkg.config.set('Dir::State::status', dpkg_status)
             apt_pkg.config.set('Acquire::Languages', 'none')
