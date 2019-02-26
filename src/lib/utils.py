@@ -50,7 +50,7 @@ def get_extra_data_info_from_url(url):
     with urllib.request.urlopen(request) as response:
         real_url = response.geturl()
         data = response.read()
-        size = response.info().get('Content-Length', -1)
+        size = int(response.info().get('Content-Length', -1))
 
     if size == -1:
         size = len(data)
