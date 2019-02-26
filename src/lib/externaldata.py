@@ -18,10 +18,9 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import abc
-from collections import OrderedDict, namedtuple
+from collections import namedtuple
 from enum import Enum
 
-import json
 import os
 import pkgutil
 
@@ -37,12 +36,6 @@ class ExternalData(abc.ABC):
         'archive': Type.ARCHIVE,
         'extra-data': Type.EXTRA_DATA,
     }
-    _TYPES_MANIFEST_MAP = {Type.EXTRA_DATA: 'extra-data',
-                           Type.FILE: 'file',
-                           Type.ARCHIVE: 'archive'}
-    _NAME_MANIFEST_MAP = {Type.EXTRA_DATA: 'filename',
-                          Type.FILE: 'dest-filename',
-                          Type.ARCHIVE: 'dest-filename'}
 
     class State(Enum):
         UNKNOWN = 0
@@ -82,25 +75,6 @@ class ExternalData(abc.ABC):
         """If self.new_version is not None, writes back the necessary changes
         to the original element from the manifest, and returns True. Otherwise,
         returns False."""
-
-    def to_json(self):
-        json_data = OrderedDict()
-        json_data['type'] = self._TYPES_MANIFEST_MAP[self.type]
-        json_data[self._TYPES_MANIFEST_MAP[self.type]] = self.filename
-
-        external_file = self.new_version or self.current_version
-        json_data['url'] = external_file.url
-        json_data['sha256'] = external_file.checksum
-        if external_file.size >= 0:
-            json_data['size'] = external_file.size
-
-        if self.arches:
-            json_data['only-arches'] = self.arches
-
-        if self.checker_data:
-            json_data['x-checker-data'] = self.checker_data
-
-        return json.dumps(json_data, indent=4)
 
 
 class ExternalDataSource(ExternalData):

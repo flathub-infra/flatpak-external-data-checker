@@ -29,7 +29,8 @@ import sys
 from lib.externaldata import ExternalData
 import checker
 
-def print_outdated_external_data(manifest_checker, as_json=False):
+
+def print_outdated_external_data(manifest_checker):
     ext_data = manifest_checker.get_outdated_external_data()
     for data in ext_data:
         if data.state == ExternalData.State.BROKEN:
@@ -41,12 +42,10 @@ def print_outdated_external_data(manifest_checker, as_json=False):
                       ' Has a new version:'.format(data.filename))
             else:
                 print(' A new version is available:')
-            if not as_json:
-                print('  URL:    {url}\n'
-                      '  SHA256: {checksum}\n'
-                      '  Size:   {size}'.format(**data.new_version._asdict()))
-            else:
-                print(data.to_json())
+
+            print('  URL:    {url}\n'
+                  '  SHA256: {checksum}\n'
+                  '  Size:   {size}'.format(**data.new_version._asdict()))
         print('')
 
     return len(ext_data) > 0
@@ -62,8 +61,6 @@ def main():
                         help="Update manifest(s) to refer to new versions of "
                              "external data",
                         action="store_true")
-    parser.add_argument('--json', help='Print the new versions of external '
-                        'data as json', action="store_true")
     parser.add_argument('--filter-type',
                         help='Only check external data of the given type',
                         choices=types, default='all')
@@ -81,7 +78,7 @@ def main():
         sys.stderr.write('No manifest checkers were found\n')
         exit(2)
 
-    if print_outdated_external_data(manifest_checker, as_json=args.json):
+    if print_outdated_external_data(manifest_checker):
         if args.update:
             manifest_checker.update_manifests()
         exit(1)
