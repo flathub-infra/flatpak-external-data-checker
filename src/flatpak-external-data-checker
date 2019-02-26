@@ -53,7 +53,8 @@ def print_outdated_external_data(manifest_checker, as_json=False):
 
     return len(ext_data) > 0
 
-if __name__ == '__main__':
+
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('manifest', help='Flatpak manifest to check')
     parser.add_argument('-v', '--verbose', help='Print debug messages',
@@ -82,4 +83,6 @@ if __name__ == '__main__':
     if print_outdated_external_data(manifest_checker, as_json=args.json):
         exit(1)
 
-    exit(0)
+
+if __name__ == "__main__":
+    main()
