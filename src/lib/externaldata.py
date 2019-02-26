@@ -77,6 +77,12 @@ class ExternalData(abc.ABC):
                                                   checker_data=self.checker_data)
         return info
 
+    @abc.abstractmethod
+    def update(self):
+        """If self.new_version is not None, writes back the necessary changes
+        to the original element from the manifest, and returns True. Otherwise,
+        returns False."""
+
     def to_json(self):
         json_data = OrderedDict()
         json_data['type'] = self._TYPES_MANIFEST_MAP[self.type]
@@ -128,6 +134,15 @@ class ExternalDataSource(ExternalData):
 
         return external_data
 
+    def update(self):
+        if self.new_version is not None:
+            self.source["url"] = self.new_version.url
+            self.source["sha256"] = self.new_version.checksum
+            self.source["size"] = self.new_version.size
+            return True
+
+        return False
+
 
 class ExternalDataFinishArg(ExternalData):
     PREFIX = '--extra-data='
@@ -151,6 +166,20 @@ class ExternalDataFinishArg(ExternalData):
             for i, arg in enumerate(finish_args)
             if arg.startswith(cls.PREFIX)
         ]
+
+    def update(self):
+        if self.new_version is not None:
+            arg = self.PREFIX + ":".join((
+                self.filename,
+                self.new_version.checksum,
+                self.new_version.size,
+                "",
+                self.new_version.url,
+            ))
+            self.finish_args[self.index] = arg
+            return True
+
+        return False
 
 
 class Checker:

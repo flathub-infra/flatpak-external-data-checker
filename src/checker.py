@@ -86,6 +86,15 @@ class ManifestChecker:
         self._manifest_contents[manifest_path] = contents
         return contents
 
+    def _dump_manifest(self, manifest_path, contents):
+        _, ext = os.path.splitext(manifest_path)
+        if ext in ('.yaml', '.yml'):
+            raise NotImplementedError(
+                "Updating YAML manifests is not yet supported"
+            )
+        else:
+            return json.dumps(contents, indent=4)
+
     def _collect_external_data(self, data):
         return (
             self._get_module_data_from_json(data) +
@@ -155,3 +164,13 @@ class ManifestChecker:
             for data in self._external_data
             if data.state == ExternalData.State.BROKEN or data.new_version
         ]
+
+    def update_manifests(self):
+        """Updates references to external data in manifests."""
+        changed = any(data.update() for data in self._external_data)
+        if changed:
+            for path, contents in self._manifest_contents.items():
+                print("Updating {}".format(path))
+                serialized = self._dump_manifest(path, contents)
+                with open(path, "w", encoding='utf-8') as fp:
+                    fp.write(serialized)

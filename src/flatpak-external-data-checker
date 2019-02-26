@@ -58,6 +58,10 @@ def main():
     parser.add_argument('manifest', help='Flatpak manifest to check')
     parser.add_argument('-v', '--verbose', help='Print debug messages',
                         action="store_true")
+    parser.add_argument("--update",
+                        help="Update manifest(s) to refer to new versions of "
+                             "external data",
+                        action="store_true")
     parser.add_argument('--json', help='Print the new versions of external '
                         'data as json', action="store_true")
     parser.add_argument('--filter-type',
@@ -78,6 +82,8 @@ def main():
         exit(2)
 
     if print_outdated_external_data(manifest_checker, as_json=args.json):
+        if args.update:
+            manifest_checker.update_manifests()
         exit(1)
 
 
