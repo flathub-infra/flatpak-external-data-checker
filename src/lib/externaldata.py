@@ -136,8 +136,7 @@ class ExternalDataFinishArg(ExternalData):
         arg = finish_args[index]
         # discard '--extra-data=' prefix from the string
         extra_data = arg[len(self.PREFIX) + 1:]
-        info, url = extra_data.split('::')
-        name, sha256sum, size = info.split(':')
+        name, sha256sum, size, _install_size, url = extra_data.split(":", 4)
         data_type = ExternalData.Type.EXTRA_DATA
 
         super().__init__(data_type, name, url, sha256sum, size, [])
