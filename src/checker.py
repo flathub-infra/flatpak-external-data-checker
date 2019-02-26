@@ -47,8 +47,14 @@ class ManifestChecker:
         CheckerRegistry.load(os.path.join(os.path.dirname(__file__), 'checkers'))
         self._checkers = [checker() for checker in CheckerRegistry.get_checkers()]
 
-        self._json_data = self._read_manifest(self._manifest)
-        self._collect_external_data()
+        # Map from filename to parsed contents of that file. Sources may be
+        # specified as references to external files, which is why there can be
+        # more than one file even though the input is a single filename.
+        self._manifest_contents = {}
+
+        # Top-level manifest contents
+        data = self._read_manifest(self._manifest)
+        self._external_data = self._collect_external_data(data)
 
     @classmethod
     def _read_json_manifest(cls, manifest_path):
@@ -71,17 +77,20 @@ class ManifestChecker:
         with open(manifest_path, 'r') as f:
             return yaml.load(f)
 
-    @classmethod
-    def _read_manifest(cls, manifest_path):
+    def _read_manifest(self, manifest_path):
         _, ext = os.path.splitext(manifest_path)
         if ext in ('.yaml', '.yml'):
-            return cls._read_yaml_manifest(manifest_path)
+            contents = self._read_yaml_manifest(manifest_path)
         else:
-            return cls._read_json_manifest(manifest_path)
+            contents = self._read_json_manifest(manifest_path)
+        self._manifest_contents[manifest_path] = contents
+        return contents
 
-    def _collect_external_data(self):
-        self._external_data = self._get_module_data_from_json(self._json_data) + \
-                              self._get_finish_args_extra_data_from_json(self._json_data)
+    def _collect_external_data(self, data):
+        return (
+            self._get_module_data_from_json(data) +
+            self._get_finish_args_extra_data_from_json(data)
+         )
 
     def _get_finish_args_extra_data_from_json(self, json_data):
         finish_args = json_data.get('finish-args', [])
