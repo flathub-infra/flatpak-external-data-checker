@@ -139,6 +139,8 @@ class ManifestChecker:
 
             for checker in self._checkers:
                 checker.check(data)
+                if data.state != ExternalData.State.UNKNOWN:
+                    break
             ext_data_checked.append(data)
 
         return ext_data_checked

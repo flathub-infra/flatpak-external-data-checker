@@ -30,12 +30,15 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import logging
+import urllib.error
 
-from lib.externaldata import Checker, ExternalFile
+from lib.externaldata import Checker, ExternalFile, ExternalData
 from lib import utils
 
-class RotatingURLChecker(Checker):
+log = logging.getLogger(__name__)
 
+
+class RotatingURLChecker(Checker):
     def _should_check(self, external_data):
         return external_data.checker_data and \
                external_data.checker_data.get('type') == 'rotating-url'
@@ -43,22 +46,23 @@ class RotatingURLChecker(Checker):
     def check(self, external_data):
         # Only process external data of the rotating-url
         if not self._should_check(external_data):
-            logging.debug('%s is not a rotating-url type ext data', external_data.filename)
+            log.debug('%s is not a rotating-url type ext data', external_data.filename)
             return
 
         url = external_data.checker_data['url']
-        logging.debug('Getting extra data info from URL %s ; may take a '
-                      'while', url)
+        log.debug('Getting extra data info from URL %s ; may take a while', url)
         try:
             new_url, checksum, size = utils.get_extra_data_info_from_url(url)
-        except Exception as e:
-            logging.debug(e)
-            return
-
-        new_version = ExternalFile(new_url, checksum, size)
-        if external_data.current_version.matches(new_version):
-            logging.debug('URL %s still valid', url)
-            return
+        except urllib.error.HTTPError as e:
+            log.warning('%s returned %s', url, e)
+            external_data.state = ExternalData.State.BROKEN
+        except Exception:
+            log.exception('Unexpected exception while checking %s', url)
+            external_data.state = ExternalData.State.BROKEN
         else:
-            external_data.new_version = new_version
-
+            new_version = ExternalFile(new_url, checksum, size)
+            if external_data.current_version.matches(new_version):
+                log.debug('URL %s still valid', url)
+                external_data.state = ExternalData.State.VALID
+            else:
+                external_data.new_version = new_version
