@@ -81,11 +81,12 @@ class DebianRepoChecker(Checker):
         with self._load_repo(root, dist, component, arch) as cache:
             package = cache[package_name]
             candidate = package.candidate
+            new_version = ExternalFile(
+                candidate.uri, candidate.sha256, candidate.size,
+            )
 
-            if candidate.sha256 != external_data.current_version.checksum:
-                external_data.new_version = ExternalFile(
-                    candidate.uri, candidate.sha256, candidate.size,
-                )
+            if not external_data.current_version.matches(new_version):
+                external_data.new_version = new_version
 
     def _translate_arch(self, arch):
         # Because architecture names in Debian differ from Flatpak's

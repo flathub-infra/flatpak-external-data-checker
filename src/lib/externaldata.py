@@ -24,7 +24,19 @@ from enum import Enum
 import os
 
 
-ExternalFile = namedtuple('ExternalFile', ('url', 'checksum', 'size'))
+class ExternalFile(namedtuple('ExternalFile', ('url', 'checksum', 'size'))):
+    __slots__ = ()
+
+    def matches(self, other):
+        return (
+            self.url == other.url and
+            self.checksum == other.checksum and
+            (
+                self.size == -1 or
+                other.size == -1 or
+                self.size == other.size
+            )
+        )
 
 
 class ExternalData(abc.ABC):

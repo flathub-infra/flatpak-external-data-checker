@@ -55,8 +55,10 @@ class RotatingURLChecker(Checker):
             logging.debug(e)
             return
 
-        if checksum == external_data.current_version.checksum:
+        new_version = ExternalFile(new_url, checksum, size)
+        if external_data.current_version.matches(new_version):
             logging.debug('URL %s still valid', url)
             return
+        else:
+            external_data.new_version = new_version
 
-        external_data.new_version = ExternalFile(new_url, checksum, size)
