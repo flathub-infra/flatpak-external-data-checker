@@ -56,8 +56,7 @@ class DebianRepoChecker(Checker):
         self._pkgs_cache = {}
 
     def _should_check(self, external_data):
-        return external_data.checker_data and \
-               external_data.checker_data.get('type') == 'debian-repo'
+        return external_data.checker_data.get('type') == 'debian-repo'
 
     def check(self, external_data):
         # Only process external data of the debian-repo

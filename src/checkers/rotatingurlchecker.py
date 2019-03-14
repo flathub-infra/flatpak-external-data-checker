@@ -40,8 +40,7 @@ log = logging.getLogger(__name__)
 
 class RotatingURLChecker(Checker):
     def _should_check(self, external_data):
-        return external_data.checker_data and \
-               external_data.checker_data.get('type') == 'rotating-url'
+        return external_data.checker_data.get('type') == 'rotating-url'
 
     def check(self, external_data):
         # Only process external data of the rotating-url

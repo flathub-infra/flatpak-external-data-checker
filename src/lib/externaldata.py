@@ -58,7 +58,7 @@ class ExternalData(abc.ABC):
         self.filename = filename
         self.arches = arches
         self.type = data_type
-        self.checker_data = checker_data
+        self.checker_data = checker_data or {}
         self.current_version = ExternalFile(url, checksum, int(size))
         self.new_version = None
         self.state = ExternalData.State.UNKNOWN
