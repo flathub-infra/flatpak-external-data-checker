@@ -22,7 +22,6 @@ from collections import namedtuple
 from enum import Enum
 
 import os
-import pkgutil
 
 
 ExternalFile = namedtuple('ExternalFile', ('url', 'checksum', 'size'))
@@ -160,23 +159,3 @@ class Checker:
 
     def check(self, external_data):
         raise NotImplementedError()
-
-class CheckerRegistry:
-
-    _checkers = []
-
-    @staticmethod
-    def load(checkers_folder):
-        for _unused, modname, _unused in pkgutil.walk_packages([checkers_folder]):
-            pkg_name = os.path.basename(checkers_folder)
-            __import__(pkg_name + '.' + modname)
-
-    @classmethod
-    def register_checker(class_, checker):
-        if not issubclass(checker, Checker):
-            raise TypeError('{} is not a of type {}'.format(checker, Checker))
-        class_._checkers.append(checker)
-
-    @classmethod
-    def get_checkers(class_):
-        return class_._checkers

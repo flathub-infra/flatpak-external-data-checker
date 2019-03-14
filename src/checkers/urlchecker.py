@@ -23,7 +23,7 @@
 import logging
 import urllib.error
 
-from lib.externaldata import ExternalData, CheckerRegistry, Checker
+from lib.externaldata import ExternalData, ExternalFile, Checker
 from lib import utils
 
 log = logging.getLogger(__name__)
@@ -44,6 +44,3 @@ class URLChecker(Checker):
             external_data.state = ExternalData.State.BROKEN
         else:
             external_data.state = ExternalData.State.VALID
-
-
-CheckerRegistry.register_checker(URLChecker)

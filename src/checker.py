@@ -18,8 +18,9 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 from collections import OrderedDict
+from checkers import ALL_CHECKERS
 from lib.externaldata import (
-    CheckerRegistry, ExternalData, ExternalDataSource, ExternalDataFinishArg,
+    ExternalData, ExternalDataSource, ExternalDataFinishArg,
 )
 
 import json
@@ -43,9 +44,8 @@ class ManifestChecker:
         self._manifest = manifest
         self._external_data = []
 
-        # Load and initialize checkers
-        CheckerRegistry.load(os.path.join(os.path.dirname(__file__), 'checkers'))
-        self._checkers = [checker() for checker in CheckerRegistry.get_checkers()]
+        # Initialize checkers
+        self._checkers = [checker() for checker in ALL_CHECKERS]
 
         # Map from filename to parsed contents of that file. Sources may be
         # specified as references to external files, which is why there can be

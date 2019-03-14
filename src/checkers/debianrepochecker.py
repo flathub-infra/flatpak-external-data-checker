@@ -38,7 +38,7 @@ import os
 import sys
 import tempfile
 
-from lib.externaldata import CheckerRegistry, Checker, ExternalFile
+from lib.externaldata import Checker, ExternalFile
 
 apt_pkg.init()
 
@@ -130,6 +130,3 @@ class DebianRepoChecker(Checker):
             cache.open()
 
             yield cache
-
-
-CheckerRegistry.register_checker(DebianRepoChecker)

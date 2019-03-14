@@ -31,7 +31,7 @@
 
 import logging
 
-from lib.externaldata import CheckerRegistry, Checker, ExternalFile
+from lib.externaldata import Checker, ExternalFile
 from lib import utils
 
 class RotatingURLChecker(Checker):
@@ -60,6 +60,3 @@ class RotatingURLChecker(Checker):
             return
 
         external_data.new_version = ExternalFile(new_url, checksum, size)
-
-
-CheckerRegistry.register_checker(RotatingURLChecker)
