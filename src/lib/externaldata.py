@@ -49,6 +49,7 @@ class ExternalData:
         self.arches = arches
         self.type = data_type
         self.checker_data = checker_data
+        self.current_version = None
         self.new_version = None
         self.state = ExternalData.State.UNKNOWN
 
