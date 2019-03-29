@@ -29,57 +29,63 @@ import sys
 from lib.externaldata import ExternalData
 import checker
 
-def print_outdated_external_data(manifest_checker, as_json=False):
+
+def print_outdated_external_data(manifest_checker):
     ext_data = manifest_checker.get_outdated_external_data()
     for data in ext_data:
-        if data.state == ExternalData.State.BROKEN:
-            print('BROKEN: {}\n'
-                  ' Unreachable URL: {}'.format(data.filename, data.url))
         if data.new_version:
             if data.state == ExternalData.State.VALID:
                 print('CHANGE SOON: {}\n'
                       ' Has a new version:'.format(data.filename))
+            elif data.state == ExternalData.State.BROKEN:
+                print('BROKEN: {}\n'
+                      ' Has a new version:'.format(data.filename))
             else:
                 print(' A new version is available:')
-            if not as_json:
-                print('  URL:    {url}\n'
-                      '  SHA256: {checksum}\n'
-                      '  Size:   {size}'.format(url=data.new_version.url,
-                                                checksum=data.new_version.checksum,
-                                                size=data.new_version.size))
-            else:
-                print(data.new_version.to_json())
+
+            print('  URL:    {url}\n'
+                  '  SHA256: {checksum}\n'
+                  '  Size:   {size}'.format(**data.new_version._asdict()))
+        elif data.state == ExternalData.State.BROKEN:
+            print('BROKEN: {}\n'
+                  ' Unreachable URL: {}'.format(data.filename, data.current_version.url))
         print('')
 
     return len(ext_data) > 0
 
-if __name__ == '__main__':
+
+def main():
+    types = ['all'] + list(ExternalData.TYPES)
     parser = argparse.ArgumentParser()
     parser.add_argument('manifest', help='Flatpak manifest to check')
     parser.add_argument('-v', '--verbose', help='Print debug messages',
                         action="store_true")
-    parser.add_argument('--json', help='Print the new versions of external '
-                        'data as json', action="store_true")
-    parser.add_argument('--filter-type', help='Only check external data of the given type',
-                        choices=['all', 'extra-data', 'file', 'archive'], default='all')
+    parser.add_argument("--update",
+                        help="Update manifest(s) to refer to new versions of "
+                             "external data",
+                        action="store_true")
+    parser.add_argument('--filter-type',
+                        help='Only check external data of the given type',
+                        choices=types, default='all')
     args = parser.parse_args()
 
     level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=level)
 
     manifest_checker = checker.ManifestChecker(args.manifest)
+    filter_type = ExternalData.TYPES.get(args.filter_type)
 
-    ext_data_types = {'all': None,
-                      'archive': ExternalData.Type.ARCHIVE,
-                      'extra-data': ExternalData.Type.EXTRA_DATA,
-                      'file': ExternalData.Type.FILE}
     try:
-        manifest_checker.check(ext_data_types.get(args.filter_type))
+        manifest_checker.check(filter_type)
     except checker.NoManifestCheckersFound:
         sys.stderr.write('No manifest checkers were found\n')
         exit(2)
 
-    if print_outdated_external_data(manifest_checker, as_json=args.json):
+    if print_outdated_external_data(manifest_checker):
+        if args.update:
+            manifest_checker.update_manifests()
         exit(1)
 
-    exit(0)
+
+if __name__ == "__main__":
+    main()

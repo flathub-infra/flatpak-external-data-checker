@@ -18,7 +18,10 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 from collections import OrderedDict
-from lib.externaldata import CheckerRegistry, ExternalData
+from checkers import ALL_CHECKERS
+from lib.externaldata import (
+    ExternalData, ExternalDataSource, ExternalDataFinishArg,
+)
 
 import json
 import os
@@ -35,17 +38,24 @@ log = logging.getLogger(__name__)
 class NoManifestCheckersFound(Exception):
     pass
 
+
 class ManifestChecker:
     def __init__(self, manifest):
         self._manifest = manifest
-        self._external_data = []
+        self._external_data = {}
 
-        # Load and initialize checkers
-        CheckerRegistry.load(os.path.join(os.path.dirname(__file__), 'checkers'))
-        self._checkers = [checker() for checker in CheckerRegistry.get_checkers()]
+        # Initialize checkers
+        self._checkers = [checker() for checker in ALL_CHECKERS]
 
-        self._json_data = self._read_manifest(self._manifest)
-        self._collect_external_data()
+        # Map from filename to parsed contents of that file. Sources may be
+        # specified as references to external files, which is why there can be
+        # more than one file even though the input is a single filename.
+        self._manifest_contents = {}
+
+        # Top-level manifest contents
+        data = self._read_manifest(self._manifest)
+        # Map from manifest path to [ExternalData]
+        self._collect_external_data(self._manifest, data)
 
     @classmethod
     def _read_json_manifest(cls, manifest_path):
@@ -68,75 +78,45 @@ class ManifestChecker:
         with open(manifest_path, 'r') as f:
             return yaml.load(f)
 
-    @classmethod
-    def _read_manifest(cls, manifest_path):
+    def _read_manifest(self, manifest_path):
         _, ext = os.path.splitext(manifest_path)
         if ext in ('.yaml', '.yml'):
-            return cls._read_yaml_manifest(manifest_path)
+            contents = self._read_yaml_manifest(manifest_path)
         else:
-            return cls._read_json_manifest(manifest_path)
+            contents = self._read_json_manifest(manifest_path)
+        self._manifest_contents[manifest_path] = contents
+        return contents
 
-    def _collect_external_data(self):
-        self._external_data = self._get_module_data_from_json(self._json_data) + \
-                              self._get_finish_args_extra_data_from_json(self._json_data)
+    def _dump_manifest(self, manifest_path, contents):
+        _, ext = os.path.splitext(manifest_path)
+        if ext in ('.yaml', '.yml'):
+            raise NotImplementedError(
+                "Updating YAML manifests is not yet supported"
+            )
+        else:
+            return json.dumps(contents, indent=4)
 
-    def _get_finish_args_extra_data_from_json(self, json_data):
-        extra_data_prefix = '--extra-data='
-        external_data = []
-        extra_data_str = [arg for arg in json_data.get('finish-args', []) \
-                          if arg.startswith(extra_data_prefix)]
+    def _collect_external_data(self, path, data):
+        self._get_module_data_from_json(path, data)
+        self._get_finish_args_extra_data_from_json(path, data)
 
-        for extra_data in extra_data_str:
-            # discard '--extra-data=' prefix from the string
-            extra_data = extra_data[len(extra_data_prefix) + 1:]
-            info, url = extra_data.split('::')
-            name, sha256sum, size = info.split(':')
-            data_type = ExternalData.Type.EXTRA_DATA
-            ext_data = ExternalData(data_type, name, url, sha256sum, size, [])
-            external_data.append(ext_data)
+    def _get_finish_args_extra_data_from_json(self, path, json_data):
+        finish_args = json_data.get('finish-args', [])
+        external_data = self._external_data.setdefault(path, [])
+        external_data.extend(ExternalDataFinishArg.from_args(finish_args))
 
-        return external_data
-
-    def _get_module_data_from_json(self, json_data):
-        external_data = []
+    def _get_module_data_from_json(self, path, json_data):
         for module in json_data.get('modules', []):
             if isinstance(module, str):
                 module_path = os.path.join(os.path.dirname(self._manifest),
                                            module)
                 module = self._read_manifest(module_path)
+            else:
+                module_path = path
 
-            for source in module.get('sources', []):
-                url = source.get('url', None)
-                if not url:
-                    continue
-
-                name = source.get('filename')
-                if not name:
-                    name = source.get('dest-filename')
-                if not name:
-                    name = os.path.basename(url)
-
-                data_type = source.get('type')
-                data_type = self._translate_data_type(data_type)
-                if data_type is None:
-                    continue
-
-                sha256sum = source.get('sha256', None)
-                arches = source.get('only-arches', [])
-                size = source.get('size', -1)
-                checker_data = source.get('x-checker-data')
-
-                ext_data = ExternalData(data_type, name, url, sha256sum, size,
-                                        arches, checker_data)
-                external_data.append(ext_data)
-
-        return external_data
-
-    def _translate_data_type(self, data_type):
-        types = { 'file': ExternalData.Type.FILE,
-                  'archive': ExternalData.Type.ARCHIVE,
-                  'extra-data': ExternalData.Type.EXTRA_DATA}
-        return types.get(data_type)
+            sources = module.get('sources', [])
+            external_data = self._external_data.setdefault(module_path, [])
+            external_data.extend(ExternalDataSource.from_sources(sources))
 
     def check(self, filter_type=None):
         '''Perform the check for all the external data in the manifest
@@ -149,17 +129,22 @@ class ManifestChecker:
             raise NoManifestCheckersFound()
 
         ext_data_checked = []
-        n = len(self._external_data)
-        for i, data in enumerate(self._external_data, 1):
-            # Ignore if the type is not the one we care about
-            if filter_type is not None and filter_type != data.type:
-                continue;
+        for path, external_data in self._external_data.items():
+            log.debug("Checking sources in %s", path)
 
-            log.debug('[%d/%d] checking %s', i, n, data.filename)
+            n = len(external_data)
+            for i, data in enumerate(external_data, 1):
+                # Ignore if the type is not the one we care about
+                if filter_type is not None and filter_type != data.type:
+                    continue
 
-            for checker in self._checkers:
-                checker.check(data)
-            ext_data_checked.append(data)
+                log.debug('[%d/%d] checking %s', i, n, data.filename)
+
+                for checker in self._checkers:
+                    checker.check(data)
+                    if data.state != ExternalData.State.UNKNOWN:
+                        break
+                ext_data_checked.append(data)
 
         return ext_data_checked
 
@@ -169,9 +154,12 @@ class ManifestChecker:
         Should be called after the 'check' method.
         'only_type' can be given for filtering the data of that type.
         '''
-        if only_type is None:
-            return list(self._external_data)
-        return [data for data in self._external_data if data.type == only_type]
+        return [
+            data
+            for datas in self._external_data.values()
+            for data in datas
+            if only_type is None or data.type == only_type
+        ]
 
     def get_outdated_external_data(self):
         '''Returns a list of the outdated external data
@@ -179,10 +167,19 @@ class ManifestChecker:
         Outdated external data are the ones that either are broken
         (unreachable URL) or have a new version.
         '''
-        external_data = []
-        for data in self._external_data:
-            if data.state == ExternalData.State.BROKEN or \
-               data.new_version:
-                external_data.append(data)
+        return [
+            data
+            for data in self.get_external_data()
+            if data.state == ExternalData.State.BROKEN or data.new_version
+        ]
 
-        return external_data
+    def update_manifests(self):
+        """Updates references to external data in manifests."""
+        for path, datas in self._external_data.items():
+            changed = any([data.update() for data in datas])
+            if changed:
+                contents = self._manifest_contents[path]
+                print("Updating {}".format(path))
+                serialized = self._dump_manifest(path, contents)
+                with open(path, "w", encoding='utf-8') as fp:
+                    fp.write(serialized)

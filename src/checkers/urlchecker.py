@@ -23,7 +23,7 @@
 import logging
 import urllib.error
 
-from lib.externaldata import ExternalData, CheckerRegistry, Checker
+from lib.externaldata import ExternalData, ExternalFile, Checker
 from lib import utils
 
 log = logging.getLogger(__name__)
@@ -31,18 +31,23 @@ log = logging.getLogger(__name__)
 
 class URLChecker(Checker):
     def check(self, external_data):
-        log.debug('Checking %s is reachable', external_data.url)
+        url = external_data.current_version.url
+        log.debug("Checking %s has expected size and checksum", url)
+
         try:
-            utils.check_url_reachable(external_data.url)
+            # Ignore any redirect, since many URLs legitimately get redirected
+            # to mirrors
+            _, checksum, size = utils.get_extra_data_info_from_url(url)
         except urllib.error.HTTPError as e:
-            log.warning('%s returned %s', external_data.url, e)
+            log.warning('%s returned %s', url, e)
             external_data.state = ExternalData.State.BROKEN
-        except:
-            log.exception('Unexpected exception while checking %s',
-                          external_data.url, exc_info=True)
+        except Exception:
+            log.exception('Unexpected exception while checking %s', url)
             external_data.state = ExternalData.State.BROKEN
         else:
-            external_data.state = ExternalData.State.VALID
-
-
-CheckerRegistry.register_checker(URLChecker)
+            new_version = ExternalFile(url, checksum, size)
+            if external_data.current_version.matches(new_version):
+                external_data.state = ExternalData.State.VALID
+            else:
+                external_data.state = ExternalData.State.BROKEN
+                external_data.new_version = new_version

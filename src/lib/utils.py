@@ -34,12 +34,6 @@ def get_url_contents(url):
     return None
 
 
-def check_url_reachable(url):
-    request = urllib.request.Request(url, method='HEAD', headers=HEADERS)
-    response = urllib.request.urlopen(request)
-    return response
-
-
 def get_extra_data_info_from_url(url):
     request = urllib.request.Request(url, headers=HEADERS)
     data = None
@@ -50,7 +44,7 @@ def get_extra_data_info_from_url(url):
     with urllib.request.urlopen(request) as response:
         real_url = response.geturl()
         data = response.read()
-        size = response.info().get('Content-Length', -1)
+        size = int(response.info().get('Content-Length', -1))
 
     if size == -1:
         size = len(data)

@@ -38,7 +38,7 @@ import os
 import sys
 import tempfile
 
-from lib.externaldata import ExternalData, CheckerRegistry, Checker
+from lib.externaldata import Checker, ExternalFile
 
 apt_pkg.init()
 
@@ -56,8 +56,7 @@ class DebianRepoChecker(Checker):
         self._pkgs_cache = {}
 
     def _should_check(self, external_data):
-        return external_data.checker_data and \
-               external_data.checker_data.get('type') == 'debian-repo'
+        return external_data.checker_data.get('type') == 'debian-repo'
 
     def check(self, external_data):
         # Only process external data of the debian-repo
@@ -81,14 +80,12 @@ class DebianRepoChecker(Checker):
         with self._load_repo(root, dist, component, arch) as cache:
             package = cache[package_name]
             candidate = package.candidate
+            new_version = ExternalFile(
+                candidate.uri, candidate.sha256, candidate.size,
+            )
 
-            if candidate.sha256 != external_data.checksum:
-                new_ext_data = ExternalData(external_data.type, package_name,
-                                            candidate.uri, candidate.sha256,
-                                            candidate.size,
-                                            external_data.arches)
-                new_ext_data.checker_data = external_data.checker_data
-                external_data.new_version = new_ext_data
+            if not external_data.current_version.matches(new_version):
+                external_data.new_version = new_version
 
     def _translate_arch(self, arch):
         # Because architecture names in Debian differ from Flatpak's
@@ -133,6 +130,3 @@ class DebianRepoChecker(Checker):
             cache.open()
 
             yield cache
-
-
-CheckerRegistry.register_checker(DebianRepoChecker)

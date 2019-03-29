@@ -17,38 +17,49 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-from collections import OrderedDict
+import abc
+from collections import namedtuple
 from enum import Enum
 
-import json
 import os
-import pkgutil
 
-class ExternalData:
 
+class ExternalFile(namedtuple('ExternalFile', ('url', 'checksum', 'size'))):
+    __slots__ = ()
+
+    def matches(self, other):
+        return (
+            self.url == other.url and
+            self.checksum == other.checksum and
+            (
+                self.size == -1 or
+                other.size == -1 or
+                self.size == other.size
+            )
+        )
+
+
+class ExternalData(abc.ABC):
     Type = Enum('Type', 'EXTRA_DATA FILE ARCHIVE')
 
-    _TYPES_MANIFEST_MAP = {Type.EXTRA_DATA: 'extra-data',
-                           Type.FILE: 'file',
-                           Type.ARCHIVE: 'archive'}
-    _NAME_MANIFEST_MAP = {Type.EXTRA_DATA: 'filename',
-                          Type.FILE: 'dest-filename',
-                          Type.ARCHIVE: 'dest-filename'}
+    TYPES = {
+        'file': Type.FILE,
+        'archive': Type.ARCHIVE,
+        'extra-data': Type.EXTRA_DATA,
+    }
 
     class State(Enum):
         UNKNOWN = 0
-        VALID = 1 << 1 # URL is reachable
-        BROKEN = 1 << 2 # URL couldn't be reached
+        VALID = 1 << 1  # URL is reachable
+        BROKEN = 1 << 2  # URL couldn't be reached
 
     def __init__(self, data_type, filename, url, checksum, size=-1, arches=[],
                  checker_data=None):
         self.filename = filename
-        self.url = url
-        self.checksum = checksum
-        self.size = int(size)
         self.arches = arches
         self.type = data_type
-        self.checker_data = checker_data
+        self.checker_data = checker_data or {}
+        self.current_version = ExternalFile(url, checksum, int(size))
         self.new_version = None
         self.state = ExternalData.State.UNKNOWN
 
@@ -70,45 +81,93 @@ class ExternalData:
                                                   checker_data=self.checker_data)
         return info
 
-    def to_json(self):
-        json_data = OrderedDict()
-        json_data['type'] = __class__._TYPES_MANIFEST_MAP[self.type]
-        json_data[__class__._TYPES_MANIFEST_MAP[self.type]] = self.filename
-        json_data['url'] = self.url
-        json_data['sha256'] = self.checksum
+    @abc.abstractmethod
+    def update(self):
+        """If self.new_version is not None, writes back the necessary changes
+        to the original element from the manifest, and returns True. Otherwise,
+        returns False."""
 
-        if self.arches:
-            json_data['only-arches'] = self.arches
 
-        if self.size >= 0:
-            json_data['size'] = self.size
+class ExternalDataSource(ExternalData):
+    def __init__(self, source, data_type, url):
+        name = (
+            source.get('filename') or
+            source.get('dest-filename') or
+            os.path.basename(url)
+        )
 
-        if self.checker_data:
-            json_data['x-checker-data'] = self.checker_data
+        sha256sum = source.get('sha256', None)
+        arches = source.get('only-arches', [])
+        size = source.get('size', -1)
+        checker_data = source.get('x-checker-data')
+        super().__init__(
+            data_type, name, url, sha256sum, size, arches, checker_data,
+        )
+        self.source = source
 
-        return json.dumps(json_data, indent=4)
+    @classmethod
+    def from_sources(cls, sources):
+        external_data = []
+
+        for source in sources:
+            url = source.get('url')
+            data_type = cls.TYPES.get(source.get('type'))
+            if url is None or data_type is None:
+                continue
+
+            external_data.append(cls(source, data_type, url))
+
+        return external_data
+
+    def update(self):
+        if self.new_version is not None:
+            self.source["url"] = self.new_version.url
+            self.source["sha256"] = self.new_version.checksum
+            self.source["size"] = self.new_version.size
+            return True
+
+        return False
+
+
+class ExternalDataFinishArg(ExternalData):
+    PREFIX = '--extra-data='
+
+    def __init__(self, finish_args, index):
+        arg = finish_args[index]
+        # discard '--extra-data=' prefix from the string
+        extra_data = arg[len(self.PREFIX) + 1:]
+        name, sha256sum, size, _install_size, url = extra_data.split(":", 4)
+        data_type = ExternalData.Type.EXTRA_DATA
+
+        super().__init__(data_type, name, url, sha256sum, size, [])
+
+        self.finish_args = finish_args
+        self.index = index
+
+    @classmethod
+    def from_args(cls, finish_args):
+        return [
+            cls(finish_args, i)
+            for i, arg in enumerate(finish_args)
+            if arg.startswith(cls.PREFIX)
+        ]
+
+    def update(self):
+        if self.new_version is not None:
+            arg = self.PREFIX + ":".join((
+                self.filename,
+                self.new_version.checksum,
+                self.new_version.size,
+                "",
+                self.new_version.url,
+            ))
+            self.finish_args[self.index] = arg
+            return True
+
+        return False
+
 
 class Checker:
 
     def check(self, external_data):
         raise NotImplementedError()
-
-class CheckerRegistry:
-
-    _checkers = []
-
-    @staticmethod
-    def load(checkers_folder):
-        for _unused, modname, _unused in pkgutil.walk_packages([checkers_folder]):
-            pkg_name = os.path.basename(checkers_folder)
-            __import__(pkg_name + '.' + modname)
-
-    @classmethod
-    def register_checker(class_, checker):
-        if not issubclass(checker, Checker):
-            raise TypeError('{} is not a of type {}'.format(checker, Checker))
-        class_._checkers.append(checker)
-
-    @classmethod
-    def get_checkers(class_):
-        return class_._checkers
