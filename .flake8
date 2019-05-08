@@ -1,0 +1,5 @@
+[flake8]
+# The default is 79 characters. A semi-official Python code formatter, Black
+# <https://github.com/python/black#line-length>, defaults to 88, based on some
+# empirical research on reducing annoying line wrapping on real source code.
+max-line-length = 88
