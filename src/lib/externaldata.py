@@ -24,7 +24,7 @@ from enum import Enum
 import os
 
 
-class ExternalFile(namedtuple('ExternalFile', ('url', 'checksum', 'size'))):
+class ExternalFile(namedtuple("ExternalFile", ("url", "checksum", "size", "version"))):
     __slots__ = ()
 
     def matches(self, other):
@@ -59,7 +59,7 @@ class ExternalData(abc.ABC):
         self.arches = arches
         self.type = data_type
         self.checker_data = checker_data or {}
-        self.current_version = ExternalFile(url, checksum, int(size))
+        self.current_version = ExternalFile(url, checksum, int(size), None)
         self.new_version = None
         self.state = ExternalData.State.UNKNOWN
 
@@ -83,9 +83,8 @@ class ExternalData(abc.ABC):
 
     @abc.abstractmethod
     def update(self):
-        """If self.new_version is not None, writes back the necessary changes
-        to the original element from the manifest, and returns True. Otherwise,
-        returns False."""
+        """If self.new_version is not None, writes back the necessary changes to the
+        original element from the manifest."""
 
 
 class ExternalDataSource(ExternalData):
@@ -124,9 +123,6 @@ class ExternalDataSource(ExternalData):
             self.source["url"] = self.new_version.url
             self.source["sha256"] = self.new_version.checksum
             self.source["size"] = self.new_version.size
-            return True
-
-        return False
 
 
 class ExternalDataFinishArg(ExternalData):
@@ -162,9 +158,6 @@ class ExternalDataFinishArg(ExternalData):
                 self.new_version.url,
             ))
             self.finish_args[self.index] = arg
-            return True
-
-        return False
 
 
 class Checker:

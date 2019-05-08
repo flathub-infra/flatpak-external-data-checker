@@ -43,9 +43,10 @@ def print_outdated_external_data(manifest_checker):
             else:
                 print(' A new version is available:')
 
-            print('  URL:    {url}\n'
-                  '  SHA256: {checksum}\n'
-                  '  Size:   {size}'.format(**data.new_version._asdict()))
+            print('  URL:     {url}\n'
+                  '  SHA256:  {checksum}\n'
+                  '  Size:    {size}\n'
+                  '  Version: {version}\n'.format(**data.new_version._asdict()))
         elif data.state == ExternalData.State.BROKEN:
             print('BROKEN: {}\n'
                   ' Unreachable URL: {}'.format(data.filename, data.current_version.url))

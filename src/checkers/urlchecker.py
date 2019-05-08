@@ -45,7 +45,7 @@ class URLChecker(Checker):
             log.exception('Unexpected exception while checking %s', url)
             external_data.state = ExternalData.State.BROKEN
         else:
-            new_version = ExternalFile(url, checksum, size)
+            new_version = ExternalFile(url, checksum, size, None)
             if external_data.current_version.matches(new_version):
                 external_data.state = ExternalData.State.VALID
             else:

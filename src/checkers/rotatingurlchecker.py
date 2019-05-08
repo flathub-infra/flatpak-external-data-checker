@@ -59,7 +59,7 @@ class RotatingURLChecker(Checker):
             log.exception('Unexpected exception while checking %s', url)
             external_data.state = ExternalData.State.BROKEN
         else:
-            new_version = ExternalFile(new_url, checksum, size)
+            new_version = ExternalFile(new_url, checksum, size, None)
             if external_data.current_version.matches(new_version):
                 log.debug('URL %s still valid', url)
                 external_data.state = ExternalData.State.VALID
