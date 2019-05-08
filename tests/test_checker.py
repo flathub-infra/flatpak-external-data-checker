@@ -21,6 +21,7 @@ import logging
 import os
 import sys
 import unittest
+import tempfile
 
 tests_dir = os.path.dirname(__file__)
 checker_path = os.path.join(tests_dir, '..', 'src')
@@ -40,6 +41,20 @@ class DummyChecker(Checker):
     def check(self, external_data):
         logging.debug('Phony checker checking external data %s and all is always good',
                       external_data.filename)
+
+
+class UpdateEverythingChecker(Checker):
+    SIZE = 0
+    # echo -n | sha256sum
+    CHECKSUM = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+    def check(self, external_data):
+        external_data.state = ExternalData.State.BROKEN
+        external_data.new_version = external_data.current_version._replace(
+            size=self.SIZE,
+            checksum=self.CHECKSUM,
+        )
+
 
 class TestExternalDataChecker(unittest.TestCase):
     def setUp(self):
@@ -64,6 +79,93 @@ class TestExternalDataChecker(unittest.TestCase):
 
         ext_data = dummy_checker.check(ExternalData.Type.ARCHIVE)
         self.assertEqual(len(ext_data), NUM_ARCHIVE_IN_MANIFEST)
+
+    def _test_update(self, filename, contents, expected_new_contents):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest = os.path.join(tmpdir, filename)
+            with open(manifest, "w") as f:
+                f.write(contents)
+
+            checker = ManifestChecker(manifest)
+            checker._checkers = [UpdateEverythingChecker()]
+            checker.check()
+            checker.update_manifests()
+
+            with open(manifest, "r") as f:
+                new_contents = f.read()
+
+            self.assertEqual(new_contents, expected_new_contents)
+
+    def test_update_json(self):
+        filename = "com.example.App.json"
+        contents = """
+/* unfortunately we can't or won't preserve C-style comments */
+{
+    "modules": [
+        {
+            "name": "foo",
+            "sources": [
+                {
+                    "type": "extra-data",
+                    "filename": "UnityHubSetup.AppImage",
+                    "url": "https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.AppImage",
+                    "sha256": "c521e2caf2ce8c8302cc9d8f385648c7d8c76ae29ac24ec0c0ffd3cd67a915fc",
+                    "size": 63236599
+                }
+            ]
+        }
+    ]
+}"""
+        expected_new_contents = """
+{
+    "modules": [
+        {
+            "name": "foo",
+            "sources": [
+                {
+                    "type": "extra-data",
+                    "filename": "UnityHubSetup.AppImage",
+                    "url": "https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.AppImage",
+                    "sha256": "%s",
+                    "size": %d
+                }
+            ]
+        }
+    ]
+}""".lstrip() % (
+            UpdateEverythingChecker.CHECKSUM,
+            UpdateEverythingChecker.SIZE,
+        )
+
+        self._test_update(filename, contents, expected_new_contents)
+
+    def test_update_yaml(self):
+        filename = "com.example.App.yaml"
+        contents = """
+modules:
+  - name: the-blank-line-below-should-be-preserved
+
+  - name: foo
+    sources:
+      - type: extra-data                  # Cool comments
+        filename: UnityHubSetup.AppImage  # Very nice
+        url: https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.AppImage
+        sha256: c521e2caf2ce8c8302cc9d8f385648c7d8c76ae29ac24ec0c0ffd3cd67a915fc
+        size: 63236599
+""".lstrip()
+        expected_new_contents = f"""
+modules:
+  - name: the-blank-line-below-should-be-preserved
+
+  - name: foo
+    sources:
+      - type: extra-data                  # Cool comments
+        filename: UnityHubSetup.AppImage  # Very nice
+        url: https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.AppImage
+        sha256: {UpdateEverythingChecker.CHECKSUM}
+        size: {UpdateEverythingChecker.SIZE}
+""".lstrip()
+        self._test_update(filename, contents, expected_new_contents)
 
     def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
