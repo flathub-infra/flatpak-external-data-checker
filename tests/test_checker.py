@@ -27,7 +27,7 @@ checker_path = os.path.join(tests_dir, '..', 'src')
 sys.path.append(checker_path)
 
 from lib.externaldata import ExternalData, Checker
-import checker
+from checker import ManifestChecker
 
 TEST_MANIFEST = os.path.join(tests_dir, 'org.externaldatachecker.Manifest.json')
 NUM_ARCHIVE_IN_MANIFEST = 1
@@ -37,21 +37,18 @@ NUM_ALL_EXT_DATA = NUM_ARCHIVE_IN_MANIFEST + NUM_FILE_IN_MANIFEST + \
                    NUM_EXTRA_DATA_IN_MANIFEST
 
 class DummyChecker(Checker):
-
     def check(self, external_data):
         logging.debug('Phony checker checking external data %s and all is always good',
                       external_data.filename)
 
 class TestExternalDataChecker(unittest.TestCase):
-
     def setUp(self):
         logging.basicConfig(level=logging.DEBUG)
-        self.checker = checker.ManifestChecker(TEST_MANIFEST)
 
     def test_check_filtered(self):
         # Use only the URLChecker which is fast so we don't have to wait a lot
         # for this test; so save the real checkers for later
-        dummy_checker = checker.ManifestChecker(TEST_MANIFEST)
+        dummy_checker = ManifestChecker(TEST_MANIFEST)
         dummy_checker._checkers = [DummyChecker()]
 
         ext_data = dummy_checker.check()
@@ -69,7 +66,8 @@ class TestExternalDataChecker(unittest.TestCase):
         self.assertEqual(len(ext_data), NUM_ARCHIVE_IN_MANIFEST)
 
     def test_check(self):
-        ext_data = self.checker.check()
+        checker = ManifestChecker(TEST_MANIFEST)
+        ext_data = checker.check()
 
         self.assertEqual(len(ext_data), NUM_ALL_EXT_DATA)
 
@@ -81,16 +79,16 @@ class TestExternalDataChecker(unittest.TestCase):
 
         self.assertEqual(ext_data_with_new_version, 4)
 
-        file_ext_data = self.checker.get_external_data(ExternalData.Type.FILE)
+        file_ext_data = checker.get_external_data(ExternalData.Type.FILE)
         self.assertEqual(len(file_ext_data), NUM_FILE_IN_MANIFEST)
 
-        archive_ext_data = self.checker.get_external_data(ExternalData.Type.ARCHIVE)
+        archive_ext_data = checker.get_external_data(ExternalData.Type.ARCHIVE)
         self.assertEqual(len(archive_ext_data), NUM_ARCHIVE_IN_MANIFEST)
 
-        extra_data = self.checker.get_external_data(ExternalData.Type.EXTRA_DATA)
+        extra_data = checker.get_external_data(ExternalData.Type.EXTRA_DATA)
         self.assertEqual(len(extra_data), NUM_EXTRA_DATA_IN_MANIFEST)
 
-        outdated_ext_data = self.checker.get_outdated_external_data()
+        outdated_ext_data = checker.get_outdated_external_data()
         self.assertEqual(len(outdated_ext_data), NUM_ALL_EXT_DATA)
 
 if __name__ == '__main__':
