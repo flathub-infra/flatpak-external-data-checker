@@ -184,19 +184,30 @@ class ManifestChecker:
         ]
 
     def _update_manifest(self, path, datas):
-        changed = False
+        changes = []
         for data in datas:
             if data.new_version is None:
                 continue
 
             data.update()
-            changed = True
+            if data.new_version.version is not None:
+                changes.append(
+                    "Update {} to {}".format(
+                        data.filename, data.new_version.version
+                    )
+                )
+            else:
+                changes.append("Update {}".format(data.filename))
 
-        if changed:
+        if changes:
             print("Updating {}".format(path))
             self._dump_manifest(path)
 
+        return changes
+
     def update_manifests(self):
         """Updates references to external data in manifests."""
+        changes = []
         for path, datas in self._external_data.items():
-            self._update_manifest(path, datas)
+            changes.extend(self._update_manifest(path, datas))
+        return changes
