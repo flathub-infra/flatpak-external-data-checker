@@ -37,7 +37,7 @@ class URLChecker(Checker):
         try:
             # Ignore any redirect, since many URLs legitimately get redirected
             # to mirrors
-            _, _, checksum, size = utils.get_extra_data_info_from_url(url)
+            _, data, checksum, size = utils.get_extra_data_info_from_url(url)
         except urllib.error.HTTPError as e:
             log.warning('%s returned %s', url, e)
             external_data.state = ExternalData.State.BROKEN
@@ -45,7 +45,15 @@ class URLChecker(Checker):
             log.exception('Unexpected exception while checking %s', url)
             external_data.state = ExternalData.State.BROKEN
         else:
-            new_version = ExternalFile(url, checksum, size, None)
+            if url.endswith(".AppImage"):
+                version_string = utils.extract_appimage_version(
+                    external_data.filename, data,
+                )
+                log.debug("%s is version %s", external_data.filename, version_string)
+            else:
+                version_string = None
+
+            new_version = ExternalFile(url, checksum, size, version_string)
             if external_data.current_version.matches(new_version):
                 external_data.state = ExternalData.State.VALID
             else:
