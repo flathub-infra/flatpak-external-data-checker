@@ -2,6 +2,7 @@
 #
 # Authors:
 #       Joaquim Rocha <jrocha@endlessm.com>
+#       Will Thompson <wjt@endlessm.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +22,7 @@ import hashlib
 import urllib.request
 
 # With the default urllib User-Agent, dl.discordapp.net returns 403
-USER_AGENT = 'flatpak-external-data-checker (+https://github.com/joaquimrocha/flatpak-external-data-checker)'  # noqa: E501
+USER_AGENT = 'flatpak-external-data-checker (+https://github.com/endlessm/flatpak-external-data-checker)'  # noqa: E501
 HEADERS = {'User-Agent': USER_AGENT}
 
 
