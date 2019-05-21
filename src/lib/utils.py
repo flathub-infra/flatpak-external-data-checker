@@ -26,15 +26,6 @@ USER_AGENT = 'flatpak-external-data-checker (+https://github.com/endlessm/flatpa
 HEADERS = {'User-Agent': USER_AGENT}
 
 
-def get_url_contents(url):
-    request = urllib.request.Request(url, headers=HEADERS)
-
-    with urllib.request.urlopen(request) as response:
-        return response.read()
-
-    return None
-
-
 def get_extra_data_info_from_url(url):
     request = urllib.request.Request(url, headers=HEADERS)
     data = None
