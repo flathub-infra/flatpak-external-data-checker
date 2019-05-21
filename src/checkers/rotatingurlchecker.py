@@ -51,7 +51,7 @@ class RotatingURLChecker(Checker):
         url = external_data.checker_data['url']
         log.debug('Getting extra data info from URL %s ; may take a while', url)
         try:
-            new_url, checksum, size = utils.get_extra_data_info_from_url(url)
+            new_url, _, checksum, size = utils.get_extra_data_info_from_url(url)
         except urllib.error.HTTPError as e:
             log.warning('%s returned %s', url, e)
             external_data.state = ExternalData.State.BROKEN

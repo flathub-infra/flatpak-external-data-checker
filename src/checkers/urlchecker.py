@@ -37,7 +37,7 @@ class URLChecker(Checker):
         try:
             # Ignore any redirect, since many URLs legitimately get redirected
             # to mirrors
-            _, checksum, size = utils.get_extra_data_info_from_url(url)
+            _, _, checksum, size = utils.get_extra_data_info_from_url(url)
         except urllib.error.HTTPError as e:
             log.warning('%s returned %s', url, e)
             external_data.state = ExternalData.State.BROKEN

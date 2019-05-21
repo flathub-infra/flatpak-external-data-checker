@@ -43,4 +43,4 @@ def get_extra_data_info_from_url(url):
 
     checksum = hashlib.sha256(data).hexdigest()
 
-    return real_url, checksum, size
+    return real_url, data, checksum, size
