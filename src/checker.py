@@ -1,7 +1,8 @@
-# Copyright (C) 2018 Endless Mobile, Inc.
+# Copyright © 2018–2019 Endless Mobile, Inc.
 #
 # Authors:
 #       Joaquim Rocha <jrocha@endlessm.com>
+#       Will Thompson <wjt@endlessm.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,9 +25,9 @@ from lib.externaldata import (
 )
 
 import json
-import os
-import yaml
 import logging
+import os
+from ruamel.yaml import YAML
 
 import gi
 gi.require_version('Json', '1.0')
@@ -40,6 +41,12 @@ class NoManifestCheckersFound(Exception):
 
 
 class ManifestChecker:
+    yaml = YAML()
+    # ruamel preserves some formatting (such as comments and blank lines) but
+    # not the indentation of the source file. These settings match the style
+    # recommended at <https://github.com/flathub/flathub/wiki/YAML-Style-Guide>.
+    yaml.indent(mapping=2, sequence=4, offset=2)
+
     def __init__(self, manifest):
         self._manifest = manifest
         self._external_data = {}
@@ -76,7 +83,7 @@ class ManifestChecker:
     def _read_yaml_manifest(cls, manifest_path):
         '''Read a YAML manifest from 'manifest_path'.'''
         with open(manifest_path, 'r') as f:
-            return yaml.load(f)
+            return cls.yaml.load(f)
 
     def _read_manifest(self, manifest_path):
         _, ext = os.path.splitext(manifest_path)
@@ -87,14 +94,17 @@ class ManifestChecker:
         self._manifest_contents[manifest_path] = contents
         return contents
 
-    def _dump_manifest(self, manifest_path, contents):
-        _, ext = os.path.splitext(manifest_path)
-        if ext in ('.yaml', '.yml'):
-            raise NotImplementedError(
-                "Updating YAML manifests is not yet supported"
-            )
-        else:
-            return json.dumps(contents, indent=4)
+    def _dump_manifest(self, path):
+        """Writes back the cached contents of 'path', which may have been
+        modified. For YAML, we make a best-effort attempt to preserve
+        formatting; for JSON, we use the canonical 4-space indentation."""
+        contents = self._manifest_contents[path]
+        _, ext = os.path.splitext(path)
+        with open(path, "w", encoding="utf-8") as fp:
+            if ext in ('.yaml', '.yml'):
+                self.yaml.dump(contents, fp)
+            else:
+                json.dump(obj=contents, fp=fp, indent=4)
 
     def _collect_external_data(self, path, data):
         self._get_module_data_from_json(path, data)
@@ -173,13 +183,31 @@ class ManifestChecker:
             if data.state == ExternalData.State.BROKEN or data.new_version
         ]
 
+    def _update_manifest(self, path, datas):
+        changes = []
+        for data in datas:
+            if data.new_version is None:
+                continue
+
+            data.update()
+            if data.new_version.version is not None:
+                changes.append(
+                    "Update {} to {}".format(
+                        data.filename, data.new_version.version
+                    )
+                )
+            else:
+                changes.append("Update {}".format(data.filename))
+
+        if changes:
+            print("Updating {}".format(path))
+            self._dump_manifest(path)
+
+        return changes
+
     def update_manifests(self):
         """Updates references to external data in manifests."""
+        changes = []
         for path, datas in self._external_data.items():
-            changed = any([data.update() for data in datas])
-            if changed:
-                contents = self._manifest_contents[path]
-                print("Updating {}".format(path))
-                serialized = self._dump_manifest(path, contents)
-                with open(path, "w", encoding='utf-8') as fp:
-                    fp.write(serialized)
+            changes.extend(self._update_manifest(path, datas))
+        return changes

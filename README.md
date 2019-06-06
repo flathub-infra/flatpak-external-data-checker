@@ -36,7 +36,7 @@ it should display messages about any broken or outdated external data.
 ### Changes to Flatpak manifests
 
 For simple checks to see if a URL is broken, no changes are needed.
-However, the DebianRepoChecker and the RotatingURLChecker can read
+However, the DebianRepoChecker and the URLChecker can read
 metadata from the manifest, in order to try to inform about new
 versions.
 
@@ -56,11 +56,11 @@ to, e.g. where "type": "extra-data" is declared):
                     }
 ```
 
-#### Rotating URL checker
+#### URL checker
 
-For the **RotatingURLChecker** you can use simply the following, as
-it will compare the URL in the *checker-data* section with the
-external data's one:
+If the upstream vendor has an URL that redirects to the latest version of the
+application, you can add something like the following to check and update the URL for
+the latest version:
 
 ```
   "x-checker-data": {
@@ -73,4 +73,4 @@ external data's one:
 
 License: GPLv2
 
-Copyright (c) 2018 Endless Mobile, Inc.
+Copyright © 2018–2019 Endless Mobile, Inc.

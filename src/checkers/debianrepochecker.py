@@ -81,7 +81,7 @@ class DebianRepoChecker(Checker):
             package = cache[package_name]
             candidate = package.candidate
             new_version = ExternalFile(
-                candidate.uri, candidate.sha256, candidate.size,
+                candidate.uri, candidate.sha256, candidate.size, candidate.version
             )
 
             if not external_data.current_version.matches(new_version):
