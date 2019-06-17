@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+import argparse
+import collections
+import logging
+import os
+import subprocess
+import sys
+
+log = logging.getLogger(os.path.basename(__file__))
+
+# Manifests that live elsewhere
+ExternalManifest = collections.namedtuple('ExternalManifest',
+                                          ['repo_url', 'manifest_filename'])
+ExternalManifest.__new__.__defaults__ = (None,)  # make manifest optional
+EXTERNAL_MANIFESTS = (
+    ExternalManifest("https://github.com/endlessm/eos-google-chrome-app",
+                     "com.google.Chrome.json"),
+    ExternalManifest("https://github.com/endlessm/firefox-flatpak",
+                     "org.mozilla.Firefox.json.in"),
+    ExternalManifest("https://github.com/flathub/com.anydesk.Anydesk"),
+    ExternalManifest("https://github.com/flathub/com.axosoft.GitKraken"),
+    ExternalManifest("https://github.com/flathub/com.discordapp.Discord"),
+    ExternalManifest("https://github.com/flathub/com.dropbox.Client"),
+    ExternalManifest("https://github.com/flathub/com.google.AndroidStudio"),
+    ExternalManifest("https://github.com/flathub/com.jagex.RuneScape"),
+    ExternalManifest("https://github.com/flathub/com.remarkable.reMarkable"),
+    ExternalManifest("https://github.com/flathub/com.skype.Client"),
+    ExternalManifest("https://github.com/flathub/com.slack.Slack"),
+    ExternalManifest("https://github.com/flathub/com.spotify.Client"),
+    ExternalManifest("https://github.com/flathub/com.sublimetext.three"),
+    ExternalManifest("https://github.com/flathub/com.unity.UnityHub"),
+    ExternalManifest("https://github.com/flathub/com.viber.Viber"),
+    ExternalManifest("https://github.com/flathub/com.visualstudio.code"),
+    ExternalManifest("https://github.com/flathub/io.exodus.Exodus"),
+    ExternalManifest("https://github.com/flathub/org.geogebra.GeoGebra"),
+    ExternalManifest("https://github.com/flathub/us.zoom.Zoom"),
+)
+
+
+def check_call(args):
+    log.debug('$ %s', ' '.join(args))
+    subprocess.check_call(args)
+
+
+class JenkinsCheckFlatpakExternalApps:
+    def __init__(self, args):
+        self.args = args
+        self.need_attention = []
+
+    def check_manifest(self, manifest_path):
+        args = [self.args.ext_data_checker, '--filter-type=extra-data']
+        if self.args.verbose:
+            args += ['--verbose']
+
+        args += [manifest_path]
+        check_call(args)
+
+    def clone_or_pull(self, repo_url, checkout_dir):
+        quiet_args = ['--quiet'] if not self.args.verbose else []
+        if os.path.isdir(checkout_dir):
+            check_call([
+                'git', '-C', checkout_dir, 'remote', 'set-url', 'origin',
+                repo_url
+            ])
+            check_call([
+                'git', '-C', checkout_dir, 'pull',
+            ] + quiet_args)
+            check_call([
+                'git', '-C', checkout_dir, 'submodule', 'update', '--init',
+            ] + quiet_args)
+        else:
+            check_call([
+                'git', 'clone', '--depth', '1', '--recurse-submodules',
+                repo_url, checkout_dir,
+            ] + quiet_args)
+
+    def check_external_manifests(self):
+        for what in EXTERNAL_MANIFESTS:
+            log.info('Checking %s', what)
+
+            repo_name = os.path.basename(what.repo_url)
+            checkout_dir = os.path.join('repos', repo_name)
+            if what.manifest_filename is not None:
+                manifest_paths = [
+                    os.path.join(checkout_dir,
+                                 what.manifest_filename)
+                ]
+            else:
+                manifest_paths = [
+                    os.path.join(checkout_dir, repo_name + ext)
+                    for ext in ('.yaml', '.yml', '.json')
+                ]
+
+            try:
+                self.clone_or_pull(what.repo_url, checkout_dir)
+
+                for manifest_path in manifest_paths:
+                    if os.path.exists(manifest_path):
+                        self.check_manifest(manifest_path)
+                        break
+                else:
+                    log.warning("Couldn't find manifest in %s (tried %s)",
+                                what.repo_url, ', '.join(manifest_paths))
+                    self.need_attention.append(what)
+            except subprocess.CalledProcessError:
+                log.warning('Checking %s failed', what)
+                self.need_attention.append(what)
+
+    def run(self):
+        self.check_external_manifests()
+
+        if self.need_attention:
+            summary = '\n * '.join([
+                'The following apps need attention:'
+            ] + [str(m) for m in self.need_attention])
+            log.warning(summary)
+            return False
+
+        return True
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--ext-data-checker',
+                        help='path to checker script',
+                        default='flatpak-external-data-checker')
+    parser.add_argument('--verbose',
+                        action='store_true')
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        level=(logging.DEBUG if args.verbose else logging.INFO),
+        format='+ %(asctime)s %(levelname)7s %(name)s: %(message)s',
+    )
+
+    app = JenkinsCheckFlatpakExternalApps(args)
+    if not app.run():
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()
