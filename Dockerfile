@@ -1,6 +1,7 @@
 FROM debian:buster
 RUN apt-get update \
   && env DEBIAN_FRONTEND=noninteractive apt-get install -y \
+      bubblewrap \
       git \
       gir1.2-glib-2.0 \
       gir1.2-json-1.0 \
