@@ -24,7 +24,6 @@ state and, possibly, new versions of each external data.
 
 ## Use
 
-
 The simplest use of this tool is by calling:
 
 ```
@@ -32,6 +31,29 @@ flatpak-external-data-checker MANIFEST_FILE
 ```
 
 it should display messages about any broken or outdated external data.
+
+## Running in a container
+
+First build the container image with:
+```
+podman build -t flatpak-external-data-checker \
+    --build-arg USER_ID=$(id -u) \
+    --build-arg GROUP_ID=$(id -g) \
+    .
+```
+
+And then run the checker in the container with:
+```
+podman run --rm \
+    --privileged \
+    -u $(id -u):$(id -g) \
+    -w $(pwd) \
+    -v $(pwd):$(pwd) \
+    -v "$SSH_AUTH_SOCK":/ssh-agent \
+    -e SSH_AUTH_SOCK=/ssh-agent \
+    -it flatpak-external-data-checker \
+    ./src/flatpak-external-data-checker ./PATH/TO/MANIFEST_FILE
+```
 
 ### Changes to Flatpak manifests
 
