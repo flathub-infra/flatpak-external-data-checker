@@ -10,7 +10,8 @@ RUN apt-get update \
       python3-gi \
       python3-github \
       python3-ruamel.yaml \
-  && apt-get clean
+  && apt-get clean \
+  && rmdir /var/cache/apt/archives/partial
 
 ARG USER_ID=1000
 ARG GROUP_ID=1000
