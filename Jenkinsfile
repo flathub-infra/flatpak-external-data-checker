@@ -35,7 +35,7 @@ node('flatpak-builder') {
                 sshagent(credentials: [ 'fe45ca53-7c92-47db-b3b1-b8d0cc8507ed' ]) {
                     sh '''
                         export GIT_SSH_COMMAND=\'ssh -oStrictHostKeyChecking=no\'
-                        ./wrappers/jenkins-check-flatpak-external-apps --verbose \
+                        ./wrappers/jenkins-check-flatpak-external-apps \
                             --ext-data-checker=./src/flatpak-external-data-checker
                     '''
                 }
