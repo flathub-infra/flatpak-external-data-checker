@@ -80,8 +80,12 @@ def extract_appimage_version(basename, data):
             "--appimage-extract"
         ])
         log.debug('$ %s', ' '.join(args))
-        # TODO: squash highly verbose unsquashfs output
-        subprocess.check_call(args, cwd=tmpdir)
+
+        p = subprocess.run(args, cwd=tmpdir, stderr=subprocess.PIPE, encoding="utf-8")
+        if p.returncode != 0:
+            log.error("--appimage-extract failed\n%s", p.stderr)
+            p.check_returncode()
+
         for desktop in glob.glob(os.path.join(tmpdir, "squashfs-root", "*.desktop")):
             kf = GLib.KeyFile()
             kf.load_from_file(desktop, GLib.KeyFileFlags.NONE)
