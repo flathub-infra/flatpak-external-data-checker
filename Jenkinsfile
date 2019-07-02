@@ -37,11 +37,14 @@ node('flatpak-builder') {
                  * by the flatpak external data checker */
                 image.inside('--privileged') {
                     sshagent(credentials: [ 'fe45ca53-7c92-47db-b3b1-b8d0cc8507ed' ]) {
-                        sh '''
-                            export GIT_SSH_COMMAND=\'ssh -oStrictHostKeyChecking=no\'
-                            ./wrappers/jenkins-check-flatpak-external-apps \
-                                --ext-data-checker=./src/flatpak-external-data-checker
-                        '''
+                        withCredentials([string(credentialsId: 'github-api-token-rw-jobs', variable: 'GITHUB_TOKEN')]) {
+                            sh '''
+                                export GIT_SSH_COMMAND=\'ssh -oStrictHostKeyChecking=no\'
+                                ./wrappers/jenkins-check-flatpak-external-apps \
+                                    --ext-data-checker=./src/flatpak-external-data-checker \
+                                    --update
+                            '''
+                        }
                     }
                 }
             } finally {
