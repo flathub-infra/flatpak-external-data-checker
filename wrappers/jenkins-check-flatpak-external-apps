@@ -76,7 +76,7 @@ class JenkinsCheckFlatpakExternalApps:
 
     def check_external_manifests(self):
         for what in EXTERNAL_MANIFESTS:
-            log.info('Checking %s', what)
+            log.info('Checking %s', what.repo_url)
 
             repo_name = os.path.basename(what.repo_url)
             checkout_dir = os.path.join('repos', repo_name)
@@ -103,7 +103,7 @@ class JenkinsCheckFlatpakExternalApps:
                                 what.repo_url, ', '.join(manifest_paths))
                     self.need_attention.append(what)
             except subprocess.CalledProcessError:
-                log.warning('Checking %s failed', what)
+                log.warning('Checking %s failed', what.repo_url)
                 self.need_attention.append(what)
 
     def run(self):
@@ -112,7 +112,7 @@ class JenkinsCheckFlatpakExternalApps:
         if self.need_attention:
             summary = '\n * '.join([
                 'The following apps need attention:'
-            ] + [str(m) for m in self.need_attention])
+            ] + [m.repo_url for m in self.need_attention])
             log.warning(summary)
             return False
 
