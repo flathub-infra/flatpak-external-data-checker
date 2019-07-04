@@ -53,7 +53,7 @@ node('flatpak-builder') {
             }
         }
     } catch (e) {
-        endless.notifyFailed('endless-dev-status@endlessm.com, rob@endlessm.com, wjt@endlessm.com')
+        endless.notifyFailed('endless-dev-status@endlessm.com, wjt@endlessm.com')
         throw e
     }
 }
