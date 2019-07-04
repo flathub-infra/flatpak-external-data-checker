@@ -147,23 +147,23 @@ def open_pr(subject, body, branch):
         check_call(("git", "remote", "add", remote, fork.ssh_url))
         repo = fork
 
-    check_call(("git", "push", "-u", remote, branch))
-
     base = "master"
     head = "{}:{}".format(repo.owner.login, branch)
     pr_message = ((body or "") + "\n\n" + DISCLAIMER).strip()
     for pr in origin_repo.get_pulls(base=base, head=head):
         log.info("Found existing PR %s", pr.html_url)
-        break
-    else:
-        pr = origin_repo.create_pull(
-            subject,
-            pr_message,
-            base,
-            head,
-            maintainer_can_modify=True,
-        )
-        log.info("Opened pull request %s", pr.html_url)
+        return
+
+    check_call(("git", "push", "-u", remote, branch))
+
+    pr = origin_repo.create_pull(
+        subject,
+        pr_message,
+        base,
+        head,
+        maintainer_can_modify=True,
+    )
+    log.info("Opened pull request %s", pr.html_url)
 
 
 def main():
