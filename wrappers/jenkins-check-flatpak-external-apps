@@ -61,6 +61,12 @@ class JenkinsCheckFlatpakExternalApps:
                 repo_url
             ])
             check_call([
+                'git', '-C', checkout_dir, "checkout", "master",
+            ] + quiet_args)
+            check_call([
+                'git', '-C', checkout_dir, "reset", "--hard",
+            ] + quiet_args)
+            check_call([
                 'git', '-C', checkout_dir, 'pull',
             ] + quiet_args)
             check_call([
