@@ -200,6 +200,9 @@ def main():
             if changes:
                 with indir(os.path.dirname(args.manifest)):
                     open_pr(*commit_changes(changes))
+                return
+
+            log.warning("Can't automatically fix any of the above issues")
 
         exit(1)
 
