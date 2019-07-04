@@ -13,27 +13,25 @@ ExternalManifest = collections.namedtuple('ExternalManifest',
                                           ['repo_url', 'manifest_filename'])
 ExternalManifest.__new__.__defaults__ = (None,)  # make manifest optional
 EXTERNAL_MANIFESTS = (
-    ExternalManifest("https://github.com/endlessm/eos-google-chrome-app",
-                     "com.google.Chrome.json"),
-    ExternalManifest("https://github.com/endlessm/firefox-flatpak",
-                     "org.mozilla.Firefox.json.in"),
-    ExternalManifest("https://github.com/flathub/com.anydesk.Anydesk"),
-    ExternalManifest("https://github.com/flathub/com.axosoft.GitKraken"),
-    ExternalManifest("https://github.com/flathub/com.discordapp.Discord"),
-    ExternalManifest("https://github.com/flathub/com.dropbox.Client"),
-    ExternalManifest("https://github.com/flathub/com.google.AndroidStudio"),
-    ExternalManifest("https://github.com/flathub/com.jagex.RuneScape"),
-    ExternalManifest("https://github.com/flathub/com.remarkable.reMarkable"),
-    ExternalManifest("https://github.com/flathub/com.skype.Client"),
-    ExternalManifest("https://github.com/flathub/com.slack.Slack"),
-    ExternalManifest("https://github.com/flathub/com.spotify.Client"),
-    ExternalManifest("https://github.com/flathub/com.sublimetext.three"),
-    ExternalManifest("https://github.com/flathub/com.unity.UnityHub"),
-    ExternalManifest("https://github.com/flathub/com.viber.Viber"),
-    ExternalManifest("https://github.com/flathub/com.visualstudio.code"),
-    ExternalManifest("https://github.com/flathub/io.exodus.Exodus"),
-    ExternalManifest("https://github.com/flathub/org.geogebra.GeoGebra"),
-    ExternalManifest("https://github.com/flathub/us.zoom.Zoom"),
+    ExternalManifest("git@github.com:endlessm/eos-google-chrome-app", "com.google.Chrome.json"),
+    ExternalManifest("git@github.com:endlessm/firefox-flatpak", "org.mozilla.Firefox.json.in"),
+    ExternalManifest("git@github.com:flathub/com.anydesk.Anydesk"),
+    ExternalManifest("git@github.com:flathub/com.axosoft.GitKraken"),
+    ExternalManifest("git@github.com:flathub/com.discordapp.Discord"),
+    ExternalManifest("git@github.com:flathub/com.dropbox.Client"),
+    ExternalManifest("git@github.com:flathub/com.google.AndroidStudio"),
+    ExternalManifest("git@github.com:flathub/com.jagex.RuneScape"),
+    ExternalManifest("git@github.com:flathub/com.remarkable.reMarkable"),
+    ExternalManifest("git@github.com:flathub/com.skype.Client"),
+    ExternalManifest("git@github.com:flathub/com.slack.Slack"),
+    ExternalManifest("git@github.com:flathub/com.spotify.Client"),
+    ExternalManifest("git@github.com:flathub/com.sublimetext.three"),
+    ExternalManifest("git@github.com:flathub/com.unity.UnityHub"),
+    ExternalManifest("git@github.com:flathub/com.viber.Viber"),
+    ExternalManifest("git@github.com:flathub/com.visualstudio.code"),
+    ExternalManifest("git@github.com:flathub/io.exodus.Exodus"),
+    ExternalManifest("git@github.com:flathub/org.geogebra.GeoGebra"),
+    ExternalManifest("git@github.com:flathub/us.zoom.Zoom"),
 )
 
 
@@ -49,6 +47,8 @@ class JenkinsCheckFlatpakExternalApps:
 
     def check_manifest(self, manifest_path):
         args = [self.args.ext_data_checker, '--filter-type=extra-data']
+        if self.args.update:
+            args += ['--update']
         if self.args.verbose:
             args += ['--verbose']
 
@@ -63,6 +63,12 @@ class JenkinsCheckFlatpakExternalApps:
                 repo_url
             ])
             check_call([
+                'git', '-C', checkout_dir, "checkout", "master",
+            ] + quiet_args)
+            check_call([
+                'git', '-C', checkout_dir, "reset", "--hard",
+            ] + quiet_args)
+            check_call([
                 'git', '-C', checkout_dir, 'pull',
             ] + quiet_args)
             check_call([
@@ -70,7 +76,7 @@ class JenkinsCheckFlatpakExternalApps:
             ] + quiet_args)
         else:
             check_call([
-                'git', 'clone', '--depth', '1', '--recurse-submodules',
+                'git', 'clone', '--recurse-submodules',
                 repo_url, checkout_dir,
             ] + quiet_args)
 
@@ -124,6 +130,10 @@ def main():
     parser.add_argument('--ext-data-checker',
                         help='path to checker script',
                         default='flatpak-external-data-checker')
+    parser.add_argument("--update",
+                        help="Update manifest(s) to refer to new versions of "
+                             "external data",
+                        action="store_true")
     parser.add_argument('--verbose',
                         action='store_true')
     args = parser.parse_args()
