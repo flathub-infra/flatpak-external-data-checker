@@ -76,7 +76,7 @@ class JenkinsCheckFlatpakExternalApps:
             ] + quiet_args)
         else:
             check_call([
-                'git', 'clone', '--depth', '1', '--recurse-submodules',
+                'git', 'clone', '--recurse-submodules',
                 repo_url, checkout_dir,
             ] + quiet_args)
 
