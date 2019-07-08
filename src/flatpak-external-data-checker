@@ -150,8 +150,14 @@ def open_pr(subject, body, branch):
     base = "master"
     head = "{}:{}".format(repo.owner.login, branch)
     pr_message = ((body or "") + "\n\n" + DISCLAIMER).strip()
-    for pr in origin_repo.get_pulls(base=base, head=head):
-        log.info("Found existing PR %s", pr.html_url)
+    # Include closed PRs – if the maintainer has closed our last PR, we don't want to
+    # open another one.
+    for pr in origin_repo.get_pulls(state="all", base=base, head=head):
+        log.info(
+            "Found existing %s PR: %s",
+            "merged" if pr.is_merged() else pr.state,
+            pr.html_url,
+        )
         return
 
     check_call(("git", "push", "-u", remote, branch))
