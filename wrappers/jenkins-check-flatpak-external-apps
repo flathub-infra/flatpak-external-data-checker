@@ -20,7 +20,6 @@ EXTERNAL_MANIFESTS = (
     ExternalManifest("git@github.com:flathub/com.discordapp.Discord"),
     ExternalManifest("git@github.com:flathub/com.dropbox.Client"),
     ExternalManifest("git@github.com:flathub/com.google.AndroidStudio"),
-    ExternalManifest("git@github.com:flathub/com.jagex.RuneScape"),
     ExternalManifest("git@github.com:flathub/com.remarkable.reMarkable"),
     ExternalManifest("git@github.com:flathub/com.skype.Client"),
     ExternalManifest("git@github.com:flathub/com.slack.Slack"),
