@@ -34,6 +34,7 @@ log = logging.getLogger(__name__)
 # With the default urllib User-Agent, dl.discordapp.net returns 403
 USER_AGENT = 'flatpak-external-data-checker (+https://github.com/endlessm/flatpak-external-data-checker)'  # noqa: E501
 HEADERS = {'User-Agent': USER_AGENT}
+TIMEOUT_SECONDS = 60
 
 
 def get_extra_data_info_from_url(url):
@@ -43,7 +44,7 @@ def get_extra_data_info_from_url(url):
     size = -1
     real_url = None
 
-    with urllib.request.urlopen(request) as response:
+    with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
         real_url = response.geturl()
         data = response.read()
         size = int(response.info().get('Content-Length', -1))
