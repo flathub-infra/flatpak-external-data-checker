@@ -2,7 +2,7 @@
 # manifest file in order to check whether there are newer versions of
 # Debian package based external data modules.
 #
-# The contens of the x-checker-data for the module should be .e.g:
+# The contents of the x-checker-data for the module should be .e.g:
 #   "x-checker-data": {
 #                       "type": "debian-repo",
 #                       "package-name": "YOUR_PACKAGE_NAME",

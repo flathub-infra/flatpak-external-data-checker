@@ -69,8 +69,8 @@ two credentials:
 ### Changes to Flatpak manifests
 
 For simple checks to see if a URL is broken, no changes are needed.
-However, the DebianRepoChecker and the URLChecker can read
-metadata from the manifest, in order to try to inform about new
+However, the DebianRepoChecker, FlashChecker and the URLChecker can
+read metadata from the manifest, in order to try to inform about new
 versions.
 
 #### Debian repo checker
@@ -79,7 +79,7 @@ For the **DebianRepoChecker**, which deals only with deb packages, it
 can read the following metadata (add it to manifest element it refers
 to, e.g. where "type": "extra-data" is declared):
 
-```
+```json
   "x-checker-data": {
                      "type": "debian-repo",
                      "package-name": "YOUR_PACKAGE_NAME",
@@ -89,13 +89,42 @@ to, e.g. where "type": "extra-data" is declared):
                     }
 ```
 
+### Flash player checker
+
+For the **FlashChecker**, which deals only with new version of Adobe
+Flash player, it can read the following metadata (add it to the manifest
+element it refers to, e.g. where "type": "extra-data" is declared):
+
+```json
+  "x-checker-data": {
+                     "type": "flash",
+                     "browser": "chrome|firefox"
+                    }
+```
+
+The value for "browser" is used to determine whether to download the
+Firefox-compatible Flash binaries (npapi) or the Chrome-compatible
+ones (ppapi).
+
+In addition, if you add that metadata, you **must** set only-arches
+on the extra-data source itself to i386 or x86_64:
+
+```json
+  "type": "extra-data",
+  "only-arches": ["i386"],
+  // ...
+```
+
+FlashChecker will use this to determine which architecture to check
+the binaries for.
+
 #### URL checker
 
 If the upstream vendor has an URL that redirects to the latest version of the
 application, you can add something like the following to check and update the URL for
 the latest version:
 
-```
+```json
   "x-checker-data": {
                      "type": "rotating-url",
                      "url": "http://example.com/last-version"
