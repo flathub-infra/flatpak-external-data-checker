@@ -34,11 +34,29 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import logging
 import urllib.error
+import re
 
 from lib.externaldata import ExternalData, ExternalFile, Checker
 from lib import utils
 
 log = logging.getLogger(__name__)
+
+
+def extract_version(checker_data, url):
+    """
+    If checker_data contains a "pattern", matches 'url' against it and returns the
+    first capture group (which is assumed to be the version number).
+    """
+    try:
+        pattern = checker_data["pattern"]
+    except KeyError:
+        return None
+
+    m = re.match(pattern, url)
+    if m is None:
+        return None
+
+    return m.group(1)
 
 
 class URLChecker(Checker):
@@ -64,9 +82,13 @@ class URLChecker(Checker):
                 version_string = utils.extract_appimage_version(
                     external_data.filename, data,
                 )
-                log.debug("%s is version %s", external_data.filename, version_string)
+            elif is_rotating:
+                version_string = extract_version(external_data.checker_data, new_url)
             else:
                 version_string = None
+
+            if version_string is not None:
+                log.debug("%s is version %s", external_data.filename, version_string)
 
             new_version = ExternalFile(
                 new_url if is_rotating else url,

@@ -194,5 +194,13 @@ modules:
         outdated_ext_data = checker.get_outdated_external_data()
         self.assertEqual(len(outdated_ext_data), NUM_ALL_EXT_DATA)
 
+        for data in ext_data:
+            if data.filename == "dropbox.tgz":
+                self.assertEqual(data.new_version.version, "1.2.3.4")
+                break
+        else:
+            self.fail("dropbox.tgz data not found")
+
+
 if __name__ == '__main__':
     unittest.main()
