@@ -71,7 +71,7 @@ class URLChecker(Checker):
 
         try:
             new_version, data = utils.get_extra_data_info_from_url(url)
-        except urllib.error.HTTPError as e:
+        except (urllib.error.HTTPError, urllib.error.URLError) as e:
             log.warning('%s returned %s', url, e)
             external_data.state = ExternalData.State.BROKEN
         except Exception:
