@@ -107,10 +107,10 @@ class FlashChecker(Checker):
         try:
             _, _, checksum, size = utils.get_extra_data_info_from_url(latest_url)
         except urllib.error.HTTPError as e:
-            log.warning('%s returned %s', url, e)
+            log.warning('%s returned %s', latest_url, e)
             external_data.state = ExternalData.State.BROKEN
         except Exception:
-            log.exception('Unexpected exception while checking %s', url)
+            log.exception('Unexpected exception while checking %s', latest_url)
             external_data.state = ExternalData.State.BROKEN
         else:
             external_data.state = ExternalData.State.VALID
