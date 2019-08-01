@@ -27,6 +27,8 @@ import subprocess
 import tempfile
 import urllib.request
 
+from .externaldata import ExternalFile
+
 from gi.repository import GLib
 
 log = logging.getLogger(__name__)
@@ -47,14 +49,16 @@ def get_extra_data_info_from_url(url):
     with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
         real_url = response.geturl()
         data = response.read()
-        size = int(response.info().get('Content-Length', -1))
+        info = response.info()
 
-    if size == -1:
-        size = len(data)
+        if "Content-Length" in info:
+            size = int(info["Content-Length"])
+        else:
+            size = len(data)
 
     checksum = hashlib.sha256(data).hexdigest()
 
-    return real_url, data, checksum, size
+    return ExternalFile(real_url, checksum, size, None), data
 
 
 def extract_appimage_version(basename, data):

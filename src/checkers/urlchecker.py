@@ -36,7 +36,7 @@ import logging
 import urllib.error
 import re
 
-from lib.externaldata import ExternalData, ExternalFile, Checker
+from lib.externaldata import ExternalData, Checker
 from lib import utils
 
 log = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ class URLChecker(Checker):
         log.debug("Getting extra data info from %s; may take a while", url)
 
         try:
-            new_url, data, checksum, size = utils.get_extra_data_info_from_url(url)
+            new_version, data = utils.get_extra_data_info_from_url(url)
         except urllib.error.HTTPError as e:
             log.warning('%s returned %s', url, e)
             external_data.state = ExternalData.State.BROKEN
@@ -83,19 +83,19 @@ class URLChecker(Checker):
                     external_data.filename, data,
                 )
             elif is_rotating:
-                version_string = extract_version(external_data.checker_data, new_url)
+                version_string = extract_version(
+                    external_data.checker_data,
+                    new_version.url,
+                )
             else:
                 version_string = None
 
             if version_string is not None:
                 log.debug("%s is version %s", external_data.filename, version_string)
+                new_version = new_version._replace(version=version_string)
 
-            new_version = ExternalFile(
-                new_url if is_rotating else url,
-                checksum, size, version_string,
-            )
             if external_data.current_version.matches(new_version):
-                log.debug("URL %s still valid", new_url)
+                log.debug("URL %s still valid", external_data.current_version.url)
                 external_data.state = ExternalData.State.VALID
             else:
                 external_data.state = ExternalData.State.BROKEN

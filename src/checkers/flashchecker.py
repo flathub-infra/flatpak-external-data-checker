@@ -27,7 +27,7 @@ import urllib.error
 import urllib.request
 import urllib.parse
 
-from lib.externaldata import ExternalData, ExternalFile, Checker
+from lib.externaldata import ExternalData, Checker
 from lib import utils
 
 log = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ class FlashChecker(Checker):
         assert latest_url is not None
 
         try:
-            _, _, checksum, size = utils.get_extra_data_info_from_url(latest_url)
+            new_version, _ = utils.get_extra_data_info_from_url(latest_url)
         except urllib.error.HTTPError as e:
             log.warning('%s returned %s', latest_url, e)
             external_data.state = ExternalData.State.BROKEN
@@ -114,6 +114,6 @@ class FlashChecker(Checker):
             external_data.state = ExternalData.State.BROKEN
         else:
             external_data.state = ExternalData.State.VALID
-            new_version = ExternalFile(latest_url, checksum, size, latest_version)
+            new_version = new_version._replace(version=latest_version)
             if not external_data.current_version.matches(new_version):
                 external_data.new_version = new_version
