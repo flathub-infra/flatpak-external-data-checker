@@ -63,10 +63,7 @@ class FlashChecker(Checker):
             return
 
         browser = external_data.checker_data['browser'].title()
-
-        try:
-            papi = BROWSER_TO_PAPI_MAP[browser]
-        except KeyError:
+        if browser not in BROWSER_TO_PAPI_MAP:
             log.warning('%s has an invalid browser (should be one of %s)',
                         external_data.filename, ', '.join(BROWSER_TO_PAPI_MAP))
             return
