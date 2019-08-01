@@ -27,7 +27,7 @@ import urllib.error
 import urllib.request
 import urllib.parse
 
-from lib.externaldata import ExternalData, ExternalFile, Checker
+from lib.externaldata import ExternalData, Checker
 from lib import utils
 
 log = logging.getLogger(__name__)
@@ -63,12 +63,10 @@ class FlashChecker(Checker):
             return
 
         browser = external_data.checker_data['browser'].title()
-
-        try:
-            papi = BROWSER_TO_PAPI_MAP[browser]
-        except KeyError:
+        if browser not in BROWSER_TO_PAPI_MAP:
             log.warning('%s has an invalid browser (should be one of %s)',
                         external_data.filename, ', '.join(BROWSER_TO_PAPI_MAP))
+            external_data.state = ExternalData.State.BROKEN
             return
 
         arches = self._get_arches(external_data)
@@ -76,6 +74,7 @@ class FlashChecker(Checker):
             log.warning('%s has invalid only-arches (should be one of %s)',
                         external_data.filename,
                         ', '.join(f'[{arch}]' for arch in FLATPAK_TO_FLASH_ARCH_MAP))
+            external_data.state = ExternalData.State.BROKEN
             return
 
         flatpak_arch, flash_arch = arches
@@ -90,10 +89,13 @@ class FlashChecker(Checker):
         latest_url = None
 
         for version in latest_version_data:
-            if (version['installation_type'] == 'Standalone' and version['browser'] == browser
-                    and version['installer_architecture'] == flash_arch):
-                assert version['platform'] == 'Linux'
-
+            if (
+                version['installation_type'] == 'Standalone' and
+                version['browser'] == browser and
+                version['installer_architecture'] == flash_arch and
+                version['platform'] == 'Linux' and
+                version["download_url"].endswith(".tar.gz")
+            ):
                 latest_version = version['Version']
                 latest_url = version['download_url']
                 break
@@ -105,15 +107,15 @@ class FlashChecker(Checker):
         assert latest_url is not None
 
         try:
-            _, _, checksum, size = utils.get_extra_data_info_from_url(latest_url)
+            new_version, _ = utils.get_extra_data_info_from_url(latest_url)
         except urllib.error.HTTPError as e:
-            log.warning('%s returned %s', url, e)
+            log.warning('%s returned %s', latest_url, e)
             external_data.state = ExternalData.State.BROKEN
         except Exception:
-            log.exception('Unexpected exception while checking %s', url)
+            log.exception('Unexpected exception while checking %s', latest_url)
             external_data.state = ExternalData.State.BROKEN
         else:
             external_data.state = ExternalData.State.VALID
-            new_version = ExternalFile(latest_url, checksum, size, latest_version)
+            new_version = new_version._replace(version=latest_version)
             if not external_data.current_version.matches(new_version):
                 external_data.new_version = new_version

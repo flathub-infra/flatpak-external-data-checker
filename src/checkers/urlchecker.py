@@ -34,11 +34,29 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import logging
 import urllib.error
+import re
 
-from lib.externaldata import ExternalData, ExternalFile, Checker
+from lib.externaldata import ExternalData, Checker
 from lib import utils
 
 log = logging.getLogger(__name__)
+
+
+def extract_version(checker_data, url):
+    """
+    If checker_data contains a "pattern", matches 'url' against it and returns the
+    first capture group (which is assumed to be the version number).
+    """
+    try:
+        pattern = checker_data["pattern"]
+    except KeyError:
+        return None
+
+    m = re.match(pattern, url)
+    if m is None:
+        return None
+
+    return m.group(1)
 
 
 class URLChecker(Checker):
@@ -52,8 +70,8 @@ class URLChecker(Checker):
         log.debug("Getting extra data info from %s; may take a while", url)
 
         try:
-            new_url, data, checksum, size = utils.get_extra_data_info_from_url(url)
-        except urllib.error.HTTPError as e:
+            new_version, data = utils.get_extra_data_info_from_url(url)
+        except (urllib.error.HTTPError, urllib.error.URLError) as e:
             log.warning('%s returned %s', url, e)
             external_data.state = ExternalData.State.BROKEN
         except Exception:
@@ -64,16 +82,20 @@ class URLChecker(Checker):
                 version_string = utils.extract_appimage_version(
                     external_data.filename, data,
                 )
-                log.debug("%s is version %s", external_data.filename, version_string)
+            elif is_rotating:
+                version_string = extract_version(
+                    external_data.checker_data,
+                    new_version.url,
+                )
             else:
                 version_string = None
 
-            new_version = ExternalFile(
-                new_url if is_rotating else url,
-                checksum, size, version_string,
-            )
+            if version_string is not None:
+                log.debug("%s is version %s", external_data.filename, version_string)
+                new_version = new_version._replace(version=version_string)
+
             if external_data.current_version.matches(new_version):
-                log.debug("URL %s still valid", new_url)
+                log.debug("URL %s still valid", external_data.current_version.url)
                 external_data.state = ExternalData.State.VALID
             else:
                 external_data.state = ExternalData.State.BROKEN

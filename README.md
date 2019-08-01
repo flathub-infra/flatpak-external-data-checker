@@ -127,9 +127,20 @@ the latest version:
 ```json
   "x-checker-data": {
                      "type": "rotating-url",
-                     "url": "http://example.com/last-version"
+                     "url": "http://example.com/last-version",
+                     "pattern": "http://example.com/foo-v([0-9.]+).tar.gz"
                     }
 ```
+
+The version number for the latest version can be detected in two ways:
+
+* If the filename ends with `.AppImage`, the version number is extracted
+  from the AppImage. (It is run in a `bwrap` sandbox.)
+* Otherwise, if `"pattern"` is specified in `"x-checker-data"`, the given
+  regular expression is matched against the full
+  URL for the latest version, and the first match group is taken to be the
+  version. (This follows the convention used by
+  [`debian/watch`](https://wiki.debian.org/debian/watch) files.)
 
 ## License and Copyright
 
