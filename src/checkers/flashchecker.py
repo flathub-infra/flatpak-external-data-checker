@@ -90,10 +90,13 @@ class FlashChecker(Checker):
         latest_url = None
 
         for version in latest_version_data:
-            if (version['installation_type'] == 'Standalone' and version['browser'] == browser
-                    and version['installer_architecture'] == flash_arch):
-                assert version['platform'] == 'Linux'
-
+            if (
+                version['installation_type'] == 'Standalone' and
+                version['browser'] == browser and
+                version['installer_architecture'] == flash_arch and
+                version['platform'] == 'Linux' and
+                version["download_url"].endswith(".tar.gz")
+            ):
                 latest_version = version['Version']
                 latest_url = version['download_url']
                 break
