@@ -66,6 +66,7 @@ class FlashChecker(Checker):
         if browser not in BROWSER_TO_PAPI_MAP:
             log.warning('%s has an invalid browser (should be one of %s)',
                         external_data.filename, ', '.join(BROWSER_TO_PAPI_MAP))
+            external_data.state = ExternalData.State.BROKEN
             return
 
         arches = self._get_arches(external_data)
@@ -73,6 +74,7 @@ class FlashChecker(Checker):
             log.warning('%s has invalid only-arches (should be one of %s)',
                         external_data.filename,
                         ', '.join(f'[{arch}]' for arch in FLATPAK_TO_FLASH_ARCH_MAP))
+            external_data.state = ExternalData.State.BROKEN
             return
 
         flatpak_arch, flash_arch = arches
