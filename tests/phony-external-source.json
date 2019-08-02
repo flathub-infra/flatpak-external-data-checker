@@ -1,0 +1,7 @@
+[
+    {
+        "type": "extra-data",
+        "url": "https://some-gibberish-phony-url.phony/phony-archive.tar.gz",
+        "sha256": "000000000000000000000000000000000000000000000000000000000000000000"
+    }
+]
