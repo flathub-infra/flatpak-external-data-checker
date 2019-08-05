@@ -125,8 +125,17 @@ class ManifestChecker:
                 module_path = path
 
             sources = module.get('sources', [])
+            inline_sources = [ source for source in sources if not isinstance(source, str) ]
+            external_sources = [ source for source in sources if isinstance(source, str) ]
+
             external_data = self._external_data.setdefault(module_path, [])
-            external_data.extend(ExternalDataSource.from_sources(sources))
+            external_data.extend(ExternalDataSource.from_sources(inline_sources))
+
+            for external_source in external_sources:
+                external_source_path = os.path.join(os.path.dirname(self._manifest),
+                                                    external_source)
+                external_source_data = self._read_manifest(external_source_path)
+                self._external_data[external_source_path] = ExternalDataSource.from_sources(external_source_data)
 
     def check(self, filter_type=None):
         '''Perform the check for all the external data in the manifest

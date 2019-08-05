@@ -14,7 +14,8 @@ ExternalManifest = collections.namedtuple('ExternalManifest',
 ExternalManifest.__new__.__defaults__ = (None,)  # make manifest optional
 EXTERNAL_MANIFESTS = (
     ExternalManifest("git@github.com:endlessm/eos-google-chrome-app", "com.google.Chrome.json"),
-    ExternalManifest("git@github.com:endlessm/firefox-flatpak", "org.mozilla.Firefox.json.in"),
+    ExternalManifest("git@github.com:endlessm/firefox-flatpak", "org.mozilla.Firefox.json"),
+    ExternalManifest("git@github.com:endlessm/firefox-flatpak", "flash/com.adobe.FlashPlayer.NPAPI.json"),
     ExternalManifest("git@github.com:flathub/com.anydesk.Anydesk"),
     ExternalManifest("git@github.com:flathub/com.axosoft.GitKraken"),
     ExternalManifest("git@github.com:flathub/com.discordapp.Discord"),
