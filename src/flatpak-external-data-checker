@@ -181,7 +181,12 @@ def main():
                         action="store_true")
     parser.add_argument("--update",
                         help="Update manifest(s) to refer to new versions of "
-                             "external data",
+                             "external data - also open PRs for changes unless "
+                             "--commit-only is specified",
+                        action="store_true")
+    parser.add_argument("--commit-only",
+                        help="Do not open PRs for updates, only commit changes "
+                             "to external data (implies --update)",
                         action="store_true")
     parser.add_argument('--filter-type',
                         help='Only check external data of the given type',
@@ -201,11 +206,13 @@ def main():
         exit(2)
 
     if print_outdated_external_data(manifest_checker):
-        if args.update:
+        if args.update or args.commit_only:
             changes = manifest_checker.update_manifests()
             if changes:
                 with indir(os.path.dirname(args.manifest)):
-                    open_pr(*commit_changes(changes))
+                    subject, body, branch = commit_changes(changes)
+                    if not args.commit_only:
+                        open_pr(subject, body, branch)
                 return
 
             log.warning("Can't automatically fix any of the above issues")
