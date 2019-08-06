@@ -52,6 +52,8 @@ class ExternalData(abc.ABC):
         UNKNOWN = 0
         VALID = 1 << 1  # URL is reachable
         BROKEN = 1 << 2  # URL couldn't be reached
+        ADDED = 1 << 3 # New source added
+        REMOVED = 1 << 4 # Source removed
 
     def __init__(self, data_type, source_path, source_parent, filename, url, checksum, size=-1, arches=[],
                  checker_data=None):
@@ -134,6 +136,11 @@ class ExternalDataSource(ExternalData):
             self.source["sha256"] = self.new_version.checksum
             self.source["size"] = self.new_version.size
 
+        if self.state == ExternalData.State.ADDED:
+            self.source_parent.append(self.source)
+        elif self.state == ExternalData.State.REMOVED:
+            self.source_parent.remove(self.source)
+
 
 class ExternalDataFinishArg(ExternalData):
     PREFIX = '--extra-data='
@@ -169,6 +176,11 @@ class ExternalDataFinishArg(ExternalData):
             ))
             self.source = arg
             self.source_parent[index] = self.source
+
+        if self.state == ExternalData.State.ADDED:
+            self.source_parent.append(self.source)
+        elif self.state == ExternalData.State.REMOVED:
+            self.source_parent.remove(self.source)
 
 
 class Checker:

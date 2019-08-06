@@ -189,15 +189,24 @@ class ManifestChecker:
         return [
             data
             for data in self.get_external_data()
-            if data.state == ExternalData.State.BROKEN or data.new_version
+            if data.state == ExternalData.State.BROKEN or \
+               data.state == ExternalData.State.ADDED or \
+               data.state == ExternalData.State.REMOVED or \
+               data.new_version
         ]
 
     def _update_manifest(self, path, datas, changes):
         for data in datas:
-            if data.new_version is None:
+            if data.new_version is None and \
+               data.state != ExternalData.State.ADDED and \
+               data.state != ExternalData.State.REMOVED:
                 continue
 
             data.update()
+            if data.state == ExternalData.State.ADDED:
+                message = "Added {}".format(data.filename)
+            elif data.state == ExternalData.State.REMOVED:
+                message = "Removed {}".format(data.filename)
             if data.new_version.version is not None:
                 message = "Update {} to {}".format(
                     data.filename, data.new_version.version

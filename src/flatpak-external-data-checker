@@ -59,7 +59,11 @@ def print_outdated_external_data(manifest_checker):
     ext_data = manifest_checker.get_outdated_external_data()
     for data in ext_data:
         if data.new_version:
-            if data.state == ExternalData.State.VALID:
+            if data.state == ExternalData.State.ADDED:
+                print('ADDED: {}'.format(data.filename))
+            elif data.state == ExternalData.State.REMOVED:
+                print('REMOVED: {}'.format(data.filename))
+            elif data.state == ExternalData.State.VALID:
                 print('CHANGE SOON: {}\n'
                       ' Has a new version:'.format(data.filename))
             elif data.state == ExternalData.State.BROKEN:
