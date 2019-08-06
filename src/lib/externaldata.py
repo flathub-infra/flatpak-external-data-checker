@@ -138,9 +138,7 @@ class ExternalDataSource(ExternalData):
 class ExternalDataFinishArg(ExternalData):
     PREFIX = '--extra-data='
 
-    def __init__(self, source_path, finish_args, index):
-        arg = finish_args[index]
-
+    def __init__(self, source_path, arg, finish_args):
         # discard '--extra-data=' prefix from the string
         extra_data = arg[len(self.PREFIX) + 1:]
         name, sha256sum, size, _install_size, url = extra_data.split(":", 4)
@@ -148,18 +146,20 @@ class ExternalDataFinishArg(ExternalData):
 
         super().__init__(data_type, source_path, finish_args, name, url, sha256sum, size, [])
 
-        self.index = index
+        self.source = arg[:]
 
     @classmethod
     def from_args(cls, source_path, finish_args):
         return [
-            cls(source_path, finish_args, i)
-            for i, arg in enumerate(finish_args)
+            cls(source_path, arg, finish_args)
+            for arg in finish_args
             if arg.startswith(cls.PREFIX)
         ]
 
     def update(self):
         if self.new_version is not None:
+            index = self.source_parent.index(self.source)
+
             arg = self.PREFIX + ":".join((
                 self.filename,
                 self.new_version.checksum,
@@ -167,7 +167,8 @@ class ExternalDataFinishArg(ExternalData):
                 "",
                 self.new_version.url,
             ))
-            self.source_parent[self.index] = arg
+            self.source = arg
+            self.source_parent[index] = self.source
 
 
 class Checker:
