@@ -106,16 +106,22 @@ class ExternalDataSource(ExternalData):
         self.source = source
 
     @classmethod
+    def from_source(cls, source):
+        url = source.get('url')
+        data_type = cls.TYPES.get(source.get('type'))
+        if url is None or data_type is None:
+            return None
+
+        return cls(source, data_type, url)
+
+    @classmethod
     def from_sources(cls, sources):
         external_data = []
 
         for source in sources:
-            url = source.get('url')
-            data_type = cls.TYPES.get(source.get('type'))
-            if url is None or data_type is None:
-                continue
-
-            external_data.append(cls(source, data_type, url))
+            data = cls.from_source(source)
+            if data:
+                external_data.append(data)
 
         return external_data
 
