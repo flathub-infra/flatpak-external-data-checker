@@ -24,6 +24,15 @@ from enum import Enum
 import os
 
 
+class ModuleData:
+
+    def __init__(self, name, path, module):
+        self.name = name
+        self.path = path
+        self.checker_data = module.get('x-checker-data', {})
+        self.external_data = []
+
+
 class ExternalFile(namedtuple("ExternalFile", ("url", "checksum", "size", "version"))):
     __slots__ = ()
 
@@ -185,5 +194,8 @@ class ExternalDataFinishArg(ExternalData):
 
 class Checker:
 
+    def check_module(self, module_data, external_data_list):
+        pass
+
     def check(self, external_data):
-        raise NotImplementedError()
+        pass

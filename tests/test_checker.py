@@ -72,7 +72,8 @@ class TestExternalDataChecker(unittest.TestCase):
 
         ext_data = dummy_checker.check()
         ext_data_from_getter = dummy_checker.get_external_data()
-        self.assertEqual(ext_data_from_getter, ext_data)
+        self.assertEqual(len(ext_data), len(ext_data_from_getter))
+        self.assertEqual(set(ext_data), set(ext_data_from_getter))
 
         self.assertEqual(len(ext_data), NUM_ALL_EXT_DATA)
         ext_data = dummy_checker.check(ExternalData.Type.EXTRA_DATA)
