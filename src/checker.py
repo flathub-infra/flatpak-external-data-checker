@@ -113,7 +113,7 @@ class ManifestChecker:
     def _get_finish_args_extra_data_from_json(self, path, json_data):
         finish_args = json_data.get('finish-args', [])
         external_data = self._external_data.setdefault(path, [])
-        external_data.extend(ExternalDataFinishArg.from_args(finish_args))
+        external_data.extend(ExternalDataFinishArg.from_args(path, finish_args))
 
     def _get_module_data_from_json(self, path, json_data):
         for module in json_data.get('modules', []):
@@ -129,13 +129,13 @@ class ManifestChecker:
             external_sources = [ source for source in sources if isinstance(source, str) ]
 
             external_data = self._external_data.setdefault(module_path, [])
-            external_data.extend(ExternalDataSource.from_sources(inline_sources))
+            external_data.extend(ExternalDataSource.from_sources(module_path, inline_sources))
 
             for external_source in external_sources:
                 external_source_path = os.path.join(os.path.dirname(self._manifest),
                                                     external_source)
                 external_source_data = self._read_manifest(external_source_path)
-                self._external_data[external_source_path] = ExternalDataSource.from_sources(external_source_data)
+                self._external_data[external_source_path] = ExternalDataSource.from_sources(external_source_path, external_source_data)
 
     def check(self, filter_type=None):
         '''Perform the check for all the external data in the manifest

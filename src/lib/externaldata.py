@@ -53,8 +53,10 @@ class ExternalData(abc.ABC):
         VALID = 1 << 1  # URL is reachable
         BROKEN = 1 << 2  # URL couldn't be reached
 
-    def __init__(self, data_type, filename, url, checksum, size=-1, arches=[],
+    def __init__(self, data_type, source_path, source_parent, filename, url, checksum, size=-1, arches=[],
                  checker_data=None):
+        self.source_path = source_path
+        self.source_parent = source_parent
         self.filename = filename
         self.arches = arches
         self.type = data_type
@@ -89,7 +91,8 @@ class ExternalData(abc.ABC):
 
 
 class ExternalDataSource(ExternalData):
-    def __init__(self, source, data_type, url):
+
+    def __init__(self, source_path, source, sources, data_type, url):
         name = (
             source.get('filename') or
             source.get('dest-filename') or
@@ -101,25 +104,25 @@ class ExternalDataSource(ExternalData):
         size = source.get('size', -1)
         checker_data = source.get('x-checker-data')
         super().__init__(
-            data_type, name, url, sha256sum, size, arches, checker_data,
+            data_type, source_path, sources, name, url, sha256sum, size, arches, checker_data,
         )
         self.source = source
 
     @classmethod
-    def from_source(cls, source):
+    def from_source(cls, source_path, source, sources):
         url = source.get('url')
         data_type = cls.TYPES.get(source.get('type'))
         if url is None or data_type is None:
             return None
 
-        return cls(source, data_type, url)
+        return cls(source_path, source, sources, data_type, url)
 
     @classmethod
-    def from_sources(cls, sources):
+    def from_sources(cls, source_path, sources):
         external_data = []
 
         for source in sources:
-            data = cls.from_source(source)
+            data = cls.from_source(source_path, source, sources)
             if data:
                 external_data.append(data)
 
@@ -135,22 +138,22 @@ class ExternalDataSource(ExternalData):
 class ExternalDataFinishArg(ExternalData):
     PREFIX = '--extra-data='
 
-    def __init__(self, finish_args, index):
+    def __init__(self, source_path, finish_args, index):
         arg = finish_args[index]
+
         # discard '--extra-data=' prefix from the string
         extra_data = arg[len(self.PREFIX) + 1:]
         name, sha256sum, size, _install_size, url = extra_data.split(":", 4)
         data_type = ExternalData.Type.EXTRA_DATA
 
-        super().__init__(data_type, name, url, sha256sum, size, [])
+        super().__init__(data_type, source_path, finish_args, name, url, sha256sum, size, [])
 
-        self.finish_args = finish_args
         self.index = index
 
     @classmethod
-    def from_args(cls, finish_args):
+    def from_args(cls, source_path, finish_args):
         return [
-            cls(finish_args, i)
+            cls(source_path, finish_args, i)
             for i, arg in enumerate(finish_args)
             if arg.startswith(cls.PREFIX)
         ]
@@ -164,7 +167,7 @@ class ExternalDataFinishArg(ExternalData):
                 "",
                 self.new_version.url,
             ))
-            self.finish_args[self.index] = arg
+            self.source_parent[self.index] = arg
 
 
 class Checker:
