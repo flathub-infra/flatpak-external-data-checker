@@ -64,6 +64,7 @@ class ExternalData(abc.ABC):
         self.state = ExternalData.State.UNKNOWN
 
     def __str__(self):
+        version = self.new_version or self.current_version
         info = '{filename}:\n' \
                '  State:   {state}\n' \
                '  Type:    {type}\n' \
@@ -74,9 +75,9 @@ class ExternalData(abc.ABC):
                '  Checker: {checker_data}'.format(state=self.state.name,
                                                   filename=self.filename,
                                                   type=self.type.name,
-                                                  url=self.url,
-                                                  checksum=self.checksum,
-                                                  size=self.size,
+                                                  url=version.url,
+                                                  checksum=version.checksum,
+                                                  size=version.size,
                                                   arches=self.arches,
                                                   checker_data=self.checker_data)
         return info
