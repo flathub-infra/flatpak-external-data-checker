@@ -1,0 +1,23 @@
+[
+    {
+        "type": "extra-data",
+        "filename": "firefox.tar.bz2",
+        "url": "https://archive.mozilla.org/pub/firefox/releases/1.2.3/linux-x86_64/en-US/firefox-1.2.3.tar.bz2",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "size": 0
+    },
+    {
+        "filename": "foo.xpi",
+        "type": "extra-data",
+        "url": "https://archive.mozilla.org/pub/firefox/releases/1.2.3/linux-x86_64/xpi/foo.xpi",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "size": 0
+    },
+    {
+        "filename": "bar.xpi",
+        "type": "extra-data",
+        "url": "https://archive.mozilla.org/pub/firefox/releases/1.2.3/linux-x86_64/xpi/bar.xpi",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "size": 0
+    }
+]

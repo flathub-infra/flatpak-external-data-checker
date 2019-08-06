@@ -1,0 +1,31 @@
+{
+    "app-id": "org.mozilla.Firefox",
+    "runtime": "org.freedesktop.Platform",
+    "runtime-version": "18.08",
+    "sdk": "org.freedesktop.Sdk",
+    "separate-locales": false,
+    "modules": [
+        {
+            "name": "some-dep",
+            "sources": [
+                {
+                    "type": "file",
+                    "path": "some-dep.sh"
+                }
+            ]
+        },
+        {
+            "name": "firefox",
+            "x-checker-data": {
+                "type": "firefox"
+            },
+            "sources": [
+                {
+                    "type": "file",
+                    "path": "firefox.sh"
+                },
+                "firefox-sources.json"
+            ]
+        }
+    ]
+}
