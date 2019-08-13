@@ -38,6 +38,7 @@ NUM_EXTRA_DATA_IN_MANIFEST = 6
 NUM_ALL_EXT_DATA = NUM_ARCHIVE_IN_MANIFEST + NUM_FILE_IN_MANIFEST + \
                    NUM_EXTRA_DATA_IN_MANIFEST
 
+
 class DummyChecker(Checker):
     def check(self, external_data):
         logging.debug('Phony checker checking external data %s and all is always good',
@@ -48,12 +49,14 @@ class UpdateEverythingChecker(Checker):
     SIZE = 0
     # echo -n | sha256sum
     CHECKSUM = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    VERSION = "1.2.3.4"
 
     def check(self, external_data):
         external_data.state = ExternalData.State.BROKEN
         external_data.new_version = external_data.current_version._replace(
             size=self.SIZE,
             checksum=self.CHECKSUM,
+            version=self.VERSION,
         )
 
 
@@ -81,7 +84,7 @@ class TestExternalDataChecker(unittest.TestCase):
         ext_data = dummy_checker.check(ExternalData.Type.ARCHIVE)
         self.assertEqual(len(ext_data), NUM_ARCHIVE_IN_MANIFEST)
 
-    def _test_update(self, filename, contents, expected_new_contents):
+    def _test_update(self, filename, contents, expected_new_contents, expected_updates):
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest = os.path.join(tmpdir, filename)
             with open(manifest, "w") as f:
@@ -90,12 +93,13 @@ class TestExternalDataChecker(unittest.TestCase):
             checker = ManifestChecker(manifest)
             checker._checkers = [UpdateEverythingChecker()]
             checker.check()
-            checker.update_manifests()
+            updates = checker.update_manifests()
 
             with open(manifest, "r") as f:
                 new_contents = f.read()
 
             self.assertEqual(new_contents, expected_new_contents)
+            self.assertEqual(updates, expected_updates)
 
     def test_update_json(self):
         filename = "com.example.App.json"
@@ -116,29 +120,29 @@ class TestExternalDataChecker(unittest.TestCase):
             ]
         }
     ]
-}"""
-        expected_new_contents = """
-{
+    }"""  # noqa: E501
+        expected_new_contents = f"""
+{{
     "modules": [
-        {
+        {{
             "name": "foo",
             "sources": [
-                {
+                {{
                     "type": "extra-data",
                     "filename": "UnityHubSetup.AppImage",
                     "url": "https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.AppImage",
-                    "sha256": "%s",
-                    "size": %d
-                }
+                    "sha256": "{UpdateEverythingChecker.CHECKSUM}",
+                    "size": {UpdateEverythingChecker.SIZE}
+                }}
             ]
-        }
+        }}
     ]
-}""".lstrip() % (
-            UpdateEverythingChecker.CHECKSUM,
-            UpdateEverythingChecker.SIZE,
-        )
+}}""".lstrip()  # noqa: E501
 
-        self._test_update(filename, contents, expected_new_contents)
+        self._test_update(
+            filename, contents, expected_new_contents,
+            ["Update UnityHubSetup.AppImage to 1.2.3.4"],
+        )
 
     def test_update_yaml(self):
         filename = "com.example.App.yaml"
@@ -153,6 +157,16 @@ modules:
         url: https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.AppImage
         sha256: c521e2caf2ce8c8302cc9d8f385648c7d8c76ae29ac24ec0c0ffd3cd67a915fc
         size: 63236599
+        only-arches:
+          - i386
+
+      - type: extra-data                  # Cool comments
+        filename: UnityHubSetup.AppImage  # Very nice
+        url: https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.AppImage
+        sha256: c521e2caf2ce8c8302cc9d8f385648c7d8c76ae29ac24ec0c0ffd3cd67a915fc
+        size: 63236599
+        only-arches:
+          - x86_64
 """.lstrip()
         expected_new_contents = f"""
 modules:
@@ -165,8 +179,21 @@ modules:
         url: https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.AppImage
         sha256: {UpdateEverythingChecker.CHECKSUM}
         size: {UpdateEverythingChecker.SIZE}
+        only-arches:
+          - i386
+
+      - type: extra-data                  # Cool comments
+        filename: UnityHubSetup.AppImage  # Very nice
+        url: https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.AppImage
+        sha256: {UpdateEverythingChecker.CHECKSUM}
+        size: {UpdateEverythingChecker.SIZE}
+        only-arches:
+          - x86_64
 """.lstrip()
-        self._test_update(filename, contents, expected_new_contents)
+        self._test_update(
+            filename, contents, expected_new_contents,
+            ["Update UnityHubSetup.AppImage to 1.2.3.4"],
+        )
 
     def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
