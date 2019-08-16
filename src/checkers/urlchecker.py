@@ -94,6 +94,9 @@ class URLChecker(Checker):
                 log.debug("%s is version %s", external_data.filename, version_string)
                 new_version = new_version._replace(version=version_string)
 
+            if not is_rotating:
+                new_version = new_version._replace(url=url)
+
             if external_data.current_version.matches(new_version):
                 log.debug("URL %s still valid", external_data.current_version.url)
                 external_data.state = ExternalData.State.VALID

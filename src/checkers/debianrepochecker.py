@@ -35,7 +35,6 @@ import apt_pkg
 import contextlib
 import logging
 import os
-import sys
 import tempfile
 
 from lib.externaldata import Checker, ExternalFile
@@ -50,6 +49,28 @@ APT_NEEDED_DIRS = (
     'var/lib/dpkg/info'
 )
 
+LOG = logging.getLogger(__name__)
+
+
+class LoggerAcquireProgress(apt.progress.text.AcquireProgress):
+    def __init__(self, logger):
+        class FileLike:
+            def write(self, text):
+                text = text.strip()
+                if text:  # ignore write("\r")
+                    logger.debug(text)
+
+            def flush(self):
+                pass
+
+            # no fileno() to avoid SIGWINCH stuff
+
+        super().__init__(FileLike())
+
+    def pulse(self, owner):
+        '''Disable percentage reporting within files.'''
+        return apt.progress.base.AcquireProgress.pulse(self, owner)
+
 
 class DebianRepoChecker(Checker):
     def __init__(self):
@@ -61,19 +82,18 @@ class DebianRepoChecker(Checker):
     def check(self, external_data):
         # Only process external data of the debian-repo
         if not self._should_check(external_data):
-            logging.debug('%s is not a debian-repo type ext data',
-                          external_data.filename)
+            LOG.debug('%s is not a debian-repo type ext data', external_data.filename)
             return
 
-        logging.debug('Checking %s', external_data.filename)
+        LOG.debug('Checking %s', external_data.filename)
         package_name = external_data.checker_data['package-name']
         root = external_data.checker_data['root']
         dist = external_data.checker_data['dist']
         component = external_data.checker_data.get('component', '')
 
         if not component and not dist.endswith('/'):
-            logging.warning('%s is missing Debian repo "component"; for an '
-                            'exact URL, "dist" must end with /', package_name)
+            LOG.warning('%s is missing Debian repo "component"; for an '
+                        'exact URL, "dist" must end with /', package_name)
             return
 
         arch = self._translate_arch(external_data.arches[0])
@@ -96,7 +116,7 @@ class DebianRepoChecker(Checker):
     @contextlib.contextmanager
     def _load_repo(self, deb_root, dist, component, arch):
         with tempfile.TemporaryDirectory() as root:
-            logging.debug('Setting up apt directory structure in %s', root)
+            LOG.debug('Setting up apt directory structure in %s', root)
 
             for path in APT_NEEDED_DIRS:
                 os.makedirs(os.path.join(root, path), exist_ok=True)
@@ -119,8 +139,7 @@ class DebianRepoChecker(Checker):
             apt_pkg.config.set('Dir', root)
             apt_pkg.config.set('Dir::State::status', dpkg_status)
             apt_pkg.config.set('Acquire::Languages', 'none')
-            # FIXME: wire up progress reporting to logger, not stderr
-            progress = apt.progress.text.AcquireProgress(outfile=sys.stderr)
+            progress = LoggerAcquireProgress(LOG)
 
             # Create a new cache with the appropriate architecture
             apt_pkg.config.set('APT::Architecture', arch)

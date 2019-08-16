@@ -192,31 +192,30 @@ class ManifestChecker:
             if data.state == ExternalData.State.BROKEN or data.new_version
         ]
 
-    def _update_manifest(self, path, datas):
-        changes = []
+    def _update_manifest(self, path, datas, changes):
         for data in datas:
             if data.new_version is None:
                 continue
 
             data.update()
             if data.new_version.version is not None:
-                changes.append(
-                    "Update {} to {}".format(
-                        data.filename, data.new_version.version
-                    )
+                message = "Update {} to {}".format(
+                    data.filename, data.new_version.version
                 )
             else:
-                changes.append("Update {}".format(data.filename))
+                message = "Update {}".format(data.filename)
+
+            changes[message] = None
 
         if changes:
             print("Updating {}".format(path))
             self._dump_manifest(path)
 
-        return changes
-
     def update_manifests(self):
         """Updates references to external data in manifests."""
-        changes = []
+        # We want a list, without duplicates; Python provides an
+        # insertion-order-preserving dictionary so we use that.
+        changes = OrderedDict()
         for path, datas in self._external_data.items():
-            changes.extend(self._update_manifest(path, datas))
-        return changes
+            self._update_manifest(path, datas, changes)
+        return list(changes)
