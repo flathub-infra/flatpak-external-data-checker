@@ -34,7 +34,7 @@ from checker import ManifestChecker
 TEST_MANIFEST = os.path.join(tests_dir, 'org.externaldatachecker.Manifest.json')
 NUM_ARCHIVE_IN_MANIFEST = 1
 NUM_FILE_IN_MANIFEST = 1
-NUM_EXTRA_DATA_IN_MANIFEST = 6
+NUM_EXTRA_DATA_IN_MANIFEST = 7
 NUM_ALL_EXT_DATA = NUM_ARCHIVE_IN_MANIFEST + NUM_FILE_IN_MANIFEST + \
                    NUM_EXTRA_DATA_IN_MANIFEST
 
@@ -219,14 +219,27 @@ modules:
         self.assertEqual(len(extra_data), NUM_EXTRA_DATA_IN_MANIFEST)
 
         outdated_ext_data = checker.get_outdated_external_data()
-        self.assertEqual(len(outdated_ext_data), NUM_ALL_EXT_DATA)
+        self.assertEqual(len(outdated_ext_data), NUM_ALL_EXT_DATA - 1)
 
+        dropbox = self._find_by_filename(ext_data, "dropbox.tgz")
+        self.assertIsNotNone(dropbox)
+        self.assertEqual(dropbox.new_version.version, "1.2.3.4")
+        self.assertEqual(
+            dropbox.new_version.url,
+            "https://httpbin.org/image/jpeg?version=1.2.3.4",
+        )
+
+        # this URL is a redirect, but since it is not a rotating-url the URL
+        # should not be updated.
+        image = self._find_by_filename(ext_data, "image.jpeg")
+        self.assertIsNone(image)
+
+    def _find_by_filename(self, ext_data, filename):
         for data in ext_data:
-            if data.filename == "dropbox.tgz":
-                self.assertEqual(data.new_version.version, "1.2.3.4")
-                break
+            if data.filename == filename:
+                return data
         else:
-            self.fail("dropbox.tgz data not found")
+            return None
 
 
 if __name__ == '__main__':
