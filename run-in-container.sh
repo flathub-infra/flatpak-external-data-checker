@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 GIT_USER_NAME=$(git config user.name)
 GIT_USER_EMAIL=$(git config user.email)
@@ -9,8 +10,9 @@ max_minus_uid=$((max_uid_count - user_id_real))
 uid_plus_one=$((user_id_real + 1))
 
 CWD=$(pwd)
+HERE=$( dirname "${BASH_SOURCE[0]}" )
 
-podman build -t flatpak-external-data-checker .
+podman build -t flatpak-external-data-checker "$HERE"
 podman run --rm --privileged \
     -v $HOME:$HOME:rslave \
     -v $CWD:$CWD:rslave \
