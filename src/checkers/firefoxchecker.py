@@ -39,8 +39,8 @@ log = logging.getLogger(__name__)
 
 
 class FirefoxChecker(Checker):
-    FIREFOX_RELEASE_INFO_URL = 'https://product-details.mozilla.org/1.0/firefox_versions.json'
-    FIREFOX_ARCHIVE_BASE_URL = 'https://archive.mozilla.org/pub/firefox/releases/{version}/'
+    FIREFOX_RELEASE_INFO_URL = 'https://product-details.mozilla.org/1.0/firefox_versions.json'  # noqa: E501
+    FIREFOX_ARCHIVE_BASE_URL = 'https://archive.mozilla.org/pub/firefox/releases/{version}/'  # noqa: E501
     FIREFOX_PLATFORM = 'linux-x86_64'
     CHECKER_BROWSER_SOURCE_FILENAME = 'firefox.tar.bz2'
     CHECKER_BROWSER_FILENAME_MATCH = r'firefox-.+\.tar\.bz2$'
@@ -59,7 +59,7 @@ class FirefoxChecker(Checker):
         # the returned json data is broken. Lets not catch it here as
         # we want that checker to break if that happens.
         latest_version = self._get_latest_available_version()
-        assert latest_version != None
+        assert latest_version is not None
 
         log.debug('Latest available firefox version: %s', latest_version)
 
@@ -94,9 +94,8 @@ class FirefoxChecker(Checker):
             processed_data.append(data.filename)
 
         added = []
-        new_sources = []
         for source_filename, info in latest_info.items():
-            if not source_filename in processed_data:
+            if source_filename not in processed_data:
                 source = {
                     'filename': source_filename,
                     'type': 'extra-data',
@@ -105,7 +104,11 @@ class FirefoxChecker(Checker):
                     'size': info.size,
                 }
                 # add new data to the same manifest as the main browser tarball
-                data = ExternalDataSource.from_source(browser_data.source_path, source, browser_data.source_parent)
+                data = ExternalDataSource.from_source(
+                    browser_data.source_path,
+                    source,
+                    browser_data.source_parent,
+                )
                 data.state = ExternalData.State.ADDED
                 added.append(data)
 
