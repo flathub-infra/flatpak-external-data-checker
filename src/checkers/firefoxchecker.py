@@ -148,6 +148,7 @@ class FirefoxChecker(Checker):
                     continue
 
                 url = '{}{}'.format(base_url, path)
+                log.debug("Inspecting %s", url)
                 info, _ = utils.get_extra_data_info_from_url(url)
                 results[source_filename] = info
 
