@@ -64,15 +64,7 @@ class FirefoxChecker(Checker):
         log.debug('Latest available firefox version: %s', latest_version)
 
         log.debug('Retrieving latest firefox version info')
-        latest_info = None
-        try:
-            latest_info = self._get_latest_version_info(latest_version)
-        except Exception as e:
-            log.warning('Error retrieving latest firefox version info: %s', e)
-        finally:
-            if not latest_info:
-                log.warning('Could not retrieve latest firefox version information')
-                return None
+        latest_info = self._get_latest_version_info(latest_version)
 
         log.debug('Checking external data')
         browser_data = None
