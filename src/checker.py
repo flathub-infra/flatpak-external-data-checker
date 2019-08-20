@@ -21,7 +21,7 @@
 from collections import OrderedDict
 from checkers import ALL_CHECKERS
 from lib.externaldata import (
-    ExternalData, ExternalDataSource, ExternalDataFinishArg,
+    ModuleData, ExternalData, ExternalDataSource, ExternalDataFinishArg,
 )
 
 import json
@@ -49,6 +49,7 @@ class ManifestChecker:
 
     def __init__(self, manifest):
         self._manifest = manifest
+        self._modules_data = {}
         self._external_data = {}
 
         # Initialize checkers
@@ -113,7 +114,7 @@ class ManifestChecker:
     def _get_finish_args_extra_data_from_json(self, path, json_data):
         finish_args = json_data.get('finish-args', [])
         external_data = self._external_data.setdefault(path, [])
-        external_data.extend(ExternalDataFinishArg.from_args(finish_args))
+        external_data.extend(ExternalDataFinishArg.from_args(path, finish_args))
 
     def _get_module_data_from_json(self, path, json_data):
         for module in json_data.get('modules', []):
@@ -124,18 +125,27 @@ class ManifestChecker:
             else:
                 module_path = path
 
+            module_name = module.get('name')
+            module_data = ModuleData(module_name, module_path, module)
+
             sources = module.get('sources', [])
             inline_sources = [ source for source in sources if not isinstance(source, str) ]
             external_sources = [ source for source in sources if isinstance(source, str) ]
 
             external_data = self._external_data.setdefault(module_path, [])
-            external_data.extend(ExternalDataSource.from_sources(inline_sources))
+            datas = ExternalDataSource.from_sources(module_path, inline_sources)
+            external_data.extend(datas)
+            module_data.external_data.extend(datas)
 
             for external_source in external_sources:
                 external_source_path = os.path.join(os.path.dirname(self._manifest),
                                                     external_source)
                 external_source_data = self._read_manifest(external_source_path)
-                self._external_data[external_source_path] = ExternalDataSource.from_sources(external_source_data)
+                datas = ExternalDataSource.from_sources(external_source_path, external_source_data)
+                self._external_data[external_source_path] = datas
+                module_data.external_data.extend(datas)
+
+            self._modules_data[module_name] = module_data
 
     def check(self, filter_type=None):
         '''Perform the check for all the external data in the manifest
@@ -148,13 +158,41 @@ class ManifestChecker:
             raise NoManifestCheckersFound()
 
         ext_data_checked = []
+
+        for _, module_data in self._modules_data.items():
+            if not filter_type:
+                external_data_filtered = module_data.external_data
+            else:
+                external_data_filtered = [ data for data in module_data.external_data if filter_type == data.type ]
+
+            log.debug("Checking module %s (path: %s)", module_data.name, module_data.path)
+
+            added = []
+            for checker in self._checkers:
+                module_added = checker.check_module(module_data, external_data_filtered)
+                if module_added:
+                    added.extend(module_added)
+
+            ext_data_checked.extend(external_data_filtered)
+
+            if added:
+                ext_data_checked.extend(added)
+
+                self._modules_data[module_data.name].external_data.extend(added)
+                for data in added:
+                    self._external_data[data.source_path].append(data)
+
         for path, external_data in self._external_data.items():
-            log.debug("Checking sources in %s", path)
+            if not filter_type:
+                external_data_filtered = external_data
+            else:
+                external_data_filtered = [ data for data in external_data if filter_type == data.type ]
+
+            log.debug("Checking individual sources in %s", path)
 
             n = len(external_data)
-            for i, data in enumerate(external_data, 1):
-                # Ignore if the type is not the one we care about
-                if filter_type is not None and filter_type != data.type:
+            for i, data in enumerate(external_data_filtered, 1):
+                if data.state != ExternalData.State.UNKNOWN:
                     continue
 
                 log.debug('[%d/%d] checking %s', i, n, data.filename)
@@ -165,7 +203,7 @@ class ManifestChecker:
                         break
                 ext_data_checked.append(data)
 
-        return ext_data_checked
+        return list(set(ext_data_checked))
 
     def get_external_data(self, only_type=None):
         '''Returns the list of the external data found in the manifest
@@ -189,15 +227,24 @@ class ManifestChecker:
         return [
             data
             for data in self.get_external_data()
-            if data.state == ExternalData.State.BROKEN or data.new_version
+            if data.state == ExternalData.State.BROKEN or \
+               data.state == ExternalData.State.ADDED or \
+               data.state == ExternalData.State.REMOVED or \
+               data.new_version
         ]
 
     def _update_manifest(self, path, datas, changes):
         for data in datas:
-            if data.new_version is None:
+            if data.new_version is None and \
+               data.state != ExternalData.State.ADDED and \
+               data.state != ExternalData.State.REMOVED:
                 continue
 
             data.update()
+            if data.state == ExternalData.State.ADDED:
+                message = "Added {}".format(data.filename)
+            elif data.state == ExternalData.State.REMOVED:
+                message = "Removed {}".format(data.filename)
             if data.new_version.version is not None:
                 message = "Update {} to {}".format(
                     data.filename, data.new_version.version

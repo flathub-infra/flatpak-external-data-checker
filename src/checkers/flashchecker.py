@@ -1,4 +1,4 @@
-# Flash Checker: A checker that to see if the url is pointing to the latest Flash Player.
+# Flash Checker: A checker to see if the url is pointing to the latest Flash Player.
 #
 # Consult the README for information on how to use this checker.
 #

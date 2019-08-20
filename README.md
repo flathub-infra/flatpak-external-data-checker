@@ -89,6 +89,27 @@ to, e.g. where "type": "extra-data" is declared):
                     }
 ```
 
+### Firefox checker
+
+For the **FirefoxChecker**, which deals only with new versions of Firefox and
+its translations, it can read the following metadata (opposed to other checkers,
+this metadata should be added to the module element instead of the source element
+in the manifest):
+
+```json
+  "x-checker-data": {
+                     "type": "firefox",
+                    }
+```
+
+The checker will try to match the module sources to be checked as follows:
+* The module source with filename "firefox.tar.bz2" will be considered to refer to
+  the firefox tarball (at least one source should refer to the firefox tarball)
+* All sources whose filename has ".xpi" as extension will be considered translations
+
+Also note that translations will be automatically added and removed depending on what
+is available upstream.
+
 ### Flash player checker
 
 For the **FlashChecker**, which deals only with new version of Adobe
