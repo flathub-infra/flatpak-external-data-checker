@@ -33,7 +33,7 @@ class ModuleData:
         self.external_data = []
 
 
-class ExternalFile(namedtuple("ExternalFile", ("url", "checksum", "size", "version"))):
+class ExternalFile(namedtuple("ExternalFile", ("url", "checksum", "size", "version", "timestamp"))):
     __slots__ = ()
 
     def matches(self, other):
@@ -72,7 +72,7 @@ class ExternalData(abc.ABC):
         self.arches = arches
         self.type = data_type
         self.checker_data = checker_data or {}
-        self.current_version = ExternalFile(url, checksum, int(size), None)
+        self.current_version = ExternalFile(url, checksum, int(size), None, None)
         self.new_version = None
         self.state = ExternalData.State.UNKNOWN
 

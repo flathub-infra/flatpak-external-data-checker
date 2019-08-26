@@ -18,11 +18,14 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import datetime as dt
 import logging
 import os
 import sys
 import unittest
 import tempfile
+
+from xml.dom import minidom
 
 tests_dir = os.path.dirname(__file__)
 checker_path = os.path.join(tests_dir, '..', 'src')
@@ -50,6 +53,7 @@ class UpdateEverythingChecker(Checker):
     # echo -n | sha256sum
     CHECKSUM = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     VERSION = "1.2.3.4"
+    TIMESTAMP = dt.datetime(2019, 8, 28, 0, 0, 0)
 
     def check(self, external_data):
         external_data.state = ExternalData.State.BROKEN
@@ -57,6 +61,7 @@ class UpdateEverythingChecker(Checker):
             size=self.SIZE,
             checksum=self.CHECKSUM,
             version=self.VERSION,
+            timestamp=self.TIMESTAMP,
         )
 
 
@@ -91,6 +96,10 @@ class TestExternalDataChecker(unittest.TestCase):
             with open(manifest, "w") as f:
                 f.write(contents)
 
+            appdata = os.path.join(tmpdir, os.path.splitext(filename)[0] + ".appdata.xml")
+            with open(appdata, "w") as f:
+                f.write("""<application></application>""")
+
             checker = ManifestChecker(manifest)
             checker._checkers = [UpdateEverythingChecker()]
             checker.check()
@@ -101,6 +110,15 @@ class TestExternalDataChecker(unittest.TestCase):
 
             self.assertEqual(new_contents, expected_new_contents)
             self.assertEqual(updates, expected_updates)
+
+            with open(appdata, "r") as f:
+                appdata_doc = minidom.parse(f)
+
+            releases = appdata_doc.getElementsByTagName("release")
+            self.assertNotEqual(releases, [])
+            self.assertEqual(releases, releases[:1])
+            self.assertEqual(releases[0].getAttribute("version"), "1.2.3.4")
+            self.assertEqual(releases[0].getAttribute("date"), "2019-08-28")
 
     def test_update_json(self):
         filename = "com.example.App.json"

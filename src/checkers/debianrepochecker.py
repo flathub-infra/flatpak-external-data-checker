@@ -38,6 +38,7 @@ import os
 import tempfile
 
 from lib.externaldata import Checker, ExternalFile
+from lib.utils import get_timestamp_from_url
 
 apt_pkg.init()
 
@@ -101,7 +102,11 @@ class DebianRepoChecker(Checker):
             package = cache[package_name]
             candidate = package.candidate
             new_version = ExternalFile(
-                candidate.uri, candidate.sha256, candidate.size, candidate.version
+                candidate.uri,
+                candidate.sha256,
+                candidate.size,
+                candidate.version,
+                timestamp=get_timestamp_from_url(candidate.uri),
             )
 
             if not external_data.current_version.matches(new_version):
