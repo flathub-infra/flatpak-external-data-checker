@@ -18,6 +18,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import datetime as dt
 import glob
 import hashlib
 import logging
@@ -39,6 +40,20 @@ HEADERS = {'User-Agent': USER_AGENT}
 TIMEOUT_SECONDS = 60
 
 
+def _extract_timestamp(info):
+    date_str = info["Last-Modified"] or info["Date"]
+    if date_str:
+        return dt.datetime.strptime(date_str, "%a, %d %b %Y %H:%M:%S %Z")
+    else:
+        return dt.datetime.now()  # what else can we do?
+
+
+def get_timestamp_from_url(url):
+    request = urllib.request.Request(url, headers=HEADERS, method="HEAD")
+    with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+        return _extract_timestamp(response.info())
+
+
 def get_extra_data_info_from_url(url):
     request = urllib.request.Request(url, headers=HEADERS)
     data = None
@@ -57,8 +72,9 @@ def get_extra_data_info_from_url(url):
             size = len(data)
 
     checksum = hashlib.sha256(data).hexdigest()
+    external_file = ExternalFile(real_url, checksum, size, None, _extract_timestamp(info))
 
-    return ExternalFile(real_url, checksum, size, None), data
+    return external_file, data
 
 
 def extract_appimage_version(basename, data):

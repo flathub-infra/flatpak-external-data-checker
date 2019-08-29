@@ -38,6 +38,7 @@ import os
 import tempfile
 
 from lib.externaldata import Checker, ExternalFile
+from lib.utils import get_timestamp_from_url
 
 apt_pkg.init()
 
@@ -72,6 +73,15 @@ class LoggerAcquireProgress(apt.progress.text.AcquireProgress):
         return apt.progress.base.AcquireProgress.pulse(self, owner)
 
 
+def _get_timestamp_for_candidate(candidate):
+    # TODO: fetch package, parse changelog, get the date from there.
+    # python-apt can fetch changelogs from Debian and Ubuntu's changelog
+    # server, but most packages this checker will be used for are not from these repos.
+    # We'd have to open-code it.
+    # https://salsa.debian.org/apt-team/python-apt/blob/master/apt/package.py#L1245-1417
+    return get_timestamp_from_url(candidate.uri)
+
+
 class DebianRepoChecker(Checker):
     def __init__(self):
         self._pkgs_cache = {}
@@ -100,8 +110,20 @@ class DebianRepoChecker(Checker):
         with self._load_repo(root, dist, component, arch) as cache:
             package = cache[package_name]
             candidate = package.candidate
+            # http://www.fifi.org/doc/debian-policy/policy.html/ch-versions.html
+            #
+            # The version number format is: [epoch:]upstream_version[-debian_revision]
+            #
+            # The package management system will break the version number apart at the
+            # last hyphen in the string (if there is one) to determine the
+            # upstream_version and debian_revision.
+            upstream_version = candidate.version.rsplit("-", 1)[0]
             new_version = ExternalFile(
-                candidate.uri, candidate.sha256, candidate.size, candidate.version
+                candidate.uri,
+                candidate.sha256,
+                candidate.size,
+                upstream_version,
+                timestamp=_get_timestamp_for_candidate(candidate),
             )
 
             if not external_data.current_version.matches(new_version):

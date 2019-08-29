@@ -20,10 +20,12 @@
 
 from collections import OrderedDict
 from checkers import ALL_CHECKERS
+from lib.appdata import add_release_to_file
 from lib.externaldata import (
     ModuleData, ExternalData, ExternalDataSource, ExternalDataFinishArg,
 )
 
+import datetime as dt
 import json
 import logging
 import os
@@ -234,6 +236,8 @@ class ManifestChecker:
         ]
 
     def _update_manifest(self, path, datas, changes):
+        last_update = None
+
         for data in datas:
             if data.new_version is None and \
                data.state != ExternalData.State.ADDED and \
@@ -249,14 +253,23 @@ class ManifestChecker:
                 message = "Update {} to {}".format(
                     data.filename, data.new_version.version
                 )
+                last_update = data.new_version
             else:
                 message = "Update {}".format(data.filename)
 
             changes[message] = None
 
         if changes:
-            print("Updating {}".format(path))
+            log.info("Updating %s", path)
             self._dump_manifest(path)
+
+            appdata = os.path.splitext(path)[0] + ".appdata.xml"
+            if last_update is not None and os.path.exists(appdata):
+                # TODO: this assumes that the last changed source for which we can
+                # detect a version number is the one corresponding to the application
+                # as a whole. In practice, this is currently true, but in general it
+                # may not be.
+                add_release_to_file(appdata, last_update.version, last_update.timestamp.strftime("%F"))
 
     def update_manifests(self):
         """Updates references to external data in manifests."""
