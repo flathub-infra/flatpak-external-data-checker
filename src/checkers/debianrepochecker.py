@@ -73,6 +73,15 @@ class LoggerAcquireProgress(apt.progress.text.AcquireProgress):
         return apt.progress.base.AcquireProgress.pulse(self, owner)
 
 
+def _get_timestamp_for_candidate(candidate):
+    # TODO: fetch package, parse changelog, get the date from there.
+    # python-apt can fetch changelogs from Debian and Ubuntu's changelog
+    # server, but most packages this checker will be used for are not from these repos.
+    # We'd have to open-code it.
+    # https://salsa.debian.org/apt-team/python-apt/blob/master/apt/package.py#L1245-1417
+    return get_timestamp_from_url(candidate.uri)
+
+
 class DebianRepoChecker(Checker):
     def __init__(self):
         self._pkgs_cache = {}
@@ -114,7 +123,7 @@ class DebianRepoChecker(Checker):
                 candidate.sha256,
                 candidate.size,
                 upstream_version,
-                timestamp=get_timestamp_from_url(candidate.uri),
+                timestamp=_get_timestamp_for_candidate(candidate),
             )
 
             if not external_data.current_version.matches(new_version):
