@@ -263,7 +263,7 @@ class ManifestChecker:
             log.info("Updating %s", path)
             self._dump_manifest(path)
 
-            appdata = os.path.splitext(path)[0] + ".appdata.xml"
+            appdata = os.path.splitext(self._manifest)[0] + ".appdata.xml"
             if last_update is not None and os.path.exists(appdata):
                 # TODO: this assumes that the last changed source for which we can
                 # detect a version number is the one corresponding to the application
@@ -278,4 +278,5 @@ class ManifestChecker:
         changes = OrderedDict()
         for path, datas in self._external_data.items():
             self._update_manifest(path, datas, changes)
+
         return list(changes)
