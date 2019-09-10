@@ -10,6 +10,7 @@ RUN apt-get update \
       python3-gi \
       python3-github \
       python3-ruamel.yaml \
+      python3-tenacity \
   && apt-get clean \
   && rmdir /var/cache/apt/archives/partial
 
