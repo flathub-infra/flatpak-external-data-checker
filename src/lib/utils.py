@@ -28,6 +28,13 @@ import subprocess
 import tempfile
 import urllib.request
 
+from tenacity import (
+    before_sleep_log,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_fixed,
+)
 from .externaldata import ExternalFile
 
 from gi.repository import GLib
@@ -57,6 +64,12 @@ def get_timestamp_from_url(url):
         return _extract_timestamp(response.info())
 
 
+@retry(
+    retry=retry_if_exception_type(ConnectionResetError),
+    stop=stop_after_attempt(3),
+    wait=wait_fixed(2),
+    before_sleep=before_sleep_log(log, logging.DEBUG),
+)
 def get_extra_data_info_from_url(url):
     request = urllib.request.Request(url, headers=HEADERS)
     data = None
