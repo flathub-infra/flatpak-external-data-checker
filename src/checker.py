@@ -25,7 +25,6 @@ from lib.externaldata import (
     ModuleData, ExternalData, ExternalDataSource, ExternalDataFinishArg,
 )
 
-import datetime as dt
 import json
 import logging
 import os
