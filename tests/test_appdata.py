@@ -18,6 +18,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import logging
 import os
 import unittest
 import sys
@@ -32,6 +33,9 @@ from lib.appdata import add_release  # noqa: E402
 
 
 class TestAddRelease(unittest.TestCase):
+    def setUp(self):
+        logging.basicConfig(level=logging.DEBUG)
+
     def _do_test(self, before, expected):
         in_ = StringIO(before)
         out = StringIO()
@@ -264,6 +268,77 @@ SentUpstream: 2014-05-22
   <name>🦝 &#38; 🍒</name>
   <releases>
     <release version="4.5.6" date="2020-02-02"/>
+  </releases>
+</component>
+            """.strip(),
+        )
+
+    def test_downgrade_already_present(self):
+        # If the update is a downgrade, we cannot simply prepend the new release to the
+        # list, or the appdata will be invalid.
+        self._do_test(
+            """
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop">
+  <releases>
+    <release version="4.5.7" date="2021-03-03">
+      <description>
+        <p>Another lovely release.</p>
+      </description>
+    </release>
+    <release version="4.5.6" date="2020-02-02">
+      <description>
+        <p>What a lovely release.</p>
+      </description>
+    </release>
+  </releases>
+</component>
+            """.strip(),
+            """
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop">
+  <releases>
+    <release version="4.5.6" date="2020-02-02">
+      <description>
+        <p>What a lovely release.</p>
+      </description>
+    </release>
+  </releases>
+</component>
+            """.strip(),
+        )
+
+    def test_downgrade_not_present(self):
+        # As above, this is a downgrade, but to a version that was not already in the
+        # appdata.
+        self._do_test(
+            """
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop">
+  <releases>
+    <release version="4.5.7" date="2021-03-03">
+      <description>
+        <p>Another lovely release.</p>
+      </description>
+    </release>
+    <release version="1.2.3" date="2019-01-01">
+      <description>
+        <p>What an ancient release.</p>
+      </description>
+    </release>
+  </releases>
+</component>
+            """.strip(),
+            """
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop">
+  <releases>
+    <release version="4.5.6" date="2020-02-02"/>
+    <release version="1.2.3" date="2019-01-01">
+      <description>
+        <p>What an ancient release.</p>
+      </description>
+    </release>
   </releases>
 </component>
             """.strip(),

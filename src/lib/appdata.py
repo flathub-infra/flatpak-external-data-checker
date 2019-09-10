@@ -23,10 +23,15 @@ preserving as much formatting as is feasible and inserting that element if it is
 missing.
 """
 
+import logging
+from distutils.version import LooseVersion
 from io import StringIO
 from xml.sax import make_parser
 from xml.sax.handler import property_lexical_handler
 from xml.sax.saxutils import XMLFilterBase, XMLGenerator
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class AddVersionFilter(XMLFilterBase):
@@ -34,10 +39,12 @@ class AddVersionFilter(XMLFilterBase):
         super().__init__(parent)
 
         self._version = version
+        self._parsed_version = LooseVersion(version)
         self._date = date
         self._context = []
         self._emitted_release = False
         self._releases_padding = ""
+        self._dropping_release = False
 
     @property
     def outside_root_element(self):
@@ -55,20 +62,41 @@ class AddVersionFilter(XMLFilterBase):
         self._emitted_release = True
 
     def startElement(self, name, attrs):
-        if self._in_releases and not self._emitted_release:
-            self._emit_release()
+        if self._dropping_release:
+            return
+
+        if self._in_releases and not self._emitted_release and name == "release":
+            parsed_version = LooseVersion(attrs["version"])
+            if attrs["date"] == self._date and parsed_version == self._parsed_version:
+                LOGGER.debug("<release> %s already present", dict(attrs))
+                self._emitted_release = True
+                # and continue below
+            elif attrs["date"] >= self._date or parsed_version >= self._parsed_version:
+                LOGGER.debug("Dropping future release %s", dict(attrs))
+                return
+            else:
+                self._emit_release()
+                # and fall through
 
         super().startElement(name, attrs)
 
         self._context.append(name)
 
     def characters(self, chars):
+        if self._dropping_release:
+            return
+
         if self._in_releases and not self._emitted_release and chars.isspace():
             self._releases_padding += chars
 
         super().characters(chars)
 
     def endElement(self, name):
+        if self._dropping_release:
+            if name == "release":
+                self._dropping_release = False
+            return
+
         if self._in_releases and not self._emitted_release:
             super().characters("\n    ")
             self._emit_release()
