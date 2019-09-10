@@ -69,10 +69,10 @@ def get_extra_data_info_from_url(url):
         data = response.read()
         info = response.info()
 
-        if "Content-Length" in info:
-            size = int(info["Content-Length"])
-        else:
-            size = len(data)
+    if "Content-Length" in info:
+        size = int(info["Content-Length"])
+    else:
+        size = len(data)
 
     checksum = hashlib.sha256(data).hexdigest()
     external_file = ExternalFile(
