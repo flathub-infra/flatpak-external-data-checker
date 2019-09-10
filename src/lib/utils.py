@@ -35,8 +35,11 @@ from gi.repository import GLib
 log = logging.getLogger(__name__)
 
 # With the default urllib User-Agent, dl.discordapp.net returns 403
-USER_AGENT = 'flatpak-external-data-checker (+https://github.com/endlessm/flatpak-external-data-checker)'  # noqa: E501
-HEADERS = {'User-Agent': USER_AGENT}
+USER_AGENT = (
+    "flatpak-external-data-checker "
+    "(+https://github.com/endlessm/flatpak-external-data-checker)"
+)
+HEADERS = {"User-Agent": USER_AGENT}
 TIMEOUT_SECONDS = 60
 
 
@@ -57,7 +60,7 @@ def get_timestamp_from_url(url):
 def get_extra_data_info_from_url(url):
     request = urllib.request.Request(url, headers=HEADERS)
     data = None
-    checksum = ''
+    checksum = ""
     size = -1
     real_url = None
 
@@ -72,7 +75,9 @@ def get_extra_data_info_from_url(url):
             size = len(data)
 
     checksum = hashlib.sha256(data).hexdigest()
-    external_file = ExternalFile(real_url, checksum, size, None, _extract_timestamp(info))
+    external_file = ExternalFile(
+        real_url, checksum, size, None, _extract_timestamp(info)
+    )
 
     return external_file, data
 
@@ -92,15 +97,19 @@ def extract_appimage_version(basename, data):
         args = ["bwrap"]
         for path in ("/usr", "/lib", "/lib64", "/bin", "/proc"):
             args.extend(["--ro-bind", path, path])
-        args.extend([
-            "--bind", tmpdir, tmpdir,
-            "--die-with-parent",
-            "--new-session",
-            "--unshare-all",
-            appimage_path,
-            "--appimage-extract"
-        ])
-        log.debug('$ %s', ' '.join(args))
+        args.extend(
+            [
+                "--bind",
+                tmpdir,
+                tmpdir,
+                "--die-with-parent",
+                "--new-session",
+                "--unshare-all",
+                appimage_path,
+                "--appimage-extract",
+            ]
+        )
+        log.debug("$ %s", " ".join(args))
 
         p = subprocess.run(args, cwd=tmpdir, stderr=subprocess.PIPE, encoding="utf-8")
         if p.returncode != 0:
