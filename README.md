@@ -52,12 +52,35 @@ two credentials:
 * `git push` access for the repository containing the manifest passed on the
   command line; ie an appropriate `ssh` key
 
-### Changes to Flatpak manifests
+## Changes to Flatpak manifests
 
-For simple checks to see if a URL is broken, no changes are needed.
-However, the DebianRepoChecker, FlashChecker and the URLChecker can
-read metadata from the manifest, in order to try to inform about new
-versions.
+For simple checks to see if a URL is broken, no changes are needed.  However,
+you can add additional metadata to the manifest to allow the checker to
+discover new versions.
+
+#### URL checker
+
+If the upstream vendor has an URL that redirects to the latest version of the
+application, you can add something like the following to check and update the URL for
+the latest version:
+
+```json
+"x-checker-data": {
+    "type": "rotating-url",
+    "url": "http://example.com/last-version",
+    "pattern": "http://example.com/foo-v([0-9.]+).tar.gz"
+}
+```
+
+The version number for the latest version can be detected in two ways:
+
+* If the filename ends with `.AppImage`, the version number is extracted
+  from the AppImage. (It is run in a `bwrap` sandbox.)
+* Otherwise, if `"pattern"` is specified in `"x-checker-data"`, the given
+  regular expression is matched against the full
+  URL for the latest version, and the first match group is taken to be the
+  version. (This follows the convention used by
+  [`debian/watch`](https://wiki.debian.org/debian/watch) files.)
 
 #### Debian repo checker
 
@@ -66,13 +89,13 @@ can read the following metadata (add it to manifest element it refers
 to, e.g. where "type": "extra-data" is declared):
 
 ```json
-  "x-checker-data": {
-                     "type": "debian-repo",
-                     "package-name": "YOUR_PACKAGE_NAME",
-                     "root": "ROOT_URL_TO_THE_DEBIAN_REPO",
-                     "dist": "DEBIAN_DIST",
-                     "component": "DEBIAN_COMPONENT"
-                    }
+"x-checker-data": {
+    "type": "debian-repo",
+    "package-name": "YOUR_PACKAGE_NAME",
+    "root": "ROOT_URL_TO_THE_DEBIAN_REPO",
+    "dist": "DEBIAN_DIST",
+    "component": "DEBIAN_COMPONENT"
+}
 ```
 
 ### Firefox checker
@@ -83,9 +106,9 @@ this metadata should be added to the module element instead of the source elemen
 in the manifest):
 
 ```json
-  "x-checker-data": {
-                     "type": "firefox",
-                    }
+"x-checker-data": {
+    "type": "firefox",
+}
 ```
 
 The checker will try to match the module sources to be checked as follows:
@@ -103,10 +126,10 @@ Flash player, it can read the following metadata (add it to the manifest
 element it refers to, e.g. where "type": "extra-data" is declared):
 
 ```json
-  "x-checker-data": {
-                     "type": "flash",
-                     "browser": "chrome|firefox"
-                    }
+"x-checker-data": {
+    "type": "flash",
+    "browser": "chrome|firefox"
+}
 ```
 
 The value for "browser" is used to determine whether to download the
@@ -124,30 +147,6 @@ on the extra-data source itself to i386 or x86_64:
 
 FlashChecker will use this to determine which architecture to check
 the binaries for.
-
-#### URL checker
-
-If the upstream vendor has an URL that redirects to the latest version of the
-application, you can add something like the following to check and update the URL for
-the latest version:
-
-```json
-  "x-checker-data": {
-                     "type": "rotating-url",
-                     "url": "http://example.com/last-version",
-                     "pattern": "http://example.com/foo-v([0-9.]+).tar.gz"
-                    }
-```
-
-The version number for the latest version can be detected in two ways:
-
-* If the filename ends with `.AppImage`, the version number is extracted
-  from the AppImage. (It is run in a `bwrap` sandbox.)
-* Otherwise, if `"pattern"` is specified in `"x-checker-data"`, the given
-  regular expression is matched against the full
-  URL for the latest version, and the first match group is taken to be the
-  version. (This follows the convention used by
-  [`debian/watch`](https://wiki.debian.org/debian/watch) files.)
 
 ## License and Copyright
 
