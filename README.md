@@ -162,6 +162,19 @@ on the extra-data source itself to i386 or x86_64:
 FlashChecker will use this to determine which architecture to check
 the binaries for.
 
+## Contributing
+
+```bash
+# Run all the tests (some of which need an internet connection):
+./run-in-container.sh python3 -m unittest discover
+
+# Run one suite of tests
+./run-in-container.sh python3 -m unittest tests.test_appdata
+
+# More information
+./run-in-container.sh python3 -m unittest --help
+```
+
 ## License and Copyright
 
 License: GPLv2
