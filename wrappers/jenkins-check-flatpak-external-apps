@@ -46,7 +46,6 @@ class JenkinsCheckFlatpakExternalApps:
         os.path.join(
             os.path.dirname(__file__),
             "..",
-            "src",
             "flatpak-external-data-checker",
         )
     )

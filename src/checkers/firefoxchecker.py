@@ -32,8 +32,8 @@ import os
 import re
 import urllib.request
 
-from lib.externaldata import ExternalData, ExternalDataSource, Checker
-from lib import utils
+from src.lib.externaldata import ExternalData, ExternalDataSource, Checker
+from src.lib import utils
 
 log = logging.getLogger(__name__)
 

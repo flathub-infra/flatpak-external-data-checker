@@ -18,17 +18,10 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import os
 import unittest
-import sys
 from io import StringIO
 
-# Yuck!
-tests_dir = os.path.dirname(__file__)
-checker_path = os.path.join(tests_dir, "..", "src")
-sys.path.append(checker_path)
-
-from lib.appdata import add_release  # noqa: E402
+from src.lib.appdata import add_release
 
 
 class TestAddRelease(unittest.TestCase):

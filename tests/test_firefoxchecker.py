@@ -20,17 +20,12 @@
 
 import logging
 import os
-import sys
 import unittest
 
-tests_dir = os.path.dirname(__file__)
-checker_path = os.path.join(tests_dir, '..', 'src')
-sys.path.append(checker_path)
+from src.lib.externaldata import ExternalData
+from src.checker import ManifestChecker
 
-from lib.externaldata import ExternalData
-from checker import ManifestChecker
-
-TEST_MANIFEST = os.path.join(tests_dir, "org.mozilla.Firefox.json")
+TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.mozilla.Firefox.json")
 
 
 class TestFirefoxChecker(unittest.TestCase):

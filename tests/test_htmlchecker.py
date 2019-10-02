@@ -22,16 +22,13 @@
 
 import logging
 import os
-import sys
 import unittest
 
-tests_dir = os.path.dirname(__file__)
-checker_path = os.path.join(tests_dir, "..", "src")
-sys.path.append(checker_path)
+from src.checker import ManifestChecker
 
-from checker import ManifestChecker
-
-TEST_MANIFEST = os.path.join(tests_dir, "com.adobe.Flash-Player-Projector.json")
+TEST_MANIFEST = os.path.join(
+    os.path.dirname(__file__), "com.adobe.Flash-Player-Projector.json"
+)
 
 
 class TestHTMLChecker(unittest.TestCase):

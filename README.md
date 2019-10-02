@@ -36,7 +36,7 @@ it should display messages about any broken or outdated external data.
 
 ```bash
 ~/src/endlessm/flatpak-external-data-checker/run-in-container.sh \
-    ~/src/endlessm/flatpak-external-data-checker/src/flatpak-external-data-checker \
+    ~/src/endlessm/flatpak-external-data-checker/flatpak-external-data-checker \
     [ARGS …] \
     ~/src/flathub/com.example.App/com.example.App.json
 ```

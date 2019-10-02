@@ -21,20 +21,18 @@
 import datetime as dt
 import logging
 import os
-import sys
 import unittest
 import tempfile
 
 from xml.dom import minidom
 
-tests_dir = os.path.dirname(__file__)
-checker_path = os.path.join(tests_dir, '..', 'src')
-sys.path.append(checker_path)
+from src.lib.externaldata import ExternalData, Checker
+from src.checker import ManifestChecker
 
-from lib.externaldata import ExternalData, Checker
-from checker import ManifestChecker
-
-TEST_MANIFEST = os.path.join(tests_dir, 'org.externaldatachecker.Manifest.json')
+TEST_MANIFEST = os.path.join(
+    os.path.dirname(__file__),
+    "org.externaldatachecker.Manifest.json",
+)
 NUM_ARCHIVE_IN_MANIFEST = 1
 NUM_FILE_IN_MANIFEST = 1
 NUM_EXTRA_DATA_IN_MANIFEST = 7

@@ -19,9 +19,9 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 from collections import OrderedDict
-from checkers import ALL_CHECKERS
-from lib.appdata import add_release_to_file
-from lib.externaldata import (
+from .checkers import ALL_CHECKERS
+from .lib.appdata import add_release_to_file
+from .lib.externaldata import (
     ModuleData, ExternalData, ExternalDataSource, ExternalDataFinishArg,
 )
 

@@ -20,16 +20,14 @@
 
 import logging
 import os
-import sys
 import unittest
 
-tests_dir = os.path.dirname(__file__)
-checker_path = os.path.join(tests_dir, '..', 'src')
-sys.path.append(checker_path)
+from src.checker import ManifestChecker
 
-from checker import ManifestChecker  # noqa: E402
-
-TEST_MANIFEST = os.path.join(tests_dir, "com.adobe.FlashPlayer.NPAPI.json")
+TEST_MANIFEST = os.path.join(
+    os.path.dirname(__file__),
+    "com.adobe.FlashPlayer.NPAPI.json",
+)
 
 
 class TestFlashChecker(unittest.TestCase):
