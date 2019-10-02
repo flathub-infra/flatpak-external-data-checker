@@ -42,12 +42,21 @@ def check_call(args):
 
 
 class JenkinsCheckFlatpakExternalApps:
+    CHECKER_PATH = os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "src",
+            "flatpak-external-data-checker",
+        )
+    )
+
     def __init__(self, args):
         self.args = args
         self.need_attention = []
 
     def check_manifest(self, manifest_path):
-        args = [self.args.ext_data_checker, '--filter-type=extra-data']
+        args = [self.CHECKER_PATH, '--filter-type=extra-data']
         if self.args.update:
             args += ['--update']
         if self.args.verbose:
@@ -128,9 +137,6 @@ class JenkinsCheckFlatpakExternalApps:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ext-data-checker',
-                        help='path to checker script',
-                        default='flatpak-external-data-checker')
     parser.add_argument("--update",
                         help="Update manifest(s) to refer to new versions of "
                              "external data",
