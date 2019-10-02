@@ -96,7 +96,10 @@ class TestExternalDataChecker(unittest.TestCase):
             with open(manifest, "w") as f:
                 f.write(contents)
 
-            appdata = os.path.join(tmpdir, os.path.splitext(filename)[0] + ".appdata.xml")
+            appdata = os.path.join(
+                tmpdir,
+                os.path.splitext(filename)[0] + ".appdata.xml",
+            )
             with open(appdata, "w") as f:
                 f.write("""<application></application>""")
 

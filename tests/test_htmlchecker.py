@@ -26,7 +26,7 @@ import sys
 import unittest
 
 tests_dir = os.path.dirname(__file__)
-checker_path = os.path.join(tests_dir, '..', 'src')
+checker_path = os.path.join(tests_dir, "..", "src")
 sys.path.append(checker_path)
 
 from checker import ManifestChecker
@@ -46,12 +46,18 @@ class TestHTMLChecker(unittest.TestCase):
         self.assertIsNotNone(data)
         self.assertEqual(data.filename, "flash_player_sa_linux.x86_64.tar.gz")
         self.assertIsNotNone(data.new_version)
-        self.assertRegex(data.new_version.url, r"^https?://fpdownload\.macromedia\.com/pub/flashplayer/updaters/.+/flash_player_sa_linux\.x86_64\.tar\.gz$")
+        self.assertRegex(
+            data.new_version.url,
+            r"^https?://fpdownload\.macromedia\.com/pub/flashplayer/updaters/.+/flash_player_sa_linux\.x86_64\.tar\.gz$",  # noqa: E501
+        )
         self.assertIsInstance(data.new_version.size, int)
         self.assertGreater(data.new_version.size, 0)
         self.assertIsNotNone(data.new_version.checksum)
         self.assertIsInstance(data.new_version.checksum, str)
-        self.assertNotEqual(data.new_version.checksum, "0000000000000000000000000000000000000000000000000000000000000000")
+        self.assertNotEqual(
+            data.new_version.checksum,
+            "0000000000000000000000000000000000000000000000000000000000000000",
+        )
 
     def _find_by_filename(self, ext_data, filename):
         for data in ext_data:
@@ -61,5 +67,5 @@ class TestHTMLChecker(unittest.TestCase):
             return None
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
