@@ -1,0 +1,105 @@
+{
+    "app-id" : "com.adobe.Flash-Player-Projector",
+    "runtime" : "org.freedesktop.Platform",
+    "runtime-version" : "19.08",
+    "sdk" : "org.freedesktop.Sdk",
+    "command" : "flashplayer",
+    "tags": ["proprietary"],
+    "finish-args" : [
+        /* X11 + XShm access */
+        "--share=ipc", "--socket=x11",
+        /* GPU acceleration */
+        "--device=dri",
+        /* Play sounds */
+        "--socket=pulseaudio",
+        /* Get access to the files */
+        "--filesystem=host:ro",
+        "--filesystem=xdg-run/gvfs:ro"
+    ],
+    "modules" : [
+        {
+            "name" : "flashplayer",
+            "buildsystem" : "simple",
+            "build-commands" : [
+                "make install",
+                "install -D -t /app/bin/ apply_extra",
+                "install flashplayer /app/bin",
+                "install -Dm644 64x64_com.adobe.Flash-Player-Projector.png /app/share/icons/hicolor/64x64/apps/com.adobe.Flash-Player-Projector.png",
+                "install -Dm644 128x128_com.adobe.Flash-Player-Projector.png /app/share/icons/hicolor/128x128/apps/com.adobe.Flash-Player-Projector.png",
+                "install -Dm644 256x256_com.adobe.Flash-Player-Projector.png /app/share/icons/hicolor/256x256/apps/com.adobe.Flash-Player-Projector.png",
+                "install -Dm644 -t /app/share/icons/hicolor/scalable/apps/ com.adobe.Flash-Player-Projector.svg",
+                "install -Dm644 -t /app/share/applications/ com.adobe.Flash-Player-Projector.desktop",
+                "install -Dm644 -t /app/share/metainfo/ com.adobe.Flash-Player-Projector.appdata.xml"
+            ],
+            "sources" : [
+                {
+                    "type" : "script",
+                    "dest-filename" : "flashplayer",
+                    "commands": [
+                       "LD_PRELOAD=/app/lib/libfix-config-location.so exec /app/extra/flashplayer \"$@\""
+                    ]
+                },
+                {
+                   "type" : "script",
+                   "dest-filename": "apply_extra",
+                   "commands": [
+                       "tar xzf flash_player_sa_linux.x86_64.tar.gz",
+                       "rm -f flash_player_sa_linux.x86_64.tar.gz"
+                   ]
+                },
+                {
+                   "type" : "file",
+                   "path" : "Makefile"
+                },
+                {
+                   "type" : "file",
+                   "path" : "fix-config-location.c"
+                },
+                {
+                   "type" : "file",
+                   "path" : "directories.h"
+                },
+                {
+                    "type" : "extra-data",
+                    "filename" : "flash_player_sa_linux.x86_64.tar.gz",
+                    "only-arches": ["x86_64"],
+                    "url" : "https://fpdownload.macromedia.com/pub/flashplayer/updaters/31/flash_player_sa_linux.x86_64.tar.gz",
+                    "sha256" : "0000000000000000000000000000000000000000000000000000000000000000",
+                    "size" : 0,
+                    "x-checker-data": {
+                        "type": "html",
+                        "url": "https://www.adobe.com/support/flashplayer/debug_downloads.html",
+                        "version-pattern": "The latest versions are <span>([\\d\\.-]*)<\\/span>",
+                        "url-pattern": "(https:\\/\\/fpdownload\\.macromedia\\.com\\/pub\\/flashplayer\\/updaters\\/\\d+\\/flash_player_sa_linux\\.x86_64\\.tar\\.gz)"
+                    }
+                },
+                {
+                    "type" : "file",
+                    "url" : "https://helpx.adobe.com/content/dam/help/mnemonics/flashplayer_app_RGB.svg",
+                    "sha256" : "97fc022ae65f37a2e36d6be71c651dbd3d2f7c82f9f89ba13ea3e6cf9be3144c",
+                    "dest-filename" : "com.adobe.Flash-Player-Projector.svg"
+                },
+                {
+                    "type" : "file",
+                    "path" : "256x256_com.adobe.Flash-Player-Projector.png"
+                },
+                {
+                    "type" : "file",
+                    "path" : "128x128_com.adobe.Flash-Player-Projector.png"
+                },
+                {
+                    "type" : "file",
+                    "path" : "64x64_com.adobe.Flash-Player-Projector.png"
+                },
+                {
+                    "type" : "file",
+                    "path" : "com.adobe.Flash-Player-Projector.desktop"
+                },
+                {
+                    "type" : "file",
+                    "path" : "com.adobe.Flash-Player-Projector.appdata.xml"
+                }
+            ]
+        }
+    ]
+}
