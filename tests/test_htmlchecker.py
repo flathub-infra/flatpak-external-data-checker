@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-# Copyright © 2019 Endless Mobile, Inc.
+# Copyright © 2019 Bastien Nocera <hadess@hadess.net>
 #
 # Authors:
-#       Andre Moreira Magalhaes <andre@endlessm.com>
+#       Bastien Nocera <hadess@hadess.net>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
