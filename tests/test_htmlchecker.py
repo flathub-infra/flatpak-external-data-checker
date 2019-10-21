@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # Copyright © 2019 Bastien Nocera <hadess@hadess.net>
+# Copyright © 2019 Endless Mobile, Inc.
 #
 # Authors:
 #       Bastien Nocera <hadess@hadess.net>
+#       Will Thompson <wjt@endlessm.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,13 +29,12 @@ tests_dir = os.path.dirname(__file__)
 checker_path = os.path.join(tests_dir, '..', 'src')
 sys.path.append(checker_path)
 
-from lib.externaldata import ExternalData
 from checker import ManifestChecker
 
 TEST_MANIFEST = os.path.join(tests_dir, "com.adobe.Flash-Player-Projector.json")
 
 
-class TestFirefoxChecker(unittest.TestCase):
+class TestHTMLChecker(unittest.TestCase):
     def setUp(self):
         logging.basicConfig(level=logging.DEBUG)
 
@@ -41,15 +42,8 @@ class TestFirefoxChecker(unittest.TestCase):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = checker.check()
 
-        removed = [ data for data in ext_data if data.state == ExternalData.State.REMOVED ]
-        added = [ data for data in ext_data if data.state == ExternalData.State.ADDED ]
-        updated = [ data for data in ext_data if data.state == ExternalData.State.VALID ]
-
-        self.assertEqual(len(removed), 0)
-        self.assertEqual(len(added), 0)
-        self.assertEqual(len(updated), 1)
-
-        data = updated[0]
+        data = self._find_by_filename(ext_data, "flash_player_sa_linux.x86_64.tar.gz")
+        self.assertIsNotNone(data)
         self.assertEqual(data.filename, "flash_player_sa_linux.x86_64.tar.gz")
         self.assertIsNotNone(data.new_version)
         self.assertRegex(data.new_version.url, r"^https?://fpdownload\.macromedia\.com/pub/flashplayer/updaters/.+/flash_player_sa_linux\.x86_64\.tar\.gz$")
@@ -58,6 +52,14 @@ class TestFirefoxChecker(unittest.TestCase):
         self.assertIsNotNone(data.new_version.checksum)
         self.assertIsInstance(data.new_version.checksum, str)
         self.assertNotEqual(data.new_version.checksum, "0000000000000000000000000000000000000000000000000000000000000000")
+
+    def _find_by_filename(self, ext_data, filename):
+        for data in ext_data:
+            if data.filename == filename:
+                return data
+        else:
+            return None
+
 
 if __name__ == '__main__':
     unittest.main()
