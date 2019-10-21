@@ -82,6 +82,20 @@ The version number for the latest version can be detected in two ways:
   version. (This follows the convention used by
   [`debian/watch`](https://wiki.debian.org/debian/watch) files.)
 
+#### HTML checker
+
+Both the version number and the download URL will be gathered from a static
+HTML page which contains this information:
+
+```json
+"x-checker-data": {•
+    "type": "html",•
+    "url": "https://www.example.com/download.html",
+    "version-pattern": "The latest version is ([\d\.-]*)",
+    "url-pattern": "https://www.example.com/pub/foo/v(\d+)/foo.tar.gz"
+}•
+```
+
 #### Debian repo checker
 
 For the **DebianRepoChecker**, which deals only with deb packages, it

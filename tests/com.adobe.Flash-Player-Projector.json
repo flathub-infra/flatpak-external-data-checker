@@ -1,0 +1,31 @@
+{
+    "app-id" : "com.adobe.Flash-Player-Projector",
+    "runtime" : "org.freedesktop.Platform",
+    "runtime-version" : "19.08",
+    "sdk" : "org.freedesktop.Sdk",
+    "command" : "flashplayer",
+    "tags": ["proprietary"],
+    "modules" : [
+        {
+            "name" : "flashplayer",
+            "buildsystem" : "simple",
+            "build-commands" : [],
+            "sources" : [
+                {
+                    "type" : "extra-data",
+                    "filename" : "flash_player_sa_linux.x86_64.tar.gz",
+                    "only-arches": ["x86_64"],
+                    "url" : "https://fpdownload.macromedia.com/pub/flashplayer/updaters/31/flash_player_sa_linux.x86_64.tar.gz",
+                    "sha256" : "0000000000000000000000000000000000000000000000000000000000000000",
+                    "size" : 0,
+                    "x-checker-data": {
+                        "type": "html",
+                        "url": "https://www.adobe.com/support/flashplayer/debug_downloads.html",
+                        "version-pattern": "The latest versions are <span>([\\d\\.-]*)<\\/span>",
+                        "url-pattern": "(https:\\/\\/fpdownload\\.macromedia\\.com\\/pub\\/flashplayer\\/updaters\\/\\d+\\/flash_player_sa_linux\\.x86_64\\.tar\\.gz)"
+                    }
+                }
+            ]
+        }
+    ]
+}
