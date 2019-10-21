@@ -29,6 +29,7 @@ from lib import utils
 
 log = logging.getLogger(__name__)
 
+
 def get_latest(checker_data, pattern_name, html):
     """
     If checker_data contains a "pattern", matches 'html' against it and returns the
@@ -48,26 +49,26 @@ def get_latest(checker_data, pattern_name, html):
 
 class HTMLChecker(Checker):
     def _should_check(self, external_data):
-        return external_data.checker_data.get('type') == 'html'
+        return external_data.checker_data.get("type") == "html"
 
     def check(self, external_data):
         if not self._should_check(external_data):
-            log.debug('%s is not a html type ext data', external_data.filename)
+            log.debug("%s is not a html type ext data", external_data.filename)
             return
 
-        url = external_data.checker_data.get('url')
+        url = external_data.checker_data.get("url")
         log.debug("Getting extra data info from %s; may take a while", url)
         resp = urllib.request.urlopen(url)
         html = resp.read().decode()
 
-        latest_version = get_latest(external_data.checker_data,
-                'version-pattern', html)
-        latest_url = get_latest(external_data.checker_data,
-                'url-pattern', html)
+        latest_version = get_latest(external_data.checker_data, "version-pattern", html)
+        latest_url = get_latest(external_data.checker_data, "url-pattern", html)
         if not latest_version:
-            log.warning('%s had no available version information', external_data.filename)
+            log.warning(
+                "%s had no available version information", external_data.filename
+            )
         if not latest_url:
-            log.warning('%s had no available URL', external_data.filename)
+            log.warning("%s had no available URL", external_data.filename)
         if not latest_version or not latest_url:
             return
 
@@ -77,10 +78,10 @@ class HTMLChecker(Checker):
         try:
             new_version, _ = utils.get_extra_data_info_from_url(latest_url)
         except urllib.error.HTTPError as e:
-            log.warning('%s returned %s', latest_url, e)
+            log.warning("%s returned %s", latest_url, e)
             external_data.state = ExternalData.State.BROKEN
         except Exception:
-            log.exception('Unexpected exception while checking %s', latest_url)
+            log.exception("Unexpected exception while checking %s", latest_url)
             external_data.state = ExternalData.State.BROKEN
         else:
             external_data.state = ExternalData.State.VALID
