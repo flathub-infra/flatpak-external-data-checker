@@ -34,6 +34,11 @@ it should display messages about any broken or outdated external data.
 
 ### Running in a container with Podman
 
+`run-in-container.sh` builds a container using `podman` and the `Dockerfile` in
+this repository, then runs it with appropriate UID and filesystem mappings.
+This is a convenient way to get all necessary dependencies regardless of your
+host system's distribution.
+
 ```bash
 ~/src/endlessm/flatpak-external-data-checker/run-in-container.sh \
     ~/src/endlessm/flatpak-external-data-checker/flatpak-external-data-checker \
@@ -174,6 +179,9 @@ the binaries for.
 # More information
 ./run-in-container.sh python3 -m unittest --help
 ```
+
+You can of course install the necessary modules on your host system and omit
+`./run-in-container.sh` if you prefer.
 
 ## License and Copyright
 
