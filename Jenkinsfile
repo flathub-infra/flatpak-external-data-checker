@@ -42,7 +42,6 @@ node('flatpak-builder') {
                                 sh '''
                                     export GIT_SSH_COMMAND=\'ssh -oStrictHostKeyChecking=no\'
                                     ./wrappers/jenkins-check-flatpak-external-apps \
-                                        --ext-data-checker=./src/flatpak-external-data-checker \
                                         --update \
                                         --verbose
                                 '''

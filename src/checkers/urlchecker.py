@@ -36,8 +36,8 @@ import logging
 import urllib.error
 import re
 
-from lib.externaldata import ExternalData, Checker
-from lib import utils
+from src.lib.externaldata import ExternalData, Checker
+from src.lib import utils
 
 log = logging.getLogger(__name__)
 

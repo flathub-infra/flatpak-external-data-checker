@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-# Copyright © 2019 Endless Mobile, Inc.
 #
-# Authors:
-#       Will Thompson <wjt@endlessm.com>
+# flatpak-extra-data-checker: A tool for checking the status of
+# the extra data in a Flatpak manifest.
+#
+# Copyright © 2019 Endless Mobile, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,26 +18,13 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-import unittest
 
-from src.lib.utils import parse_github_url
+import sys
+from pathlib import Path
 
+exe = Path(sys.argv[0]).resolve()
+sys.path.insert(0, str(exe.parent))
 
-class TestParseGitHubUrl(unittest.TestCase):
-    def test_ssh(self):
-        self.assertEqual(
-            parse_github_url(
-                "git@github.com:endlessm/flatpak-external-data-checker.git"
-            ),
-            "endlessm/flatpak-external-data-checker",
-        )
-
-    def test_https(self):
-        self.assertEqual(
-            parse_github_url("https://github.com/flathub/com.dropbox.Client"),
-            "flathub/com.dropbox.Client",
-        )
-
-
-if __name__ == "__main__":
-    unittest.main()
+from src.main import main  # noqa: E402
+if __name__ == '__main__':
+    main()

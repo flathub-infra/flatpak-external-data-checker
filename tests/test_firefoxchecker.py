@@ -20,17 +20,12 @@
 
 import logging
 import os
-import sys
 import unittest
 
-tests_dir = os.path.dirname(__file__)
-checker_path = os.path.join(tests_dir, '..', 'src')
-sys.path.append(checker_path)
+from src.lib.externaldata import ExternalData
+from src.checker import ManifestChecker
 
-from lib.externaldata import ExternalData
-from checker import ManifestChecker
-
-TEST_MANIFEST = os.path.join(tests_dir, "org.mozilla.Firefox.json")
+TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.mozilla.Firefox.json")
 
 
 class TestFirefoxChecker(unittest.TestCase):
@@ -41,9 +36,12 @@ class TestFirefoxChecker(unittest.TestCase):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = checker.check()
 
-        removed = [ data for data in ext_data if data.state == ExternalData.State.REMOVED ]
-        added = [ data for data in ext_data if data.state == ExternalData.State.ADDED ]
-        updated = [ data for data in ext_data if data.state == ExternalData.State.VALID ]
+        def data_with_state(state):
+            return [data for data in ext_data if data.state == state]
+
+        removed = data_with_state(ExternalData.State.REMOVED)
+        added = data_with_state(ExternalData.State.ADDED)
+        updated = data_with_state(ExternalData.State.VALID)
 
         self.assertEqual(len(removed), 2)
         self.assertGreater(len(added), 0)
@@ -52,7 +50,10 @@ class TestFirefoxChecker(unittest.TestCase):
         data = updated[0]
         self.assertEqual(data.filename, "firefox.tar.bz2")
         self.assertIsNotNone(data.new_version)
-        self.assertRegex(data.new_version.url, r"^https?://.*/linux-x86_64/en-US/firefox-.+\.tar\.bz2$")
+        self.assertRegex(
+            data.new_version.url,
+            r"^https?://.*/linux-x86_64/en-US/firefox-.+\.tar\.bz2$",
+        )
         self.assertIsInstance(data.new_version.size, int)
         self.assertGreater(data.new_version.size, 0)
         self.assertIsNotNone(data.new_version.checksum)
@@ -63,7 +64,10 @@ class TestFirefoxChecker(unittest.TestCase):
 
         for data in added:
             self.assertIsNotNone(data.current_version)
-            self.assertRegex(data.current_version.url, r"^https?://.*/linux-x86_64/.*/.*\.xpi$")
+            self.assertRegex(
+                data.current_version.url,
+                r"^https?://.*/linux-x86_64/.*/.*\.xpi$",
+            )
             self.assertIsInstance(data.current_version.size, int)
             self.assertGreater(data.current_version.size, 0)
             self.assertIsNotNone(data.current_version.checksum)

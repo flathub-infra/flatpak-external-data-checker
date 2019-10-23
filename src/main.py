@@ -31,12 +31,12 @@ import sys
 
 from github import Github
 
-from lib.utils import parse_github_url
-from lib.externaldata import ExternalData
-import checker
+from src.lib.utils import parse_github_url
+from src.lib.externaldata import ExternalData
+from src import checker
 
 
-log = logging.getLogger(os.path.basename(__file__))
+log = logging.getLogger(__name__)
 
 
 @contextlib.contextmanager
@@ -222,7 +222,3 @@ def main():
             log.warning("Can't automatically fix any of the above issues")
 
         exit(1)
-
-
-if __name__ == "__main__":
-    main()

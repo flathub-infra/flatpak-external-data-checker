@@ -34,9 +34,14 @@ it should display messages about any broken or outdated external data.
 
 ### Running in a container with Podman
 
+`run-in-container.sh` builds a container using `podman` and the `Dockerfile` in
+this repository, then runs it with appropriate UID and filesystem mappings.
+This is a convenient way to get all necessary dependencies regardless of your
+host system's distribution.
+
 ```bash
 ~/src/endlessm/flatpak-external-data-checker/run-in-container.sh \
-    ~/src/endlessm/flatpak-external-data-checker/src/flatpak-external-data-checker \
+    ~/src/endlessm/flatpak-external-data-checker/flatpak-external-data-checker \
     [ARGS …] \
     ~/src/flathub/com.example.App/com.example.App.json
 ```
@@ -161,6 +166,22 @@ on the extra-data source itself to i386 or x86_64:
 
 FlashChecker will use this to determine which architecture to check
 the binaries for.
+
+## Contributing
+
+```bash
+# Run all the tests (some of which need an internet connection):
+./run-in-container.sh python3 -m unittest discover
+
+# Run one suite of tests
+./run-in-container.sh python3 -m unittest tests.test_appdata
+
+# More information
+./run-in-container.sh python3 -m unittest --help
+```
+
+You can of course install the necessary modules on your host system and omit
+`./run-in-container.sh` if you prefer.
 
 ## License and Copyright
 
