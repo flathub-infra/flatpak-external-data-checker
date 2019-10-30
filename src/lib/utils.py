@@ -24,6 +24,7 @@ import hashlib
 import logging
 import os
 import re
+import socket
 import subprocess
 import tempfile
 import urllib.request
@@ -65,7 +66,7 @@ def get_timestamp_from_url(url):
 
 
 @retry(
-    retry=retry_if_exception_type(ConnectionResetError),
+    retry=retry_if_exception_type((ConnectionResetError, socket.timeout)),
     stop=stop_after_attempt(3),
     wait=wait_fixed(2),
     before_sleep=before_sleep_log(log, logging.DEBUG),
