@@ -198,7 +198,10 @@ def main():
     args = parser.parse_args()
 
     level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(level=level)
+    logging.basicConfig(
+        level=level,
+        format="+ %(asctime)s %(levelname)7s %(name)s: %(message)s"
+    )
 
     manifest_checker = checker.ManifestChecker(args.manifest)
     filter_type = ExternalData.TYPES.get(args.filter_type)
