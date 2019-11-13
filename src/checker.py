@@ -37,10 +37,6 @@ from gi.repository import Json  # noqa: E402
 log = logging.getLogger(__name__)
 
 
-class NoManifestCheckersFound(Exception):
-    pass
-
-
 class ManifestChecker:
     yaml = YAML()
     # ruamel preserves some formatting (such as comments and blank lines) but
@@ -55,6 +51,7 @@ class ManifestChecker:
 
         # Initialize checkers
         self._checkers = [checker() for checker in ALL_CHECKERS]
+        assert self._checkers
 
         # Map from filename to parsed contents of that file. Sources may be
         # specified as references to external files, which is why there can be
@@ -154,10 +151,6 @@ class ManifestChecker:
         It initializes an internal list of all the external data objects
         found in the manifest.
         '''
-
-        if not self._checkers:
-            raise NoManifestCheckersFound()
-
         ext_data_checked = []
 
         for _, module_data in self._modules_data.items():
