@@ -206,11 +206,7 @@ def main():
     manifest_checker = checker.ManifestChecker(args.manifest)
     filter_type = ExternalData.TYPES.get(args.filter_type)
 
-    try:
-        manifest_checker.check(filter_type)
-    except checker.NoManifestCheckersFound:
-        sys.stderr.write('No manifest checkers were found\n')
-        exit(2)
+    manifest_checker.check(filter_type)
 
     if print_outdated_external_data(manifest_checker):
         if args.update or args.commit_only:
