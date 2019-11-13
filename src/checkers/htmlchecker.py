@@ -36,15 +36,18 @@ def get_latest(checker_data, pattern_name, html):
     first capture group (which is assumed to be the version or URL).
     """
     try:
-        pattern = checker_data[pattern_name]
+        pattern = re.compile(checker_data[pattern_name])
     except KeyError:
         return None
 
-    m = re.search(pattern, html)
+    m = pattern.search(html)
     if m is None:
+        log.debug("%s %s did not match", pattern_name, pattern)
         return None
 
-    return m.group(1)
+    result = m.group(1)
+    log.debug("%s %s matched: %s", pattern_name, pattern, result)
+    return result
 
 
 class HTMLChecker(Checker):
