@@ -21,6 +21,7 @@
 import datetime as dt
 import glob
 import hashlib
+import json
 import logging
 import os
 import re
@@ -29,6 +30,8 @@ import subprocess
 import tempfile
 import urllib.request
 
+from collections import OrderedDict
+from ruamel.yaml import YAML
 from tenacity import (
     before_sleep_log,
     retry,
@@ -38,7 +41,9 @@ from tenacity import (
 )
 from .externaldata import ExternalFile
 
-from gi.repository import GLib
+import gi
+gi.require_version('Json', '1.0')
+from gi.repository import GLib, Json  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -152,3 +157,53 @@ def parse_github_url(url):
         return m.group("org_repo")
     else:
         raise ValueError("{!r} doesn't look like a Git URL")
+
+
+def read_json_manifest(manifest_path):
+    '''Read manifest from 'manifest_path', which may contain C-style
+    comments or multi-line strings (accepted by json-glib and hence
+    flatpak-builder, but not Python's json module).'''
+
+    # Round-trip through json-glib to get rid of comments, multi-line
+    # strings, and any other invalid JSON
+    parser = Json.Parser()
+    parser.load_from_file(manifest_path)
+    root = parser.get_root()
+    clean_manifest = Json.to_string(root, False)
+
+    return json.loads(clean_manifest, object_pairs_hook=OrderedDict)
+
+
+_yaml = YAML()
+# ruamel preserves some formatting (such as comments and blank lines) but
+# not the indentation of the source file. These settings match the style
+# recommended at <https://github.com/flathub/flathub/wiki/YAML-Style-Guide>.
+_yaml.indent(mapping=2, sequence=4, offset=2)
+
+
+def read_yaml_manifest(manifest_path):
+    '''Read a YAML manifest from 'manifest_path'.'''
+    with open(manifest_path, "r") as f:
+        return _yaml.load(f)
+
+
+def read_manifest(manifest_path):
+    """Reads a JSON or YAML manifest from 'manifest_path'."""
+    _, ext = os.path.splitext(manifest_path)
+    if ext in (".yaml", ".yml"):
+        return read_yaml_manifest(manifest_path)
+    else:
+        return read_json_manifest(manifest_path)
+
+
+def dump_manifest(contents, manifest_path):
+    """Writes back 'contents' to 'manifest_path'.
+
+    For YAML, we make a best-effort attempt to preserve
+    formatting; for JSON, we use the canonical 4-space indentation."""
+    _, ext = os.path.splitext(manifest_path)
+    with open(manifest_path, "w", encoding="utf-8") as fp:
+        if ext in (".yaml", ".yml"):
+            _yaml.dump(contents, fp)
+        else:
+            json.dump(obj=contents, fp=fp, indent=4)

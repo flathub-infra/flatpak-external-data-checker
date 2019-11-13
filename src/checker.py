@@ -24,26 +24,15 @@ from .lib.appdata import add_release_to_file
 from .lib.externaldata import (
     ModuleData, ExternalData, ExternalDataSource, ExternalDataFinishArg,
 )
+from .lib.utils import read_manifest, dump_manifest
 
-import json
 import logging
 import os
-from ruamel.yaml import YAML
-
-import gi
-gi.require_version('Json', '1.0')
-from gi.repository import Json  # noqa: E402
 
 log = logging.getLogger(__name__)
 
 
 class ManifestChecker:
-    yaml = YAML()
-    # ruamel preserves some formatting (such as comments and blank lines) but
-    # not the indentation of the source file. These settings match the style
-    # recommended at <https://github.com/flathub/flathub/wiki/YAML-Style-Guide>.
-    yaml.indent(mapping=2, sequence=4, offset=2)
-
     def __init__(self, manifest):
         self._manifest = manifest
         self._modules_data = {}
@@ -63,47 +52,16 @@ class ManifestChecker:
         # Map from manifest path to [ExternalData]
         self._collect_external_data(self._manifest, data)
 
-    @classmethod
-    def _read_json_manifest(cls, manifest_path):
-        '''Read manifest from 'manifest_path', which may contain C-style
-        comments or multi-line strings (accepted by json-glib and hence
-        flatpak-builder, but not Python's json module).'''
-
-        # Round-trip through json-glib to get rid of comments, multi-line
-        # strings, and any other invalid JSON
-        parser = Json.Parser()
-        parser.load_from_file(manifest_path)
-        root = parser.get_root()
-        clean_manifest = Json.to_string(root, False)
-
-        return json.loads(clean_manifest, object_pairs_hook=OrderedDict)
-
-    @classmethod
-    def _read_yaml_manifest(cls, manifest_path):
-        '''Read a YAML manifest from 'manifest_path'.'''
-        with open(manifest_path, 'r') as f:
-            return cls.yaml.load(f)
-
     def _read_manifest(self, manifest_path):
-        _, ext = os.path.splitext(manifest_path)
-        if ext in ('.yaml', '.yml'):
-            contents = self._read_yaml_manifest(manifest_path)
-        else:
-            contents = self._read_json_manifest(manifest_path)
+        contents = read_manifest(manifest_path)
         self._manifest_contents[manifest_path] = contents
         return contents
 
     def _dump_manifest(self, path):
         """Writes back the cached contents of 'path', which may have been
-        modified. For YAML, we make a best-effort attempt to preserve
-        formatting; for JSON, we use the canonical 4-space indentation."""
+        modified."""
         contents = self._manifest_contents[path]
-        _, ext = os.path.splitext(path)
-        with open(path, "w", encoding="utf-8") as fp:
-            if ext in ('.yaml', '.yml'):
-                self.yaml.dump(contents, fp)
-            else:
-                json.dump(obj=contents, fp=fp, indent=4)
+        dump_manifest(contents, path)
 
     def _collect_external_data(self, path, data):
         self._get_module_data_from_json(path, data)
