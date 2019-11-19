@@ -32,7 +32,6 @@ EXTERNAL_MANIFESTS = (
     ExternalManifest("git@github.com:flathub/com.visualstudio.code"),
     ExternalManifest("git@github.com:flathub/io.exodus.Exodus"),
     ExternalManifest("git@github.com:flathub/org.geogebra.GeoGebra"),
-    ExternalManifest("git@github.com:flathub/us.zoom.Zoom"),
 )
 
 
