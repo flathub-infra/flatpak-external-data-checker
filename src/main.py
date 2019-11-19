@@ -148,7 +148,8 @@ def open_pr(subject, body, branch):
         log.debug("origin repo not writable; creating fork")
         fork = user.create_fork(origin_repo)
         remote = user.login
-        check_call(("git", "remote", "add", remote, fork.ssh_url))
+        remote_url = f"https://{github_token}:x-oauth-basic@github.com/{fork.full_name}"
+        check_call(("git", "remote", "add", remote, remote_url))
         repo = fork
 
     base = "master"
