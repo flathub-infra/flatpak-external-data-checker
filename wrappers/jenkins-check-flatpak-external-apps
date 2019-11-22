@@ -16,22 +16,6 @@ EXTERNAL_MANIFESTS = (
     ExternalManifest("git@github.com:endlessm/eos-google-chrome-app", "com.google.Chrome.json"),
     ExternalManifest("git@github.com:endlessm/firefox-flatpak", "org.mozilla.Firefox.json"),
     ExternalManifest("git@github.com:endlessm/firefox-flatpak", "flash/com.adobe.FlashPlayer.NPAPI.json"),
-    ExternalManifest("git@github.com:flathub/com.adobe.Flash-Player-Projector"),
-    ExternalManifest("git@github.com:flathub/com.anydesk.Anydesk"),
-    ExternalManifest("git@github.com:flathub/com.axosoft.GitKraken"),
-    ExternalManifest("git@github.com:flathub/com.discordapp.Discord"),
-    ExternalManifest("git@github.com:flathub/com.dropbox.Client"),
-    ExternalManifest("git@github.com:flathub/com.google.AndroidStudio"),
-    ExternalManifest("git@github.com:flathub/com.remarkable.reMarkable"),
-    ExternalManifest("git@github.com:flathub/com.skype.Client"),
-    ExternalManifest("git@github.com:flathub/com.slack.Slack"),
-    ExternalManifest("git@github.com:flathub/com.spotify.Client"),
-    ExternalManifest("git@github.com:flathub/com.sublimetext.three"),
-    ExternalManifest("git@github.com:flathub/com.unity.UnityHub"),
-    ExternalManifest("git@github.com:flathub/com.viber.Viber"),
-    ExternalManifest("git@github.com:flathub/com.visualstudio.code"),
-    ExternalManifest("git@github.com:flathub/io.exodus.Exodus"),
-    ExternalManifest("git@github.com:flathub/org.geogebra.GeoGebra"),
 )
 
 
