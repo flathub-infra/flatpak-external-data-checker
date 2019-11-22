@@ -29,6 +29,9 @@ from .lib.utils import read_manifest, dump_manifest
 import logging
 import os
 
+import gi
+from gi.repository import GLib
+
 log = logging.getLogger(__name__)
 
 
@@ -77,7 +80,14 @@ class ManifestChecker:
             if isinstance(module, str):
                 module_path = os.path.join(os.path.dirname(self._manifest),
                                            module)
-                module = self._read_manifest(module_path)
+                try:
+                    module = self._read_manifest(module_path)
+                except GLib.Error as err:
+                    if err.matches(GLib.quark_from_string('g-file-error-quark'), 4):
+                        log.info("Referenced file not found: %s", module)
+                        continue
+
+                    raise
             else:
                 module_path = path
 
