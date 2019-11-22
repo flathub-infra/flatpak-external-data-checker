@@ -140,6 +140,7 @@ def open_pr(subject, body, branch):
         "git", "remote", "get-url", "origin",
     )).decode("utf-8").strip()
     origin_repo = g.get_repo(parse_github_url(origin_url))
+
     if origin_repo.permissions.push:
         log.debug("origin repo is writable")
         remote = "origin"
@@ -148,9 +149,10 @@ def open_pr(subject, body, branch):
         log.debug("origin repo not writable; creating fork")
         fork = user.create_fork(origin_repo)
         remote = user.login
-        remote_url = f"https://{github_token}:x-oauth-basic@github.com/{fork.full_name}"
-        check_call(("git", "remote", "add", remote, remote_url))
         repo = fork
+
+    remote_url = f"https://{github_token}:x-oauth-basic@github.com/{repo.full_name}"
+    check_call(("git", "remote", "set-url", remote, remote_url))
 
     base = "master"
     head = "{}:{}".format(repo.owner.login, branch)
