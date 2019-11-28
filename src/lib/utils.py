@@ -50,7 +50,7 @@ log = logging.getLogger(__name__)
 # With the default urllib User-Agent, dl.discordapp.net returns 403
 USER_AGENT = (
     "flatpak-external-data-checker "
-    "(+https://github.com/endlessm/flatpak-external-data-checker)"
+    "(+https://github.com/flathub/flatpak-external-data-checker)"
 )
 HEADERS = {"User-Agent": USER_AGENT}
 TIMEOUT_SECONDS = 60
