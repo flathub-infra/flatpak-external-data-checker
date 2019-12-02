@@ -116,17 +116,24 @@ def get_extra_data_info_from_url(url):
     return external_file, data
 
 
+def run_command(argv, cwd=None, bwrap=True):
+    command = []
+    if bwrap:
+        command.append("bwrap")
+        for path in ("/usr", "/lib", "/lib64", "/bin", "/proc"):
+            command.extend(["--ro-bind", path, path])
+
+    bwrap_cmd.extend(argv)
+    p = subprocess.run(command, cwd=cwd, stderr=subprocess.PIPE, encoding="utf-8")
+    return p
+
+
 def _check_bwrap():
-    bwrap_cmd = ["bwrap"]
-    for path in ("/usr", "/lib", "/lib64", "/bin", "/proc"):
-        bwrap_cmd.extend(["--ro-bind", path, path])
-
-    bwrap_cmd.extend(["/usr/bin/true"])
-
-    p = subprocess.run(bwrap_cmd)
+    p = run_command(["/usr/bin/true"])
     if p.returncode == 0:
         return True
 
+    logging.warning("bwrap is not available")
     return False
 
 
@@ -142,10 +149,10 @@ def extract_appimage_version(basename, data):
             fp.write(data)
 
         os.chmod(appimage_path, 0o755)
-        if _check_bwrap():
-            args = ["bwrap"]
-            for path in ("/usr", "/lib", "/lib64", "/bin", "/proc"):
-                args.extend(["--ro-bind", path, path])
+        args = []
+        bwrap = _check_bwrap()
+
+        if bwrap:
             args.extend(
                 [
                     "--bind",
@@ -155,13 +162,12 @@ def extract_appimage_version(basename, data):
                     "--new-session",
                     "--unshare-all"
                 ]
-             )
-        else:
-            args = []
-            args.extend([appimage_path,"--appimage-extract"])
+            )
+
+        args.extend([appimage_path,"--appimage-extract"])
 
         log.debug("$ %s", " ".join(args))
-        p = subprocess.run(args, cwd=tmpdir, stderr=subprocess.PIPE, encoding="utf-8")
+        p = run_command(args, cwd=tmpdir, bwrap=bwrap)
 
         if p.returncode != 0:
             log.error("--appimage-extract failed\n%s", p.stderr)
