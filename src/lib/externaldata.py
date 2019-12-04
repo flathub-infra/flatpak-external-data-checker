@@ -133,6 +133,9 @@ class ExternalDataSource(ExternalData):
         external_data = []
 
         for source in sources:
+            if isinstance(source, str):
+                continue
+
             data = cls.from_source(source_path, source, sources)
             if data:
                 external_data.append(data)
