@@ -64,6 +64,11 @@ class UpdateEverythingChecker(Checker):
         )
 
 
+class RemoveEverythingChecker(Checker):
+    def check(self, external_data):
+        external_data.state = ExternalData.State.REMOVED
+
+
 class TestExternalDataChecker(unittest.TestCase):
     def setUp(self):
         init_logging()
@@ -214,6 +219,56 @@ modules:
         self._test_update(
             filename, contents, expected_new_contents,
             ["Update UnityHubSetup.AppImage to 1.2.3.4"],
+        )
+
+    def _test_remove(self, filename, contents, expected_new_contents, expected_updates):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest = os.path.join(tmpdir, filename)
+            with open(manifest, "w") as f:
+                f.write(contents)
+
+            checker = ManifestChecker(manifest)
+            checker._checkers = [RemoveEverythingChecker()]
+            checker.check()
+            updates = checker.update_manifests()
+
+            with open(manifest, "r") as f:
+                new_contents = f.read()
+
+            self.assertEqual(new_contents, expected_new_contents)
+            self.assertEqual(updates, expected_updates)
+
+    def test_remove_json(self):
+        filename = "com.example.App.json"
+        contents = """
+{
+    "modules": [
+        {
+            "name": "foo",
+            "sources": [
+                {
+                    "type": "extra-data",
+                    "url": "https://example.com/foo-bar.xpi",
+                    "sha256": "c521e2caf2ce8c8302cc9d8f385648c7d8c76ae29ac24ec0c0ffd3cd67a915fc",
+                    "size": 63236599
+                }
+            ]
+        }
+    ]
+}"""  # noqa: E501
+        expected_new_contents = """
+{{
+    "modules": [
+        {
+            "name": "foo",
+            "sources": []
+        }
+    ]
+}}""".lstrip()  # noqa: E501
+
+        self._test_remove(
+            filename, contents, expected_new_contents,
+            ["Remove foo-bar.xpi"],
         )
 
     def test_check(self):
