@@ -198,7 +198,7 @@ class ManifestChecker:
                 message = "Added {}".format(data.filename)
             elif data.state == ExternalData.State.REMOVED:
                 message = "Removed {}".format(data.filename)
-            if data.new_version.version is not None:
+            elif data.new_version.version is not None:
                 message = "Update {} to {}".format(
                     data.filename, data.new_version.version
                 )
