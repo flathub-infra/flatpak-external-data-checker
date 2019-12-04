@@ -97,10 +97,6 @@ def get_extra_data_info_from_head(url):
 )
 def get_extra_data_info_from_url(url):
     request = urllib.request.Request(url, headers=HEADERS)
-    data = None
-    checksum = ""
-    size = -1
-    real_url = None
 
     with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
         real_url = response.geturl()
