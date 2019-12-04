@@ -26,6 +26,7 @@ import tempfile
 
 from xml.dom import minidom
 
+from src.lib.utils import init_logging
 from src.lib.externaldata import ExternalData, Checker
 from src.checker import ManifestChecker
 
@@ -65,7 +66,7 @@ class UpdateEverythingChecker(Checker):
 
 class TestExternalDataChecker(unittest.TestCase):
     def setUp(self):
-        logging.basicConfig(level=logging.DEBUG)
+        init_logging()
 
     def test_check_filtered(self):
         # Use only the URLChecker which is fast so we don't have to wait a lot

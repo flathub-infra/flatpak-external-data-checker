@@ -31,7 +31,7 @@ import sys
 
 from github import Github
 
-from src.lib.utils import parse_github_url
+from src.lib.utils import parse_github_url, init_logging
 from src.lib.externaldata import ExternalData
 from src import checker
 
@@ -197,11 +197,7 @@ def main():
                         choices=types, default='all')
     args = parser.parse_args()
 
-    level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="+ %(asctime)s %(levelname)7s %(name)s: %(message)s"
-    )
+    init_logging(logging.DEBUG if args.verbose else logging.INFO)
 
     manifest_checker = checker.ManifestChecker(args.manifest)
     filter_type = ExternalData.TYPES.get(args.filter_type)

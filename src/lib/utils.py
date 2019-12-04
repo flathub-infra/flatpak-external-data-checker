@@ -222,3 +222,10 @@ def dump_manifest(contents, manifest_path):
             _yaml.dump(contents, fp)
         else:
             json.dump(obj=contents, fp=fp, indent=4)
+
+
+def init_logging(level=logging.DEBUG):
+    logging.basicConfig(
+        level=level,
+        format="+ %(asctime)s %(levelname)7s %(name)s: %(message)s"
+    )
