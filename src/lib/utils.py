@@ -76,6 +76,25 @@ def get_timestamp_from_url(url):
     wait=wait_fixed(2),
     before_sleep=before_sleep_log(log, logging.DEBUG),
 )
+def get_extra_data_info_from_head(url):
+    request = urllib.request.Request(url, headers=HEADERS, method="HEAD")
+
+    with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+        real_url = response.geturl()
+        info = response.info()
+        size = int(info["Content-Length"])
+
+    return ExternalFile(
+        real_url, None, size, None, _extract_timestamp(info),
+    )
+
+
+@retry(
+    retry=retry_if_exception_type((ConnectionResetError, socket.timeout)),
+    stop=stop_after_attempt(3),
+    wait=wait_fixed(2),
+    before_sleep=before_sleep_log(log, logging.DEBUG),
+)
 def get_extra_data_info_from_url(url):
     request = urllib.request.Request(url, headers=HEADERS)
     data = None
