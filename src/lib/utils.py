@@ -136,6 +136,14 @@ def _check_bwrap():
     logging.warning("bwrap is not available")
     return False
 
+def _check_unappimage():
+    p = run_command(["unappimage", "-v"], bwrap=False)
+    if p.returncode == 1:
+        return True
+
+    logging.warning("unappimage is not available")
+    return False
+
 
 def extract_appimage_version(basename, data):
     """
@@ -148,9 +156,9 @@ def extract_appimage_version(basename, data):
         with open(appimage_path, "wb") as fp:
             fp.write(data)
 
-        os.chmod(appimage_path, 0o755)
         args = []
         bwrap = _check_bwrap()
+        unappimage = _check_unappimage()
 
         if bwrap:
             args.extend(
@@ -164,7 +172,11 @@ def extract_appimage_version(basename, data):
                 ]
             )
 
-        args.extend([appimage_path,"--appimage-extract"])
+        if unappimage:
+            args.extend(['unappimage', appimage_path])
+        else:
+            os.chmod(appimage_path, 0o755)
+            args.extend([appimage_path,"--appimage-extract"])
 
         log.debug("$ %s", " ".join(args))
         p = run_command(args, cwd=tmpdir, bwrap=bwrap)
