@@ -29,6 +29,9 @@ from .lib.utils import read_manifest, dump_manifest
 import logging
 import os
 
+import gi
+from gi.repository import GLib
+
 log = logging.getLogger(__name__)
 
 
@@ -77,7 +80,18 @@ class ManifestChecker:
             if isinstance(module, str):
                 module_path = os.path.join(os.path.dirname(self._manifest),
                                            module)
-                module = self._read_manifest(module_path)
+
+                try:
+                    module = self._read_manifest(module_path)
+                except GLib.Error as err:
+                    if err.matches(GLib.quark_from_string('g-file-error-quark'), 4):
+                        log.info("Referenced file not found: %s", module)
+                        continue
+
+                    raise
+                except FileNotFoundError:
+                    log.info("Referenced file not found: %s", module)
+                    continue
             else:
                 module_path = path
 
@@ -86,6 +100,12 @@ class ManifestChecker:
 
             sources = module.get('sources', [])
             external_sources = [ source for source in sources if isinstance(source, str) ]
+            for source in external_sources:
+                source_path = os.path.join(os.path.dirname(self._manifest), source)
+                source_stat = os.stat(source_path)
+                if source_stat.st_size > 102400:
+                    log.info("External source file is over 100KB, skipping: %s", source)
+                    external_sources.remove(source)
 
             external_data = self._external_data.setdefault(module_path, [])
             datas = ExternalDataSource.from_sources(module_path, sources)

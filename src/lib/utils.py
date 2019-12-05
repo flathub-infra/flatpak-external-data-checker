@@ -50,7 +50,7 @@ log = logging.getLogger(__name__)
 # With the default urllib User-Agent, dl.discordapp.net returns 403
 USER_AGENT = (
     "flatpak-external-data-checker "
-    "(+https://github.com/endlessm/flatpak-external-data-checker)"
+    "(+https://github.com/flathub/flatpak-external-data-checker)"
 )
 HEADERS = {"User-Agent": USER_AGENT}
 TIMEOUT_SECONDS = 60
@@ -116,6 +116,27 @@ def get_extra_data_info_from_url(url):
     return external_file, data
 
 
+def run_command(argv, cwd=None, bwrap=True):
+    command = []
+    if bwrap:
+        command.append("bwrap")
+        for path in ("/usr", "/lib", "/lib64", "/bin", "/proc"):
+            command.extend(["--ro-bind", path, path])
+
+    bwrap_cmd.extend(argv)
+    p = subprocess.run(command, cwd=cwd, stderr=subprocess.PIPE, encoding="utf-8")
+    return p
+
+
+def _check_bwrap():
+    p = run_command(["/usr/bin/true"])
+    if p.returncode == 0:
+        return True
+
+    logging.warning("bwrap is not available")
+    return False
+
+
 def extract_appimage_version(basename, data):
     """
     Saves 'data' to a temporary file with the given basename, executes it (in a sandbox)
@@ -128,24 +149,26 @@ def extract_appimage_version(basename, data):
             fp.write(data)
 
         os.chmod(appimage_path, 0o755)
-        args = ["bwrap"]
-        for path in ("/usr", "/lib", "/lib64", "/bin", "/proc"):
-            args.extend(["--ro-bind", path, path])
-        args.extend(
-            [
-                "--bind",
-                tmpdir,
-                tmpdir,
-                "--die-with-parent",
-                "--new-session",
-                "--unshare-all",
-                appimage_path,
-                "--appimage-extract",
-            ]
-        )
-        log.debug("$ %s", " ".join(args))
+        args = []
+        bwrap = _check_bwrap()
 
-        p = subprocess.run(args, cwd=tmpdir, stderr=subprocess.PIPE, encoding="utf-8")
+        if bwrap:
+            args.extend(
+                [
+                    "--bind",
+                    tmpdir,
+                    tmpdir,
+                    "--die-with-parent",
+                    "--new-session",
+                    "--unshare-all"
+                ]
+            )
+
+        args.extend([appimage_path,"--appimage-extract"])
+
+        log.debug("$ %s", " ".join(args))
+        p = run_command(args, cwd=tmpdir, bwrap=bwrap)
+
         if p.returncode != 0:
             log.error("--appimage-extract failed\n%s", p.stderr)
             p.check_returncode()

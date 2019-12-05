@@ -69,6 +69,10 @@ class URLChecker(Checker):
 
         log.debug("Getting extra data info from %s; may take a while", url)
 
+        if url.startswith('data:'):
+            log.debug('Skipping data URL')
+            return
+
         try:
             new_version, data = utils.get_extra_data_info_from_url(url)
         except (urllib.error.HTTPError, urllib.error.URLError) as e:
