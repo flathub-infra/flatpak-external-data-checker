@@ -24,6 +24,7 @@
 
 import argparse
 import contextlib
+import json
 import logging
 import os
 import subprocess
@@ -131,9 +132,14 @@ DISCLAIMER = (
 )
 
 
-def open_pr(subject, body, branch):
+def open_pr(subject, body, branch, manifest_checker=None):
+    try:
+        github_token = os.environ["GITHUB_TOKEN"]
+    except KeyError:
+        log.error("GITHUB_TOKEN environment variable is not set")
+        return
+
     log.info("Opening pull request for branch %s", branch)
-    github_token = os.environ["GITHUB_TOKEN"]
     g = Github(github_token)
     user = g.get_user()
 
@@ -158,15 +164,44 @@ def open_pr(subject, body, branch):
     base = origin_repo.default_branch
     head = "{}:{}".format(repo.owner.login, branch)
     pr_message = ((body or "") + "\n\n" + DISCLAIMER).strip()
-    # Include closed PRs – if the maintainer has closed our last PR, we don't want to
-    # open another one.
-    for pr in origin_repo.get_pulls(state="all", base=base, head=head):
+
+    if os.path.isfile("flathub.json"):
+        with open("flathub.json") as f:
+            repocfg = json.load(f)
+            automerge = repocfg.get("automerge-flathubbot-prs")
+
+    # Enable automatic merge if external data is broken unless explicitly disabled
+    if automerge is not False and manifest_checker:
+        for data in manifest_checker.get_outdated_external_data():
+            if data.new_version and data.state == ExternalData.State.BROKEN:
+                automerge = True
+                break
+
+    prs = origin_repo.get_pulls(state="all", base=base, head=head)
+
+    # If the maintainer has closed our last PR or it was merged,
+    # we don't want to open another one.
+    closed_prs = [pr for pr in prs if pr.state == "closed"]
+    for pr in closed_prs:
         log.info(
             "Found existing %s PR: %s",
             "merged" if pr.is_merged() else pr.state,
             pr.html_url,
         )
         return
+
+    if origin_repo.permissions.push:
+        open_prs = [pr for pr in prs if pr.state == "open"]
+        for pr in open_prs:
+            log.info("Found open PR: %s", pr.html_url)
+
+            if automerge:
+                pr_commit = pr.head.repo.get_commit(pr.head.sha)
+                if pr_commit.get_combined_status().state == "success" and pr.mergeable:
+                    log.info("PR passed CI and is mergeable, merging", pr.html_url)
+                    pr.merge(merge_method='rebase')
+            else:
+                return
 
     check_call(("git", "push", "-u", remote_url, branch))
 
@@ -220,7 +255,7 @@ def main():
                 with indir(os.path.dirname(args.manifest)):
                     subject, body, branch = commit_changes(changes)
                     if not args.commit_only:
-                        open_pr(subject, body, branch)
+                        open_pr(subject, body, branch, manifest_checker=manifest_checker)
                 return
 
             log.warning("Can't automatically fix any of the above issues")
