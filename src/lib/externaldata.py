@@ -154,47 +154,6 @@ class ExternalDataSource(ExternalData):
             self.source_parent.remove(self.source)
 
 
-class ExternalDataFinishArg(ExternalData):
-    PREFIX = '--extra-data='
-
-    def __init__(self, source_path, arg, finish_args):
-        # discard '--extra-data=' prefix from the string
-        extra_data = arg[len(self.PREFIX) + 1:]
-        name, sha256sum, size, _install_size, url = extra_data.split(":", 4)
-        data_type = ExternalData.Type.EXTRA_DATA
-
-        super().__init__(data_type, source_path, finish_args, name, url, sha256sum, size, [])
-
-        self.source = arg[:]
-
-    @classmethod
-    def from_args(cls, source_path, finish_args):
-        return [
-            cls(source_path, arg, finish_args)
-            for arg in finish_args
-            if arg.startswith(cls.PREFIX)
-        ]
-
-    def update(self):
-        if self.new_version is not None:
-            index = self.source_parent.index(self.source)
-
-            arg = self.PREFIX + ":".join((
-                self.filename,
-                self.new_version.checksum,
-                self.new_version.size,
-                "",
-                self.new_version.url,
-            ))
-            self.source = arg
-            self.source_parent[index] = self.source
-
-        if self.state == ExternalData.State.ADDED:
-            self.source_parent.append(self.source)
-        elif self.state == ExternalData.State.REMOVED:
-            self.source_parent.remove(self.source)
-
-
 class Checker:
 
     def check_module(self, module_data, external_data_list):

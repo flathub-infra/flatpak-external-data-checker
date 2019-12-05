@@ -22,7 +22,7 @@ from collections import OrderedDict
 from .checkers import ALL_CHECKERS
 from .lib.appdata import add_release_to_file
 from .lib.externaldata import (
-    ModuleData, ExternalData, ExternalDataSource, ExternalDataFinishArg,
+    ModuleData, ExternalData, ExternalDataSource,
 )
 from .lib.utils import read_manifest, dump_manifest
 
@@ -66,16 +66,7 @@ class ManifestChecker:
         contents = self._manifest_contents[path]
         dump_manifest(contents, path)
 
-    def _collect_external_data(self, path, data):
-        self._get_module_data_from_json(path, data)
-        self._get_finish_args_extra_data_from_json(path, data)
-
-    def _get_finish_args_extra_data_from_json(self, path, json_data):
-        finish_args = json_data.get('finish-args', [])
-        external_data = self._external_data.setdefault(path, [])
-        external_data.extend(ExternalDataFinishArg.from_args(path, finish_args))
-
-    def _get_module_data_from_json(self, path, json_data):
+    def _collect_external_data(self, path, json_data):
         for module in json_data.get('modules', []):
             if isinstance(module, str):
                 module_path = os.path.join(os.path.dirname(self._manifest),
