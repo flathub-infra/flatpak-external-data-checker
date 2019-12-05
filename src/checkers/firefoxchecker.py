@@ -129,6 +129,7 @@ class FirefoxChecker(Checker):
         base_url = self.FIREFOX_ARCHIVE_BASE_URL.format(version=version)
 
         url = '{}SHA256SUMS'.format(base_url)
+        log.debug("Fetching %s", url)
         with urllib.request.urlopen(url) as response:
             sha256_table = response.read().decode()
 
@@ -155,11 +156,8 @@ class FirefoxChecker(Checker):
                 # Unfortunately, the release date in firefox_versions.json does not
                 # seem to be updated when a point release is made, so we have to get it
                 # from the files' last-modified date.
-                #
-                # TODO: just make a HEAD request to get the date and size, and fill in
-                # the SHA256sum that we already know.
-                info, _ = utils.get_extra_data_info_from_url(url)
-                info = info._replace(version=version)
+                info = utils.get_extra_data_info_from_head(url)
+                info = info._replace(url=url, checksum=sha256, version=version)
                 results[source_filename] = info
 
         return results

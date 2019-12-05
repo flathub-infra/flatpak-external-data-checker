@@ -85,11 +85,10 @@ class ManifestChecker:
             module_data = ModuleData(module_name, module_path, module)
 
             sources = module.get('sources', [])
-            inline_sources = [ source for source in sources if not isinstance(source, str) ]
             external_sources = [ source for source in sources if isinstance(source, str) ]
 
             external_data = self._external_data.setdefault(module_path, [])
-            datas = ExternalDataSource.from_sources(module_path, inline_sources)
+            datas = ExternalDataSource.from_sources(module_path, sources)
             external_data.extend(datas)
             module_data.external_data.extend(datas)
 
@@ -199,7 +198,7 @@ class ManifestChecker:
                 message = "Added {}".format(data.filename)
             elif data.state == ExternalData.State.REMOVED:
                 message = "Removed {}".format(data.filename)
-            if data.new_version.version is not None:
+            elif data.new_version.version is not None:
                 message = "Update {} to {}".format(
                     data.filename, data.new_version.version
                 )

@@ -18,10 +18,10 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import logging
 import os
 import unittest
 
+from src.lib.utils import init_logging
 from src.checker import ManifestChecker
 
 TEST_MANIFEST = os.path.join(
@@ -32,7 +32,7 @@ TEST_MANIFEST = os.path.join(
 
 class TestFlashChecker(unittest.TestCase):
     def setUp(self):
-        logging.basicConfig(level=logging.DEBUG)
+        init_logging()
 
     def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
