@@ -257,18 +257,18 @@ modules:
     ]
 }"""  # noqa: E501
         expected_new_contents = """
-{{
+{
     "modules": [
         {
             "name": "foo",
             "sources": []
         }
     ]
-}}""".lstrip()  # noqa: E501
+}""".lstrip()  # noqa: E501
 
         self._test_remove(
             filename, contents, expected_new_contents,
-            ["Remove foo-bar.xpi"],
+            ["Removed foo-bar.xpi"],
         )
 
     def test_check(self):
