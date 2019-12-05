@@ -88,6 +88,9 @@ class ManifestChecker:
                         continue
 
                     raise
+                except FileNotFoundError:
+                    log.info("Referenced file not found: %s", module)
+                    continue
             else:
                 module_path = path
 
