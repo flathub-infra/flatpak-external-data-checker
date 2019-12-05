@@ -6,9 +6,6 @@
     "runtime-version": "1.6",
     "sdk": "org.freedesktop.Sdk",
     "command": "checker",
-    "finish-args": [
-        "--extra-data=phonyextdata.tgz:000000000000000000000000000000000000000000000000000000000000000000:1234567::https://some-gibberish-phony-url.phony/phony-ext-data.tar.gz"
-    ],
     "_unused": "a multi-line string
                     which is accepted by json-glib
                 even though it's not valid JSON",
