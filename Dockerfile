@@ -13,12 +13,17 @@ RUN apt-get update \
       gir1.2-glib-2.0 \
       gir1.2-json-1.0 \
       python3-apt \
+      python3-coverage \
       python3-gi \
       python3-github \
+      python3-pip \
       python3-ruamel.yaml \
+      python3-setuptools \
       python3-tenacity \
   && apt-get clean \
   && rmdir /var/cache/apt/archives/partial
+
+RUN pip3 install coveralls
 
 ARG USER_ID=1000
 ARG GROUP_ID=1000
