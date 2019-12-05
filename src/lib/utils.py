@@ -123,7 +123,7 @@ def run_command(argv, cwd=None, bwrap=True):
         for path in ("/usr", "/lib", "/lib64", "/bin", "/proc"):
             command.extend(["--ro-bind", path, path])
 
-    bwrap_cmd.extend(argv)
+    command.extend(argv)
     p = subprocess.run(command, cwd=cwd, stderr=subprocess.PIPE, encoding="utf-8")
     return p
 
