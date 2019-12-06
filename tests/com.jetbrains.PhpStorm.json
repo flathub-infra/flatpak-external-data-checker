@@ -1,0 +1,23 @@
+{
+  "id": "com.jetbrains.PhpStorm",
+  "modules": [
+    {
+      "name": "phpstorm",
+      "buildsystem": "simple",
+      "build-commands": [],
+      "sources": [
+        {
+          "type": "extra-data",
+          "filename": "phpstorm.tar.gz",
+          "url": "https://download.jetbrains.com/webide/PhpStorm-2019.2.5.tar.gz",
+          "sha256": "f26c6c81e161ba1ab2b9c78316d3689ba53a69c327bb74a1bfb31332c98e3d1d",
+          "size": 357405037,
+          "x-checker-data": {
+            "type": "jetbrains",
+            "code": "PS"
+          }
+        }
+      ]
+    }
+  ]
+}

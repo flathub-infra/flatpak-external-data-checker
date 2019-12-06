@@ -167,6 +167,19 @@ on the extra-data source itself to i386 or x86_64:
 FlashChecker will use this to determine which architecture to check
 the binaries for.
 
+#### JetBrains checker
+
+Special checker that will check for available updates
+for [JetBrains](https://www.jetbrains.com/) products:
+
+```json
+"x-checker-data": {
+    "type": "jetbrains",
+    "code": "PRODUCT-CODE",
+    "release-type": "release or eap (defaults to release)"
+}
+```
+
 ## Contributing
 
 ```bash
