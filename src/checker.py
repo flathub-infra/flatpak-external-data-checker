@@ -67,9 +67,11 @@ class ManifestChecker:
         dump_manifest(contents, path)
 
     def _collect_external_data(self, path, json_data):
-        modules = json_data.get('modules', [])
+        modules = json_data.get('modules')
         if modules is None:
-            log.error("Failed to deserialize \"modules\" in %s", path)
+            return
+        elif not isinstance(modules, list):
+            log.warning("\"modules\" in %s is not a list", path)
             return
         for module in modules:
             if isinstance(module, str):
