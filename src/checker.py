@@ -87,6 +87,8 @@ class ManifestChecker:
             else:
                 module_path = path
 
+            self._collect_external_data(path=module_path, json_data=module)
+
             module_name = module.get('name')
             module_data = ModuleData(module_name, module_path, module)
 
