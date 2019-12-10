@@ -69,8 +69,9 @@ class ManifestChecker:
     def _collect_external_data(self, path, json_data):
         for module in json_data.get('modules', []):
             if isinstance(module, str):
-                module_path = os.path.join(os.path.dirname(self._manifest),
+                module_path = os.path.join(os.path.dirname(path),
                                            module)
+                log.debug("Loading modules from %s", module_path)
 
                 try:
                     module = self._read_manifest(module_path)
@@ -92,7 +93,7 @@ class ManifestChecker:
             sources = module.get('sources', [])
             external_sources = [ source for source in sources if isinstance(source, str) ]
             for source in external_sources:
-                source_path = os.path.join(os.path.dirname(self._manifest), source)
+                source_path = os.path.join(os.path.dirname(path), source)
                 source_stat = os.stat(source_path)
                 if source_stat.st_size > 102400:
                     log.info("External source file is over 100KB, skipping: %s", source)
@@ -104,7 +105,7 @@ class ManifestChecker:
             module_data.external_data.extend(datas)
 
             for external_source in external_sources:
-                external_source_path = os.path.join(os.path.dirname(self._manifest),
+                external_source_path = os.path.join(os.path.dirname(path),
                                                     external_source)
                 external_source_data = self._read_manifest(external_source_path)
                 datas = ExternalDataSource.from_sources(external_source_path, external_source_data)
