@@ -78,13 +78,15 @@ class HTMLChecker(Checker):
         assert latest_version is not None
         assert latest_url is not None
 
+        abs_url = urllib.parse.urljoin(base=url, url=latest_url)
+
         try:
-            new_version, _ = utils.get_extra_data_info_from_url(latest_url)
+            new_version, _ = utils.get_extra_data_info_from_url(abs_url)
         except urllib.error.HTTPError as e:
-            log.warning("%s returned %s", latest_url, e)
+            log.warning("%s returned %s", abs_url, e)
             external_data.state = ExternalData.State.BROKEN
         except Exception:
-            log.exception("Unexpected exception while checking %s", latest_url)
+            log.exception("Unexpected exception while checking %s", abs_url)
             external_data.state = ExternalData.State.BROKEN
         else:
             external_data.state = ExternalData.State.VALID
