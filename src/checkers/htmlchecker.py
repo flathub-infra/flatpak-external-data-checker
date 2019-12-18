@@ -41,12 +41,15 @@ def get_latest(checker_data, pattern_name, html):
     except KeyError:
         return None
 
-    m = pattern.search(html)
-    if m is None:
+    m = pattern.findall(html)
+    if not m:
         log.debug("%s %s did not match", pattern_name, pattern)
         return None
+    if len(m) > 1:
+        log.debug("%s %s matched multiple times, picking last match", pattern_name, pattern)
 
-    result = m.group(1)
+    result = m[-1]
+    assert isinstance(result, str)
     log.debug("%s %s matched: %s", pattern_name, pattern, result)
     return result
 
