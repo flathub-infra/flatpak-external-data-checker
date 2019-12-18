@@ -24,6 +24,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from string import Template
+from distutils.version import LooseVersion
 
 from src.lib import utils
 from src.lib.externaldata import ExternalData, Checker
@@ -47,11 +48,12 @@ def get_latest(checker_data, pattern_name, html):
     if not m:
         log.debug("%s %s did not match", pattern_name, pattern)
         return None
-    if len(m) > 1:
+    if len(m) == 1:
+        result = m[0]
+    else:
+        result = max(m, key=LooseVersion)
         log.debug("%s %s matched multiple times, picking last match", pattern_name, pattern)
 
-    result = m[-1]
-    assert isinstance(result, str)
     log.debug("%s %s matched: %s", pattern_name, pattern, result)
     return result
 
