@@ -42,7 +42,8 @@ def get_latest(checker_data, pattern_name, html):
     except KeyError:
         return None
 
-    assert pattern.groups == 1
+    if pattern.groups != 1:
+        raise ValueError(f"{pattern_name} {pattern} does not contain exactly 1 match group")
 
     m = pattern.findall(html)
     if not m:
