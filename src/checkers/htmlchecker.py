@@ -41,6 +41,8 @@ def get_latest(checker_data, pattern_name, html):
     except KeyError:
         return None
 
+    assert pattern.groups == 1
+
     m = pattern.findall(html)
     if not m:
         log.debug("%s %s did not match", pattern_name, pattern)
