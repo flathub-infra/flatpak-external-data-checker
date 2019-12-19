@@ -93,12 +93,24 @@ Both the version number and the download URL will be gathered from a static
 HTML page which contains this information:
 
 ```json
-"x-checker-data": {•
-    "type": "html",•
+"x-checker-data": {
+    "type": "html",
     "url": "https://www.example.com/download.html",
     "version-pattern": "The latest version is ([\d\.-]*)",
     "url-pattern": "https://www.example.com/pub/foo/v(\d+)/foo.tar.gz"
-}•
+}
+```
+
+The HTML checker also supports building the download URL using
+the retrieved version:
+
+```json
+"x-checker-data": {
+    "type": "html-version",
+    "url": "https://www.example.com/download.html",
+    "version-pattern": "The latest version is ([\d\.-]*)",
+    "url-template": "https://www.example.com/$version/v$version.tar.gz"
+}
 ```
 
 #### Debian repo checker

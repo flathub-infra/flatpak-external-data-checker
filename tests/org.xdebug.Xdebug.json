@@ -1,0 +1,22 @@
+{
+  "modules": [
+    {
+      "name": "xdebug",
+      "sources": [
+        {
+          "type": "extra-data",
+          "filename": "xdebug.tar.gz",
+          "url": "https://xdebug.org/files/xdebug-2.8.1.tgz",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "size": 0,
+          "x-checker-data": {
+            "type": "html",
+            "url": "https://xdebug.org/download",
+            "version-pattern": "Xdebug (2\\.9\\.0)",
+            "url-template": "https://xdebug.org/files/xdebug-$version.tgz"
+          }
+        }
+      ]
+    }
+  ]
+}
