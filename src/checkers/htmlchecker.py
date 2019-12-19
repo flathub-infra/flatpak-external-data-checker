@@ -21,11 +21,12 @@
 import logging
 import re
 import urllib.error
-import urllib.request
 import urllib.parse
+import urllib.request
+from string import Template
 
-from src.lib.externaldata import ExternalData, Checker
 from src.lib import utils
+from src.lib.externaldata import ExternalData, Checker
 
 log = logging.getLogger(__name__)
 
@@ -70,8 +71,13 @@ class HTMLChecker(Checker):
             log.warning(
                 "%s had no available version information", external_data.filename
             )
-        if not latest_url:
+        try:
+            url_template = external_data.checker_data["url-template"]
+        except KeyError:
             log.warning("%s had no available URL", external_data.filename)
+        else:
+            latest_url = Template(url_template).substitute(version=latest_version)
+
         if not latest_version or not latest_url:
             return
 
