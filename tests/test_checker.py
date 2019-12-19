@@ -42,7 +42,7 @@ NUM_ALL_EXT_DATA = NUM_ARCHIVE_IN_MANIFEST + NUM_FILE_IN_MANIFEST + \
 
 
 class DummyChecker(Checker):
-    def check(self, external_data):
+    def check(self, external_data, flathub_config=None):
         logging.debug('Phony checker checking external data %s and all is always good',
                       external_data.filename)
 
@@ -54,7 +54,7 @@ class UpdateEverythingChecker(Checker):
     VERSION = "1.2.3.4"
     TIMESTAMP = dt.datetime(2019, 8, 28, 0, 0, 0)
 
-    def check(self, external_data):
+    def check(self, external_data, flathub_config=None):
         external_data.state = ExternalData.State.BROKEN
         external_data.new_version = external_data.current_version._replace(
             size=self.SIZE,
@@ -65,7 +65,7 @@ class UpdateEverythingChecker(Checker):
 
 
 class RemoveEverythingChecker(Checker):
-    def check(self, external_data):
+    def check(self, external_data, flathub_config=None):
         external_data.state = ExternalData.State.REMOVED
 
 

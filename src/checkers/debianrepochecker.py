@@ -53,6 +53,26 @@ APT_NEEDED_DIRS = (
 LOG = logging.getLogger(__name__)
 
 
+def guess_arch(external_data, flathub_config):
+    try:
+        return external_data.arches[0]
+    except IndexError:
+        pass
+
+    if flathub_config is None:
+        return None
+
+    try:
+        arches = flathub_config["only-arches"]
+    except KeyError:
+        return None
+
+    if len(arches) == 1:
+        return arches[0]
+
+    return None
+
+
 class LoggerAcquireProgress(apt.progress.text.AcquireProgress):
     def __init__(self, logger):
         class FileLike:
@@ -89,7 +109,7 @@ class DebianRepoChecker(Checker):
     def _should_check(self, external_data):
         return external_data.checker_data.get('type') == 'debian-repo'
 
-    def check(self, external_data):
+    def check(self, external_data, flathub_config=None):
         # Only process external data of the debian-repo
         if not self._should_check(external_data):
             LOG.debug('%s is not a debian-repo type ext data', external_data.filename)
@@ -106,7 +126,11 @@ class DebianRepoChecker(Checker):
                         'exact URL, "dist" must end with /', package_name)
             return
 
-        arch = self._translate_arch(external_data.arches[0])
+        arch = self._translate_arch(guess_arch(external_data, flathub_config))
+        if arch is None:
+            LOG.warning('Could not guess arch for %s', package_name)
+            return
+
         with self._load_repo(root, dist, component, arch) as cache:
             package = cache[package_name]
             candidate = package.candidate

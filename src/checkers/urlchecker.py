@@ -60,7 +60,7 @@ def extract_version(checker_data, url):
 
 
 class URLChecker(Checker):
-    def check(self, external_data):
+    def check(self, external_data, flathub_config=None):
         is_rotating = external_data.checker_data.get('type') == 'rotating-url'
         if is_rotating:
             url = external_data.checker_data['url']

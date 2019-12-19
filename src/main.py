@@ -24,17 +24,16 @@
 
 import argparse
 import contextlib
+import json
 import logging
 import os
 import subprocess
-import sys
 
 from github import Github
 
-from src.lib.utils import parse_github_url, init_logging
-from src.lib.externaldata import ExternalData
 from src import checker
-
+from src.lib.externaldata import ExternalData
+from src.lib.utils import parse_github_url, init_logging
 
 log = logging.getLogger(__name__)
 
@@ -183,6 +182,14 @@ def open_pr(subject, body, branch):
     log.info("Opened pull request %s", pr.html_url)
 
 
+def load_flathubconfig(path):
+    try:
+        with open(os.path.join(path, "flathub.json"), "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+
+
 def main():
     types = ['all'] + list(ExternalData.TYPES)
     parser = argparse.ArgumentParser()
@@ -206,7 +213,7 @@ def main():
 
     init_logging(logging.DEBUG if args.verbose else logging.INFO)
 
-    manifest_checker = checker.ManifestChecker(args.manifest)
+    manifest_checker = checker.ManifestChecker(args.manifest, load_flathubconfig(os.path.dirname(args.manifest)))
     filter_type = ExternalData.TYPES.get(args.filter_type)
 
     manifest_checker.check(filter_type)

@@ -55,7 +55,7 @@ class HTMLChecker(Checker):
     def _should_check(self, external_data):
         return external_data.checker_data.get("type") == "html"
 
-    def check(self, external_data):
+    def check(self, external_data, flathub_config=None):
         if not self._should_check(external_data):
             log.debug("%s is not a html type ext data", external_data.filename)
             return

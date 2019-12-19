@@ -57,7 +57,7 @@ class FlashChecker(Checker):
         flatpak_arch = external_data.arches[0]
         return flatpak_arch, FLATPAK_TO_FLASH_ARCH_MAP.get(external_data.arches[0])
 
-    def check(self, external_data):
+    def check(self, external_data, flathub_config=None):
         if not self._should_check(external_data):
             log.debug('%s is not a flash type ext data', external_data.filename)
             return

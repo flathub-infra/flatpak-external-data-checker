@@ -15,7 +15,7 @@ def _should_check(external_data):
 
 
 class JetBrainsChecker(Checker):
-    def check(self, external_data):
+    def check(self, external_data, flathub_config=None):
         if not _should_check(external_data):
             log.debug("%s is not a jetbrains type ext data", external_data.filename)
             return

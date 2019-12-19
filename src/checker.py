@@ -36,8 +36,9 @@ log = logging.getLogger(__name__)
 
 
 class ManifestChecker:
-    def __init__(self, manifest):
+    def __init__(self, manifest, flathub_config=None):
         self._manifest = manifest
+        self._flathub_config = flathub_config
         self._modules_data = {}
         self._external_data = {}
 
@@ -169,7 +170,7 @@ class ManifestChecker:
                 log.debug('[%d/%d] checking %s', i, n, data.filename)
 
                 for checker in self._checkers:
-                    checker.check(data)
+                    checker.check(data, self._flathub_config)
                     if data.state != ExternalData.State.UNKNOWN:
                         break
                 ext_data_checked.append(data)

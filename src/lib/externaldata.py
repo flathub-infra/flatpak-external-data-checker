@@ -159,5 +159,5 @@ class Checker:
     def check_module(self, module_data, external_data_list):
         pass
 
-    def check(self, external_data):
+    def check(self, external_data, flathub_config=None):
         pass
