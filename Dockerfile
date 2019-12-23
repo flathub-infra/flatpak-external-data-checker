@@ -24,7 +24,7 @@ RUN apt-get update \
   && apt-get clean \
   && rmdir /var/cache/apt/archives/partial
 
-RUN pip3 install coveralls
+RUN pip3 install coveralls black
 
 ARG USER_ID=1000
 ARG GROUP_ID=1000
