@@ -53,10 +53,10 @@ to Git and open a GitHub pull request. In order to do this, it requires
 a [GitHub access token](https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line),
 specified in the `GITHUB_TOKEN` environment variable.
 
-* A [GitHub access token](https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line),
-  specified in the `GITHUB_TOKEN` environment variable
-* `git push` access for the repository containing the manifest passed on the
-  command line; ie an appropriate `ssh` key
+The tool will also automatically merge previously opened pull request for
+unavailable (`BROKEN`) sources if the change has successfully passed CI checks
+and the token has sufficient privileges. It can be disabled by setting
+`automerge-flathubbot-prs` to `false` in `flathub.json`.
 
 ## Changes to Flatpak manifests
 
