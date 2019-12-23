@@ -35,6 +35,18 @@ from gi.repository import GLib
 log = logging.getLogger(__name__)
 
 
+def find_appdata_file(appid):
+    for ext in ["appdata", "metainfo"]:
+        appdata = appid + "." + ext + ".xml"
+
+        if not os.path.isfile(appdata):
+            continue
+
+        return appdata
+
+    return None
+
+
 class ManifestChecker:
     def __init__(self, manifest):
         self._manifest = manifest
@@ -232,8 +244,9 @@ class ManifestChecker:
             log.info("Updating %s", path)
             self._dump_manifest(path)
 
-            appdata = os.path.splitext(self._manifest)[0] + ".appdata.xml"
-            if last_update is not None and os.path.exists(appdata):
+            appdata = find_appdata_file(os.path.splitext(self._manifest)[0])
+
+            if last_update is not None and appdata is not None:
                 # TODO: this assumes that the last changed source for which we can
                 # detect a version number is the one corresponding to the application
                 # as a whole. In practice, this is currently true, but in general it
