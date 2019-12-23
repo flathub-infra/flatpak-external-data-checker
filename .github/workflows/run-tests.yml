@@ -18,6 +18,8 @@ jobs:
         run: docker build -t flatpak-external-data-checker .
       - name: Run tests in container
         run: docker run -v $PWD:/opt -w /opt flatpak-external-data-checker python3-coverage run -m unittest discover --verbose --buffer
+      - name: Run black
+        run: docker run -v $PWD:/opt -w /opt flatpak-external-data-checker black --check .
       - name: Submit code coverage to Coveralls.io
         run: docker run --env COVERALLS_REPO_TOKEN=${{ secrets.COVERALLS_REPO_TOKEN }}  -v $PWD:/opt -w /opt flatpak-external-data-checker coveralls
         continue-on-error: true
