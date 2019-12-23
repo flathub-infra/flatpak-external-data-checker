@@ -49,8 +49,9 @@ host system's distribution.
 ### Automatically submitting PRs
 
 When run with the `--update` flag, this tool can commit any necessary changes
-to Git and open a GitHub pull request. In order to do this, it needs to have
-two credentials:
+to Git and open a GitHub pull request. In order to do this, it requires
+a [GitHub access token](https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line),
+specified in the `GITHUB_TOKEN` environment variable.
 
 * A [GitHub access token](https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line),
   specified in the `GITHUB_TOKEN` environment variable
