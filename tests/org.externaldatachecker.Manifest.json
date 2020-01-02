@@ -24,7 +24,6 @@
                 {
                     "type": "extra-data",
                     "filename": "flatpak",
-                    "only-arches": ["i386"],
                     "url": "http://ftp.de.debian.org/some-broken-debian-pkg.deb",
                     "sha256": "000000000000000000000000000000000000000000000000000000000000000000",
                     "size": 1234567,
@@ -33,7 +32,8 @@
                         "package-name": "flatpak",
                         "root": "https://deb.debian.org/debian/",
                         "dist": "stable",
-                        "component": "main"
+                        "component": "main",
+                        "arches": ["i386"]
                     }
                 },
                 {
@@ -54,7 +54,6 @@
 		{
                     "type": "extra-data",
                     "filename": "flatpak",
-                    "only-arches": ["x86_64"],
                     "url": "http://debian.org",
                     "sha256": "just-a-valid-url-0000000000000000000000000000000000000000000000000",
                     "size": 1234567,

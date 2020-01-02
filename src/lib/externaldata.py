@@ -110,13 +110,15 @@ class ExternalDataSource(ExternalData):
             os.path.basename(url)
         )
 
-        sha256sum = source.get('sha256', None)
-        arches = source.get('only-arches', [])
+        sha256sum = source.get('sha256')
         size = source.get('size', -1)
-        checker_data = source.get('x-checker-data')
+        checker_data = source.get('x-checker-data', {})
+        arches = checker_data.get('arches') or source.get('only-arches') or ["x86_64"]
+
         super().__init__(
             data_type, source_path, sources, name, url, sha256sum, size, arches, checker_data,
         )
+
         self.source = source
 
     @classmethod
