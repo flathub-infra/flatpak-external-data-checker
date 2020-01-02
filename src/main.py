@@ -200,6 +200,7 @@ def open_pr(subject, body, branch, manifest_checker=None):
                 if pr_commit.get_combined_status().state == "success" and pr.mergeable:
                     log.info("PR passed CI and is mergeable, merging", pr.html_url)
                     pr.merge(merge_method='rebase')
+                    origin_repo.get_git_ref(f"heads/{pr.head.ref}").delete()
             else:
                 return
 
