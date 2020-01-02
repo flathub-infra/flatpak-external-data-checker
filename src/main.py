@@ -137,7 +137,7 @@ def open_pr(subject, body, branch, manifest_checker=None):
         github_token = os.environ["GITHUB_TOKEN"]
     except KeyError:
         log.error("GITHUB_TOKEN environment variable is not set")
-        return
+        sys.exit(1)
 
     log.info("Opening pull request for branch %s", branch)
     g = Github(github_token)
@@ -261,4 +261,4 @@ def main():
 
             log.warning("Can't automatically fix any of the above issues")
 
-        exit(1)
+        sys.exit(1)
