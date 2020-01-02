@@ -59,7 +59,10 @@ TIMEOUT_SECONDS = 60
 def _extract_timestamp(info):
     date_str = info["Last-Modified"] or info["Date"]
     if date_str:
-        return dt.datetime.strptime(date_str, "%a, %d %b %Y %H:%M:%S %Z")
+        try:
+            return dt.datetime.strptime(date_str, "%a, %d %b %Y %H:%M:%S %Z")
+        except ValueError:
+            return dt.datetime.strptime(date_str, "%a, %d-%b-%Y %H:%M:%S %Z")
     else:
         return dt.datetime.now()  # what else can we do?
 
