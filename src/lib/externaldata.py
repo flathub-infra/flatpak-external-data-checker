@@ -113,14 +113,7 @@ class ExternalDataSource(ExternalData):
         sha256sum = source.get('sha256')
         size = source.get('size', -1)
         checker_data = source.get('x-checker-data', {})
-
-        # TODO: Switch to walrus operator when we switch to Python 3.8
-        if checker_data.get('arches'):
-            arches = checker_data.get('arches')
-        elif source.get('only-arches'):
-            arches = source.get('only-arches')
-        else:
-            arches = ["x86_64"]
+        arches = checker_data.get('arches') or source.get('only-arches') or ["x86_64"]
 
         super().__init__(
             data_type, source_path, sources, name, url, sha256sum, size, arches, checker_data,
