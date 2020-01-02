@@ -207,6 +207,7 @@ def open_pr(subject, body, branch, manifest_checker=None):
                     pr.create_issue_comment(MERGE_COMMENT)
                     pr.merge(merge_method='rebase')
                     origin_repo.get_git_ref(f"heads/{pr.head.ref}").delete()
+                    return
             else:
                 return
 
