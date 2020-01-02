@@ -131,6 +131,11 @@ DISCLAIMER = (
     "questions or complaints.)</i>"
 )
 
+MERGE_COMMENT = (
+    "<i>Merging automatically due to the broken URL that may prevent "
+    "installation. If this behavior is unwanted, it can be disabled by setting "
+    "`automerge-flathubbot-prs` to `false` in flathub.json.</i>"
+)
 
 def open_pr(subject, body, branch, manifest_checker=None):
     try:
@@ -199,6 +204,7 @@ def open_pr(subject, body, branch, manifest_checker=None):
                 pr_commit = pr.head.repo.get_commit(pr.head.sha)
                 if pr_commit.get_combined_status().state == "success" and pr.mergeable:
                     log.info("PR passed CI and is mergeable, merging", pr.html_url)
+                    pr.create_issue_comment(MERGE_COMMENT)
                     pr.merge(merge_method='rebase')
                     origin_repo.get_git_ref(f"heads/{pr.head.ref}").delete()
             else:
