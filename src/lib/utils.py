@@ -132,17 +132,23 @@ def run_command(argv, cwd=None, bwrap=True):
 
 
 def _check_bwrap():
-    p = run_command(["/usr/bin/true"])
-    if p.returncode == 0:
-        return True
+    try:
+        p = run_command(["/usr/bin/true"])
+        if p.returncode == 0:
+            return True
+    except FileNotFoundError:
+        pass
 
     logging.warning("bwrap is not available")
     return False
 
 def _check_unappimage():
-    p = run_command(["unappimage", "-v"], bwrap=False)
-    if p.returncode == 1:
-        return True
+    try:
+        p = run_command(["unappimage", "-v"], bwrap=False)
+        if p.returncode == 1:
+            return True
+    except FileNotFoundError:
+        pass
 
     logging.warning("unappimage is not available")
     return False
