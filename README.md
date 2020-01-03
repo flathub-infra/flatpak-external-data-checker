@@ -106,7 +106,7 @@ the retrieved version:
 
 ```json
 "x-checker-data": {
-    "type": "html-version",
+    "type": "html",
     "url": "https://www.example.com/download.html",
     "version-pattern": "The latest version is ([\d\.-]*)",
     "url-template": "https://www.example.com/$version/v$version.tar.gz"
