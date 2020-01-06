@@ -30,6 +30,7 @@ import subprocess
 import sys
 
 from github import Github
+from pygit2 import Repository
 
 from src.lib.utils import parse_github_url, init_logging
 from src.lib.externaldata import ExternalData
@@ -158,7 +159,9 @@ def open_pr(subject, body, branch):
     else:
         check_call(("git", "remote", "set-url", remote, remote_url))
 
-    base = "master"
+    repo = Repository('.')
+    base = repo.head.shorthand
+
     head = "{}:{}".format(repo.owner.login, branch)
     pr_message = ((body or "") + "\n\n" + DISCLAIMER).strip()
     # Include closed PRs – if the maintainer has closed our last PR, we don't want to
