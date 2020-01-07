@@ -24,7 +24,7 @@ missing.
 """
 
 from io import StringIO
-from xml.sax import make_parser
+from defusedxml.sax import make_parser
 from xml.sax.handler import property_lexical_handler
 from xml.sax.saxutils import XMLFilterBase, XMLGenerator
 
