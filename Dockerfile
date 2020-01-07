@@ -17,7 +17,6 @@ RUN apt-get update \
       python3-gi \
       python3-github \
       python3-pip \
-      python3-pygit2 \
       python3-ruamel.yaml \
       python3-setuptools \
       python3-tenacity \
