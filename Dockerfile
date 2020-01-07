@@ -14,6 +14,7 @@ RUN apt-get update \
       gir1.2-json-1.0 \
       python3-apt \
       python3-coverage \
+      python3-defusedxml \
       python3-gi \
       python3-github \
       python3-pip \
