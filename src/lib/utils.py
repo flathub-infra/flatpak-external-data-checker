@@ -43,7 +43,8 @@ from tenacity import (
 from .externaldata import ExternalFile
 
 import gi
-gi.require_version('Json', '1.0')
+
+gi.require_version("Json", "1.0")
 from gi.repository import GLib, Json  # noqa: E402
 
 log = logging.getLogger(__name__)
@@ -88,9 +89,7 @@ def get_extra_data_info_from_head(url):
         info = response.info()
         size = int(info["Content-Length"])
 
-    return ExternalFile(
-        real_url, None, size, None, _extract_timestamp(info),
-    )
+    return ExternalFile(real_url, None, size, None, _extract_timestamp(info))
 
 
 @retry(
@@ -143,6 +142,7 @@ def _check_bwrap():
     logging.warning("bwrap is not available")
     return False
 
+
 def _check_unappimage():
     try:
         p = run_command(["unappimage", "-v"], bwrap=False)
@@ -178,15 +178,15 @@ def extract_appimage_version(basename, data):
                     tmpdir,
                     "--die-with-parent",
                     "--new-session",
-                    "--unshare-all"
+                    "--unshare-all",
                 ]
             )
 
         if unappimage:
-            args.extend(['unappimage', appimage_path])
+            args.extend(["unappimage", appimage_path])
         else:
             os.chmod(appimage_path, 0o755)
-            args.extend([appimage_path,"--appimage-extract"])
+            args.extend([appimage_path, "--appimage-extract"])
 
         log.debug("$ %s", " ".join(args))
         p = run_command(args, cwd=tmpdir, bwrap=bwrap)
@@ -227,9 +227,9 @@ def parse_github_url(url):
 
 
 def read_json_manifest(manifest_path):
-    '''Read manifest from 'manifest_path', which may contain C-style
+    """Read manifest from 'manifest_path', which may contain C-style
     comments or multi-line strings (accepted by json-glib and hence
-    flatpak-builder, but not Python's json module).'''
+    flatpak-builder, but not Python's json module)."""
 
     # Round-trip through json-glib to get rid of comments, multi-line
     # strings, and any other invalid JSON
@@ -249,7 +249,7 @@ _yaml.indent(mapping=2, sequence=4, offset=2)
 
 
 def read_yaml_manifest(manifest_path):
-    '''Read a YAML manifest from 'manifest_path'.'''
+    """Read a YAML manifest from 'manifest_path'."""
     with open(manifest_path, "r") as f:
         return _yaml.load(f)
 
@@ -278,6 +278,5 @@ def dump_manifest(contents, manifest_path):
 
 def init_logging(level=logging.DEBUG):
     logging.basicConfig(
-        level=level,
-        format="+ %(asctime)s %(levelname)7s %(name)s: %(message)s"
+        level=level, format="+ %(asctime)s %(levelname)7s %(name)s: %(message)s"
     )
