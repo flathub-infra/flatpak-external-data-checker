@@ -223,7 +223,7 @@ def parse_github_url(url):
     if m:
         return m.group("org_repo")
     else:
-        raise ValueError("{!r} doesn't look like a Git URL")
+        raise ValueError(f"{url!r} doesn't look like a Git URL")
 
 
 def read_json_manifest(manifest_path):
