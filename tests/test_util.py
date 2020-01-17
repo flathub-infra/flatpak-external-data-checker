@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright © 2019 Endless Mobile, Inc.
+# Copyright © 2019–2020 Endless Mobile, Inc.
 #
 # Authors:
 #       Will Thompson <wjt@endlessm.com>
@@ -24,18 +24,20 @@ from src.lib.utils import parse_github_url
 
 class TestParseGitHubUrl(unittest.TestCase):
     def test_ssh(self):
-        self.assertEqual(
-            parse_github_url(
-                "git@github.com:endlessm/flatpak-external-data-checker.git"
-            ),
-            "endlessm/flatpak-external-data-checker",
-        )
+        url = "git@github.com:flathub/flatpak-external-data-checker.git"
+        self.assertEqual(parse_github_url(url), "flathub/flatpak-external-data-checker")
+
+    def test_ssh_no_dotgit(self):
+        url = "git@github.com:flathub/flatpak-external-data-checker"
+        self.assertEqual(parse_github_url(url), "flathub/flatpak-external-data-checker")
 
     def test_https(self):
-        self.assertEqual(
-            parse_github_url("https://github.com/flathub/com.dropbox.Client"),
-            "flathub/com.dropbox.Client",
-        )
+        url = "https://github.com/flathub/com.dropbox.Client"
+        self.assertEqual(parse_github_url(url), "flathub/com.dropbox.Client")
+
+    def test_https_with_auth(self):
+        url = "https://acce55ed:x-oauth-basic@github.com/endlessm/eos-google-chrome-app"
+        self.assertEqual(parse_github_url(url), "endlessm/eos-google-chrome-app")
 
 
 if __name__ == "__main__":

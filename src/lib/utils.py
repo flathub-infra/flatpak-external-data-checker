@@ -1,4 +1,4 @@
-# Copyright © 2018–2019 Endless Mobile, Inc.
+# Copyright © 2018–2020 Endless Mobile, Inc.
 #
 # Authors:
 #       Joaquim Rocha <jrocha@endlessm.com>
@@ -29,6 +29,7 @@ import socket
 import subprocess
 import tempfile
 import urllib.request
+import urllib.parse
 
 from collections import OrderedDict
 from ruamel.yaml import YAML
@@ -201,9 +202,12 @@ def extract_appimage_version(basename, data):
 
 
 _GITHUB_URL_PATTERN = re.compile(
-    r"^(?:git@github.com:|https://github.com/)"
-    r"(?P<org_repo>[^/]+/[^/]+?)"
-    r"(?:\.git)?$"
+    r"""
+        ^git@github.com:
+        (?P<org_repo>[^/]+/[^/]+?)
+        (?:\.git)?$
+    """,
+    re.VERBOSE,
 )
 
 
@@ -211,6 +215,10 @@ def parse_github_url(url):
     """
     Parses the organization/repo part out of a git remote URL.
     """
+    if url.startswith("https:"):
+        o = urllib.parse.urlparse(url)
+        return o.path[1:]
+
     m = _GITHUB_URL_PATTERN.match(url)
     if m:
         return m.group("org_repo")
