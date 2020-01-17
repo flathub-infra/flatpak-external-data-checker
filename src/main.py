@@ -159,7 +159,7 @@ def open_pr(subject, body, branch):
     else:
         check_call(("git", "remote", "set-url", remote, remote_url))
 
-    base = "master"
+    base = origin_repo.default_branch
     head = "{}:{}".format(repo.owner.login, branch)
     pr_message = ((body or "") + "\n\n" + DISCLAIMER).strip()
     # Include closed PRs – if the maintainer has closed our last PR, we don't want to
