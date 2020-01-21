@@ -33,22 +33,22 @@ from src.lib import utils
 log = logging.getLogger(__name__)
 
 
-FLASH_BASE_URL = 'http://get.adobe.com/flashplayer/webservices/json/?{params}'
+FLASH_BASE_URL = "http://get.adobe.com/flashplayer/webservices/json/?{params}"
 
 FLATPAK_TO_FLASH_ARCH_MAP = {
-    'i386': 'x86-32',
-    'x86_64': 'x86-64',
+    "i386": "x86-32",
+    "x86_64": "x86-64",
 }
 
 BROWSER_TO_PAPI_MAP = {
-    'Chrome': 'ppapi',
-    'Firefox': 'npapi',
+    "Chrome": "ppapi",
+    "Firefox": "npapi",
 }
 
 
 class FlashChecker(Checker):
     def _should_check(self, external_data):
-        return external_data.checker_data.get('type') == 'flash'
+        return external_data.checker_data.get("type") == "flash"
 
     def _get_arches(self, external_data):
         if len(external_data.arches) != 1:
@@ -59,29 +59,39 @@ class FlashChecker(Checker):
 
     def check(self, external_data):
         if not self._should_check(external_data):
-            log.debug('%s is not a flash type ext data', external_data.filename)
+            log.debug("%s is not a flash type ext data", external_data.filename)
             return
 
-        browser = external_data.checker_data['browser'].title()
+        browser = external_data.checker_data["browser"].title()
         if browser not in BROWSER_TO_PAPI_MAP:
-            log.warning('%s has an invalid browser (should be one of %s)',
-                        external_data.filename, ', '.join(BROWSER_TO_PAPI_MAP))
+            log.warning(
+                "%s has an invalid browser (should be one of %s)",
+                external_data.filename,
+                ", ".join(BROWSER_TO_PAPI_MAP),
+            )
             external_data.state = ExternalData.State.BROKEN
             return
 
         arches = self._get_arches(external_data)
         if arches is None:
-            log.warning('%s has invalid only-arches (should be one of %s)',
-                        external_data.filename,
-                        ', '.join(f'[{arch}]' for arch in FLATPAK_TO_FLASH_ARCH_MAP))
+            log.warning(
+                "%s has invalid only-arches (should be one of %s)",
+                external_data.filename,
+                ", ".join(f"[{arch}]" for arch in FLATPAK_TO_FLASH_ARCH_MAP),
+            )
             external_data.state = ExternalData.State.BROKEN
             return
 
         flatpak_arch, flash_arch = arches
 
-        request_params = {'platform_type': 'Linux', 'eventname': 'flashplayerotherversions',
-                          'platform_arch': flash_arch}
-        request_url = FLASH_BASE_URL.format(params=urllib.parse.urlencode(request_params))
+        request_params = {
+            "platform_type": "Linux",
+            "eventname": "flashplayerotherversions",
+            "platform_arch": flash_arch,
+        }
+        request_url = FLASH_BASE_URL.format(
+            params=urllib.parse.urlencode(request_params)
+        )
         with urllib.request.urlopen(request_url) as resp:
             latest_version_data = json.load(resp)
 
@@ -90,17 +100,17 @@ class FlashChecker(Checker):
 
         for version in latest_version_data:
             if (
-                version['installation_type'] == 'Standalone' and
-                version['browser'] == browser and
-                version['installer_architecture'] == flash_arch and
-                version['platform'] == 'Linux' and
-                version["download_url"].endswith(".tar.gz")
+                version["installation_type"] == "Standalone"
+                and version["browser"] == browser
+                and version["installer_architecture"] == flash_arch
+                and version["platform"] == "Linux"
+                and version["download_url"].endswith(".tar.gz")
             ):
-                latest_version = version['Version']
-                latest_url = version['download_url']
+                latest_version = version["Version"]
+                latest_url = version["download_url"]
                 break
         else:
-            log.warning('%s had no available URL', external_data.filename)
+            log.warning("%s had no available URL", external_data.filename)
             return
 
         assert latest_version is not None
@@ -109,10 +119,10 @@ class FlashChecker(Checker):
         try:
             new_version, _ = utils.get_extra_data_info_from_url(latest_url)
         except urllib.error.HTTPError as e:
-            log.warning('%s returned %s', latest_url, e)
+            log.warning("%s returned %s", latest_url, e)
             external_data.state = ExternalData.State.BROKEN
         except Exception:
-            log.exception('Unexpected exception while checking %s', latest_url)
+            log.exception("Unexpected exception while checking %s", latest_url)
             external_data.state = ExternalData.State.BROKEN
         else:
             external_data.state = ExternalData.State.VALID

@@ -61,25 +61,25 @@ def extract_version(checker_data, url):
 
 class URLChecker(Checker):
     def check(self, external_data):
-        is_rotating = external_data.checker_data.get('type') == 'rotating-url'
+        is_rotating = external_data.checker_data.get("type") == "rotating-url"
         if is_rotating:
-            url = external_data.checker_data['url']
+            url = external_data.checker_data["url"]
         else:
             url = external_data.current_version.url
 
         log.debug("Getting extra data info from %s; may take a while", url)
 
-        if url.startswith('data:'):
-            log.debug('Skipping data URL')
+        if url.startswith("data:"):
+            log.debug("Skipping data URL")
             return
 
         try:
             new_version, data = utils.get_extra_data_info_from_url(url)
         except (urllib.error.HTTPError, urllib.error.URLError) as e:
-            log.warning('%s returned %s', url, e)
+            log.warning("%s returned %s", url, e)
             external_data.state = ExternalData.State.BROKEN
         except Exception:
-            log.exception('Unexpected exception while checking %s', url)
+            log.exception("Unexpected exception while checking %s", url)
             external_data.state = ExternalData.State.BROKEN
         else:
             if url.endswith(".AppImage"):
@@ -88,8 +88,7 @@ class URLChecker(Checker):
                 )
             elif is_rotating:
                 version_string = extract_version(
-                    external_data.checker_data,
-                    new_version.url,
+                    external_data.checker_data, new_version.url,
                 )
             else:
                 version_string = None

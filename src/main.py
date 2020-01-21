@@ -60,26 +60,28 @@ def print_outdated_external_data(manifest_checker):
     for data in ext_data:
         if data.new_version:
             if data.state == ExternalData.State.ADDED:
-                print('ADDED: {}'.format(data.filename))
+                print("ADDED: {}".format(data.filename))
             elif data.state == ExternalData.State.REMOVED:
-                print('REMOVED: {}'.format(data.filename))
+                print("REMOVED: {}".format(data.filename))
             elif data.state == ExternalData.State.VALID:
-                print('CHANGE SOON: {}\n'
-                      ' Has a new version:'.format(data.filename))
+                print("CHANGE SOON: {}\n" " Has a new version:".format(data.filename))
             elif data.state == ExternalData.State.BROKEN:
-                print('BROKEN: {}\n'
-                      ' Has a new version:'.format(data.filename))
+                print("BROKEN: {}\n" " Has a new version:".format(data.filename))
             else:
-                print(' A new version is available:')
+                print(" A new version is available:")
 
-            print('  URL:     {url}\n'
-                  '  SHA256:  {checksum}\n'
-                  '  Size:    {size}\n'
-                  '  Version: {version}\n'.format(**data.new_version._asdict()))
+            print(
+                "  URL:     {url}\n"
+                "  SHA256:  {checksum}\n"
+                "  Size:    {size}\n"
+                "  Version: {version}\n".format(**data.new_version._asdict())
+            )
         elif data.state == ExternalData.State.BROKEN:
-            print('BROKEN: {}\n'
-                  ' Unreachable URL: {}'.format(data.filename, data.current_version.url))
-        print('')
+            print(
+                "BROKEN: {}\n"
+                " Unreachable URL: {}".format(data.filename, data.current_version.url)
+            )
+        print("")
 
     return len(ext_data) > 0
 
@@ -112,9 +114,7 @@ def commit_changes(changes):
     try:
         # Check if the branch already exists
         subprocess.run(
-            ("git", "rev-parse", "--verify", branch),
-            capture_output=True,
-            check=True,
+            ("git", "rev-parse", "--verify", branch), capture_output=True, check=True,
         )
     except subprocess.CalledProcessError:
         # If not, create it
@@ -133,13 +133,15 @@ DISCLAIMER = (
 
 def open_pr(subject, body, branch):
     log.info("Opening pull request for branch %s", branch)
-    github_token = os.environ['GITHUB_TOKEN']
+    github_token = os.environ["GITHUB_TOKEN"]
     g = Github(github_token)
     user = g.get_user()
 
-    origin_url = subprocess.check_output((
-        "git", "remote", "get-url", "origin",
-    )).decode("utf-8").strip()
+    origin_url = (
+        subprocess.check_output(("git", "remote", "get-url", "origin",))
+        .decode("utf-8")
+        .strip()
+    )
     origin_repo = g.get_repo(parse_github_url(origin_url))
 
     if origin_repo.permissions.push:
@@ -169,34 +171,39 @@ def open_pr(subject, body, branch):
     check_call(("git", "push", "-u", remote_url, branch))
 
     pr = origin_repo.create_pull(
-        subject,
-        pr_message,
-        base,
-        head,
-        maintainer_can_modify=True,
+        subject, pr_message, base, head, maintainer_can_modify=True,
     )
     log.info("Opened pull request %s", pr.html_url)
 
 
 def main():
-    types = ['all'] + list(ExternalData.TYPES)
+    types = ["all"] + list(ExternalData.TYPES)
     parser = argparse.ArgumentParser()
-    parser.add_argument("manifest", help="Flatpak manifest to check",
-                        type=os.path.abspath)
-    parser.add_argument('-v', '--verbose', help='Print debug messages',
-                        action="store_true")
-    parser.add_argument("--update",
-                        help="Update manifest(s) to refer to new versions of "
-                             "external data - also open PRs for changes unless "
-                             "--commit-only is specified",
-                        action="store_true")
-    parser.add_argument("--commit-only",
-                        help="Do not open PRs for updates, only commit changes "
-                             "to external data (implies --update)",
-                        action="store_true")
-    parser.add_argument('--filter-type',
-                        help='Only check external data of the given type',
-                        choices=types, default='all')
+    parser.add_argument(
+        "manifest", help="Flatpak manifest to check", type=os.path.abspath
+    )
+    parser.add_argument(
+        "-v", "--verbose", help="Print debug messages", action="store_true"
+    )
+    parser.add_argument(
+        "--update",
+        help="Update manifest(s) to refer to new versions of "
+        "external data - also open PRs for changes unless "
+        "--commit-only is specified",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--commit-only",
+        help="Do not open PRs for updates, only commit changes "
+        "to external data (implies --update)",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--filter-type",
+        help="Only check external data of the given type",
+        choices=types,
+        default="all",
+    )
     args = parser.parse_args()
 
     init_logging(logging.DEBUG if args.verbose else logging.INFO)

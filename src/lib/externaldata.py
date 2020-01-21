@@ -25,47 +25,54 @@ import os
 
 
 class ModuleData:
-
     def __init__(self, name, path, module):
         self.name = name
         self.path = path
-        self.checker_data = module.get('x-checker-data', {})
+        self.checker_data = module.get("x-checker-data", {})
         self.external_data = []
 
 
-class ExternalFile(namedtuple("ExternalFile", ("url", "checksum", "size", "version", "timestamp"))):
+class ExternalFile(
+    namedtuple("ExternalFile", ("url", "checksum", "size", "version", "timestamp"))
+):
     __slots__ = ()
 
     def matches(self, other):
         return (
-            self.url == other.url and
-            self.checksum == other.checksum and
-            (
-                self.size == -1 or
-                other.size == -1 or
-                self.size == other.size
-            )
+            self.url == other.url
+            and self.checksum == other.checksum
+            and (self.size == -1 or other.size == -1 or self.size == other.size)
         )
 
 
 class ExternalData(abc.ABC):
-    Type = Enum('Type', 'EXTRA_DATA FILE ARCHIVE')
+    Type = Enum("Type", "EXTRA_DATA FILE ARCHIVE")
 
     TYPES = {
-        'file': Type.FILE,
-        'archive': Type.ARCHIVE,
-        'extra-data': Type.EXTRA_DATA,
+        "file": Type.FILE,
+        "archive": Type.ARCHIVE,
+        "extra-data": Type.EXTRA_DATA,
     }
 
     class State(Enum):
         UNKNOWN = 0
         VALID = 1 << 1  # URL is reachable
         BROKEN = 1 << 2  # URL couldn't be reached
-        ADDED = 1 << 3 # New source added
-        REMOVED = 1 << 4 # Source removed
+        ADDED = 1 << 3  # New source added
+        REMOVED = 1 << 4  # Source removed
 
-    def __init__(self, data_type, source_path, source_parent, filename, url, checksum, size=-1, arches=[],
-                 checker_data=None):
+    def __init__(
+        self,
+        data_type,
+        source_path,
+        source_parent,
+        filename,
+        url,
+        checksum,
+        size=-1,
+        arches=[],
+        checker_data=None,
+    ):
         self.source_path = source_path
         self.source_parent = source_parent
         self.filename = filename
@@ -78,21 +85,25 @@ class ExternalData(abc.ABC):
 
     def __str__(self):
         version = self.new_version or self.current_version
-        info = '{filename}:\n' \
-               '  State:   {state}\n' \
-               '  Type:    {type}\n' \
-               '  URL:     {url}\n' \
-               '  SHA256:  {checksum}\n' \
-               '  Size:    {size}\n' \
-               '  Arches:  {arches}\n' \
-               '  Checker: {checker_data}'.format(state=self.state.name,
-                                                  filename=self.filename,
-                                                  type=self.type.name,
-                                                  url=version.url,
-                                                  checksum=version.checksum,
-                                                  size=version.size,
-                                                  arches=self.arches,
-                                                  checker_data=self.checker_data)
+        info = (
+            "{filename}:\n"
+            "  State:   {state}\n"
+            "  Type:    {type}\n"
+            "  URL:     {url}\n"
+            "  SHA256:  {checksum}\n"
+            "  Size:    {size}\n"
+            "  Arches:  {arches}\n"
+            "  Checker: {checker_data}".format(
+                state=self.state.name,
+                filename=self.filename,
+                type=self.type.name,
+                url=version.url,
+                checksum=version.checksum,
+                size=version.size,
+                arches=self.arches,
+                checker_data=self.checker_data,
+            )
+        )
         return info
 
     @abc.abstractmethod
@@ -102,29 +113,36 @@ class ExternalData(abc.ABC):
 
 
 class ExternalDataSource(ExternalData):
-
     def __init__(self, source_path, source, sources, data_type, url):
         name = (
-            source.get('filename') or
-            source.get('dest-filename') or
-            os.path.basename(url)
+            source.get("filename")
+            or source.get("dest-filename")
+            or os.path.basename(url)
         )
 
-        sha256sum = source.get('sha256')
-        size = source.get('size', -1)
-        checker_data = source.get('x-checker-data', {})
-        arches = checker_data.get('arches') or source.get('only-arches') or ["x86_64"]
+        sha256sum = source.get("sha256")
+        size = source.get("size", -1)
+        checker_data = source.get("x-checker-data", {})
+        arches = checker_data.get("arches") or source.get("only-arches") or ["x86_64"]
 
         super().__init__(
-            data_type, source_path, sources, name, url, sha256sum, size, arches, checker_data,
+            data_type,
+            source_path,
+            sources,
+            name,
+            url,
+            sha256sum,
+            size,
+            arches,
+            checker_data,
         )
 
         self.source = source
 
     @classmethod
     def from_source(cls, source_path, source, sources):
-        url = source.get('url')
-        data_type = cls.TYPES.get(source.get('type'))
+        url = source.get("url")
+        data_type = cls.TYPES.get(source.get("type"))
         if url is None or data_type is None:
             return None
 
@@ -157,7 +175,6 @@ class ExternalDataSource(ExternalData):
 
 
 class Checker:
-
     def check_module(self, module_data, external_data_list):
         pass
 

@@ -69,8 +69,7 @@ class TestHTMLChecker(unittest.TestCase):
         self.assertEqual(data.filename, "xdebug.tar.gz")
         self.assertIsNotNone(data.new_version)
         self.assertEqual(
-            data.new_version.url,
-            "https://xdebug.org/files/xdebug-2.9.0.tgz",
+            data.new_version.url, "https://xdebug.org/files/xdebug-2.9.0.tgz",
         )
         self.assertIsInstance(data.new_version.size, int)
         self.assertGreater(data.new_version.size, 0)

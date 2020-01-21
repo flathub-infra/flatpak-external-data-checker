@@ -43,11 +43,15 @@ from src.lib.utils import get_timestamp_from_url
 apt_pkg.init()
 
 APT_NEEDED_DIRS = (
-    'etc/apt/apt.conf.d', 'etc/apt/preferences.d',
-    'etc/apt/trusted.gpg.d', 'var/lib/apt/lists/partial',
-    'var/cache/apt/archives/partial', 'var/log/apt',
-    'var/lib/dpkg', 'var/lib/dpkg/updates',
-    'var/lib/dpkg/info'
+    "etc/apt/apt.conf.d",
+    "etc/apt/preferences.d",
+    "etc/apt/trusted.gpg.d",
+    "var/lib/apt/lists/partial",
+    "var/cache/apt/archives/partial",
+    "var/log/apt",
+    "var/lib/dpkg",
+    "var/lib/dpkg/updates",
+    "var/lib/dpkg/info",
 )
 
 LOG = logging.getLogger(__name__)
@@ -69,7 +73,7 @@ class LoggerAcquireProgress(apt.progress.text.AcquireProgress):
         super().__init__(FileLike())
 
     def pulse(self, owner):
-        '''Disable percentage reporting within files.'''
+        """Disable percentage reporting within files."""
         return apt.progress.base.AcquireProgress.pulse(self, owner)
 
 
@@ -87,23 +91,26 @@ class DebianRepoChecker(Checker):
         self._pkgs_cache = {}
 
     def _should_check(self, external_data):
-        return external_data.checker_data.get('type') == 'debian-repo'
+        return external_data.checker_data.get("type") == "debian-repo"
 
     def check(self, external_data):
         # Only process external data of the debian-repo
         if not self._should_check(external_data):
-            LOG.debug('%s is not a debian-repo type ext data', external_data.filename)
+            LOG.debug("%s is not a debian-repo type ext data", external_data.filename)
             return
 
-        LOG.debug('Checking %s', external_data.filename)
-        package_name = external_data.checker_data['package-name']
-        root = external_data.checker_data['root']
-        dist = external_data.checker_data['dist']
-        component = external_data.checker_data.get('component', '')
+        LOG.debug("Checking %s", external_data.filename)
+        package_name = external_data.checker_data["package-name"]
+        root = external_data.checker_data["root"]
+        dist = external_data.checker_data["dist"]
+        component = external_data.checker_data.get("component", "")
 
-        if not component and not dist.endswith('/'):
-            LOG.warning('%s is missing Debian repo "component"; for an '
-                        'exact URL, "dist" must end with /', package_name)
+        if not component and not dist.endswith("/"):
+            LOG.warning(
+                '%s is missing Debian repo "component"; for an '
+                'exact URL, "dist" must end with /',
+                package_name,
+            )
             return
 
         arch = self._translate_arch(external_data.arches[0])
@@ -131,41 +138,42 @@ class DebianRepoChecker(Checker):
 
     def _translate_arch(self, arch):
         # Because architecture names in Debian differ from Flatpak's
-        arches = {'x86_64': 'amd64',
-                  'arm': 'armel'}
+        arches = {"x86_64": "amd64", "arm": "armel"}
         return arches.get(arch, arch)
 
     @contextlib.contextmanager
     def _load_repo(self, deb_root, dist, component, arch):
         with tempfile.TemporaryDirectory() as root:
-            LOG.debug('Setting up apt directory structure in %s', root)
+            LOG.debug("Setting up apt directory structure in %s", root)
 
             for path in APT_NEEDED_DIRS:
                 os.makedirs(os.path.join(root, path), exist_ok=True)
 
             # Create sources.list
-            sources_list = os.path.join(root, 'etc/apt/sources.list')
-            with open(sources_list, 'w') as f:
+            sources_list = os.path.join(root, "etc/apt/sources.list")
+            with open(sources_list, "w") as f:
                 # FIXME: import GPG key, remove 'trusted=yes' which skips GPG
                 # verification
-                f.write('deb [arch={arch} trusted=yes] '
-                        '{deb_root} {dist} {component}\n'.format(**locals()))
+                f.write(
+                    "deb [arch={arch} trusted=yes] "
+                    "{deb_root} {dist} {component}\n".format(**locals())
+                )
 
             # Create empty dpkg status
-            dpkg_status = os.path.join(root, 'var/lib/dpkg/status')
-            with open(dpkg_status, 'w') as f:
+            dpkg_status = os.path.join(root, "var/lib/dpkg/status")
+            with open(dpkg_status, "w") as f:
                 pass
 
             # Setup generic configuration
             apt_pkg.init()
-            apt_pkg.config.set('Dir', root)
-            apt_pkg.config.set('Dir::State::status', dpkg_status)
-            apt_pkg.config.set('Acquire::Languages', 'none')
+            apt_pkg.config.set("Dir", root)
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.config.set("Acquire::Languages", "none")
             progress = LoggerAcquireProgress(LOG)
 
             # Create a new cache with the appropriate architecture
-            apt_pkg.config.set('APT::Architecture', arch)
-            apt_pkg.config.set('APT::Architectures', arch)
+            apt_pkg.config.set("APT::Architecture", arch)
+            apt_pkg.config.set("APT::Architectures", arch)
             cache = apt.Cache()
             cache.update(progress)
             cache.open()

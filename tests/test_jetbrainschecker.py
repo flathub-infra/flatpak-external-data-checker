@@ -4,9 +4,7 @@ import unittest
 from src.checker import ManifestChecker
 from src.lib.utils import init_logging
 
-TEST_MANIFEST = os.path.join(
-    os.path.dirname(__file__), "com.jetbrains.PhpStorm.json"
-)
+TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.jetbrains.PhpStorm.json")
 
 
 class TestJetBrainsChecker(unittest.TestCase):
