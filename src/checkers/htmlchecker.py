@@ -43,7 +43,9 @@ def get_latest(checker_data, pattern_name, html):
         return None
 
     if pattern.groups != 1:
-        raise ValueError(f"{pattern_name} {pattern} does not contain exactly 1 match group")
+        raise ValueError(
+            f"{pattern_name} {pattern} does not contain exactly 1 match group"
+        )
 
     m = pattern.findall(html)
     if not m:
@@ -52,7 +54,9 @@ def get_latest(checker_data, pattern_name, html):
     if len(m) == 1:
         result = m[0]
     else:
-        log.debug("%s %s matched multiple times, selecting latest", pattern_name, pattern)
+        log.debug(
+            "%s %s matched multiple times, selecting latest", pattern_name, pattern
+        )
         result = max(m, key=LooseVersion)
 
     log.debug("%s %s matched: %s", pattern_name, pattern, result)

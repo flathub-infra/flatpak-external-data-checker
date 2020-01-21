@@ -30,14 +30,19 @@ class JetBrainsChecker(Checker):
         data = json.load(resp)[code][0]
         release = data["downloads"]["linux"]
 
-        checksum = urllib.request.urlopen(release["checksumLink"]).read().decode("utf-8").split(" ")[0]
+        checksum = (
+            urllib.request.urlopen(release["checksumLink"])
+            .read()
+            .decode("utf-8")
+            .split(" ")[0]
+        )
 
         new_version = ExternalFile(
             release["link"],
             checksum,
             release["size"],
             data["version"],
-            datetime.datetime.strptime(data["date"], "%Y-%m-%d")
+            datetime.datetime.strptime(data["date"], "%Y-%m-%d"),
         )
 
         if not external_data.current_version.matches(new_version):

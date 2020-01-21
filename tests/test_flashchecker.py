@@ -25,8 +25,7 @@ from src.lib.utils import init_logging
 from src.checker import ManifestChecker
 
 TEST_MANIFEST = os.path.join(
-    os.path.dirname(__file__),
-    "com.adobe.FlashPlayer.NPAPI.json",
+    os.path.dirname(__file__), "com.adobe.FlashPlayer.NPAPI.json",
 )
 
 
@@ -48,5 +47,5 @@ class TestFlashChecker(unittest.TestCase):
             self.assertIsNotNone(data.new_version.version)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

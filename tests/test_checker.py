@@ -31,20 +31,22 @@ from src.lib.externaldata import ExternalData, Checker
 from src.checker import ManifestChecker
 
 TEST_MANIFEST = os.path.join(
-    os.path.dirname(__file__),
-    "org.externaldatachecker.Manifest.json",
+    os.path.dirname(__file__), "org.externaldatachecker.Manifest.json",
 )
 NUM_ARCHIVE_IN_MANIFEST = 1
 NUM_FILE_IN_MANIFEST = 1
 NUM_EXTRA_DATA_IN_MANIFEST = 6
-NUM_ALL_EXT_DATA = NUM_ARCHIVE_IN_MANIFEST + NUM_FILE_IN_MANIFEST + \
-                   NUM_EXTRA_DATA_IN_MANIFEST
+NUM_ALL_EXT_DATA = (
+    NUM_ARCHIVE_IN_MANIFEST + NUM_FILE_IN_MANIFEST + NUM_EXTRA_DATA_IN_MANIFEST
+)
 
 
 class DummyChecker(Checker):
     def check(self, external_data):
-        logging.debug('Phony checker checking external data %s and all is always good',
-                      external_data.filename)
+        logging.debug(
+            "Phony checker checking external data %s and all is always good",
+            external_data.filename,
+        )
 
 
 class UpdateEverythingChecker(Checker):
@@ -101,8 +103,7 @@ class TestExternalDataChecker(unittest.TestCase):
                 f.write(contents)
 
             appdata = os.path.join(
-                tmpdir,
-                os.path.splitext(filename)[0] + ".appdata.xml",
+                tmpdir, os.path.splitext(filename)[0] + ".appdata.xml",
             )
             with open(appdata, "w") as f:
                 f.write("""<application></application>""")
@@ -166,7 +167,9 @@ class TestExternalDataChecker(unittest.TestCase):
 }}""".lstrip()  # noqa: E501
 
         self._test_update(
-            filename, contents, expected_new_contents,
+            filename,
+            contents,
+            expected_new_contents,
             ["Update UnityHubSetup.AppImage to 1.2.3.4"],
         )
 
@@ -217,7 +220,9 @@ modules:
           - x86_64
 """.lstrip()
         self._test_update(
-            filename, contents, expected_new_contents,
+            filename,
+            contents,
+            expected_new_contents,
             ["Update UnityHubSetup.AppImage to 1.2.3.4"],
         )
 
@@ -267,8 +272,7 @@ modules:
 }""".lstrip()  # noqa: E501
 
         self._test_remove(
-            filename, contents, expected_new_contents,
-            ["Removed foo-bar.xpi"],
+            filename, contents, expected_new_contents, ["Removed foo-bar.xpi"],
         )
 
     def test_check(self):
@@ -301,8 +305,7 @@ modules:
         self.assertIsNotNone(dropbox)
         self.assertEqual(dropbox.new_version.version, "1.2.3.4")
         self.assertEqual(
-            dropbox.new_version.url,
-            "https://httpbin.org/image/jpeg?version=1.2.3.4",
+            dropbox.new_version.url, "https://httpbin.org/image/jpeg?version=1.2.3.4",
         )
 
         # this URL is a redirect, but since it is not a rotating-url the URL
@@ -318,5 +321,5 @@ modules:
             return None
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
