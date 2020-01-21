@@ -79,9 +79,7 @@ class FirefoxChecker(Checker):
 
         if not browser_data:
             log.warning(
-                "Unable to find browser source with filename %s",
-                module_data.name,
-                self.CHECKER_BROWSER_SOURCE_FILENAME,
+                "Unable to find browser source with filename %s", module_data.name,
             )
             return None
 
