@@ -158,11 +158,9 @@ def open_pr(subject, body, branch, manifest_checker=None):
     if origin_repo.permissions.push:
         log.debug("origin repo is writable")
         repo = origin_repo
-        fork = None
     else:
         log.debug("origin repo not writable; creating fork")
-        fork = user.create_fork(origin_repo)
-        repo = fork
+        repo = user.create_fork(origin_repo)
 
     remote_url = f"https://{github_token}:x-oauth-basic@github.com/{repo.full_name}"
 
