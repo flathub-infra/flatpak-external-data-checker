@@ -195,21 +195,20 @@ def open_pr(subject, body, branch, manifest_checker=None):
         )
         return
 
-    if origin_repo.permissions.push:
-        open_prs = [pr for pr in prs if pr.state == "open"]
-        for pr in open_prs:
-            log.info("Found open PR: %s", pr.html_url)
+    open_prs = [pr for pr in prs if pr.state == "open"]
+    for pr in open_prs:
+        log.info("Found open PR: %s", pr.html_url)
 
-            if automerge:
-                pr_commit = pr.head.repo.get_commit(pr.head.sha)
-                if pr_commit.get_combined_status().state == "success" and pr.mergeable:
-                    log.info("PR passed CI and is mergeable, merging", pr.html_url)
-                    pr.create_issue_comment(MERGE_COMMENT)
-                    pr.merge(merge_method='rebase')
-                    origin_repo.get_git_ref(f"heads/{pr.head.ref}").delete()
-                    return
-            else:
+        if origin_repo.permissions.push and automerge:
+            pr_commit = pr.head.repo.get_commit(pr.head.sha)
+            if pr_commit.get_combined_status().state == "success" and pr.mergeable:
+                log.info("PR passed CI and is mergeable, merging", pr.html_url)
+                pr.create_issue_comment(MERGE_COMMENT)
+                pr.merge(merge_method='rebase')
+                origin_repo.get_git_ref(f"heads/{pr.head.ref}").delete()
                 return
+        else:
+            return
 
     check_call(("git", "push", "-u", remote_url, branch))
 
