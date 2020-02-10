@@ -11,7 +11,7 @@
           "size": 0,
           "x-checker-data": {
             "type": "html",
-            "url": "https://xdebug.org/download",
+            "url": "https://xdebug.org/download/historical",
             "version-pattern": "Xdebug (2\\.9\\.0)",
             "url-template": "https://xdebug.org/files/xdebug-$version.tgz"
           }
