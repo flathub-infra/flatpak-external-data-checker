@@ -192,25 +192,6 @@ for [JetBrains](https://www.jetbrains.com/) products:
 }
 ```
 
-## Contributing
-
-```bash
-# Run all the tests (some of which need an internet connection):
-./run-in-container.sh python3 -m unittest discover
-
-# Run one suite of tests
-./run-in-container.sh python3 -m unittest tests.test_appdata
-
-# Apply code formatting
-./run-in-container.sh black .
-
-# More information
-./run-in-container.sh python3 -m unittest --help
-```
-
-You can of course install the necessary modules on your host system and omit
-`./run-in-container.sh` if you prefer.
-
 ## License and Copyright
 
 License: GPLv2
