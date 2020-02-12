@@ -94,7 +94,7 @@ modules:
                     sha256: e0a992d740709892e81f9d93f06daf305cf73fb81b545afe72478043172c3628
                   - type: patch
                     paths:
-                      - patches/db-5.3.28-atomic_compare_exchange.patch
+                      - flatpak-builder/patches/db-5.3.28-atomic_compare_exchange.patch
                   - type: shell
                     commands:
                       - |
@@ -137,7 +137,7 @@ modules:
                 url: "https://github.com/pygobject/pycairo/releases/download/v1.18.2/pycairo-1.18.2.tar.gz"
                 sha256: dcb853fd020729516e8828ad364084e752327d4cff8505d20b13504b32b16531
 
-      - python3-ruamel.yaml.json
-      - python3-PyGithub.json
-      - python3-tenacity.json
-      - python3-defusedxml.json
+      - flatpak-builder/python3-ruamel.yaml.json
+      - flatpak-builder/python3-PyGithub.json
+      - flatpak-builder/python3-tenacity.json
+      - flatpak-builder/python3-defusedxml.json
