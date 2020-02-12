@@ -24,9 +24,8 @@ modules:
       - ln -sr /app/{lib/fedc,bin}/canonicalize-manifest
       - install -Dm644 data/${FLATPAK_ID}.metainfo.xml -t /app/share/metainfo/
     sources:
-      - type: git
-        url: "https://github.com/flathub/flatpak-external-data-checker.git"
-        commit: 113505e743a4e4ef6c9a6ad22b6c3d6886f2c6e1
+      - type: dir
+        path: "."
     modules:
 
       - name: python-apt
