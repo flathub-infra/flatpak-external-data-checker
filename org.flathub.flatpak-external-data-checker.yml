@@ -37,6 +37,11 @@ modules:
           - type: archive
             url: "http://deb.debian.org/debian/pool/main/p/python-apt/python-apt_1.8.4.1.tar.xz"
             sha256: e110b3fff9422c5e27b9cbd23f44e3c7f843d4517fef8b3c2058102b115b20b9
+            x-checker-data:
+              type: html
+              url: "https://packages.debian.org/source/stable/python-apt"
+              version-pattern: python-apt_([\d.-]+).tar.xz
+              url-pattern: (http://deb.debian.org/debian/pool/main/p/python-apt/python-apt_[\d.-]+.tar.xz)
         modules:
 
           - name: apt
