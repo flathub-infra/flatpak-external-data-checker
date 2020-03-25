@@ -35,8 +35,8 @@ modules:
           - python3 setup.py install --prefix=/app --root=/
         sources:
           - type: archive
-            url: "http://deb.debian.org/debian/pool/main/p/python-apt/python-apt_1.8.4.tar.xz"
-            sha256: 7831b3fd0093af5b76393f0d2610cb76c1d44e7aa438837779f9355a9174a220
+            url: "http://deb.debian.org/debian/pool/main/p/python-apt/python-apt_1.8.4.1.tar.xz"
+            sha256: e110b3fff9422c5e27b9cbd23f44e3c7f843d4517fef8b3c2058102b115b20b9
         modules:
 
           - name: apt
