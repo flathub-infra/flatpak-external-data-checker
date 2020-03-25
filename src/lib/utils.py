@@ -69,6 +69,16 @@ def _extract_timestamp(info):
         return dt.datetime.now()  # what else can we do?
 
 
+def strip_query(url):
+    """Strips the query string from the given URL, if any."""
+    parts = urllib.parse.urlparse(url)
+    if not parts.query:
+        return url
+    stripped = urllib.parse.urlunparse(parts._replace(query=""))
+    log.debug("Normalised %s to %s", url, stripped)
+    return stripped
+
+
 def get_timestamp_from_url(url):
     request = urllib.request.Request(url, headers=HEADERS, method="HEAD")
     with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
@@ -89,7 +99,9 @@ def get_extra_data_info_from_head(url):
         info = response.info()
         size = int(info["Content-Length"])
 
-    return ExternalFile(real_url, None, size, None, _extract_timestamp(info))
+    return ExternalFile(
+        strip_query(real_url), None, size, None, _extract_timestamp(info)
+    )
 
 
 @retry(
@@ -113,7 +125,7 @@ def get_extra_data_info_from_url(url):
 
     checksum = hashlib.sha256(data).hexdigest()
     external_file = ExternalFile(
-        real_url, checksum, size, None, _extract_timestamp(info)
+        strip_query(real_url), checksum, size, None, _extract_timestamp(info)
     )
 
     return external_file, data

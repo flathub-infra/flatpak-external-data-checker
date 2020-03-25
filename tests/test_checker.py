@@ -303,10 +303,8 @@ modules:
 
         dropbox = self._find_by_filename(ext_data, "dropbox.tgz")
         self.assertIsNotNone(dropbox)
-        self.assertEqual(dropbox.new_version.version, "1.2.3.4")
-        self.assertEqual(
-            dropbox.new_version.url, "https://httpbin.org/image/jpeg?version=1.2.3.4",
-        )
+        self.assertEqual(dropbox.new_version.version, "64")
+        self.assertEqual(dropbox.new_version.url, "https://httpbin.org/base64/4puE")
 
         # this URL is a redirect, but since it is not a rotating-url the URL
         # should not be updated.
