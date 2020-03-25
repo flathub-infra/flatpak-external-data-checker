@@ -74,8 +74,8 @@
                     "size": 1234567,
                     "x-checker-data": {
                         "type": "rotating-url",
-                        "url": "https://httpbin.org/redirect-to?url=https%3A%2F%2Fhttpbin.org%2Fimage%2Fjpeg%3Fversion=1.2.3.4&status_code=302",
-                        "pattern": ".*?version=([0-9.]+)$"
+                        "url": "https://httpbin.org/redirect-to?url=https%3A%2F%2Fhttpbin.org%2Fbase64%2F4puE&status_code=302",
+                        "pattern": ".*base(..).*"
                     }
                 },
                 {

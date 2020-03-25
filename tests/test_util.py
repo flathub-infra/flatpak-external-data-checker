@@ -19,7 +19,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import unittest
 
-from src.lib.utils import parse_github_url
+from src.lib.utils import parse_github_url, strip_query
 
 
 class TestParseGitHubUrl(unittest.TestCase):
@@ -38,6 +38,18 @@ class TestParseGitHubUrl(unittest.TestCase):
     def test_https_with_auth(self):
         url = "https://acce55ed:x-oauth-basic@github.com/endlessm/eos-google-chrome-app"
         self.assertEqual(parse_github_url(url), "endlessm/eos-google-chrome-app")
+
+
+class TestStripQuery(unittest.TestCase):
+    def test_strip_query(self):
+        url = "https://d11yldzmag5yn.cloudfront.net/prod/3.5.372466.0322/zoom_x86_64.tar.xz?_x_zm_rtaid=muDd1uOqSZ-xUScZF698QQ.1585134521724.21e5ab14908b2121f5ed53882df91cb9&_x_zm_rhtaid=732"  # noqa: E501
+        expected = "https://d11yldzmag5yn.cloudfront.net/prod/3.5.372466.0322/zoom_x86_64.tar.xz"
+        self.assertEqual(strip_query(url), expected)
+
+    def test_preserve_auth(self):
+        url = "https://user:pass@example.com/"
+        expected = url
+        self.assertEqual(strip_query(url), expected)
 
 
 if __name__ == "__main__":
