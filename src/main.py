@@ -137,6 +137,7 @@ MERGE_COMMENT = (
     "`automerge-flathubbot-prs` to `false` in flathub.json.</i>"
 )
 
+
 def open_pr(subject, body, branch, manifest_checker=None):
     try:
         github_token = os.environ["GITHUB_TOKEN"]
@@ -202,7 +203,7 @@ def open_pr(subject, body, branch, manifest_checker=None):
             if pr_commit.get_combined_status().state == "success" and pr.mergeable:
                 log.info("PR passed CI and is mergeable, merging", pr.html_url)
                 pr.create_issue_comment(MERGE_COMMENT)
-                pr.merge(merge_method='rebase')
+                pr.merge(merge_method="rebase")
                 origin_repo.get_git_ref(f"heads/{pr.head.ref}").delete()
                 return
         else:
@@ -260,7 +261,9 @@ def main():
                 with indir(os.path.dirname(args.manifest)):
                     subject, body, branch = commit_changes(changes)
                     if not args.commit_only:
-                        open_pr(subject, body, branch, manifest_checker=manifest_checker)
+                        open_pr(
+                            subject, body, branch, manifest_checker=manifest_checker
+                        )
                 return
 
             log.warning("Can't automatically fix any of the above issues")
