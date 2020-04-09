@@ -36,7 +36,8 @@ class SnapCraftChecker(Checker):
         data = [
             x
             for x in d["channel-map"]
-            if x["channel"]["architecture"] == self.arches[external_data.arches[0]] and x["channel"]["name"] == release
+            if x["channel"]["architecture"] == self.arches[external_data.arches[0]]
+            and x["channel"]["name"] == release
         ][0]
 
         new_version = ExternalFile(
@@ -44,7 +45,9 @@ class SnapCraftChecker(Checker):
             data["download"]["sha3-384"],
             data["download"]["size"],
             data["version"],
-            datetime.datetime.strptime(data["channel"]["released-at"], "%Y-%m-%dT%H:%M:%S.%f%z")
+            datetime.datetime.strptime(
+                data["channel"]["released-at"], "%Y-%m-%dT%H:%M:%S.%f%z"
+            ),
         )
 
         if not external_data.current_version.matches(new_version):

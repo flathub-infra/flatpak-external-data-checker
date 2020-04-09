@@ -4,9 +4,7 @@ import unittest
 from src.checker import ManifestChecker
 from src.lib.utils import init_logging
 
-TEST_MANIFEST = os.path.join(
-    os.path.dirname(__file__), "com.nordpass.NordPass.yaml"
-)
+TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.nordpass.NordPass.yaml")
 
 
 class TestJetBrainsChecker(unittest.TestCase):
@@ -23,7 +21,7 @@ class TestJetBrainsChecker(unittest.TestCase):
         self.assertIsNotNone(data.new_version)
         self.assertRegex(
             data.new_version.url,
-            r"^https://api\.snapcraft\.io/api/v1/snaps/download/[A-Za-z0-9]{32}_[0-9]+.snap$",  # noqa: E501
+            r"^https://api\.snapcraft\.io/api/v1/snaps/download/[A-Za-z0-9]{32}_[0-9]+.snap$",
         )
         self.assertIsInstance(data.new_version.size, int)
         self.assertGreater(data.new_version.size, 0)
