@@ -117,19 +117,11 @@ class DebianRepoChecker(Checker):
         with self._load_repo(root, dist, component, arch) as cache:
             package = cache[package_name]
             candidate = package.candidate
-            # http://www.fifi.org/doc/debian-policy/policy.html/ch-versions.html
-            #
-            # The version number format is: [epoch:]upstream_version[-debian_revision]
-            #
-            # The package management system will break the version number apart at the
-            # last hyphen in the string (if there is one) to determine the
-            # upstream_version and debian_revision.
-            upstream_version = candidate.version.rsplit("-", 1)[0]
             new_version = ExternalFile(
                 candidate.uri,
                 candidate.sha256,
                 candidate.size,
-                upstream_version,
+                candidate.version,
                 timestamp=_get_timestamp_for_candidate(candidate),
             )
 
