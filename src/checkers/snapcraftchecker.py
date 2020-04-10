@@ -2,7 +2,6 @@ import urllib.request
 import datetime
 import json
 import logging
-import os
 import hashlib
 
 from src.lib.externaldata import ExternalFile, Checker
