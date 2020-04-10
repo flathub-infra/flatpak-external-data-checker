@@ -12,4 +12,4 @@ modules:
         x-checker-data:
           type: snapcraft
           name: nordpass
-          release: stable
+          channel: stable
