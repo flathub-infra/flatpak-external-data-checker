@@ -8,7 +8,7 @@ from src.lib.externaldata import ExternalFile, Checker
 log = logging.getLogger(__name__)
 
 
-class SnapCraftChecker(Checker):
+class SnapcraftChecker(Checker):
     arches = {"x86_64": "amd64", "aarch64": "arm64", "arm": "armhf", "i386": "i386"}
 
     @staticmethod
@@ -21,7 +21,7 @@ class SnapCraftChecker(Checker):
             return
 
         name = external_data.checker_data["name"]
-        release = external_data.checker_data["release"]
+        channel = external_data.checker_data["channel"]
 
         url = f"http://api.snapcraft.io/v2/snaps/info/{name}"
         header = {"Snap-Device-Series": "16"}
@@ -37,7 +37,7 @@ class SnapCraftChecker(Checker):
             x
             for x in d["channel-map"]
             if x["channel"]["architecture"] == self.arches[external_data.arches[0]]
-            and x["channel"]["name"] == release
+            and x["channel"]["name"] == channel
         ][0]
 
         new_version = ExternalFile(
