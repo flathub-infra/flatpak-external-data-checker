@@ -193,16 +193,16 @@ for [JetBrains](https://www.jetbrains.com/) products:
 }
 ```
 
-#### SnapCraft checker
+#### Snapcraft checker
 
 Special checker that will check for available updates
-for [SnapCraft](https://snapcraft.io/) packages:
+for [Snapcraft](https://snapcraft.io/) packages:
 
 ```json
 "x-checker-data": {
     "type": "snapcraft",
     "name": "PACKAGE-NAME",
-    "release": "stable, beta, or any other tag the project uses"
+    "channel": "stable, beta, or any other tag the project uses"
 }
 ```
 
