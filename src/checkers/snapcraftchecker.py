@@ -52,13 +52,18 @@ class SnapcraftChecker(Checker):
 
         js = json.load(resp)
 
-        data = [x for x in js["channel-map"] if
-                x["channel"]["architecture"] == self._arches[external_data.arches[0]] and x["channel"][
-                    "name"] == channel][0]
+        data = [
+            x
+            for x in js["channel-map"]
+            if x["channel"]["architecture"] == self._arches[external_data.arches[0]]
+            and x["channel"]["name"] == channel
+        ][0]
 
         if external_data.current_version.url != data["download"]["url"]:
             log.debug("Downloading file from %s; may take a while", url)
-            sha256 = self._get_sha256(data["download"]["url"], data["download"]["sha3-384"])
+            sha256 = self._get_sha256(
+                data["download"]["url"], data["download"]["sha3-384"]
+            )
 
             if sha256:
                 new_version = ExternalFile(
