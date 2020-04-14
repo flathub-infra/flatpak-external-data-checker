@@ -169,10 +169,14 @@ def open_pr(subject, body, branch, manifest_checker=None):
     head = "{}:{}".format(repo.owner.login, branch)
     pr_message = ((body or "") + "\n\n" + DISCLAIMER).strip()
 
-    if os.path.isfile("flathub.json"):
+    try:
         with open("flathub.json") as f:
             repocfg = json.load(f)
-            automerge = repocfg.get("automerge-flathubbot-prs")
+    except FileNotFoundError:
+        repocfg = {}
+
+    automerge = repocfg.get("automerge-flathubbot-prs")
+
 
     # Enable automatic merge if external data is broken unless explicitly disabled
     if automerge is not False and manifest_checker:
