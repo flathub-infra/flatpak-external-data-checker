@@ -177,7 +177,6 @@ def open_pr(subject, body, branch, manifest_checker=None):
 
     automerge = repocfg.get("automerge-flathubbot-prs")
 
-
     # Enable automatic merge if external data is broken unless explicitly disabled
     if automerge is not False and manifest_checker:
         for data in manifest_checker.get_outdated_external_data():
