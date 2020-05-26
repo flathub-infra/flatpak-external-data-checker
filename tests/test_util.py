@@ -46,6 +46,11 @@ class TestStripQuery(unittest.TestCase):
         expected = "https://d11yldzmag5yn.cloudfront.net/prod/3.5.372466.0322/zoom_x86_64.tar.xz"
         self.assertEqual(strip_query(url), expected)
 
+    def test_preserve_nice_query(self):
+        url = "https://dl2.tlauncher.org/f.php?f=files%2FTLauncher-2.69.zip"
+        expected = url
+        self.assertEqual(strip_query(url), expected)
+
     def test_preserve_auth(self):
         url = "https://user:pass@example.com/"
         expected = url
