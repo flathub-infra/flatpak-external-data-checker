@@ -70,11 +70,16 @@ def _extract_timestamp(info):
 
 
 def strip_query(url):
-    """Strips the query string from the given URL, if any."""
+    """Sanitizes the query string from the given URL, if any. Parameters whose
+    names begin with an underscore are assumed to be tracking identifiers and
+    are removed."""
     parts = urllib.parse.urlparse(url)
     if not parts.query:
         return url
-    stripped = urllib.parse.urlunparse(parts._replace(query=""))
+    qsl = urllib.parse.parse_qsl(parts.query)
+    qsl_stripped = [(k, v) for (k, v) in qsl if not k.startswith("_")]
+    query_stripped = urllib.parse.urlencode(qsl_stripped)
+    stripped = urllib.parse.urlunparse(parts._replace(query=query_stripped))
     log.debug("Normalised %s to %s", url, stripped)
     return stripped
 
