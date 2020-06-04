@@ -193,6 +193,20 @@ for [JetBrains](https://www.jetbrains.com/) products:
 }
 ```
 
+#### Snapcraft checker
+
+Special checker that will check for available updates
+for [Snapcraft](https://snapcraft.io/) packages:
+
+```json
+"x-checker-data": {
+    "type": "snapcraft",
+    "name": "PACKAGE-NAME",
+    "channel": "stable, beta, or any other tag the project uses"
+}
+```
+
+
 ## License and Copyright
 
 License: GPLv2

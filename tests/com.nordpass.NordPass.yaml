@@ -1,0 +1,15 @@
+id: com.nordpass.NordPass
+modules:
+  - name: nordpass
+    buildsystem: simple
+    build-commands: []
+    sources:
+      - type: extra-data
+        filename: nordpass.snap
+        url: https://api.snapcraft.io/api/v1/snaps/download/00CQ2MvSr0Ex7zwdGhCYTa0ZLMw3H6hf_23.snap
+        sha256: 9b05211728caaabb170844aca43285079dea991358116ccb297840f84dde5464
+        size: 64237568
+        x-checker-data:
+          type: snapcraft
+          name: nordpass
+          channel: stable
