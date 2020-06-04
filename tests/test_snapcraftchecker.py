@@ -7,7 +7,7 @@ from src.lib.utils import init_logging
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.nordpass.NordPass.yaml")
 
 
-class TestJetBrainsChecker(unittest.TestCase):
+class TestSnapctaftChecker(unittest.TestCase):
     def setUp(self):
         init_logging()
 
