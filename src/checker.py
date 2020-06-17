@@ -228,8 +228,6 @@ class ManifestChecker:
         ]
 
     def _update_manifest(self, path, datas, changes):
-        last_update = None
-
         for data in datas:
             if (
                 data.new_version is None
@@ -247,7 +245,6 @@ class ManifestChecker:
                 message = "Update {} to {}".format(
                     data.filename, data.new_version.version
                 )
-                last_update = data.new_version
             else:
                 message = "Update {}".format(data.filename)
 
@@ -258,12 +255,10 @@ class ManifestChecker:
             self._dump_manifest(path)
 
             appdata = find_appdata_file(os.path.splitext(self._manifest)[0])
-
-            if last_update is not None and appdata is not None:
-                # TODO: this assumes that the last changed source for which we can
-                # detect a version number is the one corresponding to the application
-                # as a whole. In practice, this is currently true, but in general it
-                # may not be.
+            # Guess that the last external source is the one corresponding to the main
+            # application bundle.
+            last_update = datas[-1].new_version
+            if appdata is not None and last_update is not None:
                 add_release_to_file(
                     appdata, last_update.version, last_update.timestamp.strftime("%F")
                 )
