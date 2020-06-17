@@ -31,7 +31,6 @@ from .lib.utils import read_manifest, dump_manifest
 import logging
 import os
 
-import gi
 from gi.repository import GLib
 
 log = logging.getLogger(__name__)
