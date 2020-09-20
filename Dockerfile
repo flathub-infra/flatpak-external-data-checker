@@ -17,6 +17,7 @@ RUN apt-get update \
       python3-toml \
       python3-pyelftools \
       squashfs-tools \
+      jq \
   && apt-get clean \
   && rmdir /var/cache/apt/archives/partial
 

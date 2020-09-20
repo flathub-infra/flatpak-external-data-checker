@@ -1,5 +1,6 @@
 from .debianrepochecker import DebianRepoChecker
 from .firefoxchecker import FirefoxChecker
+from .jsonchecker import JSONChecker
 from .urlchecker import URLChecker
 from .htmlchecker import HTMLChecker
 from .jetbrainschecker import JetBrainsChecker
@@ -18,5 +19,6 @@ ALL_CHECKERS = [
     SnapcraftChecker,
     AnityaChecker,
     RustChecker,
+    JSONChecker,
     URLChecker,  # leave this last
 ]
