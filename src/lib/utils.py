@@ -115,7 +115,7 @@ def get_extra_data_info_from_head(url):
     wait=wait_fixed(2),
     before_sleep=before_sleep_log(log, logging.DEBUG),
 )
-def get_extra_data_info_from_url(url):
+def get_extra_data_info_from_url(url, follow_redirects=True):
     request = urllib.request.Request(url, headers=HEADERS)
 
     with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
@@ -130,7 +130,11 @@ def get_extra_data_info_from_url(url):
 
     checksum = hashlib.sha256(data).hexdigest()
     external_file = ExternalFile(
-        strip_query(real_url), checksum, size, None, _extract_timestamp(info)
+        strip_query(real_url if follow_redirects else url),
+        checksum,
+        size,
+        None,
+        _extract_timestamp(info),
     )
 
     return external_file, data
