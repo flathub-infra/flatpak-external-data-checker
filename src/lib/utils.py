@@ -150,21 +150,27 @@ def clear_env(environ):
     return new_env
 
 
-def run_command(argv, cwd=None, bwrap=True):
-    command = []
-    if bwrap:
-        command.append("bwrap")
-        for path in ("/usr", "/lib", "/lib64", "/bin", "/proc"):
-            command.extend(["--ro-bind", path, path])
+def wrap_in_bwrap(cmdline, bwrap_args=None):
+    bwrap_cmd = ["bwrap", "--unshare-all"]
+    for path in ("/usr", "/lib", "/lib64", "/bin", "/proc"):
+        bwrap_cmd.extend(["--ro-bind", path, path])
+    if bwrap_args is not None:
+        bwrap_cmd.extend(bwrap_args)
+    return bwrap_cmd + ["--"] + cmdline
 
-    command.extend(argv)
+
+def run_command(argv, cwd=None, bwrap=True, bwrap_args=None):
+    if bwrap:
+        command = wrap_in_bwrap(argv, bwrap_args)
+    else:
+        command = argv
     p = subprocess.run(command, cwd=cwd, stderr=subprocess.PIPE, encoding="utf-8")
     return p
 
 
-def _check_bwrap():
+def check_bwrap():
     try:
-        p = run_command(["/usr/bin/true"])
+        p = run_command(["/bin/true"])
         if p.returncode == 0:
             return True
     except FileNotFoundError:
@@ -197,27 +203,21 @@ def extract_appimage_version(basename, data):
         with open(appimage_path, "wb") as fp:
             fp.write(data)
 
-        args = []
-        bwrap = _check_bwrap()
+        bwrap = check_bwrap()
+        bwrap_args = [
+            "--bind",
+            tmpdir,
+            tmpdir,
+            "--die-with-parent",
+            "--new-session",
+        ]
         unappimage = _check_unappimage()
 
-        if bwrap:
-            args.extend(
-                [
-                    "--bind",
-                    tmpdir,
-                    tmpdir,
-                    "--die-with-parent",
-                    "--new-session",
-                    "--unshare-all",
-                ]
-            )
-
         if unappimage:
-            args.extend(["unappimage", appimage_path])
+            args = ["unappimage", appimage_path]
         else:
             os.chmod(appimage_path, 0o755)
-            args.extend([appimage_path, "--appimage-extract"])
+            args = [appimage_path, "--appimage-extract"]
 
         if not bwrap and not unappimage:
             log.error(
@@ -226,7 +226,7 @@ def extract_appimage_version(basename, data):
             return None
 
         log.debug("$ %s", " ".join(args))
-        p = run_command(args, cwd=tmpdir, bwrap=bwrap)
+        p = run_command(args, cwd=tmpdir, bwrap=bwrap, bwrap_args=bwrap_args)
 
         if p.returncode != 0:
             log.error("--appimage-extract failed\n%s", p.stderr)
