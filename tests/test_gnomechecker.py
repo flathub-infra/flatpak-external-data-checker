@@ -70,7 +70,6 @@ class TestGNOMEChecker(unittest.TestCase):
         self.assertGreater(data.new_version.size, 0)
         self.assertIsNotNone(data.new_version.checksum)
         self.assertIsInstance(data.new_version.checksum, str)
-        print(data.new_version.url)
         self.assertEqual(
             data.new_version.checksum,
             "a9398582f47b7d729205d6eac0c068fef35aaf249fdd57eea3724f8518d26699",
