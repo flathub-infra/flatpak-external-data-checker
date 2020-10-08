@@ -31,7 +31,7 @@ from src.lib.externaldata import ExternalData, Checker
 log = logging.getLogger(__name__)
 
 
-def get_latest(package_name):
+def get_latest(package_name, skip_unstable):
     """
     If checker_data contains a "name", matches 'cache.json' against it and
     returns the latest version without and with its minor release
@@ -63,8 +63,8 @@ def get_latest(package_name):
         log.debug(
             "%s matched multiple times, selecting latest", pattern
         )
-        versions = [x[0] for x in m]
-        short_versions = [x[1] for x in m]
+        versions = [x[0] for x in m if is_stable(x[1], skip_unstable)]
+        short_versions = [x[1] for x in m if is_stable(x[1], skip_unstable)]
         result = (
             max(versions, key=LooseVersion),
             max(short_versions, key=LooseVersion)
@@ -74,12 +74,37 @@ def get_latest(package_name):
     return result
 
 
+def is_stable(version, skip_unstable):
+    """
+    If "skip-unstable" is set to True, returns False  if version matches
+    3.x.y with x and odd number, or x.y.z for y in "alpha", "beta", "rc"
+    """
+    if skip_unstable:
+        pattern = "3.([\\d]+).[\\d]+"
+        z = re.match(pattern, version)
+        if z:
+            v = int(z.groups()[0])
+            if v % 2 == 1:
+                log.debug("Ignored unstable version: %s", version)
+                return False
+        new_pattern = "([\\d]+).([\\w]+).[\\d]+"
+        w = re.match(new_pattern, version)
+        if w:
+            mayor = int(w.groups()[0])
+            minor = w.groups()[1]
+            if minor in ["alpha", "beta", "rc"] and mayor >= 40:
+                log.debug("Ignored unstable version: %s", version)
+                return False
+    return True
+
+
 class GNOMEChecker(Checker):
     def _should_check(self, external_data):
         return external_data.checker_data.get("type") == "gnome"
 
     def check(self, external_data):
 
+        skip_unstable = external_data.checker_data.get("skip-unstable")
         if not self._should_check(external_data):
             log.debug("%s is not a GNOME type ext data",
                       external_data.filename)
@@ -88,10 +113,10 @@ class GNOMEChecker(Checker):
         url = "https://download.gnome.org/sources/{}/cache.json".format(name)
         log.debug("Getting extra data info from %s; may take a while", url)
 
-        latest_version_short, latest_version = get_latest(name)
+        latest_version_short, latest_version = get_latest(name, skip_unstable)
         latest_url = "https://download.gnome.org/sources/{}/{}/{}-{}.tar.xz".format(
             name, latest_version_short, name, latest_version
-            )
+        )
 
         if not latest_version:
             log.warning(
