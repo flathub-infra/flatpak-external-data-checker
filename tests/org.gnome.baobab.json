@@ -1,0 +1,41 @@
+{
+    "app-id" : "org.gnome.baobab",
+    "runtime" : "org.gnome.Platform",
+    "runtime-version" : "3.38",
+    "sdk" : "org.gnome.Sdk",
+    "command" : "baobab",
+    "modules" : [
+        {
+            "name" : "libhandy",
+            "filename" : "libhandy-0.81.0.tar.xz",
+            "buildsystem" : "meson",
+            "sources" : [
+                {
+                    "type": "archive",
+                    "url": "https://download.gnome.org/sources/libhandy/0.81/libhandy-0.81.0.tar.xz",
+                    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "x-checker-data": {
+                        "type": "gnome",
+                        "name": "libhandy"
+                    }
+                }
+            ]
+        },
+        {
+            "name" : "baobab",
+            "filename" : "baobab-3.34.0.tar.xz",
+            "buildsystem" : "meson",
+            "sources" : [
+                {
+                    "type": "archive",
+                    "url": "https://download.gnome.org/sources/baobab/3.34/baobab-3.34.0.tar.xz",
+                    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "x-checker-data": {
+                        "type": "gnome",
+                        "name": "baobab"
+                    }
+                }
+            ]
+        }
+    ]
+}
