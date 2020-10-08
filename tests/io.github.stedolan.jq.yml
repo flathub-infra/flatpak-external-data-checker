@@ -1,0 +1,26 @@
+id: io.github.stedolan.jq
+modules:
+  - name: jq
+    sources:
+      - type: archive
+        url: https://github.com/stedolan/jq/releases/download/jq-1.4/jq-1.4.tar.gz
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+        x-checker-data:
+          type: json
+          url: https://api.github.com/repos/stedolan/jq/releases/latest
+          version-query: '.tag_name | sub("^jq-"; "")'
+          url-query: '.assets[] | select(.name=="jq-" + $version + ".tar.gz") | .browser_download_url'
+    modules:
+
+      - name: oniguruma
+        buildsystem: cmake-ninja
+        sources:
+          - type: archive
+            archive-type: tar-gzip
+            url: https://api.github.com/repos/kkos/oniguruma/tarball/v6.9.4
+            sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+            x-checker-data:
+              type: json
+              url: https://api.github.com/repos/kkos/oniguruma/releases/latest
+              version-query: '.tag_name | sub("^v"; "")'
+              url-query: '.tarball_url'
