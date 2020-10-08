@@ -206,6 +206,20 @@ for [Snapcraft](https://snapcraft.io/) packages:
 }
 ```
 
+#### GNOME checker
+
+Both the version number and the download URL will be gathered from  [download.gnome.org](https://download.gnome.org/). The format is:
+
+```json
+"x-checker-data": {
+    "type": "gnome",
+    "name": "PACKAGE-NAME",
+    "skip-unstable": true
+}
+```
+
+where `PACKAGE-NAME` is set according to the name in [download.gnome.org/sources](https://download.gnome.org/sources).
+`skip-unstable` is optional and when set to `true` it will ignore unstable releases, e.g. "3.37.1" or "40.rc.2".
 
 ## License and Copyright
 
