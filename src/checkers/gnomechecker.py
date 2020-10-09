@@ -18,6 +18,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import json
 import logging
 import re
 import urllib.error
@@ -41,36 +42,46 @@ def get_latest(package_name, skip_unstable):
 
     try:
         pattern = re.compile(
-            "([\\d.]+\\d)/{}-([\\d.]+\\d).tar.xz".format(package_name))
+            "^([\\d.]+\\d)/{}-[\\d.]+\\d.tar.xz$".format(package_name))
     except KeyError:
         return None
 
-    if pattern.groups != 2:
+    if pattern.groups != 1:
         raise ValueError(
-            f"{pattern} does not contain exactly 2 match group"
+            f"{pattern} does not contain exactly 1 match group"
         )
 
-    resp = urllib.request.urlopen(url)
-    html = resp.read().decode()
+    with urllib.request.urlopen(url) as resp:
+        data = json.loads(resp.read().decode())
 
-    m = pattern.findall(html)
-    if not m:
+    versions = []
+    short_versions = []
+
+    # Dict { "3.38.0": { "tar.xz": "3.38/baobab-3.38.0.tar.xz", ... }, ... }
+    releases = data[1][package_name]
+    for item in releases:
+        if is_stable(item, skip_unstable):
+            match = pattern.search(releases[item]['tar.xz'])
+            if match:
+                versions.append(item)
+                short_versions.append(match.groups()[0])
+
+    if not versions:
         log.debug("%s did not match", pattern)
         return None
-    if len(m) == 1:
-        result = m[0]
+    if len(versions) == 1:
+        result = (short_versions[0], versions[0])
     else:
         log.debug(
             "%s matched multiple times, selecting latest", pattern
         )
-        versions = [x[0] for x in m if is_stable(x[1], skip_unstable)]
-        short_versions = [x[1] for x in m if is_stable(x[1], skip_unstable)]
         result = (
-            max(versions, key=LooseVersion),
-            max(short_versions, key=LooseVersion)
+            max(short_versions, key=LooseVersion),
+            max(versions, key=LooseVersion)
         )
 
     log.debug("%s matched: %s",  pattern, result[1])
+
     return result
 
 
