@@ -105,6 +105,9 @@ class GNOMEChecker(Checker):
     def check(self, external_data):
 
         skip_unstable = external_data.checker_data.get("skip-unstable")
+        if skip_unstable is None:
+            skip_unstable = True
+
         if not self._should_check(external_data):
             log.debug("%s is not a GNOME type ext data",
                       external_data.filename)
