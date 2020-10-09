@@ -222,6 +222,20 @@ for [Snapcraft](https://snapcraft.io/) packages:
 }
 ```
 
+#### Rust checker
+
+Special checker that will check for available updates
+for [Rust](https://www.rust-lang.org/):
+
+```json
+"x-checker-data": {
+    "type": "rust",
+    "package": "package name, for example: rust",
+    "channel": "nightly, stable or beta",
+    "target": "target triple, for example: x86_64-unknown-linux-gnu"
+}
+```
+
 
 ## License and Copyright
 
