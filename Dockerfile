@@ -21,6 +21,7 @@ RUN apt-get update \
       python3-ruamel.yaml \
       python3-setuptools \
       python3-tenacity \
+      python3-toml \
   && apt-get clean \
   && rmdir /var/cache/apt/archives/partial
 
