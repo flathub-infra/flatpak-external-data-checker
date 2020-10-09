@@ -58,13 +58,13 @@ class TestGNOMEChecker(unittest.TestCase):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = checker.check()
 
-        data = self._find_by_filename(ext_data, "libhandy-0.81.0.tar.xz")
+        data = self._find_by_filename(ext_data, "alleyoop-0.9.8.tar.xz")
 
         self.assertIsNotNone(data)
-        self.assertEqual(data.filename, "libhandy-0.81.0.tar.xz")
+        self.assertEqual(data.filename, "alleyoop-0.9.8.tar.xz")
         self.assertIsNotNone(data.new_version)
         self.assertEqual(
-            data.new_version.version, "1.0.0",
+            data.new_version.version, "0.9.8",
         )
         self.assertIsInstance(data.new_version.size, int)
         self.assertGreater(data.new_version.size, 0)
@@ -72,7 +72,7 @@ class TestGNOMEChecker(unittest.TestCase):
         self.assertIsInstance(data.new_version.checksum, str)
         self.assertEqual(
             data.new_version.checksum,
-            "a9398582f47b7d729205d6eac0c068fef35aaf249fdd57eea3724f8518d26699",
+            "adaa432fbbdccdb07751b2a5b8f0159a31d8d8f3d27503374a96122778163ff1",
         )
 
     def _find_by_filename(self, ext_data, filename):

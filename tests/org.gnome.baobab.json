@@ -6,17 +6,17 @@
     "command" : "baobab",
     "modules" : [
         {
-            "name" : "libhandy",
-            "filename" : "libhandy-0.81.0.tar.xz",
+            "name" : "GnomeHello",
+            "filename" : "alleyoop-0.9.8.tar.xz",
             "buildsystem" : "meson",
             "sources" : [
                 {
                     "type": "archive",
-                    "url": "https://download.gnome.org/sources/libhandy/0.81/libhandy-0.81.0.tar.xz",
-                    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "url": "https://download.gnome.org/sources/alleyoop/0.9/alleyoop-0.9.8.tar.xz",
+                    "sha256sum": "0000000000000000000000000000000000000000000000000000000000000000",
                     "x-checker-data": {
                         "type": "gnome",
-                        "name": "libhandy"
+                        "name": "alleyoop"
                     }
                 }
             ]
