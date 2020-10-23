@@ -42,7 +42,7 @@ def get_latest(package_name, skip_unstable):
 
     try:
         pattern = re.compile(
-            "^([\\d.]+\\d)/{}-[\\d.]+\\d.tar.xz$".format(package_name))
+            "^([\\d.]+\\d)/{}-[\\d.]+\\d.tar.[\\w]+$".format(package_name))
     except KeyError:
         return None
 
@@ -59,12 +59,15 @@ def get_latest(package_name, skip_unstable):
 
     # Dict { "3.38.0": { "tar.xz": "3.38/baobab-3.38.0.tar.xz", ... }, ... }
     releases = data[1][package_name]
-    for item in releases:
-        if is_stable(item, skip_unstable):
-            match = pattern.search(releases[item]['tar.xz'])
-            if match:
-                versions.append(item)
-                short_versions.append(match.groups()[0])
+    for ext in ['tar.xz', 'tar.gz', 'tar.bz2']:
+        for item in releases:
+            if is_stable(item, skip_unstable):
+                if releases[item].get(ext):
+                    match = pattern.search(releases[item].get(ext))
+                    if match:
+                        versions.append(item)
+                        short_versions.append(match.groups()[0])
+                        break
 
     if not versions:
         log.debug("%s did not match", pattern)
@@ -153,7 +156,8 @@ class GNOMEChecker(Checker):
             external_data.state = ExternalData.State.BROKEN
         else:
             external_data.state = ExternalData.State.VALID
-            new_version = new_version._replace(version=latest_version)
-            new_version = new_version._replace(url=latest_url)
+            new_version = new_version._replace(
+                version=latest_version,
+                url=latest_url)
             if not external_data.current_version.matches(new_version):
                 external_data.new_version = new_version
