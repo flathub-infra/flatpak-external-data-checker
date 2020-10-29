@@ -104,22 +104,22 @@ def commit_changes(changes):
         message = subject
 
     # Moved to detached HEAD
-    check_call(("git", "checkout", "HEAD@{0}"))
-    check_call(("git", "commit", "-am", message))
+    check_call(["git", "checkout", "HEAD@{0}"])
+    check_call(["git", "commit", "-am", message])
 
     # Find a stable identifier for the contents of the tree, to avoid
     # sending the same PR twice.
-    tree = subprocess.check_output(("git", "rev-parse", "HEAD^{tree}"))
+    tree = subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"])
     branch = "update-{}".format(tree.decode("ascii")[:7])
 
     try:
         # Check if the branch already exists
         subprocess.run(
-            ("git", "rev-parse", "--verify", branch), capture_output=True, check=True,
+            ["git", "rev-parse", "--verify", branch], capture_output=True, check=True,
         )
     except subprocess.CalledProcessError:
         # If not, create it
-        check_call(("git", "checkout", "-b", branch))
+        check_call(["git", "checkout", "-b", branch])
     return subject, body, branch
 
 
@@ -150,7 +150,7 @@ def open_pr(subject, body, branch, manifest_checker=None):
     user = g.get_user()
 
     origin_url = (
-        subprocess.check_output(("git", "remote", "get-url", "origin",))
+        subprocess.check_output(["git", "remote", "get-url", "origin"])
         .decode("utf-8")
         .strip()
     )
@@ -212,7 +212,7 @@ def open_pr(subject, body, branch, manifest_checker=None):
         else:
             return
 
-    check_call(("git", "push", "-u", remote_url, branch))
+    check_call(["git", "push", "-u", remote_url, branch])
 
     pr = origin_repo.create_pull(
         subject, pr_message, base, head, maintainer_can_modify=True,
