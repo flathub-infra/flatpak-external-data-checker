@@ -79,7 +79,8 @@ class FirefoxChecker(Checker):
 
         if not browser_data:
             log.warning(
-                "Unable to find browser source with filename %s", module_data.name,
+                "Unable to find browser source with filename %s",
+                module_data.name,
             )
             return None
 
@@ -110,7 +111,9 @@ class FirefoxChecker(Checker):
                 }
                 # add new data to the same manifest as the main browser tarball
                 data = ExternalDataSource.from_source(
-                    browser_data.source_path, source, browser_data.source_parent,
+                    browser_data.source_path,
+                    source,
+                    browser_data.source_parent,
                 )
                 data.state = ExternalData.State.ADDED
                 added.append(data)

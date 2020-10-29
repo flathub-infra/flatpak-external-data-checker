@@ -25,7 +25,8 @@ from src.lib.utils import init_logging
 from src.checker import ManifestChecker
 
 TEST_MANIFEST = os.path.join(
-    os.path.dirname(__file__), "com.adobe.FlashPlayer.NPAPI.json",
+    os.path.dirname(__file__),
+    "com.adobe.FlashPlayer.NPAPI.json",
 )
 
 

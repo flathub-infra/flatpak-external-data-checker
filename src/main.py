@@ -115,7 +115,9 @@ def commit_changes(changes):
     try:
         # Check if the branch already exists
         subprocess.run(
-            ["git", "rev-parse", "--verify", branch], capture_output=True, check=True,
+            ["git", "rev-parse", "--verify", branch],
+            capture_output=True,
+            check=True,
         )
     except subprocess.CalledProcessError:
         # If not, create it
@@ -215,7 +217,11 @@ def open_pr(subject, body, branch, manifest_checker=None):
     check_call(["git", "push", "-u", remote_url, branch])
 
     pr = origin_repo.create_pull(
-        subject, pr_message, base, head, maintainer_can_modify=True,
+        subject,
+        pr_message,
+        base,
+        head,
+        maintainer_can_modify=True,
     )
     log.info("Opened pull request %s", pr.html_url)
 
