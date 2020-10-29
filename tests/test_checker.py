@@ -31,7 +31,8 @@ from src.lib.externaldata import ExternalData, Checker
 from src.checker import ManifestChecker
 
 TEST_MANIFEST = os.path.join(
-    os.path.dirname(__file__), "org.externaldatachecker.Manifest.json",
+    os.path.dirname(__file__),
+    "org.externaldatachecker.Manifest.json",
 )
 NUM_ARCHIVE_IN_MANIFEST = 1
 NUM_FILE_IN_MANIFEST = 1
@@ -103,7 +104,8 @@ class TestExternalDataChecker(unittest.TestCase):
                 f.write(contents)
 
             appdata = os.path.join(
-                tmpdir, os.path.splitext(filename)[0] + ".appdata.xml",
+                tmpdir,
+                os.path.splitext(filename)[0] + ".appdata.xml",
             )
             with open(appdata, "w") as f:
                 f.write("""<application></application>""")
@@ -272,7 +274,10 @@ modules:
 }""".lstrip()  # noqa: E501
 
         self._test_remove(
-            filename, contents, expected_new_contents, ["Removed foo-bar.xpi"],
+            filename,
+            contents,
+            expected_new_contents,
+            ["Removed foo-bar.xpi"],
         )
 
     def test_check(self):

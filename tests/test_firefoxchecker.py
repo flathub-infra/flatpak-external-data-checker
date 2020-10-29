@@ -65,7 +65,8 @@ class TestFirefoxChecker(unittest.TestCase):
         for data in added:
             self.assertIsNotNone(data.current_version)
             self.assertRegex(
-                data.current_version.url, r"^https?://.*/linux-x86_64/.*/.*\.xpi$",
+                data.current_version.url,
+                r"^https?://.*/linux-x86_64/.*/.*\.xpi$",
             )
             self.assertIsInstance(data.current_version.size, int)
             self.assertGreater(data.current_version.size, 0)

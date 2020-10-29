@@ -84,11 +84,13 @@ class URLChecker(Checker):
         else:
             if url.endswith(".AppImage"):
                 version_string = utils.extract_appimage_version(
-                    external_data.filename, data,
+                    external_data.filename,
+                    data,
                 )
             elif is_rotating:
                 version_string = extract_version(
-                    external_data.checker_data, new_version.url,
+                    external_data.checker_data,
+                    new_version.url,
                 )
             else:
                 version_string = None
