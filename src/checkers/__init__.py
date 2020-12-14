@@ -5,6 +5,7 @@ from .urlchecker import URLChecker
 from .htmlchecker import HTMLChecker
 from .jetbrainschecker import JetBrainsChecker
 from .snapcraftchecker import SnapcraftChecker
+from .anityachecker import AnityaChecker
 
 
 # For each ExternalData, checkers are run in the order listed here, stopping once data.state is
@@ -16,5 +17,6 @@ ALL_CHECKERS = [
     HTMLChecker,
     JetBrainsChecker,
     SnapcraftChecker,
+    AnityaChecker,
     URLChecker,  # leave this last
 ]
