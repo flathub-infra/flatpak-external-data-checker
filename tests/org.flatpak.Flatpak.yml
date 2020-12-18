@@ -1,0 +1,11 @@
+id: org.flatpak.Flatpak
+modules:
+  - name: flatpak
+    sources:
+      - type: archive
+        url: https://github.com/flatpak/flatpak/releases/download/1.8.2/flatpak-1.8.2.tar.xz
+        sha256: 7926625df7c2282a5ee1a8b3c317af53d40a663b1bc6b18a2dc8747e265085b0
+        x-checker-data:
+          type: anitya
+          project-id: 6377
+          url-template: https://github.com/flatpak/flatpak/releases/download/$version/flatpak-$version.tar.xz
