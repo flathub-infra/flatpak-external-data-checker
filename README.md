@@ -130,6 +130,22 @@ to, e.g. where "type": "extra-data" is declared):
 }
 ```
 
+### Anitya (release-monitoring) checker
+
+[Anitya](https://github.com/fedora-infra/anitya) is an upstream release monitoring 
+project by Fedora. It supports multiple backends for retrieving version information 
+from different services, including GitHub, GitLab, Sourceforge, etc.  
+To use the **AnityaChecker**, specify numeric project ID on release-monitoring.org
+and add a template for source download URL:
+
+```json
+"x-checker-data": {
+    "type": "anitya",
+    "project-id": 6377,
+    "url-template": "https://github.com/flatpak/flatpak/releases/download/$version/flatpak-$version.tar.xz"
+}
+```
+
 ### Firefox checker
 
 For the **FirefoxChecker**, which deals only with new versions of Firefox and
