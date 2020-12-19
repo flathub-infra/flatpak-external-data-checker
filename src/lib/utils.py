@@ -30,6 +30,7 @@ import subprocess
 import tempfile
 import urllib.request
 import urllib.parse
+import copy
 
 from collections import OrderedDict
 from ruamel.yaml import YAML
@@ -138,6 +139,15 @@ def get_extra_data_info_from_url(url, follow_redirects=True):
     )
 
     return external_file, data
+
+
+def clear_env(environ):
+    new_env = copy.deepcopy(environ)
+    for varname in new_env.keys():
+        if any(i in varname.lower() for i in ["pass", "token", "secret", "auth"]):
+            log.debug("Removing env %s", varname)
+            new_env.pop(varname)
+    return new_env
 
 
 def run_command(argv, cwd=None, bwrap=True):
