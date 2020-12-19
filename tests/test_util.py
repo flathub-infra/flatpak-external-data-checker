@@ -18,8 +18,10 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import unittest
+import subprocess
+import os
 
-from src.lib.utils import parse_github_url, strip_query
+from src.lib.utils import parse_github_url, strip_query, clear_env
 
 
 class TestParseGitHubUrl(unittest.TestCase):
@@ -55,6 +57,16 @@ class TestStripQuery(unittest.TestCase):
         url = "https://user:pass@example.com/"
         expected = url
         self.assertEqual(strip_query(url), expected)
+
+
+class TestClearEnv(unittest.TestCase):
+    def test_clear_env(self):
+        os.environ["SOME_TOKEN_HERE"] = "leaked"
+        # pylint: disable=subprocess-run-check
+        proc = subprocess.run(
+            'test -z "$SOME_TOKEN_HERE"', shell=True, env=clear_env(os.environ)
+        )
+        self.assertEqual(proc.returncode, 0)
 
 
 if __name__ == "__main__":
