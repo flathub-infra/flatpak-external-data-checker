@@ -22,6 +22,10 @@ from collections import namedtuple
 from enum import Enum
 
 import os
+import logging
+
+
+log = logging.getLogger(__name__)
 
 
 class ModuleData:
@@ -41,7 +45,7 @@ class ExternalFile(
         return (
             self.url == other.url
             and self.checksum == other.checksum
-            and (self.size == -1 or other.size == -1 or self.size == other.size)
+            and (self.size is None or other.size is None or self.size == other.size)
         )
 
 
@@ -69,7 +73,7 @@ class ExternalData(abc.ABC):
         filename,
         url,
         checksum,
-        size=-1,
+        size=None,
         arches=[],
         checker_data=None,
     ):
@@ -79,7 +83,8 @@ class ExternalData(abc.ABC):
         self.arches = arches
         self.type = data_type
         self.checker_data = checker_data or {}
-        self.current_version = ExternalFile(url, checksum, int(size), None, None)
+        assert size is None or isinstance(size, int)
+        self.current_version = ExternalFile(url, checksum, size, None, None)
         self.new_version = None
         self.state = ExternalData.State.UNKNOWN
 
@@ -121,7 +126,7 @@ class ExternalDataSource(ExternalData):
         )
 
         sha256sum = source.get("sha256")
-        size = source.get("size", -1)
+        size = source.get("size")
         checker_data = source.get("x-checker-data", {})
         arches = checker_data.get("arches") or source.get("only-arches") or ["x86_64"]
 
@@ -166,7 +171,17 @@ class ExternalDataSource(ExternalData):
         if self.new_version is not None:
             self.source["url"] = self.new_version.url
             self.source["sha256"] = self.new_version.checksum
-            self.source["size"] = self.new_version.size
+            if self.source["type"] == "extra-data":
+                assert self.new_version.size is not None
+                self.source["size"] = self.new_version.size
+            # Remove size property for non-extra-data sources
+            elif "size" in self.source:
+                log.warning(
+                    "Removing size from source %s in %s",
+                    self.filename,
+                    self.source_path,
+                )
+                self.source.pop("size", None)
 
         if self.state == ExternalData.State.ADDED:
             self.source_parent.append(self.source)
