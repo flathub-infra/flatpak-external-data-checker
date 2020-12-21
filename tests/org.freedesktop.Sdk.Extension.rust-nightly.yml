@@ -1,0 +1,15 @@
+id: org.freedesktop.Sdk.Extension.rust-nightly
+modules:
+  - name: rust
+    buildsystem: simple
+    sources:
+      - type: archive
+        only-arches:
+          - x86_64
+        url: https://static.rust-lang.org/dist/2020-08-15/rust-nightly-x86_64-unknown-linux-gnu.tar.gz
+        sha256: 24b4681187654778817652273a68a4d55f5090604cd14b1f1c3ff8785ad24b99
+        x-checker-data:
+          type: rust
+          package: rust
+          channel: nightly
+          target: x86_64-unknown-linux-gnu
