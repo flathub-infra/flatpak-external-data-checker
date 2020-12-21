@@ -209,6 +209,12 @@ def extract_appimage_version(basename, data):
             os.chmod(appimage_path, 0o755)
             args.extend([appimage_path, "--appimage-extract"])
 
+        if not bwrap and not unappimage:
+            log.error(
+                "Neither bwrap nor unappimage available, not extracting AppImage."
+            )
+            return None
+
         log.debug("$ %s", " ".join(args))
         p = run_command(args, cwd=tmpdir, bwrap=bwrap)
 
