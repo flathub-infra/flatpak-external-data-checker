@@ -31,6 +31,7 @@ import tempfile
 import urllib.request
 import urllib.parse
 import copy
+import io
 
 from collections import OrderedDict
 from ruamel.yaml import YAML
@@ -41,6 +42,8 @@ from tenacity import (
     stop_after_attempt,
     wait_fixed,
 )
+from elftools.elf.elffile import ELFFile
+
 from .externaldata import ExternalFile
 
 import gi
@@ -159,12 +162,16 @@ def wrap_in_bwrap(cmdline, bwrap_args=None):
     return bwrap_cmd + ["--"] + cmdline
 
 
-def run_command(argv, cwd=None, bwrap=True, bwrap_args=None):
+def run_command(argv, cwd=None, env=None, bwrap=True, bwrap_args=None):
     if bwrap:
         command = wrap_in_bwrap(argv, bwrap_args)
     else:
         command = argv
-    p = subprocess.run(command, cwd=cwd, stderr=subprocess.PIPE, encoding="utf-8")
+    if env is None:
+        env = os.environ
+    p = subprocess.run(
+        command, cwd=cwd, env=env, stderr=subprocess.PIPE, encoding="utf-8"
+    )
     return p
 
 
@@ -180,28 +187,25 @@ def check_bwrap():
     return False
 
 
-def _check_unappimage():
-    try:
-        p = run_command(["unappimage", "-v"], bwrap=False)
-        if p.returncode == 1:
-            return True
-    except FileNotFoundError:
-        pass
-
-    logging.warning("unappimage is not available")
-    return False
-
-
 def extract_appimage_version(basename, data):
     """
     Saves 'data' to a temporary file with the given basename, executes it (in a sandbox)
     with --appimage-extract to unpack it, and scrapes the version number out of the
     first .desktop file it finds.
     """
+
     with tempfile.TemporaryDirectory() as tmpdir:
         appimage_path = os.path.join(tmpdir, basename)
-        with open(appimage_path, "wb") as fp:
-            fp.write(data)
+
+        with io.BytesIO(data) as appimg_io:
+            header = ELFFile(appimg_io).header
+            offset = header["e_shoff"] + header["e_shnum"] * header["e_shentsize"]
+            appimg_io.seek(offset)
+
+            log.info("Writing %s to %s with offset %i", basename, appimage_path, offset)
+
+            with open(appimage_path, "wb") as fp:
+                fp.write(appimg_io.read())
 
         bwrap = check_bwrap()
         bwrap_args = [
@@ -211,25 +215,20 @@ def extract_appimage_version(basename, data):
             "--die-with-parent",
             "--new-session",
         ]
-        unappimage = _check_unappimage()
 
-        if unappimage:
-            args = ["unappimage", appimage_path]
-        else:
-            os.chmod(appimage_path, 0o755)
-            args = [appimage_path, "--appimage-extract"]
-
-        if not bwrap and not unappimage:
-            log.error(
-                "Neither bwrap nor unappimage available, not extracting AppImage."
-            )
-            return None
+        args = ["unsquashfs", "-no-progress", appimage_path]
 
         log.debug("$ %s", " ".join(args))
-        p = run_command(args, cwd=tmpdir, bwrap=bwrap, bwrap_args=bwrap_args)
+        p = run_command(
+            args,
+            cwd=tmpdir,
+            env=clear_env(os.environ),
+            bwrap=bwrap,
+            bwrap_args=bwrap_args,
+        )
 
         if p.returncode != 0:
-            log.error("--appimage-extract failed\n%s", p.stderr)
+            log.error("AppImage extraction failed\n%s", p.stderr)
             p.check_returncode()
 
         for desktop in glob.glob(os.path.join(tmpdir, "squashfs-root", "*.desktop")):
