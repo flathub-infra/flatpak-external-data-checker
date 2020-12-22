@@ -1,11 +1,4 @@
-FROM debian:buster as unappimage
-RUN apt-get update && \
-    env DEBIAN_FRONTEND=noninteractive apt-get install -y make gcc git libelf-dev && \
-    git clone https://github.com/refi64/unappimage && \
-    cd unappimage && make -C squashfs-tools -j$(nproc)
-
 FROM debian:buster
-COPY --from=unappimage /unappimage/squashfs-tools/unappimage /usr/local/bin/
 RUN apt-get update \
   && env DEBIAN_FRONTEND=noninteractive apt-get install -y \
       bubblewrap \
@@ -22,6 +15,8 @@ RUN apt-get update \
       python3-setuptools \
       python3-tenacity \
       python3-toml \
+      python3-pyelftools \
+      squashfs-tools \
   && apt-get clean \
   && rmdir /var/cache/apt/archives/partial
 
