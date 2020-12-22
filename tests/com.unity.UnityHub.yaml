@@ -1,0 +1,9 @@
+app-id: com.unity.UnityHub
+modules:
+  - name: unityhub
+    sources:
+      - type: extra-data
+        filename: UnityHubSetup.AppImage
+        url: https://public-cdn.cloud.unity3d.com/hub/prod/UnityHub.AppImage
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+        size: 0
