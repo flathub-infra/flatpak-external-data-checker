@@ -36,7 +36,7 @@ class RustChecker(Checker):
                 target["xz_url"],
                 target["xz_hash"],
                 None,
-                package["version"].split(" ")[0],
+                package["version"],
                 datetime.datetime.strptime(data["date"], "%Y-%m-%d"),
             )
             if not external_data.current_version.matches(new_version):
