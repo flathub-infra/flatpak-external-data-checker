@@ -1,12 +1,17 @@
 import datetime
-import toml
 import logging
 import urllib.request
+import re
+
+import toml
 
 from src.lib import utils
 from src.lib.externaldata import ExternalFile, Checker
 
 log = logging.getLogger(__name__)
+
+
+VERSION_RE = re.compile(r"^(\S+)\s+\((\S+)\s+(\S+)\)")
 
 
 class RustChecker(Checker):
@@ -31,13 +36,21 @@ class RustChecker(Checker):
 
         package = data["pkg"][package_name]
         target = package["target"][target_name]
+
+        release_date = datetime.date.fromisoformat(data["date"])
+        version, _, _ = VERSION_RE.match(package["version"]).groups()
+        if channel == "nightly":
+            appstream_version = "{0}-{1:%Y%m%d}".format(version, release_date)
+        else:
+            appstream_version = version
+
         if target["available"]:
             new_version = ExternalFile(
                 target["xz_url"],
                 target["xz_hash"],
                 None,
-                package["version"],
-                datetime.datetime.strptime(data["date"], "%Y-%m-%d"),
+                appstream_version,
+                release_date,
             )
             if not external_data.current_version.matches(new_version):
                 external_data.new_version = new_version
