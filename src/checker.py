@@ -258,7 +258,11 @@ class ManifestChecker:
             # Guess that the last external source is the one corresponding to the main
             # application bundle.
             last_update = datas[-1].new_version
-            if appdata is not None and last_update is not None:
+            if (
+                appdata is not None
+                and last_update is not None
+                and last_update.version is not None
+            ):
                 add_release_to_file(
                     appdata, last_update.version, last_update.timestamp.strftime("%F")
                 )
