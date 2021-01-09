@@ -64,7 +64,7 @@ For simple checks to see if a URL is broken, no changes are needed.  However,
 you can add additional metadata to the manifest to allow the checker to
 discover new versions.
 
-#### URL checker
+### URL checker
 
 If the upstream vendor has an URL that redirects to the latest version of the
 application, you can add something like the following to check and update the URL for
@@ -88,7 +88,7 @@ The version number for the latest version can be detected in two ways:
   version. (This follows the convention used by
   [`debian/watch`](https://wiki.debian.org/debian/watch) files.)
 
-#### HTML checker
+### HTML checker
 
 Both the version number and the download URL will be gathered from a static
 HTML page which contains this information:
@@ -114,7 +114,7 @@ the retrieved version:
 }
 ```
 
-#### Debian repo checker
+### Debian repo checker
 
 For the **DebianRepoChecker**, which deals only with deb packages, it
 can read the following metadata (add it to manifest element it refers
@@ -196,7 +196,7 @@ on the extra-data source itself to i386 or x86_64:
 FlashChecker will use this to determine which architecture to check
 the binaries for.
 
-#### JetBrains checker
+### JetBrains checker
 
 Special checker that will check for available updates
 for [JetBrains](https://www.jetbrains.com/) products:
@@ -209,7 +209,7 @@ for [JetBrains](https://www.jetbrains.com/) products:
 }
 ```
 
-#### Snapcraft checker
+### Snapcraft checker
 
 Special checker that will check for available updates
 for [Snapcraft](https://snapcraft.io/) packages:
@@ -222,7 +222,7 @@ for [Snapcraft](https://snapcraft.io/) packages:
 }
 ```
 
-#### Rust checker
+### Rust checker
 
 Special checker that will check for available updates
 for [Rust](https://www.rust-lang.org/):
