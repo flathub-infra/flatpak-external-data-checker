@@ -114,6 +114,25 @@ the retrieved version:
 }
 ```
 
+### JSON checker
+
+The JSON checker allows using [jq](https://stedolan.github.io/jq/) to query
+JSON data with arbitrary schema to get version and download url.
+
+To use the **JSONChecker**, specify JSON data URL, version query and url query
+(you can use `$version` variable got from the version query in url query):
+
+```json
+{
+    "type": "json",
+    "url": "https://api.github.com/repos/stedolan/jq/releases/latest",
+    "version-query": ".tag_name | sub(\"^jq-\"; \"\")",
+    "url-query": ".assets[] | select(.name==\"jq-\" + $version + \".tar.gz\") | .browser_download_url"
+}
+```
+
+See the [jq manual](https://stedolan.github.io/jq/manual/) for complete information about writing queries.
+
 ### Debian repo checker
 
 For the **DebianRepoChecker**, which deals only with deb packages, it
