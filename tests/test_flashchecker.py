@@ -34,6 +34,7 @@ class TestFlashChecker(unittest.TestCase):
     def setUp(self):
         init_logging()
 
+    @unittest.skip("Flash Player is EOL")
     def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = checker.check()
