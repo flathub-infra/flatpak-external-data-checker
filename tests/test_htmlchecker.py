@@ -26,9 +26,7 @@ import unittest
 from src.lib.utils import init_logging
 from src.checker import ManifestChecker
 
-TEST_MANIFEST = os.path.join(
-    os.path.dirname(__file__), "org.x.xeyes.yml"
-)
+TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.x.xeyes.yml")
 
 TEST_MANIFEST_WITH_URL_TEMPLATE = os.path.join(
     os.path.dirname(__file__), "org.xdebug.Xdebug.json"
@@ -45,7 +43,7 @@ class TestHTMLChecker(unittest.TestCase):
 
         data = self._find_by_filename(ext_data, "xeyes-1.1.0.tar.bz2")
         self.assertIsNotNone(data)
-        self.assertRegex(data.filename, r'xeyes-[\d\.-]+.tar.bz2')
+        self.assertRegex(data.filename, r"xeyes-[\d\.-]+.tar.bz2")
         self.assertIsNotNone(data.new_version)
         self.assertRegex(
             data.new_version.url,
