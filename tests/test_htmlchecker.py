@@ -27,7 +27,7 @@ from src.lib.utils import init_logging
 from src.checker import ManifestChecker
 
 TEST_MANIFEST = os.path.join(
-    os.path.dirname(__file__), "com.adobe.Flash-Player-Projector.json"
+    os.path.dirname(__file__), "org.x.xeyes.yml"
 )
 
 TEST_MANIFEST_WITH_URL_TEMPLATE = os.path.join(
@@ -43,14 +43,15 @@ class TestHTMLChecker(unittest.TestCase):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = checker.check()
 
-        data = self._find_by_filename(ext_data, "flash_player_sa_linux.x86_64.tar.gz")
+        data = self._find_by_filename(ext_data, "xeyes-1.1.0.tar.bz2")
         self.assertIsNotNone(data)
-        self.assertEqual(data.filename, "flash_player_sa_linux.x86_64.tar.gz")
+        self.assertRegex(data.filename, r'xeyes-[\d\.-]+.tar.bz2')
         self.assertIsNotNone(data.new_version)
         self.assertRegex(
             data.new_version.url,
-            r"^https?://fpdownload\.macromedia\.com/pub/flashplayer/updaters/.+/flash_player_sa_linux\.x86_64\.tar\.gz$",  # noqa: E501
+            r"^https?://www.x.org/releases/individual/app/xeyes-[\d\.-]+.tar.bz2",  # noqa: E501
         )
+        self.assertIsNotNone(data.new_version.version)
         self.assertIsInstance(data.new_version.size, int)
         self.assertGreater(data.new_version.size, 0)
         self.assertIsNotNone(data.new_version.checksum)

@@ -1,0 +1,12 @@
+id: org.x.xeyes
+modules:
+  - name: xeyes
+    sources:
+      - type: archive
+        url: https://www.x.org/releases/individual/app/xeyes-1.1.0.tar.bz2
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+        x-checker-data:
+          type: html
+          url: https://www.x.org/releases/individual/app/
+          version-pattern: xeyes-([\d\.-]+).tar.bz2
+          url-pattern: (xeyes-[\d\.-]+.tar.bz2)
