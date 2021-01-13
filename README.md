@@ -186,35 +186,6 @@ The checker will try to match the module sources to be checked as follows:
 Also note that translations will be automatically added and removed depending on what
 is available upstream.
 
-### Flash player checker
-
-For the **FlashChecker**, which deals only with new version of Adobe
-Flash player, it can read the following metadata (add it to the manifest
-element it refers to, e.g. where "type": "extra-data" is declared):
-
-```json
-"x-checker-data": {
-    "type": "flash",
-    "browser": "chrome|firefox"
-}
-```
-
-The value for "browser" is used to determine whether to download the
-Firefox-compatible Flash binaries (npapi) or the Chrome-compatible
-ones (ppapi).
-
-In addition, if you add that metadata, you **must** set only-arches
-on the extra-data source itself to i386 or x86_64:
-
-```json
-  "type": "extra-data",
-  "only-arches": ["i386"],
-  // ...
-```
-
-FlashChecker will use this to determine which architecture to check
-the binaries for.
-
 ### JetBrains checker
 
 Special checker that will check for available updates
