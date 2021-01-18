@@ -33,6 +33,10 @@ import os
 
 from gi.repository import GLib
 
+
+MAIN_SRC_PROP = "is-main-source"
+
+
 log = logging.getLogger(__name__)
 
 
@@ -255,9 +259,18 @@ class ManifestChecker:
             self._dump_manifest(path)
 
             appdata = find_appdata_file(os.path.splitext(self._manifest)[0])
-            # Guess that the last external source is the one corresponding to the main
-            # application bundle.
-            last_update = datas[-1].new_version
+
+            for data in datas:
+                if data.checker_data.get(MAIN_SRC_PROP):
+                    log.info("Selected upstream source: %s", data.filename)
+                    last_update = data.new_version
+                    break
+            else:
+                # Guess that the last external source is the one corresponding to the main
+                # application bundle.
+                log.warning("Guessed upstream source: %s", data.filename)
+                last_update = datas[-1].new_version
+
             if (
                 appdata is not None
                 and last_update is not None

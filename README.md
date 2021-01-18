@@ -64,6 +64,11 @@ For simple checks to see if a URL is broken, no changes are needed.  However,
 you can add additional metadata to the manifest to allow the checker to
 discover new versions.
 
+Some of the following checkers are able to determine upstream version number,
+and automatically add it to releases list in metainfo. To specify which source
+is the app upstream source, set property `is-main-source` to `true` in the
+checker metadata for that source.
+
 ### URL checker
 
 If the upstream vendor has an URL that redirects to the latest version of the
