@@ -44,7 +44,7 @@ from tenacity import (
 )
 from elftools.elf.elffile import ELFFile
 
-from .externaldata import ExternalFile
+from . import externaldata
 
 import gi
 
@@ -108,7 +108,7 @@ def get_extra_data_info_from_head(url):
         info = response.info()
         size = int(info["Content-Length"])
 
-    return ExternalFile(
+    return externaldata.ExternalFile(
         strip_query(real_url), None, size, None, _extract_timestamp(info)
     )
 
@@ -133,7 +133,7 @@ def get_extra_data_info_from_url(url, follow_redirects=True):
         size = len(data)
 
     checksum = hashlib.sha256(data).hexdigest()
-    external_file = ExternalFile(
+    external_file = externaldata.ExternalFile(
         strip_query(real_url if follow_redirects else url),
         checksum,
         size,
