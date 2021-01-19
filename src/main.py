@@ -249,6 +249,11 @@ def main():
         action="store_true",
     )
     parser.add_argument(
+        "--edit-only",
+        help="Do not commit changes, only update files (implies --update)",
+        action="store_true",
+    )
+    parser.add_argument(
         "--filter-type",
         help="Only check external data of the given type",
         choices=types,
@@ -264,8 +269,10 @@ def main():
     manifest_checker.check(filter_type)
 
     if print_outdated_external_data(manifest_checker):
-        if args.update or args.commit_only:
+        if args.update or args.commit_only or args.edit_only:
             changes = manifest_checker.update_manifests()
+            if args.edit_only:
+                return
             if changes:
                 with indir(os.path.dirname(args.manifest)):
                     subject, body, branch = commit_changes(changes)
