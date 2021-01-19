@@ -27,6 +27,7 @@ from .lib.externaldata import (
     ModuleData,
     ExternalData,
     ExternalDataSource,
+    ExternalGitRepo,
 )
 from .lib.utils import read_manifest, dump_manifest
 
@@ -59,7 +60,7 @@ class ManifestChecker:
         self._manifest = manifest
         self._modules_data: t.Dict[str, ModuleData]
         self._modules_data = {}
-        self._external_data: t.Dict[str, t.List[ExternalData]]
+        self._external_data: t.Dict[str, t.List[t.Union[ExternalData, ExternalGitRepo]]]
         self._external_data = {}
 
         # Initialize checkers
