@@ -87,17 +87,13 @@ def _get_timestamp_for_candidate(candidate):
 
 
 class DebianRepoChecker(Checker):
+    CHECKER_DATA_TYPE = "debian-repo"
+
     def __init__(self):
         self._pkgs_cache = {}
 
-    def _should_check(self, external_data):
-        return external_data.checker_data.get("type") == "debian-repo"
-
     def check(self, external_data):
-        # Only process external data of the debian-repo
-        if not self._should_check(external_data):
-            LOG.debug("%s is not a debian-repo type ext data", external_data.filename)
-            return
+        assert self.should_check(external_data)
 
         LOG.debug("Checking %s", external_data.filename)
         package_name = external_data.checker_data["package-name"]

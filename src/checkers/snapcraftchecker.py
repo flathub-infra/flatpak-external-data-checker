@@ -10,12 +10,10 @@ log = logging.getLogger(__name__)
 
 
 class SnapcraftChecker(Checker):
+    CHECKER_DATA_TYPE = "snapcraft"
+
     _arches = {"x86_64": "amd64", "aarch64": "arm64", "arm": "armhf", "i386": "i386"}
     _BLOCK_SIZE = 65536
-
-    @staticmethod
-    def _should_check(external_data):
-        return external_data.checker_data.get("type") == "snapcraft"
 
     def _get_sha256(self, url: str, sha3_384: str):
         req = urllib.request.Request(url)
@@ -34,9 +32,7 @@ class SnapcraftChecker(Checker):
             return sha2.hexdigest()
 
     def check(self, external_data):
-        if not self._should_check(external_data):
-            log.debug("%s is not a snapcraft type ext data", external_data.filename)
-            return
+        assert self.should_check(external_data)
 
         name = external_data.checker_data["name"]
         channel = external_data.checker_data["channel"]

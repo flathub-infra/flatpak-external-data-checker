@@ -10,15 +10,11 @@ from src.lib.externaldata import ExternalFile, Checker
 log = logging.getLogger(__name__)
 
 
-def _should_check(external_data):
-    return external_data.checker_data.get("type") == "jetbrains"
-
-
 class JetBrainsChecker(Checker):
+    CHECKER_DATA_TYPE = "jetbrains"
+
     def check(self, external_data):
-        if not _should_check(external_data):
-            log.debug("%s is not a jetbrains type ext data", external_data.filename)
-            return
+        assert self.should_check(external_data)
 
         code = external_data.checker_data["code"]
         release_type = external_data.checker_data.get("release-type", "release")

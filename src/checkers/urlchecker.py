@@ -60,8 +60,15 @@ def extract_version(checker_data, url):
 
 
 class URLChecker(Checker):
+    CHECKER_DATA_TYPE = "rotating-url"
+
+    def should_check(self, external_data):
+        return isinstance(external_data, ExternalData)
+
     def check(self, external_data):
-        is_rotating = external_data.checker_data.get("type") == "rotating-url"
+        assert self.should_check(external_data)
+
+        is_rotating = external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE
         if is_rotating:
             url = external_data.checker_data["url"]
         else:

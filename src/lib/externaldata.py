@@ -20,6 +20,7 @@
 import abc
 from collections import namedtuple
 from enum import Enum
+import typing as t
 
 import os
 import logging
@@ -190,8 +191,35 @@ class ExternalDataSource(ExternalData):
 
 
 class Checker:
-    def check_module(self, module_data, external_data_list):
+    CHECKER_DATA_TYPE: t.Optional[str] = None
+    SUPPORTED_DATA_CLASSES = [ExternalData]
+
+    def should_check_module(
+        self,
+        module_data: ModuleData,
+        external_data_list: t.List[ExternalData],
+    ) -> bool:
+        return (
+            self.CHECKER_DATA_TYPE is not None
+            and module_data.checker_data.get("type") == self.CHECKER_DATA_TYPE
+        )
+
+    def should_check(self, external_data: ExternalData) -> bool:
+        supported = any(
+            isinstance(external_data, c) for c in self.SUPPORTED_DATA_CLASSES
+        )
+        applicable = (
+            self.CHECKER_DATA_TYPE is not None
+            and external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE
+        )
+        return applicable and supported
+
+    def check_module(
+        self,
+        module_data: ModuleData,
+        external_data_list: t.List[ExternalData],
+    ):
         pass
 
-    def check(self, external_data):
+    def check(self, external_data: ExternalData):
         pass

@@ -10,13 +10,10 @@ log = logging.getLogger(__name__)
 
 
 class AnityaChecker(HTMLChecker):
-    def _should_check(self, external_data):
-        return external_data.checker_data.get("type") == "anitya"
+    CHECKER_DATA_TYPE = "anitya"
 
     def check(self, external_data):
-        if not self._should_check(external_data):
-            log.debug("%s is not a anitya type ext data", external_data.filename)
-            return
+        assert self.should_check(external_data)
 
         instance_url = external_data.checker_data.get(
             "baseurl", "https://release-monitoring.org"

@@ -43,6 +43,9 @@ NUM_ALL_EXT_DATA = (
 
 
 class DummyChecker(Checker):
+    def should_check(self, external_data):
+        return True
+
     def check(self, external_data):
         logging.debug(
             "Phony checker checking external data %s and all is always good",
@@ -50,7 +53,7 @@ class DummyChecker(Checker):
         )
 
 
-class UpdateEverythingChecker(Checker):
+class UpdateEverythingChecker(DummyChecker):
     SIZE = 0
     # echo -n | sha256sum
     CHECKSUM = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -67,7 +70,7 @@ class UpdateEverythingChecker(Checker):
         )
 
 
-class RemoveEverythingChecker(Checker):
+class RemoveEverythingChecker(DummyChecker):
     def check(self, external_data):
         external_data.state = ExternalData.State.REMOVED
 
