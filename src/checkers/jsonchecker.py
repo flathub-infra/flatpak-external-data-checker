@@ -35,13 +35,10 @@ def query_json(query, data, variables=None):
 
 
 class JSONChecker(HTMLChecker):
-    def _should_check(self, external_data):
-        return external_data.checker_data.get("type") == "json"
+    CHECKER_DATA_TYPE = "json"
 
     def check(self, external_data):
-        if not self._should_check(external_data):
-            log.debug("%s is not a json type ext data", external_data.filename)
-            return
+        assert self.should_check(external_data)
 
         json_url = external_data.checker_data["url"]
         url_query = external_data.checker_data["url-query"]

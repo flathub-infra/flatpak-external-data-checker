@@ -15,14 +15,10 @@ VERSION_RE = re.compile(r"^(\S+)\s+\((\S+)\s+(\S+)\)")
 
 
 class RustChecker(Checker):
-    @staticmethod
-    def _should_check(external_data):
-        return external_data.checker_data.get("type") == "rust"
+    CHECKER_DATA_TYPE = "rust"
 
     def check(self, external_data):
-        if not self._should_check(external_data):
-            log.debug("%s is not a rust type ext data", external_data.filename)
-            return
+        assert self.should_check(external_data)
 
         channel = external_data.checker_data.get("channel", "stable")
         package_name = external_data.checker_data["package"]

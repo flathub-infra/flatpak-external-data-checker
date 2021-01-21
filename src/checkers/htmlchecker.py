@@ -64,13 +64,10 @@ def get_latest(checker_data, pattern_name, html):
 
 
 class HTMLChecker(Checker):
-    def _should_check(self, external_data):
-        return external_data.checker_data.get("type") == "html"
+    CHECKER_DATA_TYPE = "html"
 
     def check(self, external_data):
-        if not self._should_check(external_data):
-            log.debug("%s is not a html type ext data", external_data.filename)
-            return
+        assert self.should_check(external_data)
 
         url = external_data.checker_data.get("url")
         log.debug("Getting extra data info from %s; may take a while", url)

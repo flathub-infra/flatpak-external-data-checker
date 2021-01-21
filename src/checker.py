@@ -19,6 +19,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 from collections import OrderedDict
+import typing as t
+
 from .checkers import ALL_CHECKERS
 from .lib.appdata import add_release_to_file
 from .lib.externaldata import (
@@ -53,9 +55,11 @@ def find_appdata_file(appid):
 
 
 class ManifestChecker:
-    def __init__(self, manifest):
+    def __init__(self, manifest: str):
         self._manifest = manifest
+        self._modules_data: t.Dict[str, ModuleData]
         self._modules_data = {}
+        self._external_data: t.Dict[str, t.List[ExternalData]]
         self._external_data = {}
 
         # Initialize checkers
@@ -65,6 +69,7 @@ class ManifestChecker:
         # Map from filename to parsed contents of that file. Sources may be
         # specified as references to external files, which is why there can be
         # more than one file even though the input is a single filename.
+        self._manifest_contents: t.Dict[str, t.Union[t.List, t.Dict]]
         self._manifest_contents = {}
 
         # Top-level manifest contents
@@ -72,7 +77,7 @@ class ManifestChecker:
         # Map from manifest path to [ExternalData]
         self._collect_external_data(self._manifest, data)
 
-    def _read_manifest(self, manifest_path):
+    def _read_manifest(self, manifest_path: str) -> t.Union[t.List, t.Dict]:
         contents = read_manifest(manifest_path)
         self._manifest_contents[manifest_path] = contents
         return contents
@@ -165,6 +170,11 @@ class ManifestChecker:
 
             added = []
             for checker in self._checkers:
+                if not checker.should_check_module(module_data, external_data_filtered):
+                    continue
+                log.info(
+                    "Module %s: applying %s", module_data.name, type(checker).__name__
+                )
                 module_added = checker.check_module(module_data, external_data_filtered)
                 if module_added:
                     added.extend(module_added)
@@ -196,8 +206,18 @@ class ManifestChecker:
                 log.debug("[%d/%d] checking %s", i, n, data.filename)
 
                 for checker in self._checkers:
+                    if not checker.should_check(data):
+                        continue
+                    log.info(
+                        "Source %s: applying %s", data.filename, type(checker).__name__
+                    )
                     checker.check(data)
                     if data.state != ExternalData.State.UNKNOWN:
+                        log.info(
+                            "Source %s: got new state from %s, skipping remaining checkers",
+                            data.filename,
+                            type(checker).__name__,
+                        )
                         break
                 ext_data_checked.append(data)
 

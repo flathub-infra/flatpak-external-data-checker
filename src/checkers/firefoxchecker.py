@@ -39,6 +39,8 @@ log = logging.getLogger(__name__)
 
 
 class FirefoxChecker(Checker):
+    CHECKER_DATA_TYPE = "firefox"
+
     FIREFOX_RELEASE_INFO_URL = (
         "https://product-details.mozilla.org/1.0/firefox_versions.json"
     )
@@ -51,12 +53,8 @@ class FirefoxChecker(Checker):
     CHECKER_BROWSER_DEFAULT_LANGUAGE = "en-US"
     CHECKER_TRANSLATIONS_FILENAME_MATCH = r".+\.xpi$"
 
-    def _should_check(self, module_data):
-        return module_data.checker_data.get("type") == "firefox"
-
-    def check_module(self, module_data, external_data):
-        if not self._should_check(module_data):
-            return
+    def check_module(self, module_data, external_data_list):
+        assert self.should_check_module(module_data, external_data_list)
 
         log.debug("Retrieving latest available firefox version")
         # This should raise an error if either the release info url or
@@ -72,7 +70,7 @@ class FirefoxChecker(Checker):
 
         log.debug("Checking external data")
         browser_data = None
-        for data in external_data:
+        for data in external_data_list:
             if re.match(self.CHECKER_BROWSER_SOURCE_FILENAME, data.filename):
                 browser_data = data
                 break
@@ -86,7 +84,7 @@ class FirefoxChecker(Checker):
 
         added = []
         processed_data = []
-        for data in external_data:
+        for data in external_data_list:
             if data.filename in latest_info:
                 new_version = latest_info[data.filename]
                 data.state = ExternalData.State.VALID
