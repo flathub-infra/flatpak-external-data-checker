@@ -349,7 +349,7 @@ class ExternalGitRepoSource(ExternalGitRepo):
 
 class Checker:
     CHECKER_DATA_TYPE: t.Optional[str] = None
-    SUPPORTED_DATA_CLASSES = [ExternalData]
+    SUPPORTED_DATA_CLASSES: t.List[t.Type[ExternalBase]] = [ExternalData]
 
     def should_check_module(
         self,

@@ -3,6 +3,7 @@ import unittest
 
 from src.checker import ManifestChecker
 from src.lib.utils import init_logging
+from src.lib.externaldata import ExternalFile, ExternalGitRef
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "io.github.stedolan.jq.yml")
 
@@ -19,22 +20,29 @@ class TestJSONChecker(unittest.TestCase):
         for data in ext_data:
             self.assertIsNotNone(data)
             self.assertIsNotNone(data.new_version)
-            if data.filename == "v6.9.4":
-                url_re = (
-                    r"^https://api.github.com/repos/kkos/oniguruma/tarball/v[0-9\.\w]+$"
+            if data.filename == "jq-1.4.tar.gz":
+                self.assertIsInstance(data.new_version, ExternalFile)
+                self.assertNotEqual(data.current_version.url, data.new_version.url)
+                self.assertRegex(
+                    data.new_version.url,
+                    r"^https://github.com/stedolan/jq/releases/download/jq-[0-9\.\w]+/jq-[0-9\.\w]+\.tar.gz$",
                 )
-            elif data.filename == "jq-1.4.tar.gz":
-                url_re = r"^https://github.com/stedolan/jq/releases/download/jq-[0-9\.\w]+/jq-[0-9\.\w]+\.tar.gz$"
+                self.assertIsInstance(data.new_version.size, int)
+                self.assertGreater(data.new_version.size, 0)
+                self.assertIsNotNone(data.new_version.checksum)
+                self.assertIsInstance(data.new_version.checksum, str)
+                self.assertNotEqual(
+                    data.new_version.checksum,
+                    "0000000000000000000000000000000000000000000000000000000000000000",
+                )
+            elif data.filename == "oniguruma.git":
+                self.assertIsInstance(data.new_version, ExternalGitRef)
+                self.assertEqual(data.current_version.url, data.new_version.url)
+                self.assertIsNotNone(data.new_version.tag)
+                self.assertIsNotNone(data.new_version.commit)
+                self.assertNotEqual(
+                    data.new_version.commit, "e03900b038a274ee2f1341039e9003875c11e47d"
+                )
+                self.assertIsNotNone(data.new_version.version)
             else:
-                url_re = None
-            self.assertIsNotNone(url_re)
-            self.assertNotEqual(data.current_version.url, data.new_version.url)
-            self.assertRegex(data.new_version.url, url_re)
-            self.assertIsInstance(data.new_version.size, int)
-            self.assertGreater(data.new_version.size, 0)
-            self.assertIsNotNone(data.new_version.checksum)
-            self.assertIsInstance(data.new_version.checksum, str)
-            self.assertNotEqual(
-                data.new_version.checksum,
-                "0000000000000000000000000000000000000000000000000000000000000000",
-            )
+                self.fail(f"Unhandled data {data.filename}")
