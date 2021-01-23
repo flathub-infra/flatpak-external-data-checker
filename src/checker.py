@@ -215,8 +215,9 @@ class ManifestChecker:
                     checker.check(data)
                     if data.state != ExternalData.State.UNKNOWN:
                         log.info(
-                            "Source %s: got new state from %s, skipping remaining checkers",
+                            "Source %s: got new state %s from %s, skipping remaining checkers",
                             data.filename,
+                            data.state.name,
                             type(checker).__name__,
                         )
                         break
