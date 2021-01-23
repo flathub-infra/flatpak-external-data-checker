@@ -135,6 +135,15 @@ To use the **JSONChecker**, specify JSON data URL, version query and url query
     "url-query": ".assets[] | select(.name==\"jq-\" + $version + \".tar.gz\") | .browser_download_url"
 }
 ```
+for git type sources, specify tag query and, optionaly, commit and version queries:
+```json
+{
+    "type": "json",
+    "url": "https://api.github.com/repos/stedolan/jq/releases/latest",
+    "tag-query": ".tag_name",
+    "version-query": "$tag | sub(\"^jq-\"; \"\")"
+}
+```
 
 See the [jq manual](https://stedolan.github.io/jq/manual/) for complete information about writing queries.
 
