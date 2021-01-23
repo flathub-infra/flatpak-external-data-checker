@@ -1,0 +1,43 @@
+id: com.virustotal.Uploader
+modules:
+  - name: extra-cmake-modules
+    sources:
+      # Tag specified as branch
+      - type: git
+        url: https://invent.kde.org/frameworks/extra-cmake-modules.git
+        branch: v5.78.0
+        commit: 59d4958740a09d43aa5025a1cfe3d7b7d4d725b3
+
+  - name: yara
+    sources:
+      # Invalid (non-existent) tag specified
+      - type: git
+        url: https://github.com/VirusTotal/yara.git
+        tag: "4.0.4"
+
+  - name: jansson
+    sources:
+      # No commit specified
+      - type: git
+        url: "https://github.com/akheron/jansson.git"
+        tag: v2.13.1
+      - type: script
+        dest-filename: autogen.sh
+        commands:
+          - autoreconf -ifv
+
+  - name: c-vtapi
+    sources:
+      # Outdated branch tip (invalid commit)
+      - type: git
+        url: "https://github.com/VirusTotal/c-vtapi.git"
+        branch: master
+        commit: 0e525b24fa028b9203fdab46478531e910702b0d
+
+  - name: qt-virustotal-uploader
+    sources:
+      # Valid tag/commit
+      - type: git
+        url: "https://github.com/VirusTotal/qt-virustotal-uploader.git"
+        tag: v1.2
+        commit: be03674181c512b8c8935be104a42b90ccd3935a
