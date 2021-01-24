@@ -16,6 +16,17 @@ class GitChecker(Checker):
         assert self.should_check(external_data)
         external_data: ExternalGitRepo
 
+        if (
+            external_data.current_version.commit is not None
+            and external_data.current_version.tag is None
+            and external_data.current_version.branch is None
+        ):
+            log.info(
+                "Skipping source %s, commit is specified, but neither tag nor branch",
+                external_data.filename,
+            )
+            return
+
         try:
             remote_version = external_data.current_version.fetch_remote()
         except KeyError as err:
