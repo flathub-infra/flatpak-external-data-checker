@@ -1,4 +1,4 @@
-name: Run Tests
+name: Tests
 
 on:
   pull_request:
@@ -9,29 +9,46 @@ on:
       - "**"
 
 jobs:
-  build:
-    name: run-tests
-    runs-on: ubuntu-latest
+  check-formatting:
+    name: Check formatting
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3-setuptools
+          sudo python3 -m pip install \
+            black
+
+      - name: Run black
+        run: |
+          python3 -m black --check .
+
+  build-and-test-container:
+    name: Build and test container
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v1
 
       - name: Build container
-        run: docker build -t flatpak-external-data-checker .
+        run: |
+          docker build -t flatpak-external-data-checker .
 
       - name: Run tests in container
         run: |
-          docker run -v $PWD:/app -w /app --entrypoint bash flatpak-external-data-checker -c \
+          docker run -v $PWD:$PWD -w $PWD --entrypoint bash flatpak-external-data-checker -c \
           "pip3 install coverage && python3 -m coverage run -m unittest discover --verbose --buffer"
-
-      - name: Run black
-        run: |
-          docker run -v $PWD:/app -w /app --entrypoint bash flatpak-external-data-checker \
-          -c "pip3 install black && python3 -m black --check ."
 
       - name: Submit code coverage to Coveralls.io
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         run: |
-          docker run -v $PWD:/app -w /app --entrypoint bash --env COVERALLS_REPO_TOKEN flatpak-external-data-checker \
-          -c "pip3 install coveralls && python3 -m coveralls"
+          sudo apt-get install -y \
+            python3-setuptools
+          sudo python3 -m pip install \
+            coveralls
+          python3 -m coveralls
         continue-on-error: true
