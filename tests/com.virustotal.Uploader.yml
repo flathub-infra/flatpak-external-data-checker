@@ -26,6 +26,13 @@ modules:
         commands:
           - autoreconf -ifv
 
+  - name: protobuf-c
+    sources:
+      # Only commit specified, should be skipped
+      - type: git
+        url: https://github.com/VirusTotal/protobuf-c.git
+        commit: 1390409f4ee4e26d0635310995b516eb702c3f9e
+
   - name: c-vtapi
     sources:
       # Outdated branch tip (invalid commit)
