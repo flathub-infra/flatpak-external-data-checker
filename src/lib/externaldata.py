@@ -129,6 +129,7 @@ class ExternalData(ExternalBase):
         assert data_type != self.Type.GIT
         self.checker_data = checker_data or {}
         assert size is None or isinstance(size, int)
+        self.current_version: ExternalFile
         self.current_version = ExternalFile(url, checksum, size, None, None)
         self.new_version: t.Optional[ExternalFile]
         self.new_version = None
@@ -303,6 +304,7 @@ class ExternalGitRepo(ExternalBase):
         self.arches = arches
         self.type = self.TYPES["git"]
         self.checker_data = checker_data or {}
+        self.current_version: ExternalGitRef
         self.current_version = ExternalGitRef(url, commit, tag, branch, None, None)
         self.new_version: t.Optional[ExternalGitRef]
         self.new_version = None
