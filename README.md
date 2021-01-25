@@ -179,6 +179,8 @@ and add a template for source download URL:
 }
 ```
 
+for git type sources, instead of `url-template`, set `tag-template` to derive git tag from version.
+
 ### Firefox checker
 
 For the **FirefoxChecker**, which deals only with new versions of Firefox and
