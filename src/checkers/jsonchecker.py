@@ -96,7 +96,7 @@ class JSONChecker(HTMLChecker):
             return
 
         if new_version.commit is None:
-            new_version = new_version._replace(commit=new_version.get_remote_commit())
+            new_version = new_version.fetch_remote()
 
         if not external_data.current_version.matches(new_version):
             external_data.state = ExternalData.State.VALID

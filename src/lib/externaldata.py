@@ -227,7 +227,7 @@ class ExternalGitRef(
 ):
     __slots__ = ()
 
-    def get_remote_commit(self):
+    def fetch_remote(self) -> ExternalGitRef:
         log.debug(
             "Retrieving commit from %s tag %s branch %s",
             self.url,
@@ -254,7 +254,6 @@ class ExternalGitRef(
                     # fmt: on
                 ],
             )
-
         git_proc = subprocess.run(
             git_cmd,
             check=True,
@@ -263,8 +262,9 @@ class ExternalGitRef(
             timeout=5,
         )
         got_commit, got_ref = git_proc.stdout.decode().split()
+
         assert got_ref == ref
-        return got_commit
+        return self._replace(commit=got_commit)
 
     def matches(self, other: ExternalGitRef):
         return self.url == other.url and (
