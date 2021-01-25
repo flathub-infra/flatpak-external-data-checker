@@ -1,5 +1,16 @@
 id: org.flatpak.Flatpak
 modules:
+  - name: ostree
+    sources:
+      - type: git
+        url: https://github.com/ostreedev/ostree.git
+        tag: v2020.7
+        commit: 32a3a1297312e566df3141c6c7e3b99709e474b1
+        x-checker-data:
+          type: anitya
+          project-id: 10899
+          tag-template: v$version
+
   - name: flatpak
     sources:
       - type: archive
