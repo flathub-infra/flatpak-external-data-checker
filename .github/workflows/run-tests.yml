@@ -50,6 +50,7 @@ jobs:
           push: false
           load: true
           cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:latest
+          cache-to: type=inline
 
       - name: Run tests in container
         run: |
