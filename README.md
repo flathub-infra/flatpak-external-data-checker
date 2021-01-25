@@ -32,16 +32,19 @@ flatpak-external-data-checker MANIFEST_FILE
 
 it should display messages about any broken or outdated external data.
 
-### Running in a container with Podman
+### Running in a container
 
-`run-in-container.sh` builds a container using `podman` and the `Dockerfile` in
-this repository, then runs it with appropriate UID and filesystem mappings.
+**flatpak-external-data-checker** is avaiable as an
+[OCI image](https://github.com/orgs/flathub/packages/container/package/flatpak-external-data-checker)
+from GitHub Container Registry.
 This is a convenient way to get all necessary dependencies regardless of your
 host system's distribution.
 
+You can use the `run-in-container.sh` helper script to set up needed CLI
+options for you and run the image using `podman`:
+
 ```bash
 ~/src/endlessm/flatpak-external-data-checker/run-in-container.sh \
-    ~/src/endlessm/flatpak-external-data-checker/flatpak-external-data-checker \
     [ARGS …] \
     ~/src/flathub/com.example.App/com.example.App.json
 ```
