@@ -227,6 +227,22 @@ class ExternalGitRef(
 ):
     __slots__ = ()
 
+    def _get_tagged_commit(self, refs: t.Dict[str, str], tag: str) -> str:
+        annotated_tag_commit = refs.get(f"refs/tags/{tag}")
+        lightweight_tag_commit = refs.get(f"refs/tags/{tag}^{{}}")
+        # If either tag matched current commit, assume it's valid
+        if self.commit is not None:
+            if annotated_tag_commit == self.commit:
+                return annotated_tag_commit
+            if lightweight_tag_commit == self.commit:
+                return lightweight_tag_commit
+        # If neither matched current commit, prefer lightweight tag
+        if lightweight_tag_commit is not None:
+            return lightweight_tag_commit
+        if annotated_tag_commit is not None:
+            return annotated_tag_commit
+        raise KeyError(f"refs/tags/{tag}")
+
     def fetch_remote(self) -> ExternalGitRef:
         log.debug(
             "Retrieving commit from %s tag %s branch %s",
@@ -234,14 +250,8 @@ class ExternalGitRef(
             self.tag,
             self.branch,
         )
-        if self.tag is not None:
-            ref = f"refs/tags/{self.tag}"
-        elif self.branch is not None:
-            ref = f"refs/heads/{self.branch}"
-        else:
-            ref = "HEAD"
 
-        git_cmd = ["git", "ls-remote", "--exit-code", self.url, ref]
+        git_cmd = ["git", "ls-remote", "--exit-code", self.url]
         if utils.check_bwrap():
             git_cmd = utils.wrap_in_bwrap(
                 git_cmd,
@@ -261,9 +271,17 @@ class ExternalGitRef(
             env=utils.clear_env(os.environ),
             timeout=5,
         )
-        got_commit, got_ref = git_proc.stdout.decode().split()
+        git_stdout = git_proc.stdout.decode()
 
-        assert got_ref == ref
+        refs = {r: c for c, r in (l.split() for l in git_stdout.splitlines())}
+
+        if self.tag is not None:
+            got_commit = self._get_tagged_commit(refs, self.tag)
+        elif self.branch is not None:
+            got_commit = refs[f"refs/heads/{self.branch}"]
+        else:
+            got_commit = refs["HEAD"]
+
         return self._replace(commit=got_commit)
 
     def matches(self, other: ExternalGitRef):
