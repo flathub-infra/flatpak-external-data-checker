@@ -8,6 +8,10 @@ on:
     tags:
       - "**"
 
+env:
+  DOCKER_REGISTRY: ghcr.io
+  DOCKER_IMAGE: flathub/flatpak-external-data-checker
+
 jobs:
   check-formatting:
     name: Check formatting
@@ -33,13 +37,22 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
       - name: Build container
-        run: |
-          docker build -t flatpak-external-data-checker .
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile
+          tags: ${{ env.DOCKER_IMAGE }}:latest
+          push: false
+          load: true
+          cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:latest
 
       - name: Run tests in container
         run: |
-          docker run -v $PWD:$PWD -w $PWD --entrypoint bash flatpak-external-data-checker -c \
+          docker run -v $PWD:$PWD -w $PWD --entrypoint bash ${{ env.DOCKER_IMAGE }} -c \
           "pip3 install coverage && python3 -m coverage run -m unittest discover --verbose --buffer"
 
       - name: Submit code coverage to Coveralls.io
