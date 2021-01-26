@@ -19,6 +19,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 from collections import OrderedDict
+import datetime
 import typing as t
 
 from .checkers import ALL_CHECKERS
@@ -298,8 +299,13 @@ class ManifestChecker:
                 and last_update is not None
                 and last_update.version is not None
             ):
+                if last_update.timestamp is None:
+                    log.warning("Using current time in appdata release")
+                    timestamp = datetime.datetime.now()
+                else:
+                    timestamp = last_update.timestamp
                 add_release_to_file(
-                    appdata, last_update.version, last_update.timestamp.strftime("%F")
+                    appdata, last_update.version, timestamp.strftime("%F")
                 )
 
     def update_manifests(self):
