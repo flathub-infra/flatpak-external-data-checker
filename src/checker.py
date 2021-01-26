@@ -95,23 +95,23 @@ class ManifestChecker:
         if modules is None:
             return
         elif not isinstance(modules, list):
-            log.warning('"modules" in %s is not a list', path)
+            log.error('"modules" in %s is not a list', path)
             return
         for module in modules:
             if isinstance(module, str):
                 module_path = os.path.join(os.path.dirname(path), module)
-                log.debug("Loading modules from %s", module_path)
+                log.info("Loading modules from %s", module_path)
 
                 try:
                     module = self._read_manifest(module_path)
                 except GLib.Error as err:
                     if err.matches(GLib.quark_from_string("g-file-error-quark"), 4):
-                        log.info("Referenced file not found: %s", module)
+                        log.warning("Referenced file not found: %s", module)
                         continue
 
                     raise
                 except FileNotFoundError:
-                    log.info("Referenced file not found: %s", module)
+                    log.warning("Referenced file not found: %s", module)
                     continue
             else:
                 module_path = path
@@ -166,7 +166,7 @@ class ManifestChecker:
                     if filter_type == data.type
                 ]
 
-            log.debug(
+            log.info(
                 "Checking module %s (path: %s)", module_data.name, module_data.path
             )
 
@@ -174,7 +174,7 @@ class ManifestChecker:
             for checker in self._checkers:
                 if not checker.should_check_module(module_data, external_data_filtered):
                     continue
-                log.info(
+                log.debug(
                     "Module %s: applying %s", module_data.name, type(checker).__name__
                 )
                 module_added = checker.check_module(module_data, external_data_filtered)
@@ -198,24 +198,24 @@ class ManifestChecker:
                     data for data in external_data if filter_type == data.type
                 ]
 
-            log.debug("Checking individual sources in %s", path)
+            log.info("Checking individual sources in %s", path)
 
             n = len(external_data)
             for i, data in enumerate(external_data_filtered, 1):
                 if data.state != ExternalData.State.UNKNOWN:
                     continue
 
-                log.debug("[%d/%d] checking %s", i, n, data.filename)
+                log.info("[%d/%d] checking %s", i, n, data.filename)
 
                 for checker in self._checkers:
                     if not checker.should_check(data):
                         continue
-                    log.info(
+                    log.debug(
                         "Source %s: applying %s", data.filename, type(checker).__name__
                     )
                     checker.check(data)
                     if data.state != ExternalData.State.UNKNOWN:
-                        log.info(
+                        log.debug(
                             "Source %s: got new state %s from %s, skipping remaining checkers",
                             data.filename,
                             data.state.name,
