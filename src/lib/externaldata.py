@@ -241,7 +241,7 @@ class ExternalGitRef(
         else:
             ref = "HEAD"
 
-        git_cmd = ["git", "ls-remote", self.url, ref]
+        git_cmd = ["git", "ls-remote", "--exit-code", self.url, ref]
         if utils.check_bwrap():
             git_cmd = utils.wrap_in_bwrap(
                 git_cmd,
