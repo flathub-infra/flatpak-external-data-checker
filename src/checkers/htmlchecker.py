@@ -76,18 +76,15 @@ class HTMLChecker(Checker):
 
         latest_version = get_latest(external_data.checker_data, "version-pattern", html)
         latest_url = get_latest(external_data.checker_data, "url-pattern", html)
-        if not latest_version:
-            log.warning(
-                "%s had no available version information", external_data.filename
-            )
-        try:
-            url_template = external_data.checker_data["url-template"]
-        except KeyError:
-            log.warning("%s had no available URL", external_data.filename)
-        else:
+
+        url_template = external_data.checker_data.get("url-template")
+        if url_template:
             latest_url = Template(url_template).substitute(version=latest_version)
 
         if not latest_version or not latest_url:
+            log.warning(
+                "Couldn't get version and/or URL for %s", external_data.filename
+            )
             return
 
         abs_url = urllib.parse.urljoin(base=url, url=latest_url)
