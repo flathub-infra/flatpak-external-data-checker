@@ -1,8 +1,9 @@
 import logging
 import urllib.request
 import urllib.parse
-import json
 from string import Template
+
+import requests
 
 from src.lib.externaldata import ExternalData, ExternalGitRepo, ExternalGitRef
 from .htmlchecker import HTMLChecker
@@ -20,20 +21,22 @@ class AnityaChecker(HTMLChecker):
         instance_url = external_data.checker_data.get(
             "baseurl", "https://release-monitoring.org"
         )
-        project_id = external_data.checker_data.get("project-id")
-        if not isinstance(project_id, int):
-            log.error("Invalid type `%s` for project id", type(project_id).__name__)
+        versions_url = urllib.request.urljoin(instance_url, "/api/v2/versions/")
+
+        response = requests.get(
+            versions_url,
+            params={"project_id": external_data.checker_data.get("project-id")},
+        )
+        result = response.json()
+        if response.status_code != 200:
+            log.error(
+                "API call returned HTTP status %s: %s",
+                response.status_code,
+                result,
+            )
             return
 
-        project_url = urllib.parse.urljoin(instance_url, f"/api/project/{project_id}/")
-        log.debug("Getting JSON from %s", project_url)
-        with urllib.request.urlopen(project_url) as resp:
-            result = json.load(resp)
-
-        latest_version = result.get("version")
-        if not latest_version:
-            log.error("%s had no available version information", external_data.filename)
-            return
+        latest_version = result["latest_version"]
 
         if isinstance(external_data, ExternalGitRepo):
             return self._check_git(external_data, latest_version)

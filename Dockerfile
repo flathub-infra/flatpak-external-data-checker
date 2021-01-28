@@ -11,6 +11,7 @@ RUN apt-get update && \
       python3-apt \
       python3-defusedxml \
       python3-gi \
+      python3-requests \
       python3-github \
       python3-pip \
       python3-ruamel.yaml \
