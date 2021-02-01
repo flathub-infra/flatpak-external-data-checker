@@ -27,6 +27,16 @@ class GitChecker(Checker):
             )
             return
 
+        if (
+            external_data.current_version.commit is None
+            and external_data.current_version.tag is None
+        ):
+            log.info(
+                "Skipping source %s, not pinned to tag or commit",
+                external_data.filename,
+            )
+            return
+
         try:
             remote_version = external_data.current_version.fetch_remote()
         except KeyError as err:
