@@ -17,7 +17,7 @@ class TestGitChecker(unittest.TestCase):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = checker.check()
 
-        self.assertEqual(len(ext_data), 6)
+        self.assertEqual(len(ext_data), 7)
         for data in ext_data:
             self.assertIsInstance(data, ExternalGitRepo)
             self.assertIsInstance(data.current_version, ExternalGitRef)
@@ -55,6 +55,9 @@ class TestGitChecker(unittest.TestCase):
             elif data.filename == "yara.git":
                 self.assertEqual(data.state, data.State.BROKEN)
                 self.assertIsNone(data.new_version)
+            elif data.filename == "yara-python.git":
+                self.assertEqual(data.state, data.State.UNKNOWN)
+                self.assertIsNone(data.new_version)
             else:
                 self.fail(f"Unknown data {data.filename}")
             self._test_update_data(data, copy.deepcopy(data.source))
@@ -66,6 +69,8 @@ class TestGitChecker(unittest.TestCase):
         if data.filename == "protobuf-c.git":
             self.assertEqual(data.source, orig_source)
         elif data.filename == "yara.git":
+            self.assertEqual(data.source, orig_source)
+        elif data.filename == "yara-python.git":
             self.assertEqual(data.source, orig_source)
         elif data.filename == "jansson.git":
             self.assertNotEqual(data.source, orig_source)

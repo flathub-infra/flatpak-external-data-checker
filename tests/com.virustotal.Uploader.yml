@@ -15,6 +15,13 @@ modules:
         url: https://github.com/VirusTotal/yara.git
         tag: "4.0.4"
 
+  - name: yara-python
+    sources:
+      # Not pinned to commit or tag, should be skipped
+      - type: git
+        url: https://github.com/VirusTotal/yara-python.git
+        branch: v4.0.x
+
   - name: jansson
     sources:
       # No commit specified
