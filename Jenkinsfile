@@ -35,7 +35,7 @@ node('flatpak-builder') {
             try {
                 /* The '--privileged' param is required to run 'bwrap' which is used
                  * by the flatpak external data checker */
-                image.inside('--privileged') {
+                image.inside('--privileged --entrypoint=""') {
                     sshagent(credentials: [ 'fe45ca53-7c92-47db-b3b1-b8d0cc8507ed' ]) {
                         withCredentials([string(credentialsId: 'github-api-token-rw-jobs', variable: 'GITHUB_TOKEN')]) {
                             timeout(time: 20, unit: 'MINUTES') {
