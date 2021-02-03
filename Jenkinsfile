@@ -20,7 +20,7 @@ node('flatpak-builder') {
              * a workaround to make sure the user running the container exists
              * inside of it (see Dockerfile). This is needed because jenkins runs
              * the container with the same user as the host (with '-u <uid>:<gid>')
-             * but 'git push' fails with 'No user exists for uid ...' if the user
+             * but 'git' fails with 'No user exists for uid ...' if the user
              * doesn't exist inside the container (other option is to mount
              * '/etc/passwd' as a volume and export HOME/USER envs accordingly
              * when running the container ('image.inside' below)).
@@ -35,7 +35,7 @@ node('flatpak-builder') {
             try {
                 /* The '--privileged' param is required to run 'bwrap' which is used
                  * by the flatpak external data checker */
-                image.inside('--privileged') {
+                image.inside('--privileged --entrypoint=""') {
                     sshagent(credentials: [ 'fe45ca53-7c92-47db-b3b1-b8d0cc8507ed' ]) {
                         withCredentials([string(credentialsId: 'github-api-token-rw-jobs', variable: 'GITHUB_TOKEN')]) {
                             timeout(time: 20, unit: 'MINUTES') {
