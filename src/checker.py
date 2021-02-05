@@ -39,6 +39,7 @@ from gi.repository import GLib
 
 
 MAIN_SRC_PROP = "is-main-source"
+MAX_MANIFEST_SIZE = 1024 * 100
 
 
 log = logging.getLogger(__name__)
@@ -54,6 +55,22 @@ def find_appdata_file(appid):
         return appdata
 
     return None
+
+
+def _external_source_filter(manifest_path: str, source) -> t.Optional[bool]:
+    if not isinstance(source, str):
+        return None
+    source_path = os.path.join(os.path.dirname(manifest_path), source)
+    source_size = os.stat(source_path).st_size
+    if source_size > MAX_MANIFEST_SIZE:
+        log.info(
+            "External source file size %i KiB is over %i KiB, skipping: %s",
+            source_size / 1024,
+            MAX_MANIFEST_SIZE / 1024,
+            source,
+        )
+        return False
+    return True
 
 
 class ManifestChecker:
@@ -122,13 +139,7 @@ class ManifestChecker:
             module_data = ModuleData(module_name, module_path, module)
 
             sources = module.get("sources", [])
-            external_sources = [source for source in sources if isinstance(source, str)]
-            for source in external_sources:
-                source_path = os.path.join(os.path.dirname(path), source)
-                source_stat = os.stat(source_path)
-                if source_stat.st_size > 102400:
-                    log.info("External source file is over 100KB, skipping: %s", source)
-                    external_sources.remove(source)
+            external_sources = [s for s in sources if _external_source_filter(path, s)]
 
             external_data = self._external_data.setdefault(module_path, [])
             datas = ExternalDataSource.from_sources(module_path, sources)
