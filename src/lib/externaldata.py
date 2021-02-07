@@ -34,16 +34,6 @@ from . import utils
 log = logging.getLogger(__name__)
 
 
-class ModuleData:
-    def __init__(self, name: str, path: str, module: t.Dict[str, t.Any]):
-        self.name = name
-        self.path = path
-        self.checker_data: t.Dict[str, t.Any]
-        self.checker_data = module.get("x-checker-data", {})
-        self.external_data: t.List[t.Union[ExternalData, ExternalGitRepo]]
-        self.external_data = []
-
-
 class ExternalBase(abc.ABC):
     """
     Abstract base for remote data sources, such as file or VCS repo
@@ -62,23 +52,21 @@ class ExternalBase(abc.ABC):
         UNKNOWN = 0
         VALID = 1 << 1  # URL is reachable
         BROKEN = 1 << 2  # URL couldn't be reached
-        ADDED = 1 << 3  # New source added
-        REMOVED = 1 << 4  # Source removed
 
     current_version: t.Union[ExternalFile, ExternalGitRef]
     new_version: t.Optional[t.Union[ExternalFile, ExternalGitRef]]
 
     @classmethod
-    def from_source(cls, source_path, source, sources):
+    def from_source(cls, source_path, source):
         url = source.get("url")
         data_type = cls.TYPES.get(source.get("type"))
         if url is None or data_type is None:
             return None
 
         if data_type == cls.Type.GIT:
-            return ExternalGitRepoSource(source_path, source, sources, url)
+            return ExternalGitRepoSource(source_path, source, url)
 
-        return ExternalDataSource(source_path, source, sources, data_type, url)
+        return ExternalDataSource(source_path, source, data_type, url)
 
     @classmethod
     def from_sources(cls, source_path, sources):
@@ -88,7 +76,7 @@ class ExternalBase(abc.ABC):
             if isinstance(source, str):
                 continue
 
-            data = cls.from_source(source_path, source, sources)
+            data = cls.from_source(source_path, source)
             if data:
                 external_data.append(data)
 
@@ -113,7 +101,6 @@ class ExternalData(ExternalBase):
         self,
         data_type: ExternalBase.Type,
         source_path: str,
-        source_parent: t.List[dict],
         filename: str,
         url: str,
         checksum: str = None,
@@ -122,7 +109,6 @@ class ExternalData(ExternalBase):
         checker_data: dict = None,
     ):
         self.source_path = source_path
-        self.source_parent = source_parent
         self.filename = filename
         self.arches = arches
         self.type = data_type
@@ -169,7 +155,6 @@ class ExternalDataSource(ExternalData):
         self,
         source_path: str,
         source: dict,
-        sources: t.List[dict],
         data_type: ExternalBase.Type,
         url: str,
     ):
@@ -187,7 +172,6 @@ class ExternalDataSource(ExternalData):
         super().__init__(
             data_type,
             source_path,
-            sources,
             name,
             url,
             sha256sum,
@@ -213,11 +197,6 @@ class ExternalDataSource(ExternalData):
                     self.source_path,
                 )
                 self.source.pop("size", None)
-
-        if self.state == ExternalData.State.ADDED:
-            self.source_parent.append(self.source)
-        elif self.state == ExternalData.State.REMOVED:
-            self.source_parent.remove(self.source)
 
 
 class ExternalGitRef(
@@ -284,7 +263,6 @@ class ExternalGitRepo(ExternalBase):
     def __init__(
         self,
         source_path: str,
-        source_parent: t.List[dict],
         repo_name: str,
         url: str,
         commit: str = None,
@@ -294,7 +272,6 @@ class ExternalGitRepo(ExternalBase):
         checker_data=None,
     ):
         self.source_path = source_path
-        self.source_parent = source_parent
         self.filename = repo_name
         self.arches = arches
         self.type = self.TYPES["git"]
@@ -307,7 +284,7 @@ class ExternalGitRepo(ExternalBase):
 
 
 class ExternalGitRepoSource(ExternalGitRepo):
-    def __init__(self, source_path: str, source: dict, sources: t.List[dict], url: str):
+    def __init__(self, source_path: str, source: dict, url: str):
         repo_name = os.path.basename(url)
         commit = source.get("commit")
         tag = source.get("tag")
@@ -317,7 +294,6 @@ class ExternalGitRepoSource(ExternalGitRepo):
 
         super().__init__(
             source_path,
-            sources,
             repo_name,
             url,
             commit,
@@ -338,25 +314,10 @@ class ExternalGitRepoSource(ExternalGitRepo):
             if self.new_version.branch is not None:
                 self.source["branch"] = self.new_version.branch
 
-        if self.state == ExternalData.State.ADDED:
-            self.source_parent.append(self.source)
-        elif self.state == ExternalData.State.REMOVED:
-            self.source_parent.remove(self.source)
-
 
 class Checker:
     CHECKER_DATA_TYPE: t.Optional[str] = None
     SUPPORTED_DATA_CLASSES: t.List[t.Type[ExternalBase]] = [ExternalData]
-
-    def should_check_module(
-        self,
-        module_data: ModuleData,
-        external_data_list: t.List[t.Union[ExternalData, ExternalGitRepo]],
-    ) -> bool:
-        return (
-            self.CHECKER_DATA_TYPE is not None
-            and module_data.checker_data.get("type") == self.CHECKER_DATA_TYPE
-        )
 
     def should_check(
         self, external_data: t.Union[ExternalData, ExternalGitRepo]
@@ -369,13 +330,6 @@ class Checker:
             and external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE
         )
         return applicable and supported
-
-    def check_module(
-        self,
-        module_data: ModuleData,
-        external_data_list: t.List[t.Union[ExternalData, ExternalGitRepo]],
-    ):
-        pass
 
     def check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
         pass

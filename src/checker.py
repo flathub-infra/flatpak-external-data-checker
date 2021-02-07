@@ -25,7 +25,6 @@ import typing as t
 from .checkers import ALL_CHECKERS
 from .lib.appdata import add_release_to_file
 from .lib.externaldata import (
-    ModuleData,
     ExternalData,
     ExternalDataSource,
     ExternalGitRepo,
@@ -76,8 +75,6 @@ def _external_source_filter(manifest_path: str, source) -> t.Optional[bool]:
 class ManifestChecker:
     def __init__(self, manifest: str):
         self._manifest = manifest
-        self._modules_data: t.Dict[str, ModuleData]
-        self._modules_data = {}
         self._external_data: t.Dict[str, t.List[t.Union[ExternalData, ExternalGitRepo]]]
         self._external_data = {}
 
@@ -135,16 +132,12 @@ class ManifestChecker:
 
             self._collect_external_data(path=module_path, json_data=module)
 
-            module_name = module.get("name")
-            module_data = ModuleData(module_name, module_path, module)
-
             sources = module.get("sources", [])
             external_sources = [s for s in sources if _external_source_filter(path, s)]
 
             external_data = self._external_data.setdefault(module_path, [])
             datas = ExternalDataSource.from_sources(module_path, sources)
             external_data.extend(datas)
-            module_data.external_data.extend(datas)
 
             for external_source in external_sources:
                 external_source_path = os.path.join(
@@ -155,9 +148,6 @@ class ManifestChecker:
                     external_source_path, external_source_data
                 )
                 self._external_data[external_source_path] = datas
-                module_data.external_data.extend(datas)
-
-            self._modules_data[module_name] = module_data
 
     def check(self, filter_type=None):
         """Perform the check for all the external data in the manifest
@@ -166,40 +156,6 @@ class ManifestChecker:
         found in the manifest.
         """
         ext_data_checked = []
-
-        for _, module_data in self._modules_data.items():
-            if not filter_type:
-                external_data_filtered = module_data.external_data
-            else:
-                external_data_filtered = [
-                    data
-                    for data in module_data.external_data
-                    if filter_type == data.type
-                ]
-
-            log.info(
-                "Checking module %s (path: %s)", module_data.name, module_data.path
-            )
-
-            added = []
-            for checker in self._checkers:
-                if not checker.should_check_module(module_data, external_data_filtered):
-                    continue
-                log.debug(
-                    "Module %s: applying %s", module_data.name, type(checker).__name__
-                )
-                module_added = checker.check_module(module_data, external_data_filtered)
-                if module_added:
-                    added.extend(module_added)
-
-            ext_data_checked.extend(external_data_filtered)
-
-            if added:
-                ext_data_checked.extend(added)
-
-                self._modules_data[module_data.name].external_data.extend(added)
-                for data in added:
-                    self._external_data[data.source_path].append(data)
 
         for path, external_data in self._external_data.items():
             if not filter_type:
@@ -259,27 +215,16 @@ class ManifestChecker:
         return [
             data
             for data in self.get_external_data()
-            if data.state == ExternalData.State.BROKEN
-            or data.state == ExternalData.State.ADDED
-            or data.state == ExternalData.State.REMOVED
-            or data.new_version
+            if data.state == ExternalData.State.BROKEN or data.new_version
         ]
 
     def _update_manifest(self, path, datas, changes):
         for data in datas:
-            if (
-                data.new_version is None
-                and data.state != ExternalData.State.ADDED
-                and data.state != ExternalData.State.REMOVED
-            ):
+            if data.new_version is None:
                 continue
 
             data.update()
-            if data.state == ExternalData.State.ADDED:
-                message = "Added {}".format(data.filename)
-            elif data.state == ExternalData.State.REMOVED:
-                message = "Removed {}".format(data.filename)
-            elif data.new_version.version is not None:
+            if data.new_version.version is not None:
                 message = "Update {} to {}".format(
                     data.filename, data.new_version.version
                 )
