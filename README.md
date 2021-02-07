@@ -122,6 +122,23 @@ the retrieved version:
 }
 ```
 
+### Git checker ###
+
+To check for latest git tag in corresponding git source repo, add checker
+metadata with type `git` and set `tag-pattern` to a regular expression with 
+exactly one match group (the pattern will be used to extract version from tag):
+
+```json
+"x-checker-data": {
+    "type": "git",
+    "tag-pattern": "^v([\\d.]+)$"
+}
+```
+
+By default tags are sorted based on version number extracted from tag.
+To disable sorting and keep order from `git ls-remote`, set `sort-tags` to `false`.
+
+
 ### JSON checker
 
 The JSON checker allows using [jq](https://stedolan.github.io/jq/) to query
