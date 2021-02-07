@@ -32,6 +32,7 @@ import urllib.request
 import urllib.parse
 import copy
 import io
+import typing as t
 
 from collections import OrderedDict
 from ruamel.yaml import YAML
@@ -185,6 +186,32 @@ def check_bwrap():
 
     logging.warning("bwrap is not available")
     return False
+
+
+def git_ls_remote(url: str) -> t.Dict[str, str]:
+    git_cmd = ["git", "ls-remote", "--exit-code", url]
+    if check_bwrap():
+        git_cmd = wrap_in_bwrap(
+            git_cmd,
+            bwrap_args=[
+                # fmt: off
+                "--share-net",
+                "--dev", "/dev",
+                "--ro-bind", "/etc/ssl", "/etc/ssl",
+                "--ro-bind", "/etc/resolv.conf", "/etc/resolv.conf",
+                # fmt: on
+            ],
+        )
+    git_proc = subprocess.run(
+        git_cmd,
+        check=True,
+        stdout=subprocess.PIPE,
+        env=clear_env(os.environ),
+        timeout=5,
+    )
+    git_stdout = git_proc.stdout.decode()
+
+    return {r: c for c, r in (l.split() for l in git_stdout.splitlines())}
 
 
 def extract_appimage_version(basename, data):
