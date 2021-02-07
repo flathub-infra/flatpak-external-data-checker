@@ -2,11 +2,13 @@ id: com.virustotal.Uploader
 modules:
   - name: extra-cmake-modules
     sources:
-      # Tag specified as branch
       - type: git
         url: https://invent.kde.org/frameworks/extra-cmake-modules.git
-        branch: v5.78.0
-        commit: 59d4958740a09d43aa5025a1cfe3d7b7d4d725b3
+        tag: v5.77.0
+        commit: 760a013c3ff553b23d456c7787ed76981ec5142f
+        x-checker-data:
+          type: git
+          tag-pattern: ^v(\d[\d.]+\d)$
 
   - name: yara
     sources:
@@ -21,6 +23,18 @@ modules:
       - type: git
         url: https://github.com/VirusTotal/yara-python.git
         branch: v4.0.x
+
+  - name: vt-py
+    sources:
+      # Current is valid, no updates
+      - type: git
+        url: https://github.com/VirusTotal/vt-py.git
+        tag: "0.5.4"
+        commit: 61ddafaa1f6fc9eaea4cbef32f6636495de22623
+        x-checker-data:
+          type: git
+          tag-pattern: ^(0.5.4)$
+          sort-tags: false
 
   - name: jansson
     sources:
