@@ -250,30 +250,7 @@ class ExternalGitRef(
             self.tag,
             self.branch,
         )
-
-        git_cmd = ["git", "ls-remote", "--exit-code", self.url]
-        if utils.check_bwrap():
-            git_cmd = utils.wrap_in_bwrap(
-                git_cmd,
-                bwrap_args=[
-                    # fmt: off
-                    "--share-net",
-                    "--dev", "/dev",
-                    "--ro-bind", "/etc/ssl", "/etc/ssl",
-                    "--ro-bind", "/etc/resolv.conf", "/etc/resolv.conf",
-                    # fmt: on
-                ],
-            )
-        git_proc = subprocess.run(
-            git_cmd,
-            check=True,
-            stdout=subprocess.PIPE,
-            env=utils.clear_env(os.environ),
-            timeout=5,
-        )
-        git_stdout = git_proc.stdout.decode()
-
-        refs = {r: c for c, r in (l.split() for l in git_stdout.splitlines())}
+        refs = utils.git_ls_remote(self.url)
 
         if self.tag is not None:
             got_commit = self._get_tagged_commit(refs, self.tag)
