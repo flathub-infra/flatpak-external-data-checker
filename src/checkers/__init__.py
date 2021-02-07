@@ -1,5 +1,4 @@
 from .debianrepochecker import DebianRepoChecker
-from .firefoxchecker import FirefoxChecker
 from .jsonchecker import JSONChecker
 from .urlchecker import URLChecker
 from .htmlchecker import HTMLChecker
@@ -14,7 +13,6 @@ from .gitchecker import GitChecker
 # set to something other than UNKNOWN.
 ALL_CHECKERS = [
     DebianRepoChecker,
-    FirefoxChecker,
     HTMLChecker,
     JetBrainsChecker,
     SnapcraftChecker,
