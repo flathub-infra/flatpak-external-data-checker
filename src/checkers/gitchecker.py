@@ -1,8 +1,32 @@
 import logging
-import subprocess
-from src.lib.externaldata import Checker, ExternalGitRepo
+import re
+import typing as t
+from distutils.version import LooseVersion
+
+from src.lib.externaldata import Checker, ExternalGitRepo, ExternalGitRef
+from src.lib.utils import git_ls_remote
 
 log = logging.getLogger(__name__)
+
+REF_TAG_PREFIX = "refs/tags/"
+REF_TAG_LW_SUFFIX = "^{}"
+
+
+class TagWithVersion(t.NamedTuple):
+    commit: str
+    tag: str
+    annotated: bool
+    version: str
+
+    def __lt__(self, other):
+        if self.tag == other.tag:
+            return self.annotated and not other.annotated
+        return LooseVersion(self.version) < LooseVersion(other.version)
+
+    def __gt__(self, other):
+        if self.tag == other.tag:
+            return not self.annotated and other.annotated
+        return LooseVersion(self.version) > LooseVersion(other.version)
 
 
 class GitChecker(Checker):
@@ -15,7 +39,58 @@ class GitChecker(Checker):
     def check(self, external_data):
         assert self.should_check(external_data)
         external_data: ExternalGitRepo
+        if external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE:
+            return self._check_has_new(external_data)
+        return self._check_still_valid(external_data)
 
+    @staticmethod
+    def _check_has_new(external_data):
+        tag_pattern = external_data.checker_data.get(
+            "tag-pattern", r"^(?:[vV])?(\d[\d\w.-]+\d)"
+        )
+        tag_re = re.compile(tag_pattern)
+        assert tag_re.groups == 1
+
+        matching_tags = []
+        refs = git_ls_remote(external_data.current_version.url)
+        for ref, commit in refs.items():
+            if not ref.startswith(REF_TAG_PREFIX):
+                continue
+            tag = ref[len(REF_TAG_PREFIX) :]
+            if tag.endswith(REF_TAG_LW_SUFFIX):
+                annotated = False
+                tag = tag[: -len(REF_TAG_LW_SUFFIX)]
+            else:
+                annotated = True
+            tag_match = tag_re.match(tag)
+            if not tag_match:
+                continue
+            version = tag_match.group(1)
+            matching_tags.append(TagWithVersion(commit, tag, annotated, version))
+
+        if external_data.checker_data.get("sort-tags", True):
+            sorted_tags = sorted(matching_tags)
+        else:
+            sorted_tags = matching_tags
+        latest_tag = sorted_tags[-1]
+
+        new_version = ExternalGitRef(
+            url=external_data.current_version.url,
+            commit=latest_tag.commit,
+            tag=latest_tag.tag,
+            branch=None,
+            version=latest_tag.version,
+            timestamp=None,
+        )
+        if external_data.current_version.matches(new_version):
+            log.debug("No update for git repo %s", external_data.current_version.url)
+            external_data.state = ExternalGitRepo.State.VALID
+        else:
+            external_data.state = ExternalGitRepo.State.VALID
+            external_data.new_version = new_version
+
+    @staticmethod
+    def _check_still_valid(external_data):
         if (
             external_data.current_version.commit is not None
             and external_data.current_version.tag is None
