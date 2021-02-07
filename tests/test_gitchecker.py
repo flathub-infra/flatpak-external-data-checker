@@ -17,7 +17,7 @@ class TestGitChecker(unittest.TestCase):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = checker.check()
 
-        self.assertEqual(len(ext_data), 7)
+        self.assertEqual(len(ext_data), 8)
         for data in ext_data:
             self.assertIsInstance(data, ExternalGitRepo)
             self.assertIsInstance(data.current_version, ExternalGitRef)
@@ -49,15 +49,24 @@ class TestGitChecker(unittest.TestCase):
             elif data.filename == "protobuf-c.git":
                 self.assertEqual(data.state, data.State.UNKNOWN)
                 self.assertIsNone(data.new_version)
-            elif data.filename == "extra-cmake-modules.git":
-                self.assertEqual(data.state, data.State.BROKEN)
-                self.assertIsNone(data.new_version)
             elif data.filename == "yara.git":
                 self.assertEqual(data.state, data.State.BROKEN)
                 self.assertIsNone(data.new_version)
             elif data.filename == "yara-python.git":
                 self.assertEqual(data.state, data.State.UNKNOWN)
                 self.assertIsNone(data.new_version)
+            elif data.filename == "vt-py.git":
+                self.assertEqual(data.state, data.State.VALID)
+                self.assertIsNone(data.new_version)
+            elif data.filename == "extra-cmake-modules.git":
+                self.assertEqual(data.state, data.State.VALID)
+                self.assertIsNotNone(data.new_version)
+                self.assertIsNone(data.new_version.branch)
+                self.assertIsNotNone(data.new_version.commit)
+                self.assertIsNotNone(data.new_version.tag)
+                self.assertIsNotNone(data.new_version.version)
+                self.assertRegex(data.new_version.tag, r"^[vV][\d.]+$")
+                self.assertRegex(data.new_version.version, r"^[\d.]+$")
             else:
                 self.fail(f"Unknown data {data.filename}")
             self._test_update_data(data, copy.deepcopy(data.source))
@@ -89,8 +98,14 @@ class TestGitChecker(unittest.TestCase):
             self.assertNotIn("tag", data.source)
             self.assertIn("branch", data.source)
             self.assertEqual(data.source["commit"], data.new_version.commit)
-        elif data.filename == "extra-cmake-modules.git":
+        elif data.filename == "vt-py.git":
             self.assertEqual(data.source, orig_source)
+        elif data.filename == "extra-cmake-modules.git":
+            self.assertNotEqual(data.source, orig_source)
+            self.assertIn("tag", data.source)
+            self.assertIn("commit", data.source)
+            self.assertNotEqual(data.source["commit"], orig_source["commit"])
+            self.assertNotEqual(data.source["tag"], orig_source["tag"])
 
 
 if __name__ == "__main__":
