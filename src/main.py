@@ -188,10 +188,14 @@ def open_pr(subject, body, branch, manifest_checker=None):
 
     automerge = repocfg.get("automerge-flathubbot-prs")
 
-    # Enable automatic merge if external data is broken unless explicitly disabled
+    # Enable automatic merge if extra-data is broken unless explicitly disabled
     if automerge is not False and manifest_checker:
         for data in manifest_checker.get_outdated_external_data():
-            if data.new_version and data.state == ExternalData.State.BROKEN:
+            if (
+                data.type == ExternalData.Type.EXTRA_DATA
+                and data.state == ExternalData.State.BROKEN
+                and data.new_version
+            ):
                 automerge = True
                 break
 
@@ -215,7 +219,7 @@ def open_pr(subject, body, branch, manifest_checker=None):
         if origin_repo.permissions.push and automerge:
             pr_commit = pr.head.repo.get_commit(pr.head.sha)
             if pr_commit.get_combined_status().state == "success" and pr.mergeable:
-                log.info("PR passed CI and is mergeable, merging", pr.html_url)
+                log.info("PR passed CI and is mergeable, merging %s", pr.html_url)
                 pr.create_issue_comment(MERGE_COMMENT)
                 pr.merge(merge_method="rebase")
                 origin_repo.get_git_ref(f"heads/{pr.head.ref}").delete()
