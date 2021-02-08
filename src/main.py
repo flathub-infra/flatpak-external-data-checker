@@ -89,7 +89,7 @@ def print_outdated_external_data(manifest_checker):
             )
         print("")
 
-    return len(ext_data) > 0
+    return len(ext_data)
 
 
 def check_call(args):
@@ -235,7 +235,7 @@ def open_pr(subject, body, branch, manifest_checker=None):
     log.info("Opened pull request %s", pr.html_url)
 
 
-def main():
+def parse_cli_args(cli_args=None):
     types = ["all"] + list(ExternalData.TYPES)
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -268,8 +268,10 @@ def main():
         choices=types,
         default="all",
     )
-    args = parser.parse_args()
+    return parser.parse_args(cli_args)
 
+
+def run_with_args(args):
     init_logging(logging.DEBUG if args.verbose else logging.INFO)
 
     manifest_checker = checker.ManifestChecker(args.manifest)
@@ -277,11 +279,13 @@ def main():
 
     manifest_checker.check(filter_type)
 
-    if print_outdated_external_data(manifest_checker):
+    outdated_num = print_outdated_external_data(manifest_checker)
+
+    if outdated_num > 0:
         if args.update or args.commit_only or args.edit_only:
             changes = manifest_checker.update_manifests()
             if args.edit_only:
-                return
+                return outdated_num
             if changes:
                 with indir(os.path.dirname(args.manifest)):
                     subject, body, branch = commit_changes(changes)
@@ -289,8 +293,13 @@ def main():
                         open_pr(
                             subject, body, branch, manifest_checker=manifest_checker
                         )
-                return
+                return outdated_num
 
             log.warning("Can't automatically fix any of the above issues")
 
+    return outdated_num
+
+
+def main():
+    if run_with_args(parse_cli_args()) > 0:
         sys.exit(1)
