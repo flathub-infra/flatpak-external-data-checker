@@ -16,6 +16,7 @@ modules:
       - type: git
         url: https://github.com/VirusTotal/yara.git
         tag: "4.0.4"
+        commit: 814b6296f4ce389c8c16b5508b56f1f3d9af554d
 
   - name: yara-python
     sources:
@@ -38,7 +39,7 @@ modules:
 
   - name: jansson
     sources:
-      # No commit specified
+      # No commit specified, should be skipped
       - type: git
         url: "https://github.com/akheron/jansson.git"
         tag: v2.13.1

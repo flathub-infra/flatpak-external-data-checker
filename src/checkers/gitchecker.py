@@ -102,12 +102,9 @@ class GitChecker(Checker):
             )
             return
 
-        if (
-            external_data.current_version.commit is None
-            and external_data.current_version.tag is None
-        ):
+        if external_data.current_version.commit is None:
             log.info(
-                "Skipping source %s, not pinned to tag or commit",
+                "Skipping source %s, not pinned to commit",
                 external_data.filename,
             )
             return
