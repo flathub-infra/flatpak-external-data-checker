@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>net.invisible_island.xterm</id>
+  
+  <name>xterm</name>
+  <summary>The standard terminal emulator for the X Window System</summary>
+  
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  
+  <description>
+    <p>
+      The xterm program is a terminal emulator for the X Window System.
+      It provides DEC VT102 and Tektronix 4014 compatible terminals for programs that
+      can&apos;t use the window system directly.
+    </p>
+  </description>
+</component>

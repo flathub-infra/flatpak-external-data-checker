@@ -1,0 +1,23 @@
+id: net.invisible_island.xterm
+modules:
+  - name: xterm
+    sources:
+      - type: git
+        url: https://github.com/ThomasDickey/xterm-snapshots.git
+        tag: xterm-364
+        commit: 6b07755324d62a64cfcf11ef750670c2ede583ca
+        x-checker-data:
+          type: anitya
+          project-id: 5272
+          tag-template: xterm-$version
+          is-main-source: true
+    modules:
+      - name: libXaw
+        sources:
+          - type: archive
+            url: https://xorg.freedesktop.org/releases/individual/lib/libXaw-1.0.12.tar.bz2
+            sha256: 96fc314874fce9979556321d1d6ee00b5baf32fb333b7278853b4983bc3cdbf6
+            x-checker-data:
+              type: anitya
+              project-id: 1766
+              url-template: https://xorg.freedesktop.org/releases/individual/lib/libXaw-$version.tar.bz2
