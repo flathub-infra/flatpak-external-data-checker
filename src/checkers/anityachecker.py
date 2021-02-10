@@ -27,14 +27,8 @@ class AnityaChecker(HTMLChecker):
             versions_url,
             params={"project_id": external_data.checker_data.get("project-id")},
         )
+        response.raise_for_status()
         result = response.json()
-        if response.status_code != 200:
-            log.error(
-                "API call returned HTTP status %s: %s",
-                response.status_code,
-                result,
-            )
-            return
 
         latest_version = result["latest_version"]
 
@@ -43,10 +37,7 @@ class AnityaChecker(HTMLChecker):
         return self._check_data(external_data, latest_version)
 
     def _check_data(self, external_data, latest_version):
-        url_template = external_data.checker_data.get("url-template")
-        if not url_template:
-            log.error("URL template is not set")
-            return
+        url_template = external_data.checker_data["url-template"]
         latest_url = Template(url_template).substitute(version=latest_version)
 
         self._update_version(
@@ -54,10 +45,7 @@ class AnityaChecker(HTMLChecker):
         )
 
     def _check_git(self, external_data, latest_version):
-        tag_template = external_data.checker_data.get("tag-template")
-        if not tag_template:
-            log.error("Tag template is not set")
-            return
+        tag_template = external_data.checker_data["tag-template"]
         latest_tag = Template(tag_template).substitute(version=latest_version)
 
         new_version = ExternalGitRef(
