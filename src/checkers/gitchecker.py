@@ -82,10 +82,7 @@ class GitChecker(Checker):
             version=latest_tag.version,
             timestamp=None,
         )
-        if not external_data.current_version.matches(new_version):
-            external_data.new_version = new_version
-        else:
-            external_data.state = ExternalGitRepo.State.VALID
+        external_data.set_new_version(new_version)
 
     @staticmethod
     def _check_still_valid(external_data):
@@ -121,11 +118,4 @@ class GitChecker(Checker):
             external_data.state = ExternalGitRepo.State.BROKEN
             return
 
-        if external_data.current_version.matches(remote_version):
-            log.debug(
-                "Remote git repo %s is still valid", external_data.current_version.url
-            )
-            external_data.state = ExternalGitRepo.State.VALID
-        else:
-            external_data.state = ExternalGitRepo.State.BROKEN
-            external_data.new_version = remote_version
+        external_data.set_new_version(remote_version, is_update=False)

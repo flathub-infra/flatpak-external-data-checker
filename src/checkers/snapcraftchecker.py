@@ -71,7 +71,4 @@ class SnapcraftChecker(Checker):
                     ),
                 )
 
-                if not external_data.current_version.matches(new_version):
-                    external_data.new_version = new_version
-                else:
-                    external_data.state = external_data.State.VALID
+                external_data.set_new_version(new_version)

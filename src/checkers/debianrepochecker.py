@@ -121,10 +121,7 @@ class DebianRepoChecker(Checker):
                 timestamp=_get_timestamp_for_candidate(candidate),
             )
 
-            if not external_data.current_version.matches(new_version):
-                external_data.new_version = new_version
-            else:
-                external_data.state = external_data.State.VALID
+            external_data.set_new_version(new_version)
 
     def _translate_arch(self, arch):
         # Because architecture names in Debian differ from Flatpak's
