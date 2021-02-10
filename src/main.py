@@ -59,14 +59,14 @@ def indir(path):
 def print_outdated_external_data(manifest_checker):
     ext_data = manifest_checker.get_outdated_external_data()
     for data in ext_data:
+        state_txt = (
+            data.state.name
+            if data.state == ExternalData.State.BROKEN
+            else "CHANGE SOON"
+        )
+        print("{}: {}".format(state_txt, data.filename))
         if data.new_version:
-            if data.state == ExternalData.State.VALID:
-                print("CHANGE SOON: {}\n" " Has a new version:".format(data.filename))
-            elif data.state == ExternalData.State.BROKEN:
-                print("BROKEN: {}\n" " Has a new version:".format(data.filename))
-            else:
-                print(" A new version is available:")
-
+            print(" Has a new version:")
             if data.type == ExternalData.Type.GIT:
                 print(
                     "  URL:     {url}\n"
@@ -83,10 +83,7 @@ def print_outdated_external_data(manifest_checker):
                     "  Version: {version}\n".format(**data.new_version._asdict())
                 )
         elif data.state == ExternalData.State.BROKEN:
-            print(
-                "BROKEN: {}\n"
-                " Unreachable URL: {}".format(data.filename, data.current_version.url)
-            )
+            print(" Couldn't get new version for {}".format(data.current_version.url))
         print("")
 
     return len(ext_data)
