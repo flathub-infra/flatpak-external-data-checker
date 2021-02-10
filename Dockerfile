@@ -16,7 +16,6 @@ RUN apt-get update && \
       python3-pip \
       python3-ruamel.yaml \
       python3-setuptools \
-      python3-tenacity \
       python3-toml \
       python3-pyelftools \
       squashfs-tools \
