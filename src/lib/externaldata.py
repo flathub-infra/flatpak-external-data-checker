@@ -53,6 +53,8 @@ class ExternalBase(abc.ABC):
         VALID = 1 << 1  # URL is reachable
         BROKEN = 1 << 2  # URL couldn't be reached
 
+    state: State
+    filename: str
     current_version: t.Union[ExternalFile, ExternalGitRef]
     new_version: t.Optional[t.Union[ExternalFile, ExternalGitRef]]
 
@@ -81,6 +83,27 @@ class ExternalBase(abc.ABC):
                 external_data.append(data)
 
         return external_data
+
+    def set_new_version(
+        self, new_version: t.Union[ExternalFile, ExternalGitRef], is_update=True
+    ):
+        assert isinstance(new_version, type(self.current_version))
+
+        if self.current_version.matches(new_version):  # type: ignore
+            if is_update:
+                log.debug("Source %s: no update found", self.filename)
+            else:
+                log.debug("Source %s: no remote data change", self.filename)
+            self.state = self.State.VALID
+        else:
+            if is_update:
+                log.info(
+                    "Source %s: got new version %s", self.filename, new_version.version
+                )
+            else:
+                log.warning("Source %s: remote data changed", self.filename)
+                self.state = self.State.BROKEN
+            self.new_version = new_version
 
 
 class ExternalFile(
