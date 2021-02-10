@@ -22,19 +22,8 @@ class TestGitChecker(unittest.TestCase):
             self.assertIsInstance(data, ExternalGitRepo)
             self.assertIsInstance(data.current_version, ExternalGitRef)
             if data.filename == "jansson.git":
-                self.assertEqual(data.state, data.State.BROKEN)
-                self.assertIsNotNone(data.new_version)
-                self.assertEqual(data.current_version.url, data.new_version.url)
-                self.assertIsNotNone(data.new_version.tag)
-                self.assertEqual(data.current_version.tag, data.new_version.tag)
-                self.assertIsNotNone(data.new_version.commit)
-                self.assertEqual(
-                    data.new_version.commit, "e9ebfa7e77a6bee77df44e096b100e7131044059"
-                )
-                self.assertNotEqual(
-                    data.current_version.commit, data.new_version.commit
-                )
-                self.assertFalse(data.current_version.matches(data.new_version))
+                self.assertEqual(data.state, data.State.UNKNOWN)
+                self.assertIsNone(data.new_version)
             elif data.filename == "c-vtapi.git":
                 self.assertEqual(data.state, data.State.BROKEN)
                 self.assertIsNotNone(data.new_version)
@@ -85,15 +74,7 @@ class TestGitChecker(unittest.TestCase):
         elif data.filename == "yara-python.git":
             self.assertEqual(data.source, orig_source)
         elif data.filename == "jansson.git":
-            self.assertNotEqual(data.source, orig_source)
-            self.assertEqual(
-                list(data.source.keys()), list(orig_source.keys()) + ["commit"]
-            )
-            self.assertNotIn("commit", orig_source)
-            self.assertIn("commit", data.source)
-            self.assertIn("tag", data.source)
-            self.assertEqual(data.source["tag"], data.new_version.tag)
-            self.assertEqual(data.source["commit"], data.new_version.commit)
+            self.assertEqual(data.source, orig_source)
         elif data.filename == "c-vtapi.git":
             self.assertNotEqual(data.source, orig_source)
             self.assertEqual(data.source.keys(), orig_source.keys())
