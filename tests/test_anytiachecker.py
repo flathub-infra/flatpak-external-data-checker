@@ -36,9 +36,13 @@ class TestAnityaChecker(unittest.TestCase):
             elif data.filename == "ostree.git":
                 self.assertIsNotNone(data.new_version)
                 self.assertIsInstance(data.new_version, ExternalGitRef)
-                self.assertIsNotNone(data.new_version.version)
+                self.assertIsNotNone(data.new_version.commit)
                 self.assertIsNotNone(data.new_version.tag)
+                self.assertNotEqual(
+                    data.new_version.commit, data.current_version.commit
+                )
                 self.assertNotEqual(data.new_version.tag, data.current_version.tag)
+                self.assertIsNotNone(data.new_version.version)
                 self.assertNotEqual(
                     data.new_version.commit, data.current_version.commit
                 )

@@ -59,12 +59,15 @@ class TestGitChecker(unittest.TestCase):
                 self.assertEqual(data.state, data.State.VALID)
                 self.assertIsNone(data.new_version)
             elif data.filename == "extra-cmake-modules.git":
-                self.assertEqual(data.state, data.State.VALID)
                 self.assertIsNotNone(data.new_version)
                 self.assertIsNone(data.new_version.branch)
                 self.assertIsNotNone(data.new_version.commit)
                 self.assertIsNotNone(data.new_version.tag)
                 self.assertIsNotNone(data.new_version.version)
+                self.assertNotEqual(data.new_version.tag, data.current_version.tag)
+                self.assertNotEqual(
+                    data.new_version.commit, data.current_version.commit
+                )
                 self.assertRegex(data.new_version.tag, r"^[vV][\d.]+$")
                 self.assertRegex(data.new_version.version, r"^[\d.]+$")
             else:

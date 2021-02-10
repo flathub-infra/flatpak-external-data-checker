@@ -108,7 +108,8 @@ class HTMLChecker(Checker):
             log.exception("Unexpected exception while checking %s", latest_url)
             external_data.state = ExternalData.State.BROKEN
         else:
-            external_data.state = ExternalData.State.VALID
             new_version = new_version._replace(version=latest_version)
             if not external_data.current_version.matches(new_version):
                 external_data.new_version = new_version
+            else:
+                external_data.state = ExternalData.State.VALID
