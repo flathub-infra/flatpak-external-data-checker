@@ -35,10 +35,9 @@ def query_json(query, data, variables=None):
     return jq_proc.stdout.decode().strip()
 
 
-def query_sequence(checker_data, json_data, result_keys):
+def query_sequence(json_data, queries):
     results = {}
-    for result_key in result_keys:
-        query = checker_data.get(f"{result_key}-query")
+    for result_key, query in queries:
         if not query:
             continue
         results[result_key] = query_json(query, json_data, results)
@@ -64,36 +63,41 @@ class JSONChecker(HTMLChecker):
             return self._check_data(json_data, external_data)
 
     def _check_data(self, json_data: str, external_data: ExternalData):
+        checker_data = external_data.checker_data
         results = query_sequence(
-            external_data.checker_data, json_data, ["tag", "commit", "version", "url"]
+            json_data,
+            [
+                ("tag", checker_data.get("tag-query")),
+                ("commit", checker_data.get("commit-query")),
+                ("version", checker_data["version-query"]),
+                ("url", checker_data["url-query"]),
+            ],
         )
-        try:
-            latest_version = results["version"]
-            latest_url = results["url"]
-        except KeyError as err:
-            log.error("Did not get %s", err.args[0])
-            return
+        latest_version = results["version"]
+        latest_url = results["url"]
 
         self._update_version(
             external_data, latest_version, latest_url, follow_redirects=False
         )
 
     def _check_git(self, json_data: str, external_data: ExternalGitRepo):
+        checker_data = external_data.checker_data
         results = query_sequence(
-            external_data.checker_data, json_data, ["tag", "commit", "version"]
+            json_data,
+            [
+                ("tag", checker_data["tag-query"]),
+                ("commit", checker_data.get("commit-query")),
+                ("version", checker_data.get("version-query")),
+            ],
         )
-        try:
-            new_version = ExternalGitRef(
-                external_data.current_version.url,
-                results.get("commit"),
-                results["tag"],
-                None,
-                results.get("version"),
-                None,
-            )
-        except KeyError as err:
-            log.error("Did not get %s", err.args[0])
-            return
+        new_version = ExternalGitRef(
+            external_data.current_version.url,
+            results.get("commit"),
+            results["tag"],
+            None,
+            results.get("version"),
+            None,
+        )
 
         if new_version.commit is None:
             new_version = new_version.fetch_remote()
