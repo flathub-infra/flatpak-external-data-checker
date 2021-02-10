@@ -125,7 +125,7 @@ class DebianRepoChecker(Checker):
 
     def _translate_arch(self, arch):
         # Because architecture names in Debian differ from Flatpak's
-        arches = {"x86_64": "amd64", "arm": "armel"}
+        arches = {"x86_64": "amd64", "arm": "armel", "aarch64": "arm64"}
         return arches.get(arch, arch)
 
     @contextlib.contextmanager
