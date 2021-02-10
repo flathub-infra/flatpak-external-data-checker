@@ -82,12 +82,10 @@ class GitChecker(Checker):
             version=latest_tag.version,
             timestamp=None,
         )
-        if external_data.current_version.matches(new_version):
-            log.debug("No update for git repo %s", external_data.current_version.url)
-            external_data.state = ExternalGitRepo.State.VALID
+        if not external_data.current_version.matches(new_version):
+            external_data.new_version = new_version
         else:
             external_data.state = ExternalGitRepo.State.VALID
-            external_data.new_version = new_version
 
     @staticmethod
     def _check_still_valid(external_data):

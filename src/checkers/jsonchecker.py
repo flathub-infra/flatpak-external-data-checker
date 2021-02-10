@@ -99,5 +99,6 @@ class JSONChecker(HTMLChecker):
             new_version = new_version.fetch_remote()
 
         if not external_data.current_version.matches(new_version):
-            external_data.state = ExternalData.State.VALID
             external_data.new_version = new_version
+        else:
+            external_data.state = ExternalData.State.VALID

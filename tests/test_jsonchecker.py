@@ -40,6 +40,10 @@ class TestJSONChecker(unittest.TestCase):
                 self.assertEqual(data.current_version.url, data.new_version.url)
                 self.assertIsNotNone(data.new_version.tag)
                 self.assertIsNotNone(data.new_version.commit)
+                self.assertNotEqual(data.new_version.tag, data.current_version.tag)
+                self.assertNotEqual(
+                    data.new_version.commit, data.current_version.commit
+                )
                 self.assertNotEqual(
                     data.new_version.commit, "e03900b038a274ee2f1341039e9003875c11e47d"
                 )

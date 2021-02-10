@@ -49,6 +49,7 @@ class TestHTMLChecker(unittest.TestCase):
             data.new_version.url,
             r"^https?://www.x.org/releases/individual/app/xeyes-[\d\.-]+.tar.bz2",  # noqa: E501
         )
+        self.assertNotEqual(data.new_version.url, data.current_version.url)
         self.assertIsNotNone(data.new_version.version)
         self.assertIsInstance(data.new_version.size, int)
         self.assertGreater(data.new_version.size, 0)
