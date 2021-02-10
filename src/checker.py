@@ -189,6 +189,13 @@ class ManifestChecker:
                             type(checker).__name__,
                         )
                         break
+                    if data.new_version is not None:
+                        log.debug(
+                            "Source %s: got new version from %s, skipping remaining checkers",
+                            data.filename,
+                            type(checker).__name__,
+                        )
+                        break
                 ext_data_checked.append(data)
 
         return list(set(ext_data_checked))
