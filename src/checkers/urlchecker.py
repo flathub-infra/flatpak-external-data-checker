@@ -85,9 +85,6 @@ class URLChecker(Checker):
         except (urllib.error.HTTPError, urllib.error.URLError) as e:
             log.warning("%s returned %s", url, e)
             external_data.state = ExternalData.State.BROKEN
-        except Exception:
-            log.exception("Unexpected exception while checking %s", url)
-            external_data.state = ExternalData.State.BROKEN
         else:
             if url.endswith(".AppImage"):
                 version_string = utils.extract_appimage_version(

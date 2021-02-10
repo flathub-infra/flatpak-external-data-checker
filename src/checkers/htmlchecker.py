@@ -104,9 +104,6 @@ class HTMLChecker(Checker):
         except urllib.error.HTTPError as e:
             log.warning("%s returned %s", latest_url, e)
             external_data.state = ExternalData.State.BROKEN
-        except Exception:
-            log.exception("Unexpected exception while checking %s", latest_url)
-            external_data.state = ExternalData.State.BROKEN
         else:
             new_version = new_version._replace(version=latest_version)
             external_data.set_new_version(new_version)
