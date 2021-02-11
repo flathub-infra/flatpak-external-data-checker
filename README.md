@@ -206,6 +206,21 @@ and add a template for source download URL:
 
 for git type sources, instead of `url-template`, set `tag-template` to derive git tag from version.
 
+### PyPI checker ###
+
+Check for Python package updates on PyPI.
+
+```json
+"x-checker-data": {
+    "type": "pypi",
+    "name": "Pillow"
+}
+```
+
+By default it will check for source package (`sdist` package type).
+To check for binary package instead, set `packagetype` to `bdist_wheel`
+(only noarch wheels are supported currently).
+
 ### JetBrains checker
 
 Special checker that will check for available updates
