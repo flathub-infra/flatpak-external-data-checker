@@ -1,0 +1,40 @@
+id: com.valvesoftware.Steam
+modules:
+
+  - name: python-modules
+    sources:
+
+      - type: file
+        url: https://files.pythonhosted.org/packages/6d/38/c21ef5034684ffc0412deefbb07d66678332290c14bb5269c85145fbd55e/setuptools-50.3.2-py3-none-any.whl
+        sha256: 2c242a0856fbad7efbe560df4a7add9324f340cf48df43651e9604924466794a
+        x-checker-data:
+          type: pypi
+          name: setuptools
+          packagetype: bdist_wheel
+
+      - type: file
+        url: https://files.pythonhosted.org/packages/64/c2/b80047c7ac2478f9501676c988a5411ed5572f35d1beff9cae07d321512c/PyYAML-5.3.1.tar.gz
+        sha256: b8eac752c5e14d3eca0e6dd9199cd627518cb5ec06add0de9d32baeee6fe645d
+        x-checker-data:
+          type: pypi
+          name: PyYAML
+          packagetype: sdist
+
+      - type: file
+        url: https://files.pythonhosted.org/packages/7a/c2/bf87cef932c45cb7b7a79a0a954e3307fcff209c7639182a2b9ae0127959/vdf-3.1-py2.py3-none-any.whl
+        sha256: a5da182b3ef888d45f39862725bc7bb2836515c9fc329843001e506e73bb5cd4
+        x-checker-data:
+          type: pypi
+          name: vdf
+          versions:
+            - ["==", "3.2"]
+          packagetype: bdist_wheel
+
+
+      - type: file
+        url: "https://files.pythonhosted.org/packages/3e/02/b09732ca4b14405ff159c470a612979acfc6e8645dc32f83ea0129709f7a/Pillow-7.2.0.tar.gz"
+        sha256: "97f9e7953a77d5a70f49b9a48da7776dc51e9b738151b22dacf101641594a626"
+        x-checker-data:
+          type: pypi
+          name: Pillow
+          packagetype: bdist_wheel
