@@ -77,7 +77,6 @@ jobs:
           password: ${{ secrets.REGISTRY_TOKEN }}
 
       - name: Push image to registry
-        if: github.event_name != 'pull_request'
         run: |
           docker image tag \
             ${{ env.DOCKER_IMAGE }}:build \
@@ -85,5 +84,5 @@ jobs:
           docker image tag \
             ${{ env.DOCKER_IMAGE }}:build \
             ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:latest
-          docker image push \
+          docker image push --all-tags \
             ${DOCKER_REGISTRY}/${DOCKER_IMAGE}
