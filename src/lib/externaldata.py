@@ -26,7 +26,6 @@ import typing as t
 
 import os
 import logging
-import subprocess
 
 from . import utils
 

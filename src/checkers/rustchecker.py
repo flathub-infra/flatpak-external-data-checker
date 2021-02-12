@@ -5,7 +5,6 @@ import re
 
 import toml
 
-from src.lib import utils
 from src.lib.externaldata import ExternalFile, Checker
 
 log = logging.getLogger(__name__)
