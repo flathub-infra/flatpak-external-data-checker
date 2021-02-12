@@ -85,5 +85,5 @@ jobs:
           docker image tag \
             ${{ env.DOCKER_IMAGE }}:build \
             ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:latest
-          docker image push \
+          docker image push --all-tags \
             ${DOCKER_REGISTRY}/${DOCKER_IMAGE}
