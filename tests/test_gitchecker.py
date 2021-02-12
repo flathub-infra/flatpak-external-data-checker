@@ -23,8 +23,9 @@ class TestGitChecker(unittest.TestCase):
         self.assertTrue(t1a <= t1 < t3 and t3 >= t3a > t1)
         sorted_tags = [t1a, t1, t2, t3a, t3]
         self.assertEqual(sorted([t1, t1a, t3, t3a, t2]), sorted_tags)
-        self.assertEqual(sorted([t1, t1a, t3, t3a, t2], reverse=True), sorted_tags[::-1])
-
+        self.assertEqual(
+            sorted([t1, t1a, t3, t3a, t2], reverse=True), sorted_tags[::-1]
+        )
 
     def test_check_and_update(self):
         checker = ManifestChecker(TEST_MANIFEST)
