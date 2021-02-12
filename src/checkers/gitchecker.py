@@ -23,10 +23,16 @@ class TagWithVersion(t.NamedTuple):
             return self.annotated and not other.annotated
         return LooseVersion(self.version) < LooseVersion(other.version)
 
+    def __le__(self, other):
+        return self == other or self < other
+
     def __gt__(self, other):
         if self.tag == other.tag:
             return not self.annotated and other.annotated
         return LooseVersion(self.version) > LooseVersion(other.version)
+
+    def __ge__(self, other):
+        return self == other or self > other
 
 
 class GitChecker(Checker):
