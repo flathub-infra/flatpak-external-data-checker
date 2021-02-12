@@ -5,6 +5,7 @@ import unittest
 from src.checker import ManifestChecker
 from src.lib.externaldata import ExternalGitRepo, ExternalGitRef
 from src.lib.utils import init_logging
+from src.checkers.gitchecker import TagWithVersion
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.virustotal.Uploader.yml")
 
@@ -12,6 +13,18 @@ TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.virustotal.Uploader
 class TestGitChecker(unittest.TestCase):
     def setUp(self):
         init_logging()
+
+    def test_sort_tags(self):
+        t1 = TagWithVersion("x1", "v1.1", False, "1.1")
+        t1a = TagWithVersion("x2", "v1.1", True, "1.1")
+        t2 = TagWithVersion("y1", "v1.1.1", False, "1.1.1")
+        t3 = TagWithVersion("z1", "v1.2", False, "1.2")
+        t3a = TagWithVersion("z2", "v1.2", True, "1.2")
+        self.assertTrue(t1a <= t1 < t3 and t3 >= t3a > t1)
+        sorted_tags = [t1a, t1, t2, t3a, t3]
+        self.assertEqual(sorted([t1, t1a, t3, t3a, t2]), sorted_tags)
+        self.assertEqual(sorted([t1, t1a, t3, t3a, t2], reverse=True), sorted_tags[::-1])
+
 
     def test_check_and_update(self):
         checker = ManifestChecker(TEST_MANIFEST)
