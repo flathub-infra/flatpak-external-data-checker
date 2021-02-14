@@ -71,8 +71,13 @@ class PyPIChecker(Checker):
             response.raise_for_status()
             pypi_data = response.json()
 
+        if constraints:
+            releases = pypi_data["releases"]
+        else:
+            releases = {pypi_data["info"]["version"]: pypi_data["urls"]}
+
         downloads = sorted(
-            _filter_downloads(pypi_data["releases"], constraints, package_type),
+            _filter_downloads(releases, constraints, package_type),
             key=lambda r: r[2],
         )
 
