@@ -20,8 +20,8 @@
 from __future__ import annotations
 
 import abc
-from collections import namedtuple
 from enum import Enum
+import datetime
 import typing as t
 
 import os
@@ -105,10 +105,12 @@ class ExternalBase(abc.ABC):
             self.new_version = new_version
 
 
-class ExternalFile(
-    namedtuple("ExternalFile", ("url", "checksum", "size", "version", "timestamp"))
-):
-    __slots__ = ()
+class ExternalFile(t.NamedTuple):
+    url: str
+    checksum: t.Optional[str]
+    size: t.Optional[int]
+    version: t.Optional[str]
+    timestamp: t.Optional[datetime.datetime]
 
     def matches(self, other: ExternalFile):
         return (
@@ -221,12 +223,13 @@ class ExternalDataSource(ExternalData):
                 self.source.pop("size", None)
 
 
-class ExternalGitRef(
-    namedtuple(
-        "ExternalGitRef", ("url", "commit", "tag", "branch", "version", "timestamp")
-    )
-):
-    __slots__ = ()
+class ExternalGitRef(t.NamedTuple):
+    url: str
+    commit: t.Optional[str]
+    tag: t.Optional[str]
+    branch: t.Optional[str]
+    version: t.Optional[str]
+    timestamp: t.Optional[datetime.datetime]
 
     def _get_tagged_commit(self, refs: t.Dict[str, str], tag: str) -> str:
         annotated_tag_commit = refs.get(f"refs/tags/{tag}")
@@ -260,7 +263,7 @@ class ExternalGitRef(
         else:
             got_commit = refs["HEAD"]
 
-        return self._replace(commit=got_commit)
+        return self._replace(commit=got_commit)  # pylint: disable=no-member
 
     def matches(self, other: ExternalGitRef):
         return self.url == other.url and (

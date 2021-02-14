@@ -108,5 +108,7 @@ class HTMLChecker(Checker):
             log.warning("%s returned %s", latest_url, e)
             external_data.state = ExternalData.State.BROKEN
         else:
-            new_version = new_version._replace(version=latest_version)
+            new_version = new_version._replace(  # pylint: disable=no-member
+                version=latest_version
+            )
             external_data.set_new_version(new_version)
