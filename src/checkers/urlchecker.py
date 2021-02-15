@@ -33,8 +33,9 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import logging
-import urllib.error
 import re
+
+import requests
 
 from src.lib.externaldata import ExternalData, Checker
 from src.lib import utils
@@ -82,11 +83,11 @@ class URLChecker(Checker):
 
         try:
             new_version, data = utils.get_extra_data_info_from_url(url)
-        except (urllib.error.HTTPError, urllib.error.URLError) as e:
+        except (
+            requests.exceptions.HTTPError,
+            requests.exceptions.ConnectionError,
+        ) as e:
             log.warning("%s returned %s", url, e)
-            external_data.state = ExternalData.State.BROKEN
-        except Exception:
-            log.exception("Unexpected exception while checking %s", url)
             external_data.state = ExternalData.State.BROKEN
         else:
             if url.endswith(".AppImage"):

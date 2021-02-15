@@ -36,14 +36,8 @@ import typing as t
 
 from collections import OrderedDict
 from ruamel.yaml import YAML
-from tenacity import (
-    before_sleep_log,
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_fixed,
-)
 from elftools.elf.elffile import ELFFile
+import requests
 
 from . import externaldata
 
@@ -64,7 +58,7 @@ TIMEOUT_SECONDS = 60
 
 
 def _extract_timestamp(info):
-    date_str = info["Last-Modified"] or info["Date"]
+    date_str = info.get("Last-Modified") or info.get("Date")
     if date_str:
         try:
             return dt.datetime.strptime(date_str, "%a, %d %b %Y %H:%M:%S %Z")
@@ -95,19 +89,21 @@ def get_timestamp_from_url(url):
         return _extract_timestamp(response.info())
 
 
-@retry(
-    retry=retry_if_exception_type((ConnectionResetError, socket.timeout)),
-    stop=stop_after_attempt(3),
-    wait=wait_fixed(2),
-    before_sleep=before_sleep_log(log, logging.DEBUG),
-)
 def get_extra_data_info_from_url(url, follow_redirects=True):
-    request = urllib.request.Request(url, headers=HEADERS)
+    http_adapter = requests.adapters.HTTPAdapter(
+        max_retries=requests.adapters.Retry(total=2)
+    )
 
-    with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
-        real_url = response.geturl()
-        data = response.read()
-        info = response.info()
+    with requests.Session() as session:
+        session.mount(
+            urllib.parse.urlunparse(urllib.parse.urlparse(url)._replace(path="/")),
+            http_adapter,
+        )
+        with session.get(url, headers=HEADERS, timeout=TIMEOUT_SECONDS) as response:
+            response.raise_for_status()
+            real_url = response.url
+            data = response.content
+            info = response.headers
 
     if "Content-Length" in info:
         size = int(info["Content-Length"])

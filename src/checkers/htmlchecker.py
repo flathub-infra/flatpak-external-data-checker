@@ -20,11 +20,11 @@
 
 import logging
 import re
-import urllib.error
 import urllib.parse
-import urllib.request
 from string import Template
 from distutils.version import LooseVersion
+
+import requests
 
 from src.lib import utils
 from src.lib.externaldata import ExternalData, Checker
@@ -69,10 +69,10 @@ class HTMLChecker(Checker):
     def check(self, external_data):
         assert self.should_check(external_data)
 
-        url = external_data.checker_data.get("url")
-        log.debug("Getting extra data info from %s; may take a while", url)
-        resp = urllib.request.urlopen(url)
-        html = resp.read().decode()
+        url = external_data.checker_data["url"]
+        with requests.get(url) as response:
+            response.raise_for_status()
+            html = response.text
 
         latest_version = get_latest(external_data.checker_data, "version-pattern", html)
         latest_url = get_latest(external_data.checker_data, "url-pattern", html)
@@ -101,11 +101,11 @@ class HTMLChecker(Checker):
             new_version, _ = utils.get_extra_data_info_from_url(
                 latest_url, follow_redirects
             )
-        except urllib.error.HTTPError as e:
+        except (
+            requests.exceptions.HTTPError,
+            requests.exceptions.ConnectionError,
+        ) as e:
             log.warning("%s returned %s", latest_url, e)
-            external_data.state = ExternalData.State.BROKEN
-        except Exception:
-            log.exception("Unexpected exception while checking %s", latest_url)
             external_data.state = ExternalData.State.BROKEN
         else:
             new_version = new_version._replace(version=latest_version)
