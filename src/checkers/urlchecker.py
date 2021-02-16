@@ -75,8 +75,6 @@ class URLChecker(Checker):
         else:
             url = external_data.current_version.url
 
-        log.debug("Getting extra data info from %s; may take a while", url)
-
         if url.startswith("data:"):
             log.debug("Skipping data URL")
             return
