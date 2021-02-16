@@ -36,6 +36,7 @@ import contextlib
 import logging
 import os
 import tempfile
+import urllib.parse
 
 from src.lib.externaldata import Checker, ExternalFile
 from src.lib.utils import get_timestamp_from_url
@@ -100,6 +101,7 @@ class DebianRepoChecker(Checker):
         root = external_data.checker_data["root"]
         dist = external_data.checker_data["dist"]
         component = external_data.checker_data.get("component", "")
+        src_pkg = external_data.checker_data.get("source", False)
 
         if not component and not dist.endswith("/"):
             LOG.warning(
@@ -110,16 +112,35 @@ class DebianRepoChecker(Checker):
             return
 
         arch = self._translate_arch(external_data.arches[0])
-        with self._load_repo(root, dist, component, arch) as cache:
-            package = cache[package_name]
-            candidate = package.candidate
-            new_version = ExternalFile(
-                candidate.uri,
-                candidate.sha256,
-                candidate.size,
-                candidate.version,
-                timestamp=_get_timestamp_for_candidate(candidate),
-            )
+        with self._load_repo(root, dist, component, arch, src_pkg) as cache:
+            if src_pkg:
+                src_record = apt_pkg.SourceRecords()
+                source_version, source_files = None, None
+                while src_record.lookup(package_name):
+                    source_version, source_files = src_record.version, src_record.files
+                if not source_version:
+                    raise ValueError(f"No source package {package_name}")
+
+                source_file = next(f for f in source_files if f.type == "tar")
+
+                new_version = ExternalFile(
+                    urllib.parse.urljoin(root.rstrip("/") + "/", source_file.path),
+                    str(source_file.hashes.find("sha256")).split(":")[1],
+                    source_file.size,
+                    source_version,
+                    timestamp=None,
+                )
+            else:
+                package = cache[package_name]
+                candidate = package.candidate
+
+                new_version = ExternalFile(
+                    candidate.uri,
+                    candidate.sha256,
+                    candidate.size,
+                    candidate.version,
+                    timestamp=_get_timestamp_for_candidate(candidate),
+                )
 
             external_data.set_new_version(new_version)
 
@@ -129,7 +150,7 @@ class DebianRepoChecker(Checker):
         return arches.get(arch, arch)
 
     @contextlib.contextmanager
-    def _load_repo(self, deb_root, dist, component, arch):
+    def _load_repo(self, deb_root, dist, component, arch, source=False):
         with tempfile.TemporaryDirectory() as root:
             LOG.debug("Setting up apt directory structure in %s", root)
 
@@ -141,10 +162,12 @@ class DebianRepoChecker(Checker):
             with open(sources_list, "w") as f:
                 # FIXME: import GPG key, remove 'trusted=yes' which skips GPG
                 # verification
-                f.write(
-                    "deb [arch={arch} trusted=yes] "
-                    "{deb_root} {dist} {component}\n".format(**locals())
-                )
+                if source:
+                    f.write(f"deb-src [trusted=yes] {deb_root} {dist} {component}\n")
+                else:
+                    f.write(
+                        f"deb [arch={arch} trusted=yes] {deb_root} {dist} {component}\n"
+                    )
 
             # Create empty dpkg status
             dpkg_status = os.path.join(root, "var/lib/dpkg/status")

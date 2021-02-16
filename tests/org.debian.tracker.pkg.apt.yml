@@ -7,10 +7,11 @@ modules:
             sha256: "0000000000000000000000000000000000000000000000000000000000000000"
             x-checker-data:
               type: debian-repo
-              root: http://deb.debian.org/debian
+              root: http://deb.debian.org/debian/
               dist: buster
               component: main
               package-name: python-apt
+              source: true
         modules:
 
           - name: apt
