@@ -1,9 +1,7 @@
 import datetime
-import json
 import logging
-import urllib.error
-import urllib.parse
-import urllib.request
+
+import requests
 
 from src.lib.externaldata import ExternalFile, Checker
 
@@ -19,19 +17,19 @@ class JetBrainsChecker(Checker):
         code = external_data.checker_data["code"]
         release_type = external_data.checker_data.get("release-type", "release")
 
-        url = f"https://data.services.jetbrains.com/products/releases?code={code}&latest=true&type={release_type}"
+        url = "https://data.services.jetbrains.com/products/releases"
+        query = {"code": code, "latest": "true", "type": release_type}
 
-        log.debug("Getting extra data info from %s; may take a while", url)
-        resp = urllib.request.urlopen(url)
-        data = json.load(resp)[code][0]
+        with requests.get(url, params=query) as response:
+            response.raise_for_status()
+            result = response.json()
+            data = result[code][0]
+
         release = data["downloads"]["linux"]
 
-        checksum = (
-            urllib.request.urlopen(release["checksumLink"])
-            .read()
-            .decode("utf-8")
-            .split(" ")[0]
-        )
+        with requests.get(release["checksumLink"]) as response:
+            response.raise_for_status()
+            checksum = response.text.split(" ")[0]
 
         new_version = ExternalFile(
             release["link"],
