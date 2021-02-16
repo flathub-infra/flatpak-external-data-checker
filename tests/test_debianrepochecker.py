@@ -29,3 +29,15 @@ class TestDebianRepoChecker(unittest.TestCase):
             self.assertRegex(
                 data.new_version.url, r"http://deb.debian.org/debian/pool/main/.+"
             )
+            if data.filename == "python-apt-source.tar.xz":
+                self.assertRegex(
+                    data.new_version.url,
+                    r"http://deb.debian.org/debian/pool/main/p/python-apt/python-apt_(\d[\d\.-]+\d).tar.xz",
+                )
+            elif data.filename == "apt-aarch64.deb":
+                self.assertRegex(
+                    data.new_version.url,
+                    r"http://deb.debian.org/debian/pool/main/a/apt/apt_(\d[\d\.-]+\d)_arm64.deb",
+                )
+            else:
+                self.fail(f"Unknown data {data.filename}")
