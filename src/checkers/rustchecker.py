@@ -1,9 +1,9 @@
 import datetime
 import logging
-import urllib.request
 import re
 
 import toml
+import requests
 
 from src.lib.externaldata import ExternalFile, Checker
 
@@ -25,9 +25,9 @@ class RustChecker(Checker):
 
         url = f"https://static.rust-lang.org/dist/channel-rust-{channel}.toml"
 
-        log.debug("Getting extra data info from %s; may take a while", url)
-        with urllib.request.urlopen(url) as response:
-            data = toml.loads(response.read().decode())
+        with requests.get(url) as response:
+            response.raise_for_status()
+            data = toml.loads(response.text)
 
         package = data["pkg"][package_name]
         target = package["target"][target_name]
