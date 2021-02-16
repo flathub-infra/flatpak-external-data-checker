@@ -36,7 +36,7 @@ TEST_MANIFEST = os.path.join(
 )
 NUM_ARCHIVE_IN_MANIFEST = 1
 NUM_FILE_IN_MANIFEST = 1
-NUM_EXTRA_DATA_IN_MANIFEST = 6
+NUM_EXTRA_DATA_IN_MANIFEST = 3
 NUM_ALL_EXT_DATA = (
     NUM_ARCHIVE_IN_MANIFEST + NUM_FILE_IN_MANIFEST + NUM_EXTRA_DATA_IN_MANIFEST
 )
@@ -238,7 +238,7 @@ modules:
             if data.new_version:
                 ext_data_with_new_version += 1
 
-        self.assertEqual(ext_data_with_new_version, 4)
+        self.assertEqual(ext_data_with_new_version, 1)
 
         file_ext_data = checker.get_external_data(ExternalData.Type.FILE)
         self.assertEqual(len(file_ext_data), NUM_FILE_IN_MANIFEST)

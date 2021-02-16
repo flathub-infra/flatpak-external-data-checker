@@ -1,0 +1,27 @@
+id: org.debian.tracker.pkg.apt
+modules:
+      - name: python-apt
+        sources:
+          - type: archive
+            url: "http://deb.debian.org/debian/python-apt-source.tar.xz"
+            sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+            x-checker-data:
+              type: debian-repo
+              root: http://deb.debian.org/debian
+              dist: buster
+              component: main
+              package-name: python-apt
+        modules:
+
+          - name: apt
+            sources:
+              - type: file
+                only-arches: [ "aarch64" ]
+                url: "http://deb.debian.org/debian/apt-aarch64.deb"
+                sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+                x-checker-data:
+                  type: debian-repo
+                  root: http://deb.debian.org/debian
+                  dist: buster
+                  component: main
+                  package-name: apt
