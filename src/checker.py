@@ -143,7 +143,13 @@ class ManifestChecker:
                 external_source_path = os.path.join(
                     os.path.dirname(path), external_source
                 )
-                external_source_data = self._read_manifest(external_source_path)
+                external_manifest = self._read_manifest(external_source_path)
+                if isinstance(external_manifest, list):
+                    external_source_data = external_manifest
+                elif isinstance(external_manifest, dict):
+                    external_source_data = [external_manifest]
+                else:
+                    raise TypeError(f"Invalid data type in {external_source_path}")
                 datas = ExternalDataSource.from_sources(
                     external_source_path, external_source_data
                 )
