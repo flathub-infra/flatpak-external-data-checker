@@ -3,8 +3,8 @@ import re
 import typing as t
 from distutils.version import LooseVersion
 
-from src.lib.externaldata import Checker, ExternalGitRepo, ExternalGitRef
-from src.lib.utils import git_ls_remote
+from ..lib.externaldata import Checker, ExternalGitRepo, ExternalGitRef
+from ..lib.utils import git_ls_remote
 
 log = logging.getLogger(__name__)
 

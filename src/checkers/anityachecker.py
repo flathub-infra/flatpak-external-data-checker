@@ -5,7 +5,7 @@ from string import Template
 
 import requests
 
-from src.lib.externaldata import ExternalData, ExternalGitRepo, ExternalGitRef
+from ..lib.externaldata import ExternalData, ExternalGitRepo, ExternalGitRef
 from .htmlchecker import HTMLChecker
 
 log = logging.getLogger(__name__)

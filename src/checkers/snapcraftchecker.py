@@ -4,7 +4,7 @@ import json
 import logging
 import hashlib
 
-from src.lib.externaldata import ExternalFile, Checker
+from ..lib.externaldata import ExternalFile, Checker
 
 log = logging.getLogger(__name__)
 

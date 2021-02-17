@@ -5,7 +5,7 @@ import re
 import toml
 import requests
 
-from src.lib.externaldata import ExternalFile, Checker
+from ..lib.externaldata import ExternalFile, Checker
 
 log = logging.getLogger(__name__)
 

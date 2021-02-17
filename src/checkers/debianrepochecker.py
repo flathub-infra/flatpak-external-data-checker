@@ -38,8 +38,8 @@ import os
 import tempfile
 import urllib.parse
 
-from src.lib.externaldata import Checker, ExternalFile
-from src.lib.utils import get_timestamp_from_url
+from ..lib.externaldata import Checker, ExternalFile
+from ..lib.utils import get_timestamp_from_url
 
 apt_pkg.init()
 

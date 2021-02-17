@@ -32,9 +32,9 @@ import sys
 
 from github import Github
 
-from src.lib.utils import parse_github_url, init_logging
-from src.lib.externaldata import ExternalData
-from src import checker
+from .lib.utils import parse_github_url, init_logging
+from .lib.externaldata import ExternalData
+from . import checker
 
 
 log = logging.getLogger(__name__)

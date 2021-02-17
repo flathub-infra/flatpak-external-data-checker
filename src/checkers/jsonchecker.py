@@ -3,8 +3,8 @@ import urllib.request
 import os
 import subprocess
 
-from src.lib import utils
-from src.lib.externaldata import ExternalData, ExternalGitRepo, ExternalGitRef
+from ..lib import utils
+from ..lib.externaldata import ExternalData, ExternalGitRepo, ExternalGitRef
 from .htmlchecker import HTMLChecker
 
 log = logging.getLogger(__name__)

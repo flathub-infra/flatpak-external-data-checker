@@ -37,8 +37,8 @@ import re
 
 import requests
 
-from src.lib.externaldata import ExternalData, Checker
-from src.lib import utils
+from ..lib.externaldata import ExternalData, Checker
+from ..lib import utils
 
 log = logging.getLogger(__name__)
 

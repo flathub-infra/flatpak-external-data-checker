@@ -26,8 +26,8 @@ from distutils.version import LooseVersion
 
 import requests
 
-from src.lib import utils
-from src.lib.externaldata import ExternalData, Checker
+from ..lib import utils
+from ..lib.externaldata import ExternalData, Checker
 
 log = logging.getLogger(__name__)
 
