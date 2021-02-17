@@ -10,3 +10,14 @@ modules:
           url: https://www.x.org/releases/individual/app/
           version-pattern: xeyes-([\d\.-]+).tar.bz2
           url-pattern: (xeyes-[\d\.-]+.tar.bz2)
+
+  - name: ico
+    sources:
+      - type: archive
+        url: https://www.x.org/releases/individual/app/ico-1.0.4.tar.bz2
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+        x-checker-data:
+          type: html
+          url: https://www.x.org/releases/individual/app/
+          version-pattern: ico-(1\.0\.5)\.tar\.bz2
+          url-template: https://www.x.org/releases/individual/app/ico-$version.tar.bz2

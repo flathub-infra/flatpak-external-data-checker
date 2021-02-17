@@ -28,10 +28,6 @@ from src.checker import ManifestChecker
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.x.xeyes.yml")
 
-TEST_MANIFEST_WITH_URL_TEMPLATE = os.path.join(
-    os.path.dirname(__file__), "org.xdebug.Xdebug.json"
-)
-
 
 class TestHTMLChecker(unittest.TestCase):
     def setUp(self):
@@ -61,16 +57,16 @@ class TestHTMLChecker(unittest.TestCase):
         )
 
     def test_check_with_url_template(self):
-        checker = ManifestChecker(TEST_MANIFEST_WITH_URL_TEMPLATE)
+        checker = ManifestChecker(TEST_MANIFEST)
         ext_data = checker.check()
 
-        data = self._find_by_filename(ext_data, "xdebug.tar.gz")
+        data = self._find_by_filename(ext_data, "ico-1.0.4.tar.bz2")
         self.assertIsNotNone(data)
-        self.assertEqual(data.filename, "xdebug.tar.gz")
+        self.assertEqual(data.filename, "ico-1.0.4.tar.bz2")
         self.assertIsNotNone(data.new_version)
         self.assertEqual(
             data.new_version.url,
-            "https://xdebug.org/files/xdebug-2.9.0.tgz",
+            "https://www.x.org/releases/individual/app/ico-1.0.5.tar.bz2",
         )
         self.assertIsInstance(data.new_version.size, int)
         self.assertGreater(data.new_version.size, 0)
@@ -78,7 +74,7 @@ class TestHTMLChecker(unittest.TestCase):
         self.assertIsInstance(data.new_version.checksum, str)
         self.assertEqual(
             data.new_version.checksum,
-            "8dd1f867805d4ae78ccefc1825da1180eb82efbe6d6575eef2cc3dd1aeca5943",
+            "d73b62f29eb98d850f16b76d759395180b860b613fbe1686b18eee99a6e3773f",
         )
 
     def _find_by_filename(self, ext_data, filename):
