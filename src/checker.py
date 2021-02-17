@@ -44,9 +44,9 @@ MAX_MANIFEST_SIZE = 1024 * 100
 log = logging.getLogger(__name__)
 
 
-def find_appdata_file(appid):
+def find_appdata_file(directory, appid):
     for ext in ["appdata", "metainfo"]:
-        appdata = appid + "." + ext + ".xml"
+        appdata = os.path.join(directory, appid + "." + ext + ".xml")
 
         if not os.path.isfile(appdata):
             continue
@@ -74,7 +74,7 @@ def _external_source_filter(manifest_path: str, source) -> t.Optional[bool]:
 
 class ManifestChecker:
     def __init__(self, manifest: str):
-        self._manifest = manifest
+        self._root_manifest_path = manifest
         self._external_data: t.Dict[str, t.List[t.Union[ExternalData, ExternalGitRepo]]]
         self._external_data = {}
 
@@ -89,9 +89,10 @@ class ManifestChecker:
         self._manifest_contents = {}
 
         # Top-level manifest contents
-        data = self._read_manifest(self._manifest)
+        self._root_manifest = self._read_manifest(self._root_manifest_path)
+        assert isinstance(self._root_manifest, dict)
         # Map from manifest path to [ExternalData]
-        self._collect_external_data(self._manifest, data)
+        self._collect_external_data(self._root_manifest_path, self._root_manifest)
 
     def _read_manifest(self, manifest_path: str) -> t.Union[t.List, t.Dict]:
         contents = read_manifest(manifest_path)
@@ -250,32 +251,39 @@ class ManifestChecker:
             log.info("Updating %s", path)
             self._dump_manifest(path)
 
-            appdata = find_appdata_file(os.path.splitext(self._manifest)[0])
+    def _update_appdata(self):
+        if "id" in self._root_manifest:
+            app_id = self._root_manifest["id"]
+        else:
+            app_id = self._root_manifest["app-id"]
 
-            for data in datas:
-                if data.checker_data.get(MAIN_SRC_PROP):
-                    log.info("Selected upstream source: %s", data.filename)
-                    last_update = data.new_version
-                    break
+        appdata = find_appdata_file(os.path.dirname(self._root_manifest_path), app_id)
+        if appdata is None:
+            log.debug("Appdata not found for %s", app_id)
+            return
+
+        last_root_data = None
+        for data in self.get_external_data():
+            if data.source_path == self._root_manifest_path:
+                last_root_data = data
+            if data.checker_data.get(MAIN_SRC_PROP):
+                log.info("Selected upstream source: %s", data.filename)
+                last_update = data.new_version
+                break
+        else:
+            # Guess that the last external source in the root manifest is the one
+            # corresponding to the main application bundle.
+            assert last_root_data is not None
+            log.warning("Guessed upstream source: %s", last_root_data.filename)
+            last_update = last_root_data.new_version
+
+        if last_update is not None and last_update.version is not None:
+            if last_update.timestamp is None:
+                log.warning("Using current time in appdata release")
+                timestamp = datetime.datetime.now()
             else:
-                # Guess that the last external source is the one corresponding to the main
-                # application bundle.
-                log.warning("Guessed upstream source: %s", data.filename)
-                last_update = datas[-1].new_version
-
-            if (
-                appdata is not None
-                and last_update is not None
-                and last_update.version is not None
-            ):
-                if last_update.timestamp is None:
-                    log.warning("Using current time in appdata release")
-                    timestamp = datetime.datetime.now()
-                else:
-                    timestamp = last_update.timestamp
-                add_release_to_file(
-                    appdata, last_update.version, timestamp.strftime("%F")
-                )
+                timestamp = last_update.timestamp
+            add_release_to_file(appdata, last_update.version, timestamp.strftime("%F"))
 
     def update_manifests(self):
         """Updates references to external data in manifests."""
@@ -284,5 +292,7 @@ class ManifestChecker:
         changes = OrderedDict()
         for path, datas in self._external_data.items():
             self._update_manifest(path, datas, changes)
+        if changes:
+            self._update_appdata()
 
         return list(changes)

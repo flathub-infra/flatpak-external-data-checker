@@ -133,6 +133,7 @@ class TestExternalDataChecker(unittest.TestCase):
         contents = """
 /* unfortunately we can't or won't preserve C-style comments */
 {
+    "app-id": "com.example.App",
     "modules": [
         {
             "name": "foo",
@@ -150,6 +151,7 @@ class TestExternalDataChecker(unittest.TestCase):
     }"""  # noqa: E501
         expected_new_contents = f"""
 {{
+    "app-id": "com.example.App",
     "modules": [
         {{
             "name": "foo",
@@ -176,6 +178,7 @@ class TestExternalDataChecker(unittest.TestCase):
     def test_update_yaml(self):
         filename = "com.example.App.yaml"
         contents = """
+id: com.example.App
 modules:
   - name: the-blank-line-below-should-be-preserved
 
@@ -198,6 +201,7 @@ modules:
           - x86_64
 """.lstrip()
         expected_new_contents = f"""
+id: com.example.App
 modules:
   - name: the-blank-line-below-should-be-preserved
 
