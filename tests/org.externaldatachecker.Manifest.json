@@ -11,6 +11,8 @@
                 even though it's not valid JSON",
     "modules": [
         "phony-shared-module.json",
+        "non-existent-shared-module.json",
+        "non-existent-shared-module.yml",
         {
             "name": "phony",
             "sources": [
@@ -41,8 +43,9 @@
                     "sha256": "e4d67702da4eeeb2f15629b65bf6767c028a511839c14ed44d9f34479eaa2b94",
                     "size": 18
                 },
-
-                "phony-external-source.json"
+                "phony-external-source.json",
+                "phony-external-source-single-item.json",
+                "phony-too-large-generated-sources.json"
             ]
         }
     ]
