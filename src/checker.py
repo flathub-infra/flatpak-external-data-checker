@@ -33,6 +33,7 @@ from .lib.utils import read_manifest, dump_manifest
 
 import logging
 import os
+from xml.sax import SAXParseException
 
 from gi.repository import GLib
 
@@ -283,7 +284,12 @@ class ManifestChecker:
                 timestamp = datetime.datetime.now()
             else:
                 timestamp = last_update.timestamp
-            add_release_to_file(appdata, last_update.version, timestamp.strftime("%F"))
+            try:
+                add_release_to_file(
+                    appdata, last_update.version, timestamp.strftime("%F")
+                )
+            except SAXParseException as err:
+                log.error(str(err))
 
     def update_manifests(self):
         """Updates references to external data in manifests."""
