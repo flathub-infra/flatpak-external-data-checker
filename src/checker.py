@@ -73,6 +73,16 @@ def _external_source_filter(manifest_path: str, source) -> t.Optional[bool]:
     return True
 
 
+class Problem(t.NamedTuple):
+    kind: str
+    origin: t.Optional[str]
+    message: str
+    text: str
+
+    def __str__(self):
+        return self.message.format(**self._asdict())  # pylint: disable=no-member
+
+
 class ManifestChecker:
     def __init__(self, manifest: str):
         self._root_manifest_path = manifest
@@ -92,6 +102,10 @@ class ManifestChecker:
         # Top-level manifest contents
         self._root_manifest = self._read_manifest(self._root_manifest_path)
         assert isinstance(self._root_manifest, dict)
+
+        self._problems: t.List[Problem]
+        self._problems = []
+
         # Map from manifest path to [ExternalData]
         self._collect_external_data(self._root_manifest_path, self._root_manifest)
 
@@ -289,7 +303,21 @@ class ManifestChecker:
                     appdata, last_update.version, timestamp.strftime("%F")
                 )
             except SAXParseException as err:
+                self._problems.append(
+                    Problem(
+                        kind="appdata:parse-error",
+                        origin=os.path.relpath(
+                            appdata, os.path.dirname(self._root_manifest_path)
+                        ),
+                        message="Failed to update appdata file {origin}",
+                        text=err.getMessage(),
+                    )
+                )
                 log.error(str(err))
+
+    @property
+    def problems(self):
+        return self._problems.copy()
 
     def update_manifests(self):
         """Updates references to external data in manifests."""

@@ -35,9 +35,13 @@ class TestEntrypoint(unittest.TestCase):
         self.test_dir.cleanup()
 
     def _run_cmd(self, cmd):
-        return subprocess.run(cmd, cwd=self.test_dir.name, check=True)
+        return subprocess.run(
+            cmd, cwd=self.test_dir.name, stdout=subprocess.PIPE, text=True, check=True
+        )
 
     def test_full_run(self):
         args = main.parse_cli_args(["--update", "--commit-only", self.manifest_path])
         self.assertEqual(main.run_with_args(args), 2)
         self.assertEqual(main.run_with_args(args), 0)
+        commit_msg = self._run_cmd(["git", "log", "-1", "--pretty=%B"]).stdout
+        self.assertIn("Failed to update appdata", commit_msg)

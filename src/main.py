@@ -29,6 +29,7 @@ import logging
 import os
 import subprocess
 import sys
+import typing as t
 
 from github import Github
 
@@ -89,20 +90,35 @@ def print_outdated_external_data(manifest_checker):
     return len(ext_data)
 
 
+def format_problems(problems: t.List[checker.Problem]):
+    if not problems:
+        return ""
+    text = ""
+    for problem in problems:
+        text += f"{str(problem)}:\n {problem.text}\n"
+    return text
+
+
 def check_call(args):
     log.debug("$ %s", " ".join(args))
     subprocess.check_call(args)
 
 
-def commit_changes(changes):
+def commit_changes(changes: t.List[str], extra_text: t.Optional[str] = None):
+    body: t.Optional[str]
     log.info("Committing updates")
     if len(changes) > 1:
         subject = "Update {} modules".format(len(changes))
         body = "\n".join(changes)
+        if extra_text:
+            body += "\n" + extra_text
         message = subject + "\n\n" + body
     else:
         subject = changes[0]
-        body = None
+        if extra_text:
+            body = extra_text
+        else:
+            body = None
         message = subject
 
     # Moved to detached HEAD
@@ -281,11 +297,15 @@ def run_with_args(args):
     if outdated_num > 0:
         if args.update or args.commit_only or args.edit_only:
             changes = manifest_checker.update_manifests()
+            if manifest_checker.problems:
+                problems_txt = format_problems(manifest_checker.problems)
+            else:
+                problems_txt = None
             if args.edit_only:
                 return outdated_num
             if changes:
                 with indir(os.path.dirname(args.manifest)):
-                    subject, body, branch = commit_changes(changes)
+                    subject, body, branch = commit_changes(changes, problems_txt)
                     if not args.commit_only:
                         open_pr(
                             subject, body, branch, manifest_checker=manifest_checker
