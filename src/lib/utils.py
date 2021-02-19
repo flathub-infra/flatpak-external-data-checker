@@ -175,6 +175,7 @@ def git_ls_remote(url: str) -> t.Dict[str, str]:
                 "--share-net",
                 "--dev", "/dev",
                 "--ro-bind", "/etc/ssl", "/etc/ssl",
+                "--ro-bind-try", "/etc/pki", "/etc/pki",
                 "--ro-bind", "/etc/resolv.conf", "/etc/resolv.conf",
                 # fmt: on
             ],
