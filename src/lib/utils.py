@@ -25,7 +25,6 @@ import json
 import logging
 import os
 import re
-import socket
 import subprocess
 import tempfile
 import urllib.request
@@ -33,6 +32,7 @@ import urllib.parse
 import copy
 import io
 import typing as t
+from functools import lru_cache
 
 from collections import OrderedDict
 from ruamel.yaml import YAML
@@ -165,6 +165,7 @@ def check_bwrap():
     return False
 
 
+@lru_cache()
 def git_ls_remote(url: str) -> t.Dict[str, str]:
     git_cmd = ["git", "ls-remote", "--exit-code", url]
     if check_bwrap():
