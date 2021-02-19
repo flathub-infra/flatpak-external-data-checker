@@ -136,10 +136,15 @@ DISCLAIMER = (
     "if you have any questions or complaints. 🤖"
 )
 
-MERGE_COMMENT = (
-    "<i>Merging automatically due to the broken URL that may prevent "
-    "installation. If this behavior is unwanted, it can be disabled by setting "
-    "`automerge-flathubbot-prs` to `false` in flathub.json.</i>"
+AUTOMERGE_DUE_TO_CONFIG = (
+    "🤖 This PR passed CI, and `automerge-flathubbot-prs` is `true` in "
+    "`flathub.json`, so I'm merging it automatically. 🤖"
+)
+
+AUTOMERGE_DUE_TO_BROKEN_URLS = (
+    "🤖 The currently-published version contains broken URLs, and this PR passed "
+    "CI, so I'm merging it automatically. You can disable this behaviour by setting "
+    "`automerge-flathubbot-prs` to `false` in flathub.json. 🤖"
 )
 
 
@@ -181,17 +186,20 @@ def open_pr(subject, body, branch, manifest_checker=None):
         repocfg = {}
 
     automerge = repocfg.get("automerge-flathubbot-prs")
-
-    # Enable automatic merge if extra-data is broken unless explicitly disabled
-    if automerge is not False and manifest_checker:
-        for data in manifest_checker.get_outdated_external_data():
-            if (
-                data.type == ExternalData.Type.EXTRA_DATA
-                and data.state == ExternalData.State.BROKEN
-                and data.new_version
-            ):
-                automerge = True
-                break
+    # Implicitly automerge if…
+    force_automerge = (
+        # …the user has not explicitly disabled automerge…
+        automerge is not False
+        # …and we have a manifest checker (i.e. we're not in a test)…
+        and manifest_checker
+        # …and at least one source is broken and has an update
+        and any(
+            data.type == ExternalData.Type.EXTRA_DATA
+            and data.state == ExternalData.State.BROKEN
+            and data.new_version
+            for data in manifest_checker.get_outdated_external_data()
+        )
+    )
 
     prs = origin_repo.get_pulls(state="all", base=base, head=head)
 
@@ -210,11 +218,14 @@ def open_pr(subject, body, branch, manifest_checker=None):
     for pr in open_prs:
         log.info("Found open PR: %s", pr.html_url)
 
-        if origin_repo.permissions.push and automerge:
+        if origin_repo.permissions.push and (automerge or force_automerge):
             pr_commit = pr.head.repo.get_commit(pr.head.sha)
             if pr_commit.get_combined_status().state == "success" and pr.mergeable:
                 log.info("PR passed CI and is mergeable, merging %s", pr.html_url)
-                pr.create_issue_comment(MERGE_COMMENT)
+                if automerge:
+                    pr.create_issue_comment(AUTOMERGE_DUE_TO_CONFIG)
+                else:  # force_automerge
+                    pr.create_issue_comment(AUTOMERGE_DUE_TO_BROKEN_URLS)
                 pr.merge(merge_method="rebase")
                 origin_repo.get_git_ref(f"heads/{pr.head.ref}").delete()
                 return
