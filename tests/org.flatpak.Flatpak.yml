@@ -9,6 +9,7 @@ modules:
         x-checker-data:
           type: anitya
           project-id: 10899
+          stable-only: true
           tag-template: v$version
 
   - name: flatpak

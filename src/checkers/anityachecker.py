@@ -22,15 +22,17 @@ class AnityaChecker(HTMLChecker):
             "baseurl", "https://release-monitoring.org"
         )
         versions_url = urllib.request.urljoin(instance_url, "/api/v2/versions/")
+        stable_only = external_data.checker_data.get("stable-only", False)
 
-        response = requests.get(
-            versions_url,
-            params={"project_id": external_data.checker_data.get("project-id")},
-        )
-        response.raise_for_status()
-        result = response.json()
+        query = {"project_id": external_data.checker_data.get("project-id")}
+        with requests.get(versions_url, params=query) as response:
+            response.raise_for_status()
+            result = response.json()
 
-        latest_version = result["latest_version"]
+        if stable_only:
+            latest_version = result["stable_versions"][0]
+        else:
+            latest_version = result["latest_version"]
 
         if isinstance(external_data, ExternalGitRepo):
             return self._check_git(external_data, latest_version)

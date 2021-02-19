@@ -200,11 +200,13 @@ and add a template for source download URL:
 "x-checker-data": {
     "type": "anitya",
     "project-id": 6377,
+    "stable-only": false,
     "url-template": "https://github.com/flatpak/flatpak/releases/download/$version/flatpak-$version.tar.xz"
 }
 ```
+Set `stable-only` to `true` to retrieve latest stable version (as recognized by Anitya).
 
-for git type sources, instead of `url-template`, set `tag-template` to derive git tag from version.
+For git type sources, instead of `url-template`, set `tag-template` to derive git tag from version.
 
 ### PyPI checker ###
 
