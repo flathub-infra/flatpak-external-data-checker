@@ -1,0 +1,8 @@
+python-apt
+PyGObject
+defusedxml
+requests
+PyGithub
+ruamel.yaml
+toml
+pyelftools
