@@ -153,6 +153,19 @@ the retrieved version:
 }
 ```
 
+If the HTML page contains multiple versions with download links,
+set single pattern containing two nested match groups for both url and version:
+
+```json
+"x-checker-data": {
+    "type": "html",
+    "url": "https://sourceforge.net/projects/qrupdate/rss",
+    "pattern": "<link>(https://sourceforge.net/.+/qrupdate-([\\d\\.]+\\d).tar.gz)/download</link>"
+}
+```
+
+To disable sorting and get first matched version/url, set `sort-matches` to `false`.
+
 ### Git checker
 
 To check for latest git tag in corresponding git source repo, add checker

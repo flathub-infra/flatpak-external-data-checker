@@ -23,6 +23,7 @@ import re
 import urllib.parse
 from string import Template
 from distutils.version import LooseVersion
+import typing as t
 
 import requests
 
@@ -32,35 +33,27 @@ from ..lib.externaldata import ExternalData, Checker
 log = logging.getLogger(__name__)
 
 
-def get_latest(checker_data, pattern_name, html):
-    """
-    If checker_data contains a "pattern", matches 'html' against it and returns the
-    first capture group (which is assumed to be the version or URL).
-    """
+def _get_latest(
+    html: str, pattern: re.Pattern, sort_key=t.Optional[t.Callable]
+) -> t.Optional[t.Union[str, t.Tuple[str, ...]]]:
+    match = pattern.findall(html)
+    if not match:
+        log.warning("%s did not match", pattern.pattern)
+        return None
+    if sort_key is None or len(match) == 1:
+        result = match[0]
+    else:
+        log.debug("%s matched multiple times, selected latest", pattern.pattern)
+        result = max(match, key=sort_key)
+    log.debug("%s matched %s", pattern.pattern, result)
+    return result
+
+
+def _get_pattern(checker_data: t.Dict, pattern_name: str):
     try:
-        pattern = re.compile(checker_data[pattern_name])
+        return re.compile(checker_data[pattern_name])
     except KeyError:
         return None
-
-    if pattern.groups != 1:
-        raise ValueError(
-            f"{pattern_name} {pattern} does not contain exactly 1 match group"
-        )
-
-    m = pattern.findall(html)
-    if not m:
-        log.debug("%s %s did not match", pattern_name, pattern)
-        return None
-    if len(m) == 1:
-        result = m[0]
-    else:
-        log.debug(
-            "%s %s matched multiple times, selecting latest", pattern_name, pattern
-        )
-        result = max(m, key=LooseVersion)
-
-    log.debug("%s %s matched: %s", pattern_name, pattern, result)
-    return result
 
 
 class HTMLChecker(Checker):
@@ -70,16 +63,41 @@ class HTMLChecker(Checker):
         assert self.should_check(external_data)
 
         url = external_data.checker_data["url"]
+        combo_pattren = _get_pattern(external_data.checker_data, "pattern")
+        version_pattern = _get_pattern(external_data.checker_data, "version-pattern")
+        url_pattern = _get_pattern(external_data.checker_data, "url-pattern")
+        url_template = external_data.checker_data.get("url-template")
+        sort_matches = external_data.checker_data.get("sort-matches", True)
+        assert combo_pattren or (version_pattern and (url_pattern or url_template))
+
         with requests.get(url) as response:
             response.raise_for_status()
             html = response.text
 
-        latest_version = get_latest(external_data.checker_data, "version-pattern", html)
-        latest_url = get_latest(external_data.checker_data, "url-pattern", html)
+        latest_version: t.Optional[str] = None
+        latest_url: t.Optional[str] = None
 
-        url_template = external_data.checker_data.get("url-template")
-        if url_template:
-            latest_url = Template(url_template).substitute(version=latest_version)
+        if combo_pattren:
+            assert combo_pattren.groups == 2
+            latest_pair = _get_latest(
+                html,
+                combo_pattren,
+                (lambda m: LooseVersion(m[1])) if sort_matches else None,
+            )
+            if latest_pair:
+                latest_url, latest_version = latest_pair
+        elif version_pattern:
+            assert version_pattern.groups == 1
+            latest_version = _get_latest(
+                html, version_pattern, LooseVersion if sort_matches else None
+            )
+            if latest_version and url_template:
+                latest_url = Template(url_template).substitute(version=latest_version)
+            elif url_pattern:
+                assert url_pattern.groups == 1
+                latest_url = _get_latest(
+                    html, url_pattern, LooseVersion if sort_matches else None
+                )
 
         if not latest_version or not latest_url:
             log.warning(

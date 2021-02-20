@@ -22,6 +22,7 @@
 
 import os
 import unittest
+from distutils.version import LooseVersion
 
 from src.lib.utils import init_logging
 from src.checker import ManifestChecker
@@ -36,8 +37,21 @@ class TestHTMLChecker(unittest.TestCase):
     def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = checker.check()
+        self._test_separate_patterns(
+            self._find_by_filename(ext_data, "xeyes-1.1.0.tar.bz2")
+        )
+        self._test_check_with_url_template(
+            self._find_by_filename(ext_data, "ico-1.0.4.tar.bz2")
+        )
+        self._test_combo_pattern(
+            self._find_by_filename(ext_data, "libXScrnSaver-1.2.2.tar.bz2")
+        )
+        self._test_combo_pattern_nosort(
+            self._find_by_filename(ext_data, "qrupdate-1.1.0.tar.gz")
+        )
+        self._test_no_match(self._find_by_filename(ext_data, "libFS-1.0.7.tar.bz2"))
 
-        data = self._find_by_filename(ext_data, "xeyes-1.1.0.tar.bz2")
+    def _test_separate_patterns(self, data):
         self.assertIsNotNone(data)
         self.assertRegex(data.filename, r"xeyes-[\d\.-]+.tar.bz2")
         self.assertIsNotNone(data.new_version)
@@ -47,6 +61,9 @@ class TestHTMLChecker(unittest.TestCase):
         )
         self.assertNotEqual(data.new_version.url, data.current_version.url)
         self.assertIsNotNone(data.new_version.version)
+        self.assertLessEqual(
+            LooseVersion("1.1.0"), LooseVersion(data.new_version.version)
+        )
         self.assertIsInstance(data.new_version.size, int)
         self.assertGreater(data.new_version.size, 0)
         self.assertIsNotNone(data.new_version.checksum)
@@ -56,11 +73,7 @@ class TestHTMLChecker(unittest.TestCase):
             "0000000000000000000000000000000000000000000000000000000000000000",
         )
 
-    def test_check_with_url_template(self):
-        checker = ManifestChecker(TEST_MANIFEST)
-        ext_data = checker.check()
-
-        data = self._find_by_filename(ext_data, "ico-1.0.4.tar.bz2")
+    def _test_check_with_url_template(self, data):
         self.assertIsNotNone(data)
         self.assertEqual(data.filename, "ico-1.0.4.tar.bz2")
         self.assertIsNotNone(data.new_version)
@@ -76,6 +89,42 @@ class TestHTMLChecker(unittest.TestCase):
             data.new_version.checksum,
             "d73b62f29eb98d850f16b76d759395180b860b613fbe1686b18eee99a6e3773f",
         )
+
+    def _test_combo_pattern(self, data):
+        self.assertIsNotNone(data)
+        self.assertRegex(data.filename, r"libXScrnSaver-[\d\.-]+.tar.bz2")
+        self.assertIsNotNone(data.new_version)
+        self.assertLessEqual(
+            LooseVersion("1.2.2"), LooseVersion(data.new_version.version)
+        )
+        self.assertRegex(
+            data.new_version.url,
+            r"^https?://www.x.org/releases/individual/lib/libXScrnSaver-[\d\.-]+.tar.bz2$",  # noqa: E501
+        )
+        self.assertNotEqual(
+            data.new_version.checksum,
+            "0000000000000000000000000000000000000000000000000000000000000000",
+        )
+
+    def _test_combo_pattern_nosort(self, data):
+        self.assertIsNotNone(data)
+        self.assertRegex(data.filename, r"qrupdate-[\d\.-]+.tar.gz")
+        self.assertIsNotNone(data.new_version)
+        self.assertLessEqual(
+            LooseVersion("1.1.0"), LooseVersion(data.new_version.version)
+        )
+        self.assertRegex(
+            data.new_version.url,
+            r"^https://[\d\w\.-]+sourceforge.net/project/qrupdate/qrupdate/[\d\.]+/qrupdate-[\d\.]+.tar.gz$",  # noqa: E501
+        )
+        self.assertNotEqual(
+            data.new_version.checksum,
+            "0000000000000000000000000000000000000000000000000000000000000000",
+        )
+
+    def _test_no_match(self, data):
+        self.assertIsNotNone(data)
+        self.assertIsNone(data.new_version)
 
     def _find_by_filename(self, ext_data, filename):
         for data in ext_data:

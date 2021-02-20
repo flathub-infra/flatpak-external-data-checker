@@ -21,3 +21,35 @@ modules:
           url: https://www.x.org/releases/individual/app/
           version-pattern: ico-(1\.0\.5)\.tar\.bz2
           url-template: https://www.x.org/releases/individual/app/ico-$version.tar.bz2
+
+  - name: libXScrnSaver
+    sources:
+      - type: archive
+        url: https://www.x.org/releases/individual/lib/libXScrnSaver-1.2.2.tar.bz2
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+        x-checker-data:
+          type: html
+          url: https://www.x.org/releases/individual/lib/
+          pattern: (libXScrnSaver-([\d\.]+\d).tar.bz2)
+
+  - name: qrupdate
+    sources:
+      - type: archive
+        url: https://sourceforge.net/projects/qrupdate/files/qrupdate/1.1/qrupdate-1.1.0.tar.gz
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+        x-checker-data:
+          type: html
+          url: https://sourceforge.net/projects/qrupdate/rss
+          pattern: <link>(https://sourceforge.net/.+/qrupdate-([\d\.]+\d)\.tar\.gz)/download</link>
+          sort-matches: false
+
+  - name: libFS
+    sources:
+      - type: archive
+        url: http://some-incorrect.url/libFS-1.0.7.tar.bz2
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+        x-checker-data:
+          type: html
+          url: https://www.x.org/releases/individual/lib/
+          url-pattern: (http://some-incorrect.url/libFS-[\d\.]+.tar.bz2)
+          version-pattern: http://some-incorrect.url/libFS-([\d\.]+).tar.bz2
