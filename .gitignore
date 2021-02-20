@@ -2,3 +2,4 @@ __pycache__
 /.coverage
 /coverage.xml
 /htmlcov
+/.mypy_cache

@@ -31,6 +31,47 @@ jobs:
         run: |
           python3 -m black --check .
 
+  check-typing:
+    name: Static type check
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Prime pip cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.cache/pip
+          key: |
+            pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3-apt \
+            python3-gi \
+            python3-cairo \
+            gir1.2-glib-2.0 \
+            gir1.2-json-1.0 \
+            python3-setuptools
+          python3 -m pip install mypy
+          python3 -m pip install -r requirements.txt
+
+      - name: Prime mypy cache
+        uses: actions/cache@v2
+        with:
+          path: .mypy_cache
+          key: |
+            mypy-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            mypy-${{ runner.os }}-
+
+      - name: Run mypy check
+        run: |
+          python3 -m mypy --ignore-missing-imports src
+
   build-and-test-container:
     name: Build and test container
     runs-on: ubuntu-20.04
