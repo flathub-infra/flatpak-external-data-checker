@@ -136,8 +136,8 @@ HTML page which contains this information:
 "x-checker-data": {
     "type": "html",
     "url": "https://www.example.com/download.html",
-    "version-pattern": "The latest version is ([\d\.-]*)",
-    "url-pattern": "https://www.example.com/pub/foo/v(\d+)/foo.tar.gz"
+    "version-pattern": "The latest version is ([\\d\\.-]+)",
+    "url-pattern": "(https://www.example.com/pub/foo/v([\\d\\.-]+)/foo.tar.gz)"
 }
 ```
 
@@ -148,7 +148,7 @@ the retrieved version:
 "x-checker-data": {
     "type": "html",
     "url": "https://www.example.com/download.html",
-    "version-pattern": "The latest version is ([\d\.-]*)",
+    "version-pattern": "The latest version is ([\\d\\.-]*)",
     "url-template": "https://www.example.com/$version/v$version.tar.gz"
 }
 ```
