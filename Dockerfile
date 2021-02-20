@@ -3,7 +3,7 @@ FROM debian:buster
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install --no-install-recommends -y \
       bubblewrap \
       git \
       gir1.2-glib-2.0 \
@@ -11,6 +11,7 @@ RUN apt-get update && \
       python3-apt \
       python3-defusedxml \
       python3-gi \
+      python3-cairo \
       python3-requests \
       python3-github \
       python3-pip \
@@ -20,8 +21,14 @@ RUN apt-get update && \
       python3-pyelftools \
       squashfs-tools \
       jq \
-  && apt-get clean \
-  && rmdir /var/cache/apt/archives/partial
+    && \
+  apt-get clean && \
+  rmdir /var/cache/apt/archives/partial
+
+ADD requirements.txt ./
+
+RUN python3 -m pip install -r requirements.txt && \
+    rm -rf $HOME/.cache/pip
 
 # Creating the user is required because jenkins runs he container
 # with the same user as the host (with '-u <uid>:<gid>')
