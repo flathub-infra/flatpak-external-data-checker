@@ -61,10 +61,16 @@ to Git and open a GitHub pull request. In order to do this, it requires
 a [GitHub access token](https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line),
 specified in the `GITHUB_TOKEN` environment variable.
 
+### Automatically merging PRs
+
 The tool will also automatically merge previously opened pull request for
 unavailable (`BROKEN`) sources if the change has successfully passed CI checks
-and the token has sufficient privileges. It can be disabled by setting
-`automerge-flathubbot-prs` to `false` in `flathub.json`.
+and the token has sufficient privileges.
+
+Automatically merging all submitted PRs, not just unavailable sources,
+from the tool can be forcefully enabled by setting
+`automerge-flathubbot-prs` to `true` in `flathub.json`,
+or it can be completely disabled by setting `automerge-flathubbot-prs` to `false`.
 
 ## Changes to Flatpak manifests
 
