@@ -28,6 +28,8 @@ from .lib.externaldata import (
     ExternalData,
     ExternalDataSource,
     ExternalGitRepo,
+    ExternalFile,
+    ExternalGitRef,
 )
 from .lib.utils import read_manifest, dump_manifest
 
@@ -262,23 +264,46 @@ class ManifestChecker:
         if appdata is None:
             log.debug("Appdata not found for %s", app_id)
             return
+        log.info("Preparing to update appdata %s", appdata)
 
-        last_root_data = None
+        selected_data = None
         for data in self.get_external_data():
-            if data.source_path == self._root_manifest_path:
-                last_root_data = data
             if data.checker_data.get(MAIN_SRC_PROP):
-                log.info("Selected upstream source: %s", data.filename)
-                last_update = data.new_version
+                selected_data = data
+                log.info("Selected upstream source: %s", selected_data.filename)
                 break
+            elif data.source_path == self._root_manifest_path:
+                selected_data = data
         else:
             # Guess that the last external source in the root manifest is the one
             # corresponding to the main application bundle.
-            assert last_root_data is not None
-            log.warning("Guessed upstream source: %s", last_root_data.filename)
-            last_update = last_root_data.new_version
+            assert selected_data is not None
+            log.warning("Guessed upstream source: %s", selected_data.filename)
 
-        if last_update is not None and last_update.version is not None:
+        last_update = selected_data.new_version
+
+        version_changed = (
+            last_update is not None
+            and last_update.version is not None
+            and (
+                (
+                    isinstance(last_update, ExternalFile)
+                    and (
+                        last_update.url != selected_data.current_version.url
+                        # TODO We can't reliably tell if the appimage version stayed the same
+                        # without downloading it, so just assume it changed
+                        or last_update.url.endswith(".AppImage")
+                    )
+                )
+                or (
+                    isinstance(last_update, ExternalGitRef)
+                    and last_update.tag != selected_data.current_version.tag
+                )
+            )
+        )
+
+        if version_changed:
+            log.info("Version changed, adding release to %s", appdata)
             if last_update.timestamp is None:
                 log.warning("Using current time in appdata release")
                 timestamp = datetime.datetime.now()
@@ -290,6 +315,8 @@ class ManifestChecker:
                 )
             except SAXParseException as err:
                 log.error(str(err))
+        else:
+            log.debug("Version didn't change, not adding release")
 
     def update_manifests(self):
         """Updates references to external data in manifests."""
