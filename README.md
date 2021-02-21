@@ -153,7 +153,7 @@ the retrieved version:
 }
 ```
 
-### Git checker ###
+### Git checker
 
 To check for latest git tag in corresponding git source repo, add checker
 metadata with type `git` and set `tag-pattern` to a regular expression with 
@@ -218,7 +218,7 @@ to, e.g. where "type": "extra-data" is declared):
 
 [Anitya](https://github.com/fedora-infra/anitya) is an upstream release monitoring 
 project by Fedora. It supports multiple backends for retrieving version information 
-from different services, including GitHub, GitLab, Sourceforge, etc.  
+from different services, including GitHub, GitLab, Sourceforge, etc.
 To use the **AnityaChecker**, specify numeric project ID on release-monitoring.org
 and add a template for source download URL:
 
@@ -234,7 +234,7 @@ Set `stable-only` to `true` to retrieve latest stable version (as recognized by 
 
 For git type sources, instead of `url-template`, set `tag-template` to derive git tag from version.
 
-### PyPI checker ###
+### PyPI checker
 
 Check for Python package updates on PyPI.
 
@@ -288,7 +288,6 @@ for [Rust](https://www.rust-lang.org/):
     "target": "target triple, for example: x86_64-unknown-linux-gnu"
 }
 ```
-
 
 ## License and Copyright
 
