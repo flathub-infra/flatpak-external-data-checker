@@ -95,7 +95,14 @@ class TestExternalDataChecker(unittest.TestCase):
         ext_data = dummy_checker.check(ExternalData.Type.ARCHIVE)
         self.assertEqual(len(ext_data), NUM_ARCHIVE_IN_MANIFEST)
 
-    def _test_update(self, filename, contents, expected_new_contents, expected_updates):
+    def _test_update(
+        self,
+        filename,
+        contents,
+        expected_new_contents,
+        expected_updates,
+        new_release=True,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest = os.path.join(tmpdir, filename)
             with open(manifest, "w") as f:
@@ -123,10 +130,13 @@ class TestExternalDataChecker(unittest.TestCase):
                 appdata_doc = minidom.parse(f)
 
             releases = appdata_doc.getElementsByTagName("release")
-            self.assertNotEqual(releases, [])
-            self.assertEqual(releases, releases[:1])
-            self.assertEqual(releases[0].getAttribute("version"), "1.2.3.4")
-            self.assertEqual(releases[0].getAttribute("date"), "2019-08-28")
+            if new_release:
+                self.assertNotEqual(releases, [])
+                self.assertEqual(releases, releases[:1])
+                self.assertEqual(releases[0].getAttribute("version"), "1.2.3.4")
+                self.assertEqual(releases[0].getAttribute("date"), "2019-08-28")
+            else:
+                self.assertEqual(releases, [])
 
     def test_update_json(self):
         filename = "com.example.App.json"
@@ -228,6 +238,38 @@ modules:
             contents,
             expected_new_contents,
             ["Update UnityHubSetup.AppImage to 1.2.3.4"],
+        )
+
+    def test_update_no_new_version(self):
+        filename = "com.example.App.yaml"
+        contents = """
+id: com.example.App
+modules:
+  - name: foo
+    sources:
+      - type: extra-data
+        filename: some-deb.deb
+        url: https://phony-url.phony/some-deb_1.2.3.4-1_amd64.deb
+        sha256: c521e2caf2ce8c8302cc9d8f385648c7d8c76ae29ac24ec0c0ffd3cd67a915fc
+        size: 63236599
+""".lstrip()
+        expected_new_contents = f"""
+id: com.example.App
+modules:
+  - name: foo
+    sources:
+      - type: extra-data
+        filename: some-deb.deb
+        url: https://phony-url.phony/some-deb_1.2.3.4-1_amd64.deb
+        sha256: {UpdateEverythingChecker.CHECKSUM}
+        size: {UpdateEverythingChecker.SIZE}
+""".lstrip()
+        self._test_update(
+            filename,
+            contents,
+            expected_new_contents,
+            ["Update some-deb.deb to 1.2.3.4"],
+            new_release=False,
         )
 
     def test_check(self):
