@@ -22,6 +22,7 @@ data in Flatpak manifests.
     - [JSON checker](#json-checker)
     - [Debian repo checker](#debian-repo-checker)
     - [Anitya (release-monitoring) checker](#anitya-release-monitoring-checker)
+    - [GNOME checker](#gnome-checker)
     - [PyPI checker](#pypi-checker)
     - [JetBrains checker](#jetbrains-checker)
     - [Snapcraft checker](#snapcraft-checker)
@@ -246,6 +247,20 @@ and add a template for source download URL:
 Set `stable-only` to `true` to retrieve latest stable version (as recognized by Anitya).
 
 For git type sources, instead of `url-template`, set `tag-template` to derive git tag from version.
+
+### GNOME checker
+
+Check for latest source tarball for a GNOME project.
+
+```json
+"x-checker-data": {
+    "type": "gnome",
+    "name": "pygobject",
+    "stable-only": true
+}
+```
+
+Set `stable-only` to `false` to check for pre-releases, too.
 
 ### PyPI checker
 
