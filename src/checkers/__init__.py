@@ -8,6 +8,7 @@ from .anityachecker import AnityaChecker
 from .rustchecker import RustChecker
 from .gitchecker import GitChecker
 from .pypichecker import PyPIChecker
+from .gnomechecker import GNOMEChecker
 
 
 # For each ExternalData, checkers are run in the order listed here, stopping once data.state is
@@ -21,6 +22,7 @@ ALL_CHECKERS = [
     RustChecker,
     JSONChecker,
     PyPIChecker,
+    GNOMEChecker,
     GitChecker,  # leave this last but one
     URLChecker,  # leave this last
 ]
