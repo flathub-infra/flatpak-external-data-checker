@@ -1,0 +1,52 @@
+{
+    "app-id" : "org.gnome.baobab",
+    "runtime" : "org.gnome.Platform",
+    "runtime-version" : "3.38",
+    "sdk" : "org.gnome.Sdk",
+    "command" : "baobab",
+    "modules" : [
+        {
+            "name" : "alleyoop",
+            "sources" : [
+                {
+                    "type": "archive",
+                    "url": "https://download.gnome.org/sources/alleyoop/0.9/alleyoop-0.9.8.tar.xz",
+                    "sha256sum": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "x-checker-data": {
+                        "type": "gnome",
+                        "name": "alleyoop"
+                    }
+                }
+            ]
+        },
+        {
+            "name" : "pygobject",
+            "sources" : [
+                {
+                    "type": "archive",
+                    "url": "https://download.gnome.org/sources/pygobject/3.36/pygobject-3.36.0.tar.xz",
+                    "sha256sum": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "x-checker-data": {
+                        "type": "gnome",
+                        "name": "pygobject",
+                        "stable-only": false
+                    }
+                }
+            ]
+        },
+        {
+            "name" : "baobab",
+            "sources" : [
+                {
+                    "type": "archive",
+                    "url": "https://download.gnome.org/sources/baobab/3.34/baobab-3.34.0.tar.xz",
+                    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "x-checker-data": {
+                        "type": "gnome",
+                        "name": "baobab"
+                    }
+                }
+            ]
+        }
+    ]
+}
