@@ -1,7 +1,8 @@
 import logging
-import urllib.request
 import os
 import subprocess
+
+import requests
 
 from ..lib import utils
 from ..lib.externaldata import ExternalData, ExternalGitRepo, ExternalGitRef
@@ -52,10 +53,9 @@ class JSONChecker(HTMLChecker):
         assert self.should_check(external_data)
 
         json_url = external_data.checker_data["url"]
-
-        log.debug("Getting JSON from %s", json_url)
-        with urllib.request.urlopen(json_url) as resp:
-            json_data = resp.read()
+        with requests.get(json_url) as response:
+            response.raise_for_status()
+            json_data = response.content
 
         if isinstance(external_data, ExternalGitRepo):
             return self._check_git(json_data, external_data)
