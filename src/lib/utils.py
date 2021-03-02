@@ -37,7 +37,7 @@ from functools import lru_cache
 from collections import OrderedDict
 from ruamel.yaml import YAML
 from elftools.elf.elffile import ELFFile
-import requests
+import urllib3
 
 from . import externaldata
 
@@ -90,24 +90,17 @@ def get_timestamp_from_url(url):
 
 
 def get_extra_data_info_from_url(url, follow_redirects=True):
-    http_adapter = requests.adapters.HTTPAdapter(
-        max_retries=requests.adapters.Retry(total=2)
-    )
+    retries = urllib3.util.Retry(connect=2, read=2, redirect=10)
 
-    with requests.Session() as session:
-        session.mount(
-            urllib.parse.urlunparse(urllib.parse.urlparse(url)._replace(path="/")),
-            http_adapter,
+    with urllib3.PoolManager(headers=HEADERS, timeout=TIMEOUT_SECONDS) as http:
+        response = http.request(
+            "GET", url, retries=retries, enforce_content_length=True
         )
-        with session.get(url, headers=HEADERS, timeout=TIMEOUT_SECONDS) as response:
-            response.raise_for_status()
-            real_url = response.url
-            data = response.content
-            info = response.headers
-
-    if "Content-Length" in info:
-        size = int(info["Content-Length"])
-    else:
+        if 400 <= response.status < 500 or 500 <= response.status < 600:
+            raise urllib3.exceptions.HTTPError(f"HTTP error {response.status}")
+        real_url = response.geturl()
+        info = response.headers
+        data = response.data
         size = len(data)
 
     checksum = hashlib.sha256(data).hexdigest()
