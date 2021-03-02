@@ -20,6 +20,7 @@ RUN apt-get update && \
       python3-toml \
       python3-pyelftools \
       squashfs-tools \
+      ssh-client \
       jq \
     && \
   apt-get clean && \
