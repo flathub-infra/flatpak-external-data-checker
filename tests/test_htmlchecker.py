@@ -50,7 +50,6 @@ class TestHTMLChecker(unittest.TestCase):
             self._find_by_filename(ext_data, "qrupdate-1.1.0.tar.gz")
         )
         self._test_no_match(self._find_by_filename(ext_data, "libFS-1.0.7.tar.bz2"))
-        self._test_invalid_url(self._find_by_filename(ext_data, "libdoesntexist.tar"))
 
     def _test_separate_patterns(self, data):
         self.assertIsNotNone(data)
@@ -124,10 +123,6 @@ class TestHTMLChecker(unittest.TestCase):
         )
 
     def _test_no_match(self, data):
-        self.assertIsNotNone(data)
-        self.assertIsNone(data.new_version)
-
-    def _test_invalid_url(self, data):
         self.assertIsNotNone(data)
         self.assertIsNone(data.new_version)
 

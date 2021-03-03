@@ -43,27 +43,6 @@
                     "sha256": "e4d67702da4eeeb2f15629b65bf6767c028a511839c14ed44d9f34479eaa2b94",
                     "size": 18
                 },
-                {
-                    "type": "extra-data",
-                    "filename": "http-404.txt",
-                    "url": "https://httpbingo.org/status/404",
-                    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-
-                },
-                {
-                    "type": "extra-data",
-                    "filename": "http-500.txt",
-                    "url": "https://httpbingo.org/status/500",
-                    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-
-                },
-                {
-                    "type": "extra-data",
-                    "filename": "incomplete-read.txt",
-                    "url": "https://httpbingo.org/response-headers?Content-Length=1000",
-                    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-
-                },
                 "phony-external-source.json",
                 "phony-external-source-single-item.json",
                 "phony-too-large-generated-sources.json"
