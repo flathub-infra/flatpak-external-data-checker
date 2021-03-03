@@ -294,7 +294,7 @@ def run_with_args(args):
         if args.update or args.commit_only or args.edit_only:
             changes = manifest_checker.update_manifests()
             if args.edit_only:
-                return 0
+                return (outdated_num, True)
             if changes:
                 with indir(os.path.dirname(args.manifest)):
                     subject, body, branch = commit_changes(changes)
@@ -302,13 +302,14 @@ def run_with_args(args):
                         open_pr(
                             subject, body, branch, manifest_checker=manifest_checker
                         )
-                return 0
+                return (outdated_num, True)
 
             log.warning("Can't automatically fix any of the above issues")
 
-    return outdated_num
+    return (outdated_num, False)
 
 
 def main():
-    if run_with_args(parse_cli_args()) > 0:
+    outdated_num, updated = run_with_args(parse_cli_args())
+    if outdated_num > 0 and not updated:
         sys.exit(1)
