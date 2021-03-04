@@ -115,7 +115,7 @@ class TestHTMLChecker(unittest.TestCase):
         )
         self.assertRegex(
             data.new_version.url,
-            r"^https://[\d\w\.-]+sourceforge.net/project/qrupdate/qrupdate/[\d\.]+/qrupdate-[\d\.]+.tar.gz$",  # noqa: E501
+            r"^https://sourceforge\.net/projects/qrupdate/.+/qrupdate-\d[\d\.]+\d\.tar\.gz$",  # noqa: E501
         )
         self.assertNotEqual(
             data.new_version.checksum,
