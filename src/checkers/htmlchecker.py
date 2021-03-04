@@ -122,6 +122,7 @@ class HTMLChecker(Checker):
         except (
             requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError,
+            requests.exceptions.ChunkedEncodingError,
         ) as e:
             log.warning("%s returned %s", latest_url, e)
             external_data.state = ExternalData.State.BROKEN
