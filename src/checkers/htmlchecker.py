@@ -110,7 +110,7 @@ class HTMLChecker(Checker):
         self._update_version(external_data, latest_version, abs_url)
 
     def _update_version(
-        self, external_data, latest_version, latest_url, follow_redirects=True
+        self, external_data, latest_version, latest_url, follow_redirects=False
     ):
         assert latest_version is not None
         assert latest_url is not None
