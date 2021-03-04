@@ -63,12 +63,12 @@ class HTMLChecker(Checker):
         assert self.should_check(external_data)
 
         url = external_data.checker_data["url"]
-        combo_pattren = _get_pattern(external_data.checker_data, "pattern")
+        combo_pattern = _get_pattern(external_data.checker_data, "pattern")
         version_pattern = _get_pattern(external_data.checker_data, "version-pattern")
         url_pattern = _get_pattern(external_data.checker_data, "url-pattern")
         url_template = external_data.checker_data.get("url-template")
         sort_matches = external_data.checker_data.get("sort-matches", True)
-        assert combo_pattren or (version_pattern and (url_pattern or url_template))
+        assert combo_pattern or (version_pattern and (url_pattern or url_template))
 
         with requests.get(url) as response:
             response.raise_for_status()
@@ -77,11 +77,11 @@ class HTMLChecker(Checker):
         latest_version: t.Optional[str] = None
         latest_url: t.Optional[str] = None
 
-        if combo_pattren:
-            assert combo_pattren.groups == 2
+        if combo_pattern:
+            assert combo_pattern.groups == 2
             latest_pair = _get_latest(
                 html,
-                combo_pattren,
+                combo_pattern,
                 (lambda m: LooseVersion(m[1])) if sort_matches else None,
             )
             if latest_pair:
