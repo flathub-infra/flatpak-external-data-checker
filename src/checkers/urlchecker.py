@@ -34,7 +34,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import logging
 import re
-import io
+import tempfile
 
 import requests
 
@@ -80,13 +80,20 @@ class URLChecker(Checker):
             log.debug("Skipping data URL")
             return
 
-        if url.endswith(".AppImage"):
-            appimg_io = io.BytesIO()
-        else:
-            appimg_io = None
+        version_string = None
 
         try:
-            new_version = utils.get_extra_data_info_from_url(url, dest_io=appimg_io)
+            if url.endswith(".AppImage"):
+                with tempfile.TemporaryFile("w+b") as tmpfile:
+                    new_version = utils.get_extra_data_info_from_url(
+                        url, dest_io=tmpfile
+                    )
+                    version_string = utils.extract_appimage_version(
+                        external_data.filename,
+                        tmpfile,
+                    )
+            else:
+                new_version = utils.get_extra_data_info_from_url(url)
         except (
             requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError,
@@ -96,18 +103,11 @@ class URLChecker(Checker):
             external_data.state = ExternalData.State.BROKEN
             return
 
-        if appimg_io is not None:
-            version_string = utils.extract_appimage_version(
-                external_data.filename,
-                appimg_io,
-            )
-        elif is_rotating:
+        if is_rotating and not version_string:
             version_string = extract_version(
                 external_data.checker_data,
                 new_version.url,
             )
-        else:
-            version_string = None
 
         if version_string is not None:
             log.debug("%s is version %s", external_data.filename, version_string)
