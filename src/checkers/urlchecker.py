@@ -88,32 +88,33 @@ class URLChecker(Checker):
         ) as e:
             log.warning("%s returned %s", url, e)
             external_data.state = ExternalData.State.BROKEN
-        else:
-            if url.endswith(".AppImage"):
-                version_string = utils.extract_appimage_version(
-                    external_data.filename,
-                    data,
-                )
-            elif is_rotating:
-                version_string = extract_version(
-                    external_data.checker_data,
-                    new_version.url,
-                )
-            else:
-                version_string = None
+            return
 
-            if version_string is not None:
-                log.debug("%s is version %s", external_data.filename, version_string)
-                new_version = new_version._replace(  # pylint: disable=no-member
-                    version=version_string
-                )
-
-            if not is_rotating:
-                new_version = new_version._replace(url=url)  # pylint: disable=no-member
-
-            external_data.set_new_version(
-                new_version,
-                is_update=(
-                    is_rotating and external_data.current_version.url != new_version.url
-                ),
+        if url.endswith(".AppImage"):
+            version_string = utils.extract_appimage_version(
+                external_data.filename,
+                data,
             )
+        elif is_rotating:
+            version_string = extract_version(
+                external_data.checker_data,
+                new_version.url,
+            )
+        else:
+            version_string = None
+
+        if version_string is not None:
+            log.debug("%s is version %s", external_data.filename, version_string)
+            new_version = new_version._replace(  # pylint: disable=no-member
+                version=version_string
+            )
+
+        if not is_rotating:
+            new_version = new_version._replace(url=url)  # pylint: disable=no-member
+
+        external_data.set_new_version(
+            new_version,
+            is_update=(
+                is_rotating and external_data.current_version.url != new_version.url
+            ),
+        )
