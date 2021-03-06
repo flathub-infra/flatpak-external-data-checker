@@ -116,7 +116,7 @@ class HTMLChecker(Checker):
         assert latest_url is not None
 
         try:
-            new_version, _ = utils.get_extra_data_info_from_url(
+            new_version = utils.get_extra_data_info_from_url(
                 latest_url, follow_redirects
             )
         except (
