@@ -53,3 +53,15 @@ modules:
           url: https://www.x.org/releases/individual/lib/
           url-pattern: (http://some-incorrect.url/libFS-[\d\.]+.tar.bz2)
           version-pattern: http://some-incorrect.url/libFS-([\d\.]+).tar.bz2
+
+  - name: libdoesntexist
+    sources:
+      - type: extra-data
+        filename: libdoesntexist.tar
+        url: https://httpbingo.org/status/500
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+        x-checker-data:
+          type: html
+          url: https://httpbingo.org/base64/MS4wLjAK
+          version-pattern: (\d[\d\.]+\d)
+          url-template: https://httpbingo.org/status/404

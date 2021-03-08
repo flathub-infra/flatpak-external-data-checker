@@ -34,6 +34,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import logging
 import re
+import tempfile
 
 import requests
 
@@ -79,40 +80,47 @@ class URLChecker(Checker):
             log.debug("Skipping data URL")
             return
 
+        version_string = None
+
         try:
-            new_version, data = utils.get_extra_data_info_from_url(url)
+            if url.endswith(".AppImage"):
+                with tempfile.TemporaryFile("w+b") as tmpfile:
+                    new_version = utils.get_extra_data_info_from_url(
+                        url, dest_io=tmpfile
+                    )
+                    version_string = utils.extract_appimage_version(
+                        external_data.filename,
+                        tmpfile,
+                    )
+            else:
+                new_version = utils.get_extra_data_info_from_url(url)
         except (
             requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError,
+            requests.exceptions.ChunkedEncodingError,
         ) as e:
             log.warning("%s returned %s", url, e)
             external_data.state = ExternalData.State.BROKEN
-        else:
-            if url.endswith(".AppImage"):
-                version_string = utils.extract_appimage_version(
-                    external_data.filename,
-                    data,
-                )
-            elif is_rotating:
-                version_string = extract_version(
-                    external_data.checker_data,
-                    new_version.url,
-                )
-            else:
-                version_string = None
+            return
 
-            if version_string is not None:
-                log.debug("%s is version %s", external_data.filename, version_string)
-                new_version = new_version._replace(  # pylint: disable=no-member
-                    version=version_string
-                )
-
-            if not is_rotating:
-                new_version = new_version._replace(url=url)  # pylint: disable=no-member
-
-            external_data.set_new_version(
-                new_version,
-                is_update=(
-                    is_rotating and external_data.current_version.url != new_version.url
-                ),
+        if is_rotating and not version_string:
+            version_string = extract_version(
+                external_data.checker_data,
+                new_version.url,
             )
+
+        if version_string is not None:
+            log.debug("%s is version %s", external_data.filename, version_string)
+            new_version = new_version._replace(  # pylint: disable=no-member
+                version=version_string
+            )
+
+        if not is_rotating:
+            new_version = new_version._replace(url=url)  # pylint: disable=no-member
+
+        external_data.set_new_version(
+            new_version,
+            is_update=(
+                is_rotating and external_data.current_version.url != new_version.url
+            ),
+        )

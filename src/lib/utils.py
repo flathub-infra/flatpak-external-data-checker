@@ -30,7 +30,6 @@ import tempfile
 import urllib.request
 import urllib.parse
 import copy
-import io
 import typing as t
 from functools import lru_cache
 
@@ -55,6 +54,7 @@ USER_AGENT = (
 )
 HEADERS = {"User-Agent": USER_AGENT}
 TIMEOUT_SECONDS = 60
+HTTP_CHUNK_SIZE = 1024 * 64
 
 
 def _extract_timestamp(info):
@@ -89,7 +89,9 @@ def get_timestamp_from_url(url):
         return _extract_timestamp(response.info())
 
 
-def get_extra_data_info_from_url(url, follow_redirects=True):
+def get_extra_data_info_from_url(
+    url, follow_redirects=True, dest_io: t.Optional[t.IO] = None
+):
     http_adapter = requests.adapters.HTTPAdapter(
         max_retries=requests.adapters.Retry(total=2)
     )
@@ -102,24 +104,24 @@ def get_extra_data_info_from_url(url, follow_redirects=True):
         with session.get(url, headers=HEADERS, timeout=TIMEOUT_SECONDS) as response:
             response.raise_for_status()
             real_url = response.url
-            data = response.content
             info = response.headers
+            checksum = hashlib.sha256()
+            size = 0
+            for chunk in response.iter_content(HTTP_CHUNK_SIZE):
+                checksum.update(chunk)
+                size += len(chunk)
+                if dest_io is not None:
+                    dest_io.write(chunk)
 
-    if "Content-Length" in info:
-        size = int(info["Content-Length"])
-    else:
-        size = len(data)
-
-    checksum = hashlib.sha256(data).hexdigest()
     external_file = externaldata.ExternalFile(
         strip_query(real_url if follow_redirects else url),
-        checksum,
+        checksum.hexdigest(),
         size,
         None,
         _extract_timestamp(info),
     )
 
-    return external_file, data
+    return external_file
 
 
 def clear_env(environ):
@@ -193,7 +195,7 @@ def git_ls_remote(url: str) -> t.Dict[str, str]:
     return {r: c for c, r in (l.split() for l in git_stdout.splitlines())}
 
 
-def extract_appimage_version(basename, data):
+def extract_appimage_version(basename, appimg_io: t.IO):
     """
     Saves 'data' to a temporary file with the given basename, executes it (in a sandbox)
     with --appimage-extract to unpack it, and scrapes the version number out of the
@@ -203,15 +205,17 @@ def extract_appimage_version(basename, data):
     with tempfile.TemporaryDirectory() as tmpdir:
         appimage_path = os.path.join(tmpdir, basename)
 
-        with io.BytesIO(data) as appimg_io:
-            header = ELFFile(appimg_io).header
-            offset = header["e_shoff"] + header["e_shnum"] * header["e_shentsize"]
-            appimg_io.seek(offset)
+        header = ELFFile(appimg_io).header
+        offset = header["e_shoff"] + header["e_shnum"] * header["e_shentsize"]
+        appimg_io.seek(offset)
 
-            log.info("Writing %s to %s with offset %i", basename, appimage_path, offset)
+        log.info("Writing %s to %s with offset %i", basename, appimage_path, offset)
 
-            with open(appimage_path, "wb") as fp:
-                fp.write(appimg_io.read())
+        with open(appimage_path, "wb") as fp:
+            chunk = appimg_io.read(1024 ** 2)
+            while chunk:
+                fp.write(chunk)
+                chunk = appimg_io.read(1024 ** 2)
 
         bwrap = check_bwrap()
         bwrap_args = [

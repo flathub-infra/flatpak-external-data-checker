@@ -116,12 +116,13 @@ class HTMLChecker(Checker):
         assert latest_url is not None
 
         try:
-            new_version, _ = utils.get_extra_data_info_from_url(
+            new_version = utils.get_extra_data_info_from_url(
                 latest_url, follow_redirects
             )
         except (
             requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError,
+            requests.exceptions.ChunkedEncodingError,
         ) as e:
             log.warning("%s returned %s", latest_url, e)
             external_data.state = ExternalData.State.BROKEN
