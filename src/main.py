@@ -69,18 +69,20 @@ def print_outdated_external_data(manifest_checker):
             print(" Has a new version:")
             if data.type == ExternalData.Type.GIT:
                 print(
-                    "  URL:     {url}\n"
-                    "  Commit:  {commit}\n"
-                    "  Tag:     {tag}\n"
-                    "  Branch:  {branch}\n"
-                    "  Version: {version}\n".format(**data.new_version._asdict())
+                    "  URL:       {url}\n"
+                    "  Commit:    {commit}\n"
+                    "  Tag:       {tag}\n"
+                    "  Branch:    {branch}\n"
+                    "  Version:   {version}\n"
+                    "  Timestamp: {timestamp}\n".format(**data.new_version._asdict())
                 )
             else:
                 print(
-                    "  URL:     {url}\n"
-                    "  SHA256:  {checksum}\n"
-                    "  Size:    {size}\n"
-                    "  Version: {version}\n".format(**data.new_version._asdict())
+                    "  URL:       {url}\n"
+                    "  SHA256:    {checksum}\n"
+                    "  Size:      {size}\n"
+                    "  Version:   {version}\n"
+                    "  Timestamp: {timestamp}\n".format(**data.new_version._asdict())
                 )
         elif data.state == ExternalData.State.BROKEN:
             print(" Couldn't get new version for {}".format(data.current_version.url))
