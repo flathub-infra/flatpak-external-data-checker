@@ -16,7 +16,7 @@ class TestJSONChecker(unittest.TestCase):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = checker.check()
 
-        self.assertEqual(len(ext_data), 2)
+        self.assertEqual(len(ext_data), 4)
         for data in ext_data:
             self.assertIsNotNone(data)
             self.assertIsNotNone(data.new_version)
@@ -48,5 +48,22 @@ class TestJSONChecker(unittest.TestCase):
                     data.new_version.commit, "e03900b038a274ee2f1341039e9003875c11e47d"
                 )
                 self.assertIsNotNone(data.new_version.version)
+                self.assertIsNotNone(data.new_version.timestamp)
+            elif data.filename == "yasm.git":
+                self.assertIsInstance(data.new_version, ExternalGitRef)
+                self.assertEqual(data.current_version.url, data.new_version.url)
+                self.assertIsNotNone(data.new_version.tag)
+                self.assertIsNotNone(data.new_version.commit)
+                self.assertNotEqual(data.new_version.tag, data.current_version.tag)
+                self.assertIsNotNone(data.new_version.version)
+                self.assertIsNone(data.new_version.timestamp)
+            elif data.filename == "tdesktop.git":
+                self.assertIsInstance(data.new_version, ExternalGitRef)
+                self.assertEqual(data.current_version.url, data.new_version.url)
+                self.assertIsNotNone(data.new_version.tag)
+                self.assertIsNotNone(data.new_version.commit)
+                self.assertNotEqual(data.new_version.tag, data.current_version.tag)
+                self.assertIsNotNone(data.new_version.version)
+                self.assertIsNone(data.new_version.timestamp)
             else:
                 self.fail(f"Unhandled data {data.filename}")

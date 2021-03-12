@@ -1,6 +1,9 @@
 import logging
 import os
 import subprocess
+import re
+from datetime import datetime
+import typing as t
 
 import requests
 
@@ -43,6 +46,16 @@ def query_sequence(json_data, queries):
             continue
         results[result_key] = query_json(query, json_data, results)
     return results
+
+
+def parse_timestamp(date_string: t.Optional[str]) -> t.Optional[datetime]:
+    if date_string is None:
+        return None
+    try:
+        return datetime.fromisoformat(re.sub(r"Z$", "+00:00", date_string))
+    except ValueError as err:
+        log.error("Failed to parse timestamp %s: %s", date_string, err)
+        return None
 
 
 class JSONChecker(HTMLChecker):
@@ -88,6 +101,7 @@ class JSONChecker(HTMLChecker):
                 ("tag", checker_data["tag-query"]),
                 ("commit", checker_data.get("commit-query")),
                 ("version", checker_data.get("version-query")),
+                ("timestamp", checker_data.get("timestamp-query")),
             ],
         )
         new_version = ExternalGitRef(
@@ -96,7 +110,7 @@ class JSONChecker(HTMLChecker):
             results["tag"],
             None,
             results.get("version"),
-            None,
+            parse_timestamp(results.get("timestamp")),
         )
 
         if new_version.commit is None:
