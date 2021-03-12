@@ -206,9 +206,12 @@ for git type sources, specify tag query and, optionaly, commit and version queri
     "type": "json",
     "url": "https://api.github.com/repos/stedolan/jq/releases/latest",
     "tag-query": ".tag_name",
-    "version-query": "$tag | sub(\"^jq-\"; \"\")"
+    "version-query": "$tag | sub(\"^jq-\"; \"\")",
+    "timestamp-query": ".published_at"
 }
 ```
+
+`timestamp-query` is optional, but if provided - must return a string with timestamp in ISO format.
 
 See the [jq manual](https://stedolan.github.io/jq/manual/) for complete information about writing queries.
 

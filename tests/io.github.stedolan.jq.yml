@@ -24,3 +24,28 @@ modules:
               url: https://api.github.com/repos/kkos/oniguruma/releases/latest
               tag-query: '.tag_name'
               version-query: '$tag | sub("^[vV]"; "")'
+              timestamp-query: '.published_at'
+
+  - name: yasm
+    sources:
+      - type: git
+        url: https://github.com/yasm/yasm.git
+        x-checker-data:
+          type: json
+          url: https://api.github.com/repos/yasm/yasm/releases/latest
+          tag-query: '.tag_name'
+          version-query: '.tag_name | sub("^[vV]"; "")'
+
+  - name: tdesktop
+    sources:
+      - type: git
+        url: https://github.com/telegramdesktop/tdesktop.git
+        tag: v2.6.0
+        commit: 740ffb3c6426d62ac1a54e68d5a13f91479baf9a
+        x-checker-data:
+          type: json
+          url: https://api.github.com/repos/telegramdesktop/tdesktop/releases/latest
+          tag-query: '.tag_name'
+          version-query: '.tag_name | sub("^[vV]"; "")'
+          # This one should result in parse error
+          timestamp-query: '.target_commitish'
