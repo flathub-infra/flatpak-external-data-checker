@@ -20,6 +20,7 @@
 
 import os
 import unittest
+from distutils.version import LooseVersion
 
 from src.lib.utils import init_logging
 from src.checker import ManifestChecker
@@ -50,6 +51,9 @@ class TestGNOMEChecker(unittest.TestCase):
                 self._test_stable_only(data)
             elif data.filename == "pygobject-3.36.0.tar.xz":
                 self._test_include_unstable(data)
+                self.assertLess(
+                    LooseVersion(data.new_version.version), LooseVersion("3.38.0")
+                )
             elif data.filename == "alleyoop-0.9.8.tar.xz":
                 self._test_non_standard_version(data)
 

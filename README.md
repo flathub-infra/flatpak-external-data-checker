@@ -259,11 +259,20 @@ Check for latest source tarball for a GNOME project.
 "x-checker-data": {
     "type": "gnome",
     "name": "pygobject",
+    "versions": {
+        "<": "3.38.0"
+    },
     "stable-only": true
 }
 ```
 
 Set `stable-only` to `false` to check for pre-releases, too.
+
+You can also set version constraints in `versions` property (optional).  
+It should contain key-value pairs where key is the comparison operator
+(one of `<`, `>`, `<=`, `>=`, `==`, `!=`), and the value is the version to compare with.
+So, `{"<": "3.38.0", "!=": "3.37.1"}` means *"any version less than 3.38.0 except 3.37.1"*.
+All constraints must match simultaneously, i.e. if one doesn't match - version is rejected.
 
 ### PyPI checker
 
