@@ -1,39 +1,17 @@
 import logging
 from datetime import datetime
-from distutils.version import StrictVersion, LooseVersion
-import operator
 import re
 import typing as t
 
 import requests
 
 from ..lib.externaldata import Checker, ExternalFile
+from ..lib.utils import filter_versions
 
 log = logging.getLogger(__name__)
 
 PYPI_INDEX = "https://pypi.org/pypi"
-OPERATORS = {
-    "<": operator.lt,
-    "<=": operator.le,
-    ">": operator.gt,
-    ">=": operator.ge,
-    "==": operator.eq,
-    "!=": operator.ne,
-}
 BDIST_RE = re.compile(r"^(\S+)-(\d[\d\.\w]*\d)-(\S+)-(\S+)-(\S+).whl$")
-
-
-def _version_matches(version: str, constraints: t.List[t.Tuple[str, str]]):
-    if not constraints:
-        return True
-    for ver_oper, ver_limit in constraints:
-        oper = OPERATORS[ver_oper]
-        try:
-            matches = oper(StrictVersion(version), StrictVersion(ver_limit))
-        except ValueError:
-            matches = oper(LooseVersion(version), LooseVersion(ver_limit))
-        return matches
-    return None
 
 
 def _filter_downloads(
@@ -41,9 +19,13 @@ def _filter_downloads(
     constraints: t.List[t.Tuple[str, str]],
     packagetype: str,
 ) -> t.Generator[t.Tuple[str, t.Dict, datetime], None, None]:
-    for pypi_version, pypi_downloads in pypy_releases.items():
-        if not _version_matches(pypi_version, constraints):
-            continue
+    releases = filter_versions(
+        pypy_releases.items(),
+        constraints,
+        to_string=lambda r: r[0],
+        sort=True,
+    )
+    for pypi_version, pypi_downloads in releases:
         for download in pypi_downloads:
             if download["packagetype"] != packagetype:
                 continue
@@ -76,10 +58,7 @@ class PyPIChecker(Checker):
         else:
             releases = {pypi_data["info"]["version"]: pypi_data["urls"]}
 
-        downloads = sorted(
-            _filter_downloads(releases, constraints, package_type),
-            key=lambda r: r[2],
-        )
+        downloads = list(_filter_downloads(releases, constraints, package_type))
 
         try:
             pypi_version, pypi_download, pypi_date = downloads[-1]
