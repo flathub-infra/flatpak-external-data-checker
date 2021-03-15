@@ -5,6 +5,7 @@ import typing as t
 import requests
 
 from ..lib.externaldata import Checker, ExternalData, ExternalFile
+from ..lib.utils import filter_versions
 
 log = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ class GNOMEChecker(Checker):
         external_data: ExternalData
         project_name = external_data.checker_data["name"]
         stable_only = external_data.checker_data.get("stable-only", True)
+        constraints = external_data.checker_data.get("versions", {}).items()
         assert isinstance(project_name, str)
 
         proj_url = urljoin(GNOME_MIRROR, f"sources/{project_name}/")
@@ -44,18 +46,22 @@ class GNOMEChecker(Checker):
             cache_json = cache_resp.json()
         _, downloads, versions, _ = cache_json
 
+        filtered_versions = versions[project_name]
+        if constraints:
+            filtered_versions = filter_versions(filtered_versions, constraints)
+
         if stable_only:
             try:
-                latest_version = list(filter(_is_stable, versions[project_name]))[-1]
+                latest_version = list(filter(_is_stable, filtered_versions))[-1]
             except IndexError:
-                latest_version = versions[project_name][-1]
+                latest_version = filtered_versions[-1]
                 log.warning(
                     "Couldn't find any stable version for %s, selecting latest %s",
                     project_name,
                     latest_version,
                 )
         else:
-            latest_version = versions[project_name][-1]
+            latest_version = filtered_versions[-1]
 
         proj_files = downloads[project_name][latest_version]
 

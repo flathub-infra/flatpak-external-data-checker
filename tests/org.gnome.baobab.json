@@ -29,7 +29,10 @@
                     "x-checker-data": {
                         "type": "gnome",
                         "name": "pygobject",
-                        "stable-only": false
+                        "stable-only": false,
+                        "versions": {
+                            "<": "3.38"
+                        }
                     }
                 }
             ]
