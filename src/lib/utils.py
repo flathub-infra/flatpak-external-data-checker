@@ -32,6 +32,8 @@ import urllib.parse
 import copy
 import typing as t
 from functools import lru_cache
+import operator
+from distutils.version import StrictVersion, LooseVersion
 
 from collections import OrderedDict
 from ruamel.yaml import YAML
@@ -55,6 +57,15 @@ USER_AGENT = (
 HEADERS = {"User-Agent": USER_AGENT}
 TIMEOUT_SECONDS = 60
 HTTP_CHUNK_SIZE = 1024 * 64
+
+OPERATORS = {
+    "<": operator.lt,
+    "<=": operator.le,
+    ">": operator.gt,
+    ">=": operator.ge,
+    "==": operator.eq,
+    "!=": operator.ne,
+}
 
 
 def _extract_timestamp(info):
@@ -122,6 +133,32 @@ def get_extra_data_info_from_url(
     )
 
     return external_file
+
+
+def filter_versions(
+    versions: t.Iterable,
+    constraints: t.List[t.Tuple[str, str]],
+    to_string: t.Callable[..., str] = str,
+    sort=False,
+):
+    new_versions = []
+    for version in versions:
+        version_str = to_string(version)
+        matches = []
+        for oper_str, version_limit in constraints:
+            oper = OPERATORS[oper_str]
+            try:
+                match = oper(StrictVersion(version_str), StrictVersion(version_limit))
+            except ValueError:
+                match = oper(LooseVersion(version_str), LooseVersion(version_limit))
+            matches.append(match)
+        if all(matches):
+            new_versions.append(version)
+
+    if sort:
+        return sorted(new_versions, key=lambda v: LooseVersion(to_string(v)))
+
+    return new_versions
 
 
 def clear_env(environ):

@@ -21,7 +21,7 @@ import unittest
 import subprocess
 import os
 
-from src.lib.utils import parse_github_url, strip_query, clear_env
+from src.lib.utils import parse_github_url, strip_query, clear_env, filter_versions
 
 
 class TestParseGitHubUrl(unittest.TestCase):
@@ -67,6 +67,60 @@ class TestClearEnv(unittest.TestCase):
             'test -z "$SOME_TOKEN_HERE"', shell=True, env=clear_env(os.environ)
         )
         self.assertEqual(proc.returncode, 0)
+
+
+class TestVersionFilter(unittest.TestCase):
+    def test_filter(self):
+        self.assertEqual(filter_versions(["1.1"], []), ["1.1"])
+        self.assertEqual(
+            filter_versions(["1.1", "1.2", "1.3"], [(">", "1.0"), ("<=", "1.4")]),
+            ["1.1", "1.2", "1.3"],
+        )
+        self.assertEqual(
+            filter_versions(["1.1", "1.2", "1.3"], [("<", "1.0")]),
+            [],
+        )
+        self.assertEqual(
+            filter_versions(["1.1", "1.2", "1.3"], [("<", "1.0"), ("==", "1.2")]),
+            [],
+        )
+        self.assertEqual(
+            filter_versions(["1.1", "1.2", "1.3"], [("==", "1.2")]),
+            ["1.2"],
+        )
+        self.assertEqual(
+            filter_versions(["1.1", "1.2", "1.3"], [("!=", "1.2")]),
+            ["1.1", "1.3"],
+        )
+        self.assertEqual(
+            filter_versions(["1.a", "1.b", "1.c"], [(">=", "1.b")]),
+            ["1.b", "1.c"],
+        )
+
+    def test_sort(self):
+        self.assertEqual(
+            filter_versions(["1.1", "1.2", "1.3"], [], sort=True),
+            ["1.1", "1.2", "1.3"],
+        )
+        self.assertEqual(
+            filter_versions(["1.3", "1.2", "1.1"], [], sort=True),
+            ["1.1", "1.2", "1.3"],
+        )
+        self.assertEqual(
+            filter_versions(["1.c", "1.a", "1.b"], [], sort=True),
+            ["1.a", "1.b", "1.c"],
+        )
+
+    def test_objects(self):
+        self.assertEqual(
+            filter_versions(
+                [("c", "1.1"), ("a", "1.3"), ("b", "1.2"), ("d", "1.0")],
+                [("!=", "1.2")],
+                to_string=lambda o: o[1],
+                sort=True,
+            ),
+            [("d", "1.0"), ("c", "1.1"), ("a", "1.3")],
+        )
 
 
 if __name__ == "__main__":
