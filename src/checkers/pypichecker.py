@@ -44,10 +44,7 @@ class PyPIChecker(Checker):
     def check(self, external_data):
         package_name = external_data.checker_data["name"]
         package_type = external_data.checker_data.get("packagetype", "sdist")
-        if "versions" in external_data.checker_data:
-            constraints = [(o, l) for o, l in external_data.checker_data["versions"]]
-        else:
-            constraints = []
+        constraints = external_data.checker_data.get("versions", {}).items()
 
         with self.session.get(f"{PYPI_INDEX}/{package_name}/json") as response:
             response.raise_for_status()
