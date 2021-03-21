@@ -112,7 +112,9 @@ def get_extra_data_info_from_url(
             urllib.parse.urlunparse(urllib.parse.urlparse(url)._replace(path="/")),
             http_adapter,
         )
-        with session.get(url, headers=HEADERS, timeout=TIMEOUT_SECONDS) as response:
+        with session.get(
+            url, headers=HEADERS, timeout=TIMEOUT_SECONDS, stream=True
+        ) as response:
             response.raise_for_status()
             real_url = response.url
             info = response.headers
