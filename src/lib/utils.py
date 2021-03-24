@@ -126,6 +126,13 @@ def get_extra_data_info_from_url(
                 if dest_io is not None:
                     dest_io.write(chunk)
 
+            if "Content-Length" in info:
+                content_length = int(info["Content-Length"])
+                if size < content_length:
+                    raise requests.exceptions.ChunkedEncodingError(
+                        f"Incomplete read: expected {content_length} bytes, got {size}"
+                    )
+
     external_file = externaldata.ExternalFile(
         strip_query(real_url if follow_redirects else url),
         checksum.hexdigest(),
