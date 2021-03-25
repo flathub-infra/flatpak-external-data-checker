@@ -78,6 +78,7 @@ def _external_source_filter(manifest_path: str, source) -> t.Optional[bool]:
 class ManifestChecker:
     def __init__(self, manifest: str):
         self._root_manifest_path = manifest
+        self._root_manifest_dir = os.path.dirname(self._root_manifest_path)
         self._external_data: t.Dict[str, t.List[t.Union[ExternalData, ExternalGitRepo]]]
         self._external_data = {}
 
@@ -118,7 +119,10 @@ class ManifestChecker:
         for module in modules:
             if isinstance(module, str):
                 module_path = os.path.join(os.path.dirname(path), module)
-                log.info("Loading modules from %s", module_path)
+                log.info(
+                    "Loading modules from %s",
+                    os.path.relpath(module_path, self._root_manifest_dir),
+                )
 
                 try:
                     module = self._read_manifest(module_path)
@@ -147,6 +151,10 @@ class ManifestChecker:
                 external_source_path = os.path.join(
                     os.path.dirname(path), external_source
                 )
+                log.info(
+                    "Loading sources from %s",
+                    os.path.relpath(external_source_path, self._root_manifest_dir),
+                )
                 external_manifest = self._read_manifest(external_source_path)
                 if isinstance(external_manifest, list):
                     external_source_data = external_manifest
@@ -167,46 +175,41 @@ class ManifestChecker:
         """
         ext_data_checked = []
 
-        for path, external_data in self._external_data.items():
-            if not filter_type:
-                external_data_filtered = external_data
-            else:
-                external_data_filtered = [
-                    data for data in external_data if filter_type == data.type
-                ]
+        external_data = sum(self._external_data.values(), [])
+        if filter_type is not None:
+            external_data = [d for d in external_data if d.type == filter_type]
 
-            log.info("Checking individual sources in %s", path)
+        n = len(external_data)
+        for i, data in enumerate(external_data, 1):
+            if data.state != ExternalData.State.UNKNOWN:
+                continue
 
-            n = len(external_data)
-            for i, data in enumerate(external_data_filtered, 1):
-                if data.state != ExternalData.State.UNKNOWN:
+            src_rel_path = os.path.relpath(data.source_path, self._root_manifest_dir)
+            log.info("[%d/%d] checking %s (from %s)", i, n, data.filename, src_rel_path)
+
+            for checker in self._checkers:
+                if not checker.should_check(data):
                     continue
-
-                log.info("[%d/%d] checking %s", i, n, data.filename)
-
-                for checker in self._checkers:
-                    if not checker.should_check(data):
-                        continue
+                log.debug(
+                    "Source %s: applying %s", data.filename, type(checker).__name__
+                )
+                checker.check(data)
+                if data.state != ExternalData.State.UNKNOWN:
                     log.debug(
-                        "Source %s: applying %s", data.filename, type(checker).__name__
+                        "Source %s: got new state %s from %s, skipping remaining checkers",
+                        data.filename,
+                        data.state.name,
+                        type(checker).__name__,
                     )
-                    checker.check(data)
-                    if data.state != ExternalData.State.UNKNOWN:
-                        log.debug(
-                            "Source %s: got new state %s from %s, skipping remaining checkers",
-                            data.filename,
-                            data.state.name,
-                            type(checker).__name__,
-                        )
-                        break
-                    if data.new_version is not None:
-                        log.debug(
-                            "Source %s: got new version from %s, skipping remaining checkers",
-                            data.filename,
-                            type(checker).__name__,
-                        )
-                        break
-                ext_data_checked.append(data)
+                    break
+                if data.new_version is not None:
+                    log.debug(
+                        "Source %s: got new version from %s, skipping remaining checkers",
+                        data.filename,
+                        type(checker).__name__,
+                    )
+                    break
+            ext_data_checked.append(data)
 
         return list(set(ext_data_checked))
 
