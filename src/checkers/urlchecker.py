@@ -36,7 +36,7 @@ import logging
 import re
 import tempfile
 
-import requests
+import urllib3
 
 from ..lib.externaldata import ExternalData, Checker
 from ..lib import utils
@@ -95,9 +95,8 @@ class URLChecker(Checker):
             else:
                 new_version = utils.get_extra_data_info_from_url(url)
         except (
-            requests.exceptions.HTTPError,
-            requests.exceptions.ConnectionError,
-            requests.exceptions.ChunkedEncodingError,
+            urllib3.exceptions.HTTPError,
+            urllib3.exceptions.ConnectionError,
         ) as e:
             log.warning("%s returned %s", url, e)
             external_data.state = ExternalData.State.BROKEN

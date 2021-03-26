@@ -26,6 +26,7 @@ from distutils.version import LooseVersion
 import typing as t
 
 import requests
+import urllib3
 
 from ..lib import utils
 from ..lib.externaldata import ExternalData, Checker
@@ -120,9 +121,8 @@ class HTMLChecker(Checker):
                 latest_url, follow_redirects
             )
         except (
-            requests.exceptions.HTTPError,
-            requests.exceptions.ConnectionError,
-            requests.exceptions.ChunkedEncodingError,
+            urllib3.exceptions.HTTPError,
+            urllib3.exceptions.ConnectionError,
         ) as e:
             log.warning("%s returned %s", latest_url, e)
             external_data.state = ExternalData.State.BROKEN

@@ -38,7 +38,7 @@ from distutils.version import StrictVersion, LooseVersion
 from collections import OrderedDict
 from ruamel.yaml import YAML
 from elftools.elf.elffile import ELFFile
-import requests
+import urllib3
 
 from . import externaldata
 
@@ -104,49 +104,47 @@ def get_timestamp_from_url(url):
 def get_extra_data_info_from_url(
     url, follow_redirects=True, dest_io: t.Optional[t.IO] = None
 ):
-    http_adapter = requests.adapters.HTTPAdapter(
-        max_retries=requests.adapters.Retry(total=2)
-    )
+    # NOTE: .geturl() could've been usable if it couldn't return relative or empty location
+    def get_redirect_url(response: urllib3.response.HTTPResponse):
+        if response.retries and response.retries.history:
+            last_retry = response.retries.history[-1]
+            return urllib.parse.urljoin(last_retry.url, last_retry.redirect_location)
+        return None
 
-    with requests.Session() as session:
-        session.mount(
-            urllib.parse.urlunparse(urllib.parse.urlparse(url)._replace(path="/")),
-            http_adapter,
+    retries = urllib3.util.Retry(connect=2, read=2, redirect=10)
+
+    with urllib3.PoolManager(headers=HEADERS, timeout=TIMEOUT_SECONDS) as http:
+        head = http.request("HEAD", url)
+        if 400 <= head.status < 500 or 500 <= head.status < 600:
+            raise urllib3.exceptions.HTTPError(f"HTTP error {head.status}")
+        real_url = get_redirect_url(head) or url
+        info = head.headers
+        if "Content-Length" in info:
+            preload = int(info["Content-Length"]) <= MAX_PRELOAD_SIZE
+        else:
+            preload = False
+
+        response = http.request(
+            "GET",
+            real_url,
+            retries=retries,
+            preload_content=preload,
+            decode_content=False,
+            enforce_content_length=True,
         )
-        with session.head(
-            url, headers=HEADERS, timeout=TIMEOUT_SECONDS, allow_redirects=True
-        ) as head:
-            head.raise_for_status()
-            real_url = head.url
-            info = head.headers
-            if "Content-Length" in info:
-                preload = int(info["Content-Length"]) <= MAX_PRELOAD_SIZE
-            else:
-                preload = False
-
-        with session.get(
-            url, headers=HEADERS, timeout=TIMEOUT_SECONDS, stream=not preload
-        ) as response:
-            if preload:
-                checksum = hashlib.sha256(response.content)
-                size = len(response.content)
+        if preload:
+            checksum = hashlib.sha256(response.data)
+            size = len(response.data)
+            if dest_io is not None:
+                dest_io.write(response.data)
+        else:
+            checksum = hashlib.sha256()
+            size = 0
+            for chunk in response.stream(HTTP_CHUNK_SIZE):
+                checksum.update(chunk)
+                size += len(chunk)
                 if dest_io is not None:
-                    dest_io.write(response.content)
-            else:
-                checksum = hashlib.sha256()
-                size = 0
-                for chunk in response.iter_content(HTTP_CHUNK_SIZE):
-                    checksum.update(chunk)
-                    size += len(chunk)
-                    if dest_io is not None:
-                        dest_io.write(chunk)
-
-            if "Content-Length" in info:
-                content_length = int(info["Content-Length"])
-                if size < content_length:
-                    raise requests.exceptions.ChunkedEncodingError(
-                        f"Incomplete read: expected {content_length} bytes, got {size}"
-                    )
+                    dest_io.write(chunk)
 
     external_file = externaldata.ExternalFile(
         strip_query(real_url if follow_redirects else url),
