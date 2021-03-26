@@ -36,7 +36,7 @@ TEST_MANIFEST = os.path.join(
 )
 NUM_ARCHIVE_IN_MANIFEST = 1
 NUM_FILE_IN_MANIFEST = 1
-NUM_EXTRA_DATA_IN_MANIFEST = 8
+NUM_EXTRA_DATA_IN_MANIFEST = 9
 NUM_ALL_EXT_DATA = (
     NUM_ARCHIVE_IN_MANIFEST + NUM_FILE_IN_MANIFEST + NUM_EXTRA_DATA_IN_MANIFEST
 )
@@ -284,7 +284,7 @@ modules:
             if data.new_version:
                 ext_data_with_new_version += 1
 
-        self.assertEqual(ext_data_with_new_version, 1)
+        self.assertEqual(ext_data_with_new_version, 2)
 
         file_ext_data = checker.get_external_data(ExternalData.Type.FILE)
         self.assertEqual(len(file_ext_data), NUM_FILE_IN_MANIFEST)
@@ -302,6 +302,18 @@ modules:
         self.assertIsNotNone(dropbox)
         self.assertEqual(dropbox.new_version.version, "64")
         self.assertEqual(dropbox.new_version.url, "https://httpbingo.org/base64/4puE")
+
+        relative_redirect = self._find_by_filename(ext_data, "relative-redirect.txt")
+        self.assertIsNotNone(relative_redirect)
+        self.assertEqual(
+            relative_redirect.new_version.url,
+            "https://httpbingo.org/base64/MzAtNTAgZmVyYWwgaG9ncyEK",
+        )
+        self.assertEqual(
+            relative_redirect.new_version.checksum,
+            "e4d67702da4eeeb2f15629b65bf6767c028a511839c14ed44d9f34479eaa2b94",
+        )
+        self.assertEqual(relative_redirect.new_version.size, 18)
 
         # this URL is a redirect, but since it is not a rotating-url the URL
         # should not be updated.

@@ -38,6 +38,17 @@
                 },
                 {
                     "type": "extra-data",
+                    "filename": "relative-redirect.txt",
+                    "url": "https://httpbingo.org/status/404",
+                    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "size": 0,
+                    "x-checker-data": {
+                        "type": "rotating-url",
+                        "url": "https://httpbingo.org/redirect-to?url=/base64/MzAtNTAgZmVyYWwgaG9ncyEK"
+                    }
+                },
+                {
+                    "type": "extra-data",
                     "filename": "hogs.txt",
                     "url": "https://httpbingo.org/base64/MzAtNTAgZmVyYWwgaG9ncyEK",
                     "sha256": "e4d67702da4eeeb2f15629b65bf6767c028a511839c14ed44d9f34479eaa2b94",
