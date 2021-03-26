@@ -57,6 +57,7 @@ USER_AGENT = (
 HEADERS = {"User-Agent": USER_AGENT}
 TIMEOUT_SECONDS = 60
 HTTP_CHUNK_SIZE = 1024 * 64
+MAX_PRELOAD_SIZE = 10 * 1024 ** 2
 
 OPERATORS = {
     "<": operator.lt,
@@ -112,19 +113,33 @@ def get_extra_data_info_from_url(
             urllib.parse.urlunparse(urllib.parse.urlparse(url)._replace(path="/")),
             http_adapter,
         )
+        with session.head(
+            url, headers=HEADERS, timeout=TIMEOUT_SECONDS, allow_redirects=True
+        ) as head:
+            head.raise_for_status()
+            real_url = head.url
+            info = head.headers
+            if "Content-Length" in info:
+                preload = int(info["Content-Length"]) <= MAX_PRELOAD_SIZE
+            else:
+                preload = False
+
         with session.get(
-            url, headers=HEADERS, timeout=TIMEOUT_SECONDS, stream=True
+            url, headers=HEADERS, timeout=TIMEOUT_SECONDS, stream=not preload
         ) as response:
-            response.raise_for_status()
-            real_url = response.url
-            info = response.headers
-            checksum = hashlib.sha256()
-            size = 0
-            for chunk in response.iter_content(HTTP_CHUNK_SIZE):
-                checksum.update(chunk)
-                size += len(chunk)
+            if preload:
+                checksum = hashlib.sha256(response.content)
+                size = len(response.content)
                 if dest_io is not None:
-                    dest_io.write(chunk)
+                    dest_io.write(response.content)
+            else:
+                checksum = hashlib.sha256()
+                size = 0
+                for chunk in response.iter_content(HTTP_CHUNK_SIZE):
+                    checksum.update(chunk)
+                    size += len(chunk)
+                    if dest_io is not None:
+                        dest_io.write(chunk)
 
             if "Content-Length" in info:
                 content_length = int(info["Content-Length"])
