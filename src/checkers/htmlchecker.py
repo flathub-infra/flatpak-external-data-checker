@@ -25,7 +25,6 @@ from string import Template
 from distutils.version import LooseVersion
 import typing as t
 
-import requests
 import aiohttp
 
 from ..lib import utils
@@ -71,9 +70,8 @@ class HTMLChecker(Checker):
         sort_matches = external_data.checker_data.get("sort-matches", True)
         assert combo_pattern or (version_pattern and (url_pattern or url_template))
 
-        with requests.get(url) as response:
-            response.raise_for_status()
-            html = response.text
+        async with self.session.get(url) as response:
+            html = await response.text()
 
         latest_version: t.Optional[str] = None
         latest_url: t.Optional[str] = None
