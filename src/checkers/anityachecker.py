@@ -2,8 +2,6 @@ import logging
 import urllib.request
 import urllib.parse
 
-import requests
-
 from ..lib.externaldata import ExternalData, ExternalGitRepo, ExternalGitRef
 from .htmlchecker import HTMLChecker
 
@@ -24,9 +22,8 @@ class AnityaChecker(HTMLChecker):
         stable_only = external_data.checker_data.get("stable-only", False)
 
         query = {"project_id": external_data.checker_data.get("project-id")}
-        with requests.get(versions_url, params=query) as response:
-            response.raise_for_status()
-            result = response.json()
+        async with self.session.get(versions_url, params=query) as response:
+            result = await response.json()
 
         if stable_only:
             latest_version = result["stable_versions"][0]
