@@ -114,6 +114,6 @@ class JSONChecker(HTMLChecker):
         )
 
         if new_version.commit is None:
-            new_version = new_version.fetch_remote()
+            new_version = await new_version.fetch_remote()
 
         external_data.set_new_version(new_version)

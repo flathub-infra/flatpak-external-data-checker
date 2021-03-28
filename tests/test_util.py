@@ -20,6 +20,7 @@
 import unittest
 import subprocess
 import os
+import asyncio
 
 from src.lib.utils import parse_github_url, strip_query, clear_env, filter_versions
 
@@ -59,13 +60,21 @@ class TestStripQuery(unittest.TestCase):
         self.assertEqual(strip_query(url), expected)
 
 
-class TestClearEnv(unittest.TestCase):
+class TestClearEnv(unittest.IsolatedAsyncioTestCase):
     def test_clear_env(self):
         os.environ["SOME_TOKEN_HERE"] = "leaked"
         # pylint: disable=subprocess-run-check
         proc = subprocess.run(
             'test -z "$SOME_TOKEN_HERE"', shell=True, env=clear_env(os.environ)
         )
+        self.assertEqual(proc.returncode, 0)
+
+    async def test_clear_env_async(self):
+        os.environ["SOME_TOKEN_HERE"] = "leaked"
+        proc = await asyncio.create_subprocess_shell(
+            'test -z "$SOME_TOKEN_HERE"', env=clear_env(os.environ)
+        )
+        await proc.wait()
         self.assertEqual(proc.returncode, 0)
 
 

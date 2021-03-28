@@ -31,9 +31,9 @@ import urllib.request
 import urllib.parse
 import copy
 import typing as t
-from functools import lru_cache
 import operator
 from distutils.version import StrictVersion, LooseVersion
+import asyncio
 
 from collections import OrderedDict
 from ruamel.yaml import YAML
@@ -211,8 +211,7 @@ def check_bwrap():
     return False
 
 
-@lru_cache()
-def git_ls_remote(url: str) -> t.Dict[str, str]:
+async def git_ls_remote(url: str) -> t.Dict[str, str]:
     git_cmd = ["git", "ls-remote", "--exit-code", url]
     if check_bwrap():
         git_cmd = wrap_in_bwrap(
@@ -227,14 +226,14 @@ def git_ls_remote(url: str) -> t.Dict[str, str]:
                 # fmt: on
             ],
         )
-    git_proc = subprocess.run(
-        git_cmd,
-        check=True,
-        stdout=subprocess.PIPE,
+    git_proc = await asyncio.create_subprocess_exec(
+        *git_cmd,
+        stdout=asyncio.subprocess.PIPE,
         env=clear_env(os.environ),
-        timeout=5,
     )
-    git_stdout = git_proc.stdout.decode()
+    git_stdout_raw, _ = await git_proc.communicate()
+    assert git_proc.returncode == 0
+    git_stdout = git_stdout_raw.decode()
 
     return {r: c for c, r in (l.split() for l in git_stdout.splitlines())}
 

@@ -49,7 +49,7 @@ class AnityaChecker(HTMLChecker):
         tag_template = external_data.checker_data["tag-template"]
         latest_tag = self._substitute_placeholders(tag_template, latest_version)
 
-        new_version = ExternalGitRef(
+        new_version = await ExternalGitRef(
             url=external_data.current_version.url,
             commit=None,
             tag=latest_tag,

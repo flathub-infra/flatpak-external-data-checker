@@ -249,14 +249,14 @@ class ExternalGitRef(t.NamedTuple):
             return annotated_tag_commit
         raise KeyError(f"refs/tags/{tag}")
 
-    def fetch_remote(self) -> ExternalGitRef:
+    async def fetch_remote(self) -> ExternalGitRef:
         log.debug(
             "Retrieving commit from %s tag %s branch %s",
             self.url,
             self.tag,
             self.branch,
         )
-        refs = utils.git_ls_remote(self.url)
+        refs = await utils.git_ls_remote(self.url)
 
         if self.tag is not None:
             got_commit = self._get_tagged_commit(refs, self.tag)
