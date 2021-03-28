@@ -1,11 +1,9 @@
 import logging
 import os
-import subprocess
 import re
 from datetime import datetime
 import typing as t
-
-import requests
+import asyncio
 
 from ..lib import utils
 from ..lib.externaldata import ExternalData, ExternalGitRepo, ExternalGitRef
@@ -14,7 +12,7 @@ from .htmlchecker import HTMLChecker
 log = logging.getLogger(__name__)
 
 
-def query_json(query, data, variables=None):
+async def query_json(query, data, variables=None):
     typecheck_q = (
         '.|type as $rt | if $rt=="string" or $rt=="number" then . else error($rt) end'
     )
@@ -28,23 +26,23 @@ def query_json(query, data, variables=None):
     if utils.check_bwrap():
         jq_cmd = utils.wrap_in_bwrap(jq_cmd, bwrap_args=["--die-with-parent"])
 
-    jq_proc = subprocess.run(
-        jq_cmd,
-        check=True,
-        stdout=subprocess.PIPE,
-        input=data,
-        timeout=10,
+    jq_proc = await asyncio.create_subprocess_exec(
+        *jq_cmd,
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
         env=utils.clear_env(os.environ),
     )
-    return jq_proc.stdout.decode().strip()
+    jq_stdout, _ = await jq_proc.communicate(input=data)
+    assert jq_proc.returncode == 0
+    return jq_stdout.decode().strip()
 
 
-def query_sequence(json_data, queries):
+async def query_sequence(json_data, queries):
     results = {}
     for result_key, query in queries:
         if not query:
             continue
-        results[result_key] = query_json(query, json_data, results)
+        results[result_key] = await query_json(query, json_data, results)
     return results
 
 
@@ -66,18 +64,17 @@ class JSONChecker(HTMLChecker):
         assert self.should_check(external_data)
 
         json_url = external_data.checker_data["url"]
-        with requests.get(json_url) as response:
-            response.raise_for_status()
-            json_data = response.content
+        async with self.session.get(json_url) as response:
+            json_data = await response.read()
 
         if isinstance(external_data, ExternalGitRepo):
             return await self._check_git(json_data, external_data)
         else:
             return await self._check_data(json_data, external_data)
 
-    async def _check_data(self, json_data: str, external_data: ExternalData):
+    async def _check_data(self, json_data: bytes, external_data: ExternalData):
         checker_data = external_data.checker_data
-        results = query_sequence(
+        results = await query_sequence(
             json_data,
             [
                 ("tag", checker_data.get("tag-query")),
@@ -93,9 +90,9 @@ class JSONChecker(HTMLChecker):
             external_data, latest_version, latest_url, follow_redirects=False
         )
 
-    async def _check_git(self, json_data: str, external_data: ExternalGitRepo):
+    async def _check_git(self, json_data: bytes, external_data: ExternalGitRepo):
         checker_data = external_data.checker_data
-        results = query_sequence(
+        results = await query_sequence(
             json_data,
             [
                 ("tag", checker_data["tag-query"]),
