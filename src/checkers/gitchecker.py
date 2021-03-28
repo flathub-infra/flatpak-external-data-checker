@@ -58,7 +58,7 @@ class GitChecker(Checker):
         assert tag_re.groups == 1
 
         matching_tags = []
-        refs = git_ls_remote(external_data.current_version.url)
+        refs = await git_ls_remote(external_data.current_version.url)
         for ref, commit in refs.items():
             if not ref.startswith(REF_TAG_PREFIX):
                 continue
@@ -111,7 +111,7 @@ class GitChecker(Checker):
             return
 
         try:
-            remote_version = external_data.current_version.fetch_remote()
+            remote_version = await external_data.current_version.fetch_remote()
         except KeyError as err:
             log.error(
                 "Couldn't get remote commit from %s: not found %s",
