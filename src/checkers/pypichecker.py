@@ -38,17 +38,15 @@ def _filter_downloads(
 class PyPIChecker(Checker):
     CHECKER_DATA_TYPE = "pypi"
 
-    def __init__(self):
-        self.session = requests.Session()
-
     def check(self, external_data):
         package_name = external_data.checker_data["name"]
         package_type = external_data.checker_data.get("packagetype", "sdist")
         constraints = external_data.checker_data.get("versions", {}).items()
 
-        with self.session.get(f"{PYPI_INDEX}/{package_name}/json") as response:
-            response.raise_for_status()
-            pypi_data = response.json()
+        with requests.Session() as session:
+            with session.get(f"{PYPI_INDEX}/{package_name}/json") as response:
+                response.raise_for_status()
+                pypi_data = response.json()
 
         if constraints:
             releases = pypi_data["releases"]
