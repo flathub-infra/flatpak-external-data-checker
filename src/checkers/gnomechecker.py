@@ -30,9 +30,6 @@ def _is_stable(version: str) -> bool:
 class GNOMEChecker(Checker):
     CHECKER_DATA_TYPE = "gnome"
 
-    def __init__(self):
-        self.session = requests.Session()
-
     def check(self, external_data):
         external_data: ExternalData
         project_name = external_data.checker_data["name"]
@@ -41,9 +38,10 @@ class GNOMEChecker(Checker):
         assert isinstance(project_name, str)
 
         proj_url = urljoin(GNOME_MIRROR, f"sources/{project_name}/")
-        with self.session.get(urljoin(proj_url, "cache.json")) as cache_resp:
-            cache_resp.raise_for_status()
-            cache_json = cache_resp.json()
+        with requests.Session() as session:
+            with session.get(urljoin(proj_url, "cache.json")) as cache_resp:
+                cache_resp.raise_for_status()
+                cache_json = cache_resp.json()
         _, downloads, versions, _ = cache_json
 
         filtered_versions = versions[project_name]
@@ -70,9 +68,10 @@ class GNOMEChecker(Checker):
             for prop in ["tar.xz", "tar.bz2", "tar.gz"]
             if prop in proj_files
         )
-        with self.session.get(urljoin(proj_url, proj_files["sha256sum"])) as cs_resp:
-            cs_resp.raise_for_status()
-            checksums = _parse_checksums(cs_resp.text)
+        with requests.Session() as session:
+            with session.get(urljoin(proj_url, proj_files["sha256sum"])) as cs_resp:
+                cs_resp.raise_for_status()
+                checksums = _parse_checksums(cs_resp.text)
         checksum = checksums[tarball.split("/")[-1]]
 
         new_version = ExternalFile(
