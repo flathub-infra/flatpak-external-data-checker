@@ -1,8 +1,6 @@
 import datetime
 import logging
 
-import requests
-
 from ..lib.externaldata import ExternalFile, Checker
 
 log = logging.getLogger(__name__)
@@ -20,16 +18,15 @@ class JetBrainsChecker(Checker):
         url = "https://data.services.jetbrains.com/products/releases"
         query = {"code": code, "latest": "true", "type": release_type}
 
-        with requests.get(url, params=query) as response:
-            response.raise_for_status()
-            result = response.json()
+        async with self.session.get(url, params=query) as response:
+            result = await response.json()
             data = result[code][0]
 
         release = data["downloads"]["linux"]
 
-        with requests.get(release["checksumLink"]) as response:
-            response.raise_for_status()
-            checksum = response.text.split(" ")[0]
+        async with self.session.get(release["checksumLink"]) as response:
+            result = await response.text()
+            checksum = result.split(" ")[0]
 
         new_version = ExternalFile(
             release["link"],
