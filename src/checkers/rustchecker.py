@@ -3,7 +3,6 @@ import logging
 import re
 
 import toml
-import requests
 
 from ..lib.externaldata import ExternalFile, Checker
 
@@ -25,9 +24,8 @@ class RustChecker(Checker):
 
         url = f"https://static.rust-lang.org/dist/channel-rust-{channel}.toml"
 
-        with requests.get(url) as response:
-            response.raise_for_status()
-            data = toml.loads(response.text)
+        async with self.session.get(url) as response:
+            data = toml.loads(await response.text())
 
         package = data["pkg"][package_name]
         target = package["target"][target_name]
