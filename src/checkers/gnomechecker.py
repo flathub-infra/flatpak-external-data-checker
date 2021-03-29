@@ -2,8 +2,6 @@ import logging
 from urllib.parse import urljoin
 import typing as t
 
-import requests
-
 from ..lib.externaldata import Checker, ExternalData, ExternalFile
 from ..lib.utils import filter_versions
 
@@ -38,10 +36,8 @@ class GNOMEChecker(Checker):
         assert isinstance(project_name, str)
 
         proj_url = urljoin(GNOME_MIRROR, f"sources/{project_name}/")
-        with requests.Session() as session:
-            with session.get(urljoin(proj_url, "cache.json")) as cache_resp:
-                cache_resp.raise_for_status()
-                cache_json = cache_resp.json()
+        async with self.session.get(urljoin(proj_url, "cache.json")) as cache_resp:
+            cache_json = await cache_resp.json()
         _, downloads, versions, _ = cache_json
 
         filtered_versions = versions[project_name]
@@ -68,10 +64,10 @@ class GNOMEChecker(Checker):
             for prop in ["tar.xz", "tar.bz2", "tar.gz"]
             if prop in proj_files
         )
-        with requests.Session() as session:
-            with session.get(urljoin(proj_url, proj_files["sha256sum"])) as cs_resp:
-                cs_resp.raise_for_status()
-                checksums = _parse_checksums(cs_resp.text)
+        async with self.session.get(
+            urljoin(proj_url, proj_files["sha256sum"])
+        ) as cs_resp:
+            checksums = _parse_checksums(await cs_resp.text())
         checksum = checksums[tarball.split("/")[-1]]
 
         new_version = ExternalFile(
