@@ -3,8 +3,6 @@ from datetime import datetime
 import re
 import typing as t
 
-import requests
-
 from ..lib.externaldata import Checker, ExternalFile
 from ..lib.utils import filter_versions
 
@@ -43,10 +41,8 @@ class PyPIChecker(Checker):
         package_type = external_data.checker_data.get("packagetype", "sdist")
         constraints = external_data.checker_data.get("versions", {}).items()
 
-        with requests.Session() as session:
-            with session.get(f"{PYPI_INDEX}/{package_name}/json") as response:
-                response.raise_for_status()
-                pypi_data = response.json()
+        async with self.session.get(f"{PYPI_INDEX}/{package_name}/json") as response:
+            pypi_data = await response.json()
 
         if constraints:
             releases = pypi_data["releases"]
