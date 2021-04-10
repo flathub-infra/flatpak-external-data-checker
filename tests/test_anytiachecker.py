@@ -16,9 +16,39 @@ class TestAnityaChecker(unittest.TestCase):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = checker.check()
 
-        self.assertEqual(len(ext_data), 2)
+        self.assertEqual(len(ext_data), 4)
         for data in ext_data:
-            if data.filename == "flatpak-1.8.2.tar.xz":
+            if data.filename == "ghostscript-9.26.tar.xz":
+                self.assertIsNotNone(data.new_version)
+                self.assertIsInstance(data.new_version, ExternalFile)
+                self.assertRegex(
+                    data.new_version.url,
+                    r"^https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs[\d]+/ghostscript-[\d.]+.tar.xz$",
+                )
+                self.assertIsInstance(data.new_version.size, int)
+                self.assertGreater(data.new_version.size, 0)
+                self.assertIsNotNone(data.new_version.checksum)
+                self.assertIsInstance(data.new_version.checksum, str)
+                self.assertNotEqual(
+                    data.new_version.checksum,
+                    "90ed475f37584f646e9ef829932b2525d5c6fc2e0147e8d611bc50aa0e718598",
+                )
+            elif data.filename == "boost_1_74_0.tar.bz2":
+                self.assertIsNotNone(data.new_version)
+                self.assertIsInstance(data.new_version, ExternalFile)
+                self.assertRegex(
+                    data.new_version.url,
+                    r"^https://dl\.bintray\.com/boostorg/release/[\d.]+/source/boost_[\d]+_[\d]+_[\d]+.tar.bz2$",
+                )
+                self.assertIsInstance(data.new_version.size, int)
+                self.assertGreater(data.new_version.size, 0)
+                self.assertIsNotNone(data.new_version.checksum)
+                self.assertIsInstance(data.new_version.checksum, str)
+                self.assertNotEqual(
+                    data.new_version.checksum,
+                    "83bfc1507731a0906e387fc28b7ef5417d591429e51e788417fe9ff025e116b1",
+                )
+            elif data.filename == "flatpak-1.8.2.tar.xz":
                 self.assertIsNotNone(data.new_version)
                 self.assertIsInstance(data.new_version, ExternalFile)
                 self.assertRegex(
