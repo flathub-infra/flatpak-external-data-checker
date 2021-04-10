@@ -92,7 +92,7 @@ class HTMLChecker(Checker):
                 html, version_pattern, LooseVersion if sort_matches else None
             )
             if latest_version and url_template:
-                latest_url = Template(url_template).substitute(version=latest_version)
+                latest_url = self._substitute_placeholders(url_template, latest_version)
             elif url_pattern:
                 assert url_pattern.groups == 1
                 latest_url = _get_latest(
@@ -108,6 +108,21 @@ class HTMLChecker(Checker):
         abs_url = urllib.parse.urljoin(base=url, url=latest_url)
 
         self._update_version(external_data, latest_version, abs_url)
+
+    @staticmethod
+    def _substitute_placeholders(template_string, version):
+        version_list = LooseVersion(version).version
+        tmpl = Template(template_string)
+        tmpl_vars = {"version": version}
+        for i, version_part in enumerate(version_list):
+            tmpl_vars[f"version{i}"] = version_part
+            if i == 0:
+                tmpl_vars["major"] = version_part
+            elif i == 1:
+                tmpl_vars["minor"] = version_part
+            elif i == 2:
+                tmpl_vars["patch"] = version_part
+        return tmpl.substitute(**tmpl_vars)
 
     def _update_version(
         self, external_data, latest_version, latest_url, follow_redirects=False

@@ -1,7 +1,6 @@
 import logging
 import urllib.request
 import urllib.parse
-from string import Template
 
 import requests
 
@@ -40,7 +39,7 @@ class AnityaChecker(HTMLChecker):
 
     def _check_data(self, external_data, latest_version):
         url_template = external_data.checker_data["url-template"]
-        latest_url = Template(url_template).substitute(version=latest_version)
+        latest_url = self._substitute_placeholders(url_template, latest_version)
 
         self._update_version(
             external_data, latest_version, latest_url, follow_redirects=False
@@ -48,7 +47,7 @@ class AnityaChecker(HTMLChecker):
 
     def _check_git(self, external_data, latest_version):
         tag_template = external_data.checker_data["tag-template"]
-        latest_tag = Template(tag_template).substitute(version=latest_version)
+        latest_tag = self._substitute_placeholders(tag_template, latest_version)
 
         new_version = ExternalGitRef(
             url=external_data.current_version.url,

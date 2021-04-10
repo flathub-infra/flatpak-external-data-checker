@@ -143,7 +143,9 @@ HTML page which contains this information:
 ```
 
 The HTML checker also supports building the download URL using
-the retrieved version:
+the retrieved version string, its components according to the Python
+[LooseVersion](http://epydoc.sourceforge.net/stdlib/distutils.version.LooseVersion-class.html)
+class and semantic versioning fields:
 
 ```json
 "x-checker-data": {
@@ -151,6 +153,26 @@ the retrieved version:
     "url": "https://www.example.com/download.html",
     "version-pattern": "The latest version is ([\\d\\.-]*)",
     "url-template": "https://www.example.com/$version/v$version.tar.gz"
+}
+```
+
+```json
+"x-checker-data": {
+    "type": "html",
+    "url": "https://www.example.com/download.html",
+    "version-pattern": "The latest version is ([\\d\\.-]*)",
+    "url-template": "https://www.example.com/$major.$minor/v$version.tar.gz"
+}
+```
+
+If the placeholder is immediately followed by an underscore, you need to add braces:
+
+```json
+"x-checker-data": {
+    "type": "html",
+    "url": "https://www.example.com/download.html",
+    "version-pattern": "The latest version is ([\\d\\.-]*)",
+    "url-template": "https://www.example.com/$version0.$version1/v${version0}_${version1}_version2.tar.gz"
 }
 ```
 
@@ -237,7 +259,8 @@ to, e.g. where "type": "extra-data" is declared):
 project by Fedora. It supports multiple backends for retrieving version information 
 from different services, including GitHub, GitLab, Sourceforge, etc.
 To use the **AnityaChecker**, specify numeric project ID on release-monitoring.org
-and add a template for source download URL:
+and add a template for source download URL. This checker supports the same placeholders
+as the **HTMLChecker**:
 
 ```json
 "x-checker-data": {
