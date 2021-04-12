@@ -67,7 +67,7 @@ class URLChecker(Checker):
     def should_check(self, external_data):
         return isinstance(external_data, ExternalData)
 
-    def check(self, external_data):
+    async def check(self, external_data):
         assert self.should_check(external_data)
 
         is_rotating = external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE

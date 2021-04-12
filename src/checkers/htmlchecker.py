@@ -59,7 +59,7 @@ def _get_pattern(checker_data: t.Dict, pattern_name: str):
 class HTMLChecker(Checker):
     CHECKER_DATA_TYPE = "html"
 
-    def check(self, external_data):
+    async def check(self, external_data):
         assert self.should_check(external_data)
 
         url = external_data.checker_data["url"]
@@ -107,7 +107,7 @@ class HTMLChecker(Checker):
 
         abs_url = urllib.parse.urljoin(base=url, url=latest_url)
 
-        self._update_version(external_data, latest_version, abs_url)
+        await self._update_version(external_data, latest_version, abs_url)
 
     @staticmethod
     def _substitute_placeholders(template_string, version):
@@ -124,7 +124,7 @@ class HTMLChecker(Checker):
                 tmpl_vars["patch"] = version_part
         return tmpl.substitute(**tmpl_vars)
 
-    def _update_version(
+    async def _update_version(
         self, external_data, latest_version, latest_url, follow_redirects=False
     ):
         assert latest_version is not None

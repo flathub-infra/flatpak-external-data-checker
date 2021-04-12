@@ -28,13 +28,13 @@ from src.checker import ManifestChecker
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.gnome.baobab.json")
 
 
-class TestGNOMEChecker(unittest.TestCase):
+class TestGNOMEChecker(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         init_logging()
 
-    def test_check(self):
+    async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
-        ext_data = checker.check()
+        ext_data = await checker.check()
 
         for data in ext_data:
             self.assertIsNotNone(data.new_version)

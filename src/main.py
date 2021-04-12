@@ -29,6 +29,7 @@ import logging
 import os
 import subprocess
 import sys
+import asyncio
 
 from github import Github
 
@@ -282,13 +283,13 @@ def parse_cli_args(cli_args=None):
     return parser.parse_args(cli_args)
 
 
-def run_with_args(args):
+async def run_with_args(args):
     init_logging(logging.DEBUG if args.verbose else logging.INFO)
 
     manifest_checker = checker.ManifestChecker(args.manifest)
     filter_type = ExternalData.TYPES.get(args.filter_type)
 
-    manifest_checker.check(filter_type)
+    await manifest_checker.check(filter_type)
 
     outdated_num = print_outdated_external_data(manifest_checker)
 
@@ -312,6 +313,6 @@ def run_with_args(args):
 
 
 def main():
-    outdated_num, updated = run_with_args(parse_cli_args())
+    outdated_num, updated = asyncio.run(run_with_args(parse_cli_args()))
     if outdated_num > 0 and not updated:
         sys.exit(1)

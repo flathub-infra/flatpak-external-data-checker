@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 class JetBrainsChecker(Checker):
     CHECKER_DATA_TYPE = "jetbrains"
 
-    def check(self, external_data):
+    async def check(self, external_data):
         assert self.should_check(external_data)
 
         code = external_data.checker_data["code"]

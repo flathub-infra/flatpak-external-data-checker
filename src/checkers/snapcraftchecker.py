@@ -31,7 +31,7 @@ class SnapcraftChecker(Checker):
         if sha3.hexdigest() == sha3_384:
             return sha2.hexdigest()
 
-    def check(self, external_data):
+    async def check(self, external_data):
         assert self.should_check(external_data)
 
         name = external_data.checker_data["name"]

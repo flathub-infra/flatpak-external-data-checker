@@ -62,7 +62,7 @@ class JSONChecker(HTMLChecker):
     CHECKER_DATA_TYPE = "json"
     SUPPORTED_DATA_CLASSES = [ExternalData, ExternalGitRepo]
 
-    def check(self, external_data):
+    async def check(self, external_data):
         assert self.should_check(external_data)
 
         json_url = external_data.checker_data["url"]
@@ -71,11 +71,11 @@ class JSONChecker(HTMLChecker):
             json_data = response.content
 
         if isinstance(external_data, ExternalGitRepo):
-            return self._check_git(json_data, external_data)
+            return await self._check_git(json_data, external_data)
         else:
-            return self._check_data(json_data, external_data)
+            return await self._check_data(json_data, external_data)
 
-    def _check_data(self, json_data: str, external_data: ExternalData):
+    async def _check_data(self, json_data: str, external_data: ExternalData):
         checker_data = external_data.checker_data
         results = query_sequence(
             json_data,
@@ -89,11 +89,11 @@ class JSONChecker(HTMLChecker):
         latest_version = results["version"]
         latest_url = results["url"]
 
-        self._update_version(
+        await self._update_version(
             external_data, latest_version, latest_url, follow_redirects=False
         )
 
-    def _check_git(self, json_data: str, external_data: ExternalGitRepo):
+    async def _check_git(self, json_data: str, external_data: ExternalGitRepo):
         checker_data = external_data.checker_data
         results = query_sequence(
             json_data,

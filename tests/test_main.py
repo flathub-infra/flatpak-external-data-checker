@@ -15,7 +15,7 @@ TEST_APPDATA = os.path.join(
 )
 
 
-class TestEntrypoint(unittest.TestCase):
+class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.test_dir = tempfile.TemporaryDirectory()
         self.manifest_filename = os.path.basename(TEST_MANIFEST)
@@ -37,8 +37,8 @@ class TestEntrypoint(unittest.TestCase):
     def _run_cmd(self, cmd):
         return subprocess.run(cmd, cwd=self.test_dir.name, check=True)
 
-    def test_full_run(self):
+    async def test_full_run(self):
         args1 = main.parse_cli_args(["--update", "--commit-only", self.manifest_path])
-        self.assertEqual(main.run_with_args(args1), (2, True))
+        self.assertEqual(await main.run_with_args(args1), (2, True))
         args2 = main.parse_cli_args([self.manifest_path])
-        self.assertEqual(main.run_with_args(args2), (0, False))
+        self.assertEqual(await main.run_with_args(args2), (0, False))

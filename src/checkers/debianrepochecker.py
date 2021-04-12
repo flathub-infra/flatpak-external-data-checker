@@ -91,10 +91,7 @@ def _get_timestamp_for_candidate(candidate):
 class DebianRepoChecker(Checker):
     CHECKER_DATA_TYPE = "debian-repo"
 
-    def __init__(self):
-        self._pkgs_cache = {}
-
-    def check(self, external_data):
+    async def check(self, external_data):
         assert self.should_check(external_data)
 
         LOG.debug("Checking %s", external_data.filename)

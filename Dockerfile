@@ -1,4 +1,4 @@
-FROM debian:buster
+FROM debian:bullseye
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -10,6 +10,7 @@ RUN apt-get update && \
       gir1.2-json-1.0 \
       python3-apt \
       python3-defusedxml \
+      python3-aiohttp \
       python3-gi \
       python3-cairo \
       python3-requests \

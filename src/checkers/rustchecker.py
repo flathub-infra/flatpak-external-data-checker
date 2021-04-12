@@ -16,7 +16,7 @@ VERSION_RE = re.compile(r"^(\S+)\s+\((\S+)\s+(\S+)\)")
 class RustChecker(Checker):
     CHECKER_DATA_TYPE = "rust"
 
-    def check(self, external_data):
+    async def check(self, external_data):
         assert self.should_check(external_data)
 
         channel = external_data.checker_data.get("channel", "stable")

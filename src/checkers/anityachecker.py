@@ -14,7 +14,7 @@ class AnityaChecker(HTMLChecker):
     CHECKER_DATA_TYPE = "anitya"
     SUPPORTED_DATA_CLASSES = [ExternalData, ExternalGitRepo]
 
-    def check(self, external_data):
+    async def check(self, external_data):
         assert self.should_check(external_data)
 
         instance_url = external_data.checker_data.get(
@@ -34,18 +34,18 @@ class AnityaChecker(HTMLChecker):
             latest_version = result["latest_version"]
 
         if isinstance(external_data, ExternalGitRepo):
-            return self._check_git(external_data, latest_version)
-        return self._check_data(external_data, latest_version)
+            return await self._check_git(external_data, latest_version)
+        return await self._check_data(external_data, latest_version)
 
-    def _check_data(self, external_data, latest_version):
+    async def _check_data(self, external_data, latest_version):
         url_template = external_data.checker_data["url-template"]
         latest_url = self._substitute_placeholders(url_template, latest_version)
 
-        self._update_version(
+        await self._update_version(
             external_data, latest_version, latest_url, follow_redirects=False
         )
 
-    def _check_git(self, external_data, latest_version):
+    async def _check_git(self, external_data, latest_version):
         tag_template = external_data.checker_data["tag-template"]
         latest_tag = self._substitute_placeholders(tag_template, latest_version)
 
