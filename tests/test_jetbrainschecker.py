@@ -7,13 +7,13 @@ from src.lib.utils import init_logging
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.jetbrains.PhpStorm.json")
 
 
-class TestJetBrainsChecker(unittest.TestCase):
+class TestJetBrainsChecker(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         init_logging()
 
-    def test_check(self):
+    async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
-        ext_data = checker.check()
+        ext_data = await checker.check()
 
         data = self._find_by_filename(ext_data, "phpstorm.tar.gz")
         self.assertIsNotNone(data)

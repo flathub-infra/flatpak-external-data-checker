@@ -38,7 +38,7 @@ def _filter_downloads(
 class PyPIChecker(Checker):
     CHECKER_DATA_TYPE = "pypi"
 
-    def check(self, external_data):
+    async def check(self, external_data):
         package_name = external_data.checker_data["name"]
         package_type = external_data.checker_data.get("packagetype", "sdist")
         constraints = external_data.checker_data.get("versions", {}).items()

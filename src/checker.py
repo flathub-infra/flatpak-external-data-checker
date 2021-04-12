@@ -21,6 +21,8 @@
 from collections import OrderedDict
 import datetime
 import typing as t
+import asyncio
+from dataclasses import dataclass
 
 from .checkers import ALL_CHECKERS
 from .lib.appdata import add_release_to_file
@@ -30,6 +32,7 @@ from .lib.externaldata import (
     ExternalGitRepo,
     ExternalFile,
     ExternalGitRef,
+    Checker,
 )
 from .lib.utils import read_manifest, dump_manifest
 
@@ -76,6 +79,12 @@ def _external_source_filter(manifest_path: str, source) -> t.Optional[bool]:
 
 
 class ManifestChecker:
+    @dataclass
+    class TasksCounter:
+        started: int = 0
+        finished: int = 0
+        total: int = 0
+
     def __init__(self, manifest: str):
         self._root_manifest_path = manifest
         self._root_manifest_dir = os.path.dirname(self._root_manifest_path)
@@ -83,7 +92,8 @@ class ManifestChecker:
         self._external_data = {}
 
         # Initialize checkers
-        self._checkers = [checker() for checker in ALL_CHECKERS]
+        self._checkers: t.List[t.Type[Checker]]
+        self._checkers = [checker_cls for checker_cls in ALL_CHECKERS]
         assert self._checkers
 
         # Map from filename to parsed contents of that file. Sources may be
@@ -167,49 +177,69 @@ class ManifestChecker:
                 )
                 self._external_data[external_source_path] = datas
 
-    def check(self, filter_type=None):
+    async def _check_data(
+        self, counter: TasksCounter, data: t.Union[ExternalData, ExternalGitRepo]
+    ):
+        src_rel_path = os.path.relpath(data.source_path, self._root_manifest_dir)
+        counter.started += 1
+        log.info(
+            "Started check [%d/%d] %s (from %s)",
+            counter.started,
+            counter.total,
+            data.filename,
+            src_rel_path,
+        )
+        for checker_cls in self._checkers:
+            checker = checker_cls()
+            if not checker.should_check(data):
+                continue
+            log.debug("Source %s: applying %s", data.filename, checker_cls.__name__)
+            async with checker:
+                await checker.check(data)
+            if data.state != ExternalData.State.UNKNOWN:
+                log.debug(
+                    "Source %s: got new state %s from %s, skipping remaining checkers",
+                    data.filename,
+                    data.state.name,
+                    checker_cls.__name__,
+                )
+                break
+            if data.new_version is not None:
+                log.debug(
+                    "Source %s: got new version from %s, skipping remaining checkers",
+                    data.filename,
+                    checker_cls.__name__,
+                )
+                break
+        counter.finished += 1
+        log.info(
+            "Finished check [%d/%d] %s (from %s)",
+            counter.finished,
+            counter.total,
+            data.filename,
+            src_rel_path,
+        )
+        return data
+
+    async def check(self, filter_type=None):
         """Perform the check for all the external data in the manifest
 
         It initializes an internal list of all the external data objects
         found in the manifest.
         """
-        ext_data_checked = []
-
         external_data = sum(self._external_data.values(), [])
         if filter_type is not None:
             external_data = [d for d in external_data if d.type == filter_type]
 
-        n = len(external_data)
-        for i, data in enumerate(external_data, 1):
+        counter = self.TasksCounter(total=len(external_data))
+        check_tasks = []
+        for data in external_data:
             if data.state != ExternalData.State.UNKNOWN:
                 continue
+            check_tasks.append(self._check_data(counter, data))
 
-            src_rel_path = os.path.relpath(data.source_path, self._root_manifest_dir)
-            log.info("[%d/%d] checking %s (from %s)", i, n, data.filename, src_rel_path)
-
-            for checker in self._checkers:
-                if not checker.should_check(data):
-                    continue
-                log.debug(
-                    "Source %s: applying %s", data.filename, type(checker).__name__
-                )
-                checker.check(data)
-                if data.state != ExternalData.State.UNKNOWN:
-                    log.debug(
-                        "Source %s: got new state %s from %s, skipping remaining checkers",
-                        data.filename,
-                        data.state.name,
-                        type(checker).__name__,
-                    )
-                    break
-                if data.new_version is not None:
-                    log.debug(
-                        "Source %s: got new version from %s, skipping remaining checkers",
-                        data.filename,
-                        type(checker).__name__,
-                    )
-                    break
-            ext_data_checked.append(data)
+        log.info("Checking %s external data items", counter.total)
+        ext_data_checked = await asyncio.gather(*check_tasks)
 
         return list(set(ext_data_checked))
 

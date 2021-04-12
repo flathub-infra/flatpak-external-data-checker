@@ -9,13 +9,13 @@ TEST_MANIFEST = os.path.join(
 )
 
 
-class TestRustChecker(unittest.TestCase):
+class TestRustChecker(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         init_logging()
 
-    def test_check(self):
+    async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
-        ext_data = checker.check()
+        ext_data = await checker.check()
 
         self.assertEqual(len(ext_data), 1)
         data = ext_data[0]

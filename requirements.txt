@@ -6,3 +6,4 @@ PyGithub
 ruamel.yaml
 toml
 pyelftools
+aiohttp

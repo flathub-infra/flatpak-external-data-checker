@@ -7,13 +7,13 @@ from src.lib.utils import init_logging
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.valvesoftware.Steam.yml")
 
 
-class TestPyPIChecker(unittest.TestCase):
+class TestPyPIChecker(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         init_logging()
 
-    def test_check(self):
+    async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
-        ext_data = checker.check()
+        ext_data = await checker.check()
 
         self.assertEqual(len(ext_data), 4)
         for data in ext_data:

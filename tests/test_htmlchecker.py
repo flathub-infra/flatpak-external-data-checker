@@ -30,13 +30,13 @@ from src.checker import ManifestChecker
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.x.xeyes.yml")
 
 
-class TestHTMLChecker(unittest.TestCase):
+class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         init_logging()
 
-    def test_check(self):
+    async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
-        ext_data = checker.check()
+        ext_data = await checker.check()
         self._test_separate_patterns(
             self._find_by_filename(ext_data, "xeyes-1.1.0.tar.bz2")
         )

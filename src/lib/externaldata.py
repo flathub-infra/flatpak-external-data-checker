@@ -27,6 +27,8 @@ import typing as t
 import os
 import logging
 
+import aiohttp
+
 from . import utils
 
 
@@ -343,6 +345,20 @@ class ExternalGitRepoSource(ExternalGitRepo):
 class Checker:
     CHECKER_DATA_TYPE: t.Optional[str] = None
     SUPPORTED_DATA_CLASSES: t.List[t.Type[ExternalBase]] = [ExternalData]
+    session: t.Optional[aiohttp.ClientSession]
+
+    def __init__(self):
+        self.session = None
+
+    async def __aenter__(self):
+        log.debug("Starting HTTP session for %s", self)
+        self.session = aiohttp.ClientSession(raise_for_status=True)
+        await self.session.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        log.debug("Closing HTTP session for %s", self)
+        await self.session.__aexit__(exc_type, exc_val, exc_tb)
 
     def should_check(
         self, external_data: t.Union[ExternalData, ExternalGitRepo]
@@ -356,5 +372,5 @@ class Checker:
         )
         return applicable and supported
 
-    def check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
+    async def check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
         pass

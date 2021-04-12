@@ -10,7 +10,7 @@ from src.checkers.gitchecker import TagWithVersion
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.virustotal.Uploader.yml")
 
 
-class TestGitChecker(unittest.TestCase):
+class TestGitChecker(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         init_logging()
 
@@ -27,9 +27,9 @@ class TestGitChecker(unittest.TestCase):
             sorted([t1, t1a, t3, t3a, t2], reverse=True), sorted_tags[::-1]
         )
 
-    def test_check_and_update(self):
+    async def test_check_and_update(self):
         checker = ManifestChecker(TEST_MANIFEST)
-        ext_data = checker.check()
+        ext_data = await checker.check()
 
         self.assertEqual(len(ext_data), 8)
         for data in ext_data:

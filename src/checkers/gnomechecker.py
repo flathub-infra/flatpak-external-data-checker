@@ -30,7 +30,7 @@ def _is_stable(version: str) -> bool:
 class GNOMEChecker(Checker):
     CHECKER_DATA_TYPE = "gnome"
 
-    def check(self, external_data):
+    async def check(self, external_data):
         external_data: ExternalData
         project_name = external_data.checker_data["name"]
         stable_only = external_data.checker_data.get("stable-only", True)

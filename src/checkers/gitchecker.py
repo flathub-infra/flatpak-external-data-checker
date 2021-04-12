@@ -42,15 +42,15 @@ class GitChecker(Checker):
     def should_check(self, external_data):
         return isinstance(external_data, ExternalGitRepo)
 
-    def check(self, external_data):
+    async def check(self, external_data):
         assert self.should_check(external_data)
         external_data: ExternalGitRepo
         if external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE:
-            return self._check_has_new(external_data)
-        return self._check_still_valid(external_data)
+            return await self._check_has_new(external_data)
+        return await self._check_still_valid(external_data)
 
     @staticmethod
-    def _check_has_new(external_data):
+    async def _check_has_new(external_data):
         tag_pattern = external_data.checker_data.get(
             "tag-pattern", r"^(?:[vV])?(\d[\d\w.-]+\d)"
         )
@@ -91,7 +91,7 @@ class GitChecker(Checker):
         external_data.set_new_version(new_version)
 
     @staticmethod
-    def _check_still_valid(external_data):
+    async def _check_still_valid(external_data):
         if (
             external_data.current_version.commit is not None
             and external_data.current_version.tag is None

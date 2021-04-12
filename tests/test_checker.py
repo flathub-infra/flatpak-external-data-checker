@@ -46,7 +46,7 @@ class DummyChecker(Checker):
     def should_check(self, external_data):
         return True
 
-    def check(self, external_data):
+    async def check(self, external_data):
         logging.debug(
             "Phony checker checking external data %s and all is always good",
             external_data.filename,
@@ -60,7 +60,7 @@ class UpdateEverythingChecker(DummyChecker):
     VERSION = "1.2.3.4"
     TIMESTAMP = dt.datetime(2019, 8, 28, 0, 0, 0)
 
-    def check(self, external_data):
+    async def check(self, external_data):
         external_data.state = ExternalData.State.BROKEN
         external_data.new_version = external_data.current_version._replace(
             size=self.SIZE,
@@ -70,32 +70,32 @@ class UpdateEverythingChecker(DummyChecker):
         )
 
 
-class TestExternalDataChecker(unittest.TestCase):
+class TestExternalDataChecker(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         init_logging()
 
-    def test_check_filtered(self):
+    async def test_check_filtered(self):
         # Use only the URLChecker which is fast so we don't have to wait a lot
         # for this test; so save the real checkers for later
         dummy_checker = ManifestChecker(TEST_MANIFEST)
-        dummy_checker._checkers = [DummyChecker()]
+        dummy_checker._checkers = [DummyChecker]
 
-        ext_data = dummy_checker.check()
+        ext_data = await dummy_checker.check()
         ext_data_from_getter = dummy_checker.get_external_data()
         self.assertEqual(len(ext_data), len(ext_data_from_getter))
         self.assertEqual(set(ext_data), set(ext_data_from_getter))
 
         self.assertEqual(len(ext_data), NUM_ALL_EXT_DATA)
-        ext_data = dummy_checker.check(ExternalData.Type.EXTRA_DATA)
+        ext_data = await dummy_checker.check(ExternalData.Type.EXTRA_DATA)
         self.assertEqual(len(ext_data), NUM_EXTRA_DATA_IN_MANIFEST)
 
-        ext_data = dummy_checker.check(ExternalData.Type.FILE)
+        ext_data = await dummy_checker.check(ExternalData.Type.FILE)
         self.assertEqual(len(ext_data), NUM_FILE_IN_MANIFEST)
 
-        ext_data = dummy_checker.check(ExternalData.Type.ARCHIVE)
+        ext_data = await dummy_checker.check(ExternalData.Type.ARCHIVE)
         self.assertEqual(len(ext_data), NUM_ARCHIVE_IN_MANIFEST)
 
-    def _test_update(
+    async def _test_update(
         self,
         filename,
         contents,
@@ -116,8 +116,8 @@ class TestExternalDataChecker(unittest.TestCase):
                 f.write("""<application></application>""")
 
             checker = ManifestChecker(manifest)
-            checker._checkers = [UpdateEverythingChecker()]
-            checker.check()
+            checker._checkers = [UpdateEverythingChecker]
+            await checker.check()
             updates = checker.update_manifests()
 
             with open(manifest, "r") as f:
@@ -138,7 +138,7 @@ class TestExternalDataChecker(unittest.TestCase):
             else:
                 self.assertEqual(releases, [])
 
-    def test_update_json(self):
+    async def test_update_json(self):
         filename = "com.example.App.json"
         contents = """
 /* unfortunately we can't or won't preserve C-style comments */
@@ -178,14 +178,14 @@ class TestExternalDataChecker(unittest.TestCase):
     ]
 }}""".lstrip()  # noqa: E501
 
-        self._test_update(
+        await self._test_update(
             filename,
             contents,
             expected_new_contents,
             ["Update UnityHubSetup.AppImage to 1.2.3.4"],
         )
 
-    def test_update_yaml(self):
+    async def test_update_yaml(self):
         filename = "com.example.App.yaml"
         contents = """
 id: com.example.App
@@ -233,14 +233,14 @@ modules:
         only-arches:
           - x86_64
 """.lstrip()
-        self._test_update(
+        await self._test_update(
             filename,
             contents,
             expected_new_contents,
             ["Update UnityHubSetup.AppImage to 1.2.3.4"],
         )
 
-    def test_update_no_new_version(self):
+    async def test_update_no_new_version(self):
         filename = "com.example.App.yaml"
         contents = """
 id: com.example.App
@@ -264,7 +264,7 @@ modules:
         sha256: {UpdateEverythingChecker.CHECKSUM}
         size: {UpdateEverythingChecker.SIZE}
 """.lstrip()
-        self._test_update(
+        await self._test_update(
             filename,
             contents,
             expected_new_contents,
@@ -272,9 +272,9 @@ modules:
             new_release=False,
         )
 
-    def test_check(self):
+    async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
-        ext_data = checker.check()
+        ext_data = await checker.check()
 
         self.assertEqual(len(ext_data), NUM_ALL_EXT_DATA)
 
