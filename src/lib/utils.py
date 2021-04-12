@@ -38,7 +38,7 @@ from distutils.version import StrictVersion, LooseVersion
 from collections import OrderedDict
 from ruamel.yaml import YAML
 from elftools.elf.elffile import ELFFile
-import requests
+import aiohttp
 
 from . import externaldata
 
@@ -100,38 +100,36 @@ def get_timestamp_from_url(url):
         return _extract_timestamp(response.info())
 
 
-def get_extra_data_info_from_url(
-    url, follow_redirects=True, dest_io: t.Optional[t.IO] = None
+async def get_extra_data_info_from_url(
+    url: str,
+    follow_redirects: bool = True,
+    session: t.Optional[aiohttp.ClientSession] = None,
+    dest_io: t.Optional[t.IO] = None,
 ):
-    http_adapter = requests.adapters.HTTPAdapter(
-        max_retries=requests.adapters.Retry(total=2)
-    )
+    if session is None:
+        private_session = True
+        session = aiohttp.ClientSession(raise_for_status=True)
+    else:
+        private_session = False
 
-    with requests.Session() as session:
-        session.mount(
-            urllib.parse.urlunparse(urllib.parse.urlparse(url)._replace(path="/")),
-            http_adapter,
-        )
-        with session.get(
-            url, headers=HEADERS, timeout=TIMEOUT_SECONDS, stream=True
-        ) as response:
-            response.raise_for_status()
-            real_url = response.url
-            info = response.headers
-            checksum = hashlib.sha256()
-            size = 0
-            for chunk in response.iter_content(HTTP_CHUNK_SIZE):
-                checksum.update(chunk)
-                size += len(chunk)
-                if dest_io is not None:
-                    dest_io.write(chunk)
+    async with session.get(
+        url,
+        headers=HEADERS,
+        timeout=aiohttp.ClientTimeout(connect=TIMEOUT_SECONDS),
+        # auto_decompress=False,
+    ) as response:
+        real_url = str(response.url)
+        info = response.headers
+        checksum = hashlib.sha256()
+        size = 0
+        async for chunk in response.content.iter_chunked(HTTP_CHUNK_SIZE):
+            checksum.update(chunk)
+            size += len(chunk)
+            if dest_io is not None:
+                dest_io.write(chunk)
 
-            if "Content-Length" in info:
-                content_length = int(info["Content-Length"])
-                if size < content_length:
-                    raise requests.exceptions.ChunkedEncodingError(
-                        f"Incomplete read: expected {content_length} bytes, got {size}"
-                    )
+    if private_session:
+        session.close()
 
     external_file = externaldata.ExternalFile(
         strip_query(real_url if follow_redirects else url),

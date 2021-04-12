@@ -26,6 +26,7 @@ from distutils.version import LooseVersion
 import typing as t
 
 import requests
+import aiohttp
 
 from ..lib import utils
 from ..lib.externaldata import ExternalData, Checker
@@ -131,13 +132,14 @@ class HTMLChecker(Checker):
         assert latest_url is not None
 
         try:
-            new_version = utils.get_extra_data_info_from_url(
-                latest_url, follow_redirects
+            new_version = await utils.get_extra_data_info_from_url(
+                latest_url, follow_redirects=follow_redirects, session=self.session
             )
         except (
-            requests.exceptions.HTTPError,
-            requests.exceptions.ConnectionError,
-            requests.exceptions.ChunkedEncodingError,
+            aiohttp.ClientError,
+            aiohttp.ServerConnectionError,
+            aiohttp.ServerDisconnectedError,
+            aiohttp.ServerTimeoutError,
         ) as e:
             log.warning("%s returned %s", latest_url, e)
             external_data.state = ExternalData.State.BROKEN
