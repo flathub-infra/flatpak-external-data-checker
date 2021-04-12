@@ -36,7 +36,7 @@ import logging
 import re
 import tempfile
 
-import requests
+import aiohttp
 
 from ..lib.externaldata import ExternalData, Checker
 from ..lib import utils
@@ -85,19 +85,22 @@ class URLChecker(Checker):
         try:
             if url.endswith(".AppImage"):
                 with tempfile.TemporaryFile("w+b") as tmpfile:
-                    new_version = utils.get_extra_data_info_from_url(
-                        url, dest_io=tmpfile
+                    new_version = await utils.get_extra_data_info_from_url(
+                        url, session=self.session, dest_io=tmpfile
                     )
                     version_string = utils.extract_appimage_version(
                         external_data.filename,
                         tmpfile,
                     )
             else:
-                new_version = utils.get_extra_data_info_from_url(url)
+                new_version = await utils.get_extra_data_info_from_url(
+                    url, session=self.session
+                )
         except (
-            requests.exceptions.HTTPError,
-            requests.exceptions.ConnectionError,
-            requests.exceptions.ChunkedEncodingError,
+            aiohttp.ClientError,
+            aiohttp.ServerConnectionError,
+            aiohttp.ServerDisconnectedError,
+            aiohttp.ServerTimeoutError,
         ) as e:
             log.warning("%s returned %s", url, e)
             external_data.state = ExternalData.State.BROKEN
