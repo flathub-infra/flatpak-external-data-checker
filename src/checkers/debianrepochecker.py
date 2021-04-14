@@ -37,6 +37,7 @@ import logging
 import os
 import tempfile
 import urllib.parse
+import re
 
 from ..lib.externaldata import Checker, ExternalFile
 from ..lib.utils import get_timestamp_from_url
@@ -127,7 +128,7 @@ class DebianRepoChecker(Checker):
                     urllib.parse.urljoin(root.rstrip("/") + "/", source_file.path),
                     str(source_file.hashes.find("sha256")).split(":")[1],
                     source_file.size,
-                    source_version,
+                    re.sub(r"^\d+:", "", source_version),  # Strip epoch if present
                     timestamp=None,
                 )
             else:
