@@ -11,6 +11,9 @@ RUN apt-get update && \
       python3-apt \
       python3-defusedxml \
       python3-aiohttp \
+      python3-chardet \
+      python3-aiodns \
+      python3-brotli \
       python3-gi \
       python3-cairo \
       python3-requests \
