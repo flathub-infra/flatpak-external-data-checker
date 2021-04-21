@@ -55,7 +55,6 @@ USER_AGENT = (
     "(+https://github.com/flathub/flatpak-external-data-checker)"
 )
 HEADERS = {"User-Agent": USER_AGENT}
-TIMEOUT_SECONDS = 60
 HTTP_CHUNK_SIZE = 1024 * 64
 
 OPERATORS = {
@@ -96,7 +95,9 @@ def strip_query(url):
 
 def get_timestamp_from_url(url):
     request = urllib.request.Request(url, headers=HEADERS, method="HEAD")
-    with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+    with urllib.request.urlopen(
+        request, timeout=externaldata.TIMEOUT_CONNECT
+    ) as response:
         return _extract_timestamp(response.info())
 
 
@@ -109,7 +110,6 @@ async def get_extra_data_info_from_url(
     async with session.get(
         url,
         headers=HEADERS,
-        timeout=aiohttp.ClientTimeout(connect=TIMEOUT_SECONDS),
         # auto_decompress=False,
     ) as response:
         real_url = str(response.url)

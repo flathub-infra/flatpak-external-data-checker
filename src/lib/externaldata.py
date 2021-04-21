@@ -32,6 +32,8 @@ import aiohttp
 from . import utils
 
 
+TIMEOUT_CONNECT = 60
+TIMEOUT_TOTAL = 60 * 10
 log = logging.getLogger(__name__)
 
 
@@ -352,7 +354,10 @@ class Checker:
 
     async def __aenter__(self):
         log.debug("Starting HTTP session for %s", self)
-        self.session = aiohttp.ClientSession(raise_for_status=True)
+        self.session = aiohttp.ClientSession(
+            raise_for_status=True,
+            timeout=aiohttp.ClientTimeout(connect=TIMEOUT_CONNECT, total=TIMEOUT_TOTAL),
+        )
         await self.session.__aenter__()
         return self
 
