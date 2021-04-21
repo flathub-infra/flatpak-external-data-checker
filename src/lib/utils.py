@@ -102,16 +102,10 @@ def get_timestamp_from_url(url):
 
 async def get_extra_data_info_from_url(
     url: str,
+    session: aiohttp.ClientSession,
     follow_redirects: bool = True,
-    session: t.Optional[aiohttp.ClientSession] = None,
     dest_io: t.Optional[t.IO] = None,
 ):
-    if session is None:
-        private_session = True
-        session = aiohttp.ClientSession(raise_for_status=True)
-    else:
-        private_session = False
-
     async with session.get(
         url,
         headers=HEADERS,
@@ -127,9 +121,6 @@ async def get_extra_data_info_from_url(
             size += len(chunk)
             if dest_io is not None:
                 dest_io.write(chunk)
-
-    if private_session:
-        session.close()
 
     external_file = externaldata.ExternalFile(
         strip_query(real_url if follow_redirects else url),
