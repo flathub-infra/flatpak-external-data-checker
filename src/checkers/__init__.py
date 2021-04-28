@@ -1,4 +1,5 @@
 from .debianrepochecker import DebianRepoChecker
+from .rpmrepochecker import RPMRepoChecker
 from .jsonchecker import JSONChecker
 from .urlchecker import URLChecker
 from .htmlchecker import HTMLChecker
@@ -16,6 +17,7 @@ from .chromiumchecker import ChromiumChecker
 # set to something other than UNKNOWN.
 ALL_CHECKERS = [
     DebianRepoChecker,
+    RPMRepoChecker,
     HTMLChecker,
     JetBrainsChecker,
     SnapcraftChecker,
