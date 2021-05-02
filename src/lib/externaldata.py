@@ -37,6 +37,7 @@ from .errors import (
     SourceLoadError,
     SourceUnsupported,
 )
+from .checksums import MultiDigest
 
 _BS = t.TypeVar("_BS", bound="BuilderSource")
 _ES = t.TypeVar("_ES", bound="ExternalState")
@@ -200,10 +201,12 @@ class ExternalBase(BuilderSource):
 
 @dataclasses.dataclass(frozen=True)
 class ExternalFile(ExternalState):
-    checksum: t.Optional[str]
+    checksum: MultiDigest
     size: t.Optional[int]
 
     def matches(self, other: ExternalFile):
+        for i in (self, other):
+            assert i.checksum is None or isinstance(i.checksum, MultiDigest), i.checksum
         return (
             self.url == other.url
             and self.checksum == other.checksum
@@ -236,7 +239,7 @@ class ExternalData(ExternalBase):
             or cls._name_from_url(url)
         )
 
-        sha256sum = source.get("sha256")
+        checksum = MultiDigest.from_source(source)
         size = source.get("size")
         checker_data = source.get("x-checker-data", {})
         arches = checker_data.get("arches") or source.get("only-arches") or ["x86_64"]
@@ -250,7 +253,7 @@ class ExternalData(ExternalBase):
             checker_data,
             ExternalFile(
                 url=url_str,
-                checksum=sha256sum,
+                checksum=checksum,
                 size=size,
                 version=None,
                 timestamp=None,
@@ -262,7 +265,7 @@ class ExternalData(ExternalBase):
     def update(self):
         if self.new_version is not None:
             self.source["url"] = self.new_version.url
-            self.source["sha256"] = self.new_version.checksum
+            self.new_version.checksum.update_source(self.source)
             if self.source["type"] == "extra-data":
                 assert self.new_version.size is not None
                 self.source["size"] = self.new_version.size
