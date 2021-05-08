@@ -20,6 +20,8 @@ modules:
         x-checker-data:
           type: anitya
           project-id: 6377
+          versions:
+            ==: "1.10.1"
           url-template: https://github.com/flatpak/flatpak/releases/download/$version/flatpak-$version.tar.xz
           
   - name: boost

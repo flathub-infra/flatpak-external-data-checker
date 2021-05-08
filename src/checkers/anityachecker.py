@@ -3,6 +3,7 @@ import urllib.request
 import urllib.parse
 
 from ..lib.externaldata import ExternalData, ExternalGitRepo, ExternalGitRef
+from ..lib.utils import filter_versions
 from .htmlchecker import HTMLChecker
 
 log = logging.getLogger(__name__)
@@ -20,13 +21,20 @@ class AnityaChecker(HTMLChecker):
         )
         versions_url = urllib.request.urljoin(instance_url, "/api/v2/versions/")
         stable_only = external_data.checker_data.get("stable-only", False)
+        constraints = external_data.checker_data.get("versions", {}).items()
 
         query = {"project_id": external_data.checker_data.get("project-id")}
         async with self.session.get(versions_url, params=query) as response:
             result = await response.json()
 
-        if stable_only:
-            latest_version = result["stable_versions"][0]
+        if stable_only or constraints:
+            if stable_only:
+                versions = result["stable_versions"]
+            else:
+                versions = result["versions"]
+            if constraints:
+                versions = filter_versions(versions, constraints, sort=False)
+            latest_version = versions[0]
         else:
             latest_version = result["latest_version"]
 

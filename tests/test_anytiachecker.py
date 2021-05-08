@@ -1,5 +1,6 @@
 import os
 import unittest
+from distutils.version import LooseVersion
 
 from src.checker import ManifestChecker
 from src.lib.externaldata import ExternalFile, ExternalGitRef
@@ -25,6 +26,10 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                     data.new_version.url,
                     r"^https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs[\d]+/ghostscript-[\d.]+.tar.xz$",
                 )
+                self.assertIsNotNone(data.new_version.version)
+                self.assertGreater(
+                    LooseVersion(data.new_version.version), LooseVersion("9.26")
+                )
                 self.assertIsInstance(data.new_version.size, int)
                 self.assertGreater(data.new_version.size, 0)
                 self.assertIsNotNone(data.new_version.checksum)
@@ -40,6 +45,10 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                     data.new_version.url,
                     r"^https://boostorg\.jfrog\.io/artifactory/main/release/[\d.]+/source/boost_[\d]+_[\d]+_[\d]+.tar.bz2$",
                 )
+                self.assertIsNotNone(data.new_version.version)
+                self.assertGreater(
+                    LooseVersion(data.new_version.version), LooseVersion("1.74.0")
+                )
                 self.assertIsInstance(data.new_version.size, int)
                 self.assertGreater(data.new_version.size, 0)
                 self.assertIsNotNone(data.new_version.checksum)
@@ -54,6 +63,10 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertRegex(
                     data.new_version.url,
                     r"^https://github.com/flatpak/flatpak/releases/download/[\w\d.]+/flatpak-[\w\d.]+.tar.xz$",
+                )
+                self.assertIsNotNone(data.new_version.version)
+                self.assertEqual(
+                    LooseVersion(data.new_version.version), LooseVersion("1.10.1")
                 )
                 self.assertIsInstance(data.new_version.size, int)
                 self.assertGreater(data.new_version.size, 0)
@@ -73,6 +86,9 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertNotEqual(data.new_version.tag, data.current_version.tag)
                 self.assertIsNotNone(data.new_version.version)
+                self.assertGreater(
+                    LooseVersion(data.new_version.version), LooseVersion("2020.7")
+                )
                 self.assertNotEqual(
                     data.new_version.commit, data.current_version.commit
                 )
