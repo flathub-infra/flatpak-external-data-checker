@@ -69,13 +69,19 @@ OPERATORS = {
 
 def _extract_timestamp(info):
     date_str = info.get("Last-Modified") or info.get("Date")
-    if date_str:
-        try:
-            return dt.datetime.strptime(date_str, "%a, %d %b %Y %H:%M:%S %Z")
-        except ValueError:
-            return dt.datetime.strptime(date_str, "%a, %d-%b-%Y %H:%M:%S %Z")
-    else:
+    if not date_str:
         return dt.datetime.now()  # what else can we do?
+    for date_fmt in [
+        "%a, %d %b %Y %H:%M:%S %Z",
+        "%a, %d %b %Y %H:%M:%S %z",
+        "%a, %d-%b-%Y %H:%M:%S %Z",
+        "%a, %d-%b-%Y %H:%M:%S %z",
+    ]:
+        try:
+            return dt.datetime.strptime(date_str, date_fmt)
+        except ValueError:
+            continue
+    raise ValueError(date_str)
 
 
 def strip_query(url):
