@@ -21,8 +21,15 @@ import unittest
 import subprocess
 import os
 import asyncio
+from datetime import datetime, timezone
 
-from src.lib.utils import parse_github_url, strip_query, clear_env, filter_versions
+from src.lib.utils import (
+    parse_github_url,
+    strip_query,
+    clear_env,
+    filter_versions,
+    _extract_timestamp,
+)
 
 
 class TestParseGitHubUrl(unittest.TestCase):
@@ -130,6 +137,30 @@ class TestVersionFilter(unittest.TestCase):
             ),
             [("d", "1.0"), ("c", "1.1"), ("a", "1.3")],
         )
+
+
+class TestParseHTTPDate(unittest.TestCase):
+    def test_parse_valid(self):
+        for date_str in [
+            "Wed, 20 Jan 2021 15:25:15 UTC",
+            "Wed, 20-Jan-2021 15:25:15 UTC",
+            "Wed, 20 Jan 2021 15:25:15 +0000",
+            "Wed, 20 Jan 2021 18:25:15 +0300",
+        ]:
+            parsed = _extract_timestamp({"Date": date_str})
+            self.assertEqual(
+                parsed,
+                datetime(
+                    # fmt: off
+                    2021, 1, 20, 15, 25, 15,
+                    tzinfo=timezone.utc if parsed.tzinfo else None
+                    # fmt: on
+                ),
+            )
+
+    @unittest.expectedFailure
+    def test_parse_invalid(self):
+        self.assertIsNotNone(_extract_timestamp({"Date": "some broken string"}))
 
 
 if __name__ == "__main__":
