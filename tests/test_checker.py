@@ -40,6 +40,9 @@ NUM_EXTRA_DATA_IN_MANIFEST = 9
 NUM_ALL_EXT_DATA = (
     NUM_ARCHIVE_IN_MANIFEST + NUM_FILE_IN_MANIFEST + NUM_EXTRA_DATA_IN_MANIFEST
 )
+NUM_UP_TO_DATE_DATA = 1
+NUM_OUTDATED_DATA = NUM_ALL_EXT_DATA - NUM_UP_TO_DATE_DATA
+NUM_NEW_VERSIONS = 2
 
 
 class DummyChecker(Checker):
@@ -284,7 +287,7 @@ modules:
             if data.new_version:
                 ext_data_with_new_version += 1
 
-        self.assertEqual(ext_data_with_new_version, 2)
+        self.assertEqual(ext_data_with_new_version, NUM_NEW_VERSIONS)
 
         file_ext_data = checker.get_external_data(ExternalData.Type.FILE)
         self.assertEqual(len(file_ext_data), NUM_FILE_IN_MANIFEST)
@@ -296,7 +299,7 @@ modules:
         self.assertEqual(len(extra_data), NUM_EXTRA_DATA_IN_MANIFEST)
 
         outdated_ext_data = checker.get_outdated_external_data()
-        self.assertEqual(len(outdated_ext_data), NUM_ALL_EXT_DATA - 1)
+        self.assertEqual(len(outdated_ext_data), NUM_OUTDATED_DATA)
 
         dropbox = self._find_by_filename(ext_data, "dropbox.tgz")
         self.assertIsNotNone(dropbox)
