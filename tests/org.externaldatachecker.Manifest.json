@@ -81,6 +81,19 @@
                 },
                 {
                     "type": "extra-data",
+                    "filename": "strip-query.txt",
+                    "url": "https://httpbingo.org/response-headers",
+                    "//": "This is sha256 of '{}' string, returned by the url above (without GET params)",
+                    "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+                    "size": 2,
+                    "x-checker-data": {
+                        "type": "rotating-url",
+                        "url": "https://httpbingo.org/redirect-to?url=/response-headers?This-Should-Be=Removed",
+                        "strip-query": true
+                    }
+                },
+                {
+                    "type": "extra-data",
                     "filename": "http-404.txt",
                     "url": "https://httpbingo.org/status/404",
                     "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
