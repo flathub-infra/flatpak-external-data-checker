@@ -3,6 +3,8 @@ import re
 import typing as t
 from distutils.version import LooseVersion
 
+import semver
+
 from ..lib.externaldata import Checker, ExternalGitRepo, ExternalGitRef
 from ..lib.utils import git_ls_remote
 
@@ -18,10 +20,14 @@ class TagWithVersion(t.NamedTuple):
     annotated: bool
     version: str
 
+    @property
+    def parsed_version(self):
+        return LooseVersion(self.version)
+
     def __lt__(self, other):
         if self.tag == other.tag:
             return self.annotated and not other.annotated
-        return LooseVersion(self.version) < LooseVersion(other.version)
+        return self.parsed_version < other.parsed_version
 
     def __le__(self, other):
         return self == other or self < other
@@ -29,10 +35,16 @@ class TagWithVersion(t.NamedTuple):
     def __gt__(self, other):
         if self.tag == other.tag:
             return not self.annotated and other.annotated
-        return LooseVersion(self.version) > LooseVersion(other.version)
+        return self.parsed_version > other.parsed_version
 
     def __ge__(self, other):
         return self == other or self > other
+
+
+class TagWithSemver(TagWithVersion):
+    @property
+    def parsed_version(self):
+        return semver.VersionInfo.parse(self.version)
 
 
 class GitChecker(Checker):

@@ -7,3 +7,4 @@ ruamel.yaml
 toml
 pyelftools
 aiohttp
+semver
