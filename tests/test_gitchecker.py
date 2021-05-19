@@ -5,7 +5,7 @@ import unittest
 from src.checker import ManifestChecker
 from src.lib.externaldata import ExternalGitRepo, ExternalGitRef
 from src.lib.utils import init_logging
-from src.checkers.gitchecker import TagWithVersion
+from src.checkers.gitchecker import TagWithVersion, TagWithSemver
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.virustotal.Uploader.yml")
 
@@ -22,10 +22,24 @@ class TestGitChecker(unittest.IsolatedAsyncioTestCase):
         t3a = TagWithVersion("z2", "v1.2", True, "1.2")
         self.assertTrue(t1a <= t1 < t3 and t3 >= t3a > t1)
         sorted_tags = [t1a, t1, t2, t3a, t3]
-        self.assertEqual(sorted([t1, t1a, t3, t3a, t2]), sorted_tags)
-        self.assertEqual(
-            sorted([t1, t1a, t3, t3a, t2], reverse=True), sorted_tags[::-1]
-        )
+        shaked_tags = [t1, t1a, t3, t3a, t2]
+        self.assertEqual(sorted(shaked_tags), sorted_tags)
+        self.assertEqual(sorted(shaked_tags, reverse=True), sorted_tags[::-1])
+
+    def test_sort_tags_semver(self):
+        ts1 = TagWithSemver("x1", "v0.3", False, "0.3.0")
+        ts1a = TagWithSemver("x1", "v0.3", True, "0.3.0")
+        ts2 = TagWithSemver("x1", "v0.3.1", False, "0.3.1")
+        ts2a = TagWithSemver("x1", "v0.3.1", True, "0.3.1")
+        ts3 = TagWithSemver("x1", "v0.4.0-beta.1", False, "0.4.0-beta.1")
+        ts3a = TagWithSemver("x1", "v0.4.0-beta.1", True, "0.4.0-beta.1")
+        ts4 = TagWithSemver("x1", "v0.4.0", False, "0.4.0")
+        ts4a = TagWithSemver("x1", "v0.4.0", True, "0.4.0")
+        self.assertTrue(ts1a <= ts1 < ts3 and ts3 >= ts3a > ts1)
+        sorted_tags_sem = [ts1a, ts1, ts2a, ts2, ts3a, ts3, ts4a, ts4]
+        shaked_tags_sem = [ts2, ts1, ts4, ts1a, ts4a, ts3, ts3a, ts2a]
+        self.assertEqual(sorted(shaked_tags_sem), sorted_tags_sem)
+        self.assertEqual(sorted(shaked_tags_sem, reverse=True), sorted_tags_sem[::-1])
 
     async def test_check_and_update(self):
         checker = ManifestChecker(TEST_MANIFEST)

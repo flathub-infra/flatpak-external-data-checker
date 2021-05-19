@@ -23,6 +23,7 @@ RUN apt-get update && \
       python3-setuptools \
       python3-toml \
       python3-pyelftools \
+      python3-semver \
       squashfs-tools \
       ssh-client \
       jq \
