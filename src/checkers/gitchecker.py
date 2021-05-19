@@ -47,6 +47,12 @@ class TagWithSemver(TagWithVersion):
         return semver.VersionInfo.parse(self.version)
 
 
+TAG_VERSION_SCHEMES = {
+    "loose": TagWithVersion,
+    "semantic": TagWithSemver,
+}
+
+
 class GitChecker(Checker):
     CHECKER_DATA_TYPE = "git"
     SUPPORTED_DATA_CLASSES = [ExternalGitRepo]
@@ -69,6 +75,9 @@ class GitChecker(Checker):
         tag_re = re.compile(tag_pattern)
         assert tag_re.groups == 1
 
+        version_scheme = external_data.checker_data.get("version-scheme", "loose")
+        tag_cls = TAG_VERSION_SCHEMES[version_scheme]
+
         matching_tags = []
         refs = await git_ls_remote(external_data.current_version.url)
         for ref, commit in refs.items():
@@ -84,7 +93,7 @@ class GitChecker(Checker):
             if not tag_match:
                 continue
             version = tag_match.group(1)
-            matching_tags.append(TagWithVersion(commit, tag, annotated, version))
+            matching_tags.append(tag_cls(commit, tag, annotated, version))
 
         if external_data.checker_data.get("sort-tags", True):
             sorted_tags = sorted(matching_tags)
