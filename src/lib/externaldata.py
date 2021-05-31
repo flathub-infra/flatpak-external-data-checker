@@ -352,7 +352,7 @@ class ExternalGitRepoSource(ExternalGitRepo):
 class Checker:
     CHECKER_DATA_TYPE: t.Optional[str] = None
     SUPPORTED_DATA_CLASSES: t.List[t.Type[ExternalBase]] = [ExternalData]
-    session: t.Optional[aiohttp.ClientSession]
+    session: aiohttp.ClientSession
 
     def __init__(self):
         self.session = None
