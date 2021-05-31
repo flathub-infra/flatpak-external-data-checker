@@ -1,0 +1,186 @@
+import aiohttp
+import base64
+import logging
+import re
+import typing as t
+
+from ..lib.externaldata import (
+    Checker,
+    ExternalBase,
+    ExternalData,
+    ExternalDataSource,
+    ExternalGitRepo,
+    ExternalGitRef,
+)
+from ..lib.utils import get_extra_data_info_from_url
+
+log = logging.getLogger(__name__)
+
+
+class Component:
+    NAME: str
+    DATA_CLASS: t.Type[ExternalBase]
+
+    def __init__(
+        self,
+        session: aiohttp.ClientSession,
+        external_data: ExternalBase,
+        latest_version: str,
+    ) -> None:
+        self.session = session
+        self.external_data = external_data
+        self.latest_version = latest_version
+
+        assert latest_version is not None
+
+    async def check(self) -> None:
+        raise NotImplemented
+
+    async def update_external_source_version(self, latest_url):
+        assert latest_url is not None
+
+        try:
+            new_version = await get_extra_data_info_from_url(latest_url, self.session)
+        except (
+            aiohttp.ClientError,
+            aiohttp.ServerConnectionError,
+            aiohttp.ServerDisconnectedError,
+            aiohttp.ServerTimeoutError,
+        ) as e:
+            log.warning("%s returned %s", latest_url, e)
+            self.external_data.state = ExternalData.State.BROKEN
+        else:
+            new_version = new_version._replace(  # pylint: disable=no-member
+                version=self.latest_version
+            )
+            self.external_data.set_new_version(new_version)
+
+
+class ChromiumComponent(Component):
+    NAME = "chromium"
+    DATA_CLASS = ExternalDataSource
+
+    _URL_FORMAT = (
+        "https://commondatastorage.googleapis.com"
+        "/chromium-browser-official/chromium-{version}.tar.xz"
+    )
+
+    async def check(self) -> None:
+        assert isinstance(self.external_data, ExternalDataSource)
+
+        latest_url = self._URL_FORMAT.format(version=self.latest_version)
+        await self.update_external_source_version(latest_url)
+
+
+class LLVMComponent(Component):
+    class Version(t.NamedTuple):
+        revision: str
+        sub_revision: str
+
+    _UPDATE_PY_URL_FORMAT = (
+        "https://chromium.googlesource.com/chromium/src/+"
+        "/{version}/tools/clang/scripts/update.py"
+    )
+
+    _UPDATE_PY_PARAMS = {"format": "TEXT"}
+
+    _CLANG_REVISION_RE = re.compile(r"CLANG_REVISION = '(.*)'")
+    _CLANG_SUB_REVISION_RE = re.compile(r"CLANG_SUB_REVISION = (\d+)")
+
+    async def get_llvm_version(self) -> "LLVMComponent.Version":
+        url = self._UPDATE_PY_URL_FORMAT.format(version=self.latest_version)
+        async with self.session.get(url, params=self._UPDATE_PY_PARAMS) as response:
+            result = await response.text()
+
+        update_py = base64.b64decode(result).decode("utf-8")
+
+        revision_match = self._CLANG_REVISION_RE.search(update_py)
+        assert revision_match is not None, url
+
+        sub_revision_match = self._CLANG_SUB_REVISION_RE.search(update_py)
+        assert sub_revision_match is not None, url
+
+        return LLVMComponent.Version(
+            revision_match.group(1), sub_revision_match.group(1)
+        )
+
+
+class LLVMGitComponent(LLVMComponent):
+    NAME = "llvm-git"
+    DATA_CLASS = ExternalGitRepo
+
+    _LLVM_REPO_URL = "https://github.com/llvm/llvm-project"
+
+    async def check(self) -> None:
+        assert isinstance(self.external_data, ExternalGitRepo)
+
+        llvm_version = await self.get_llvm_version()
+
+        new_version = await ExternalGitRef(
+            url=self.external_data.current_version.url,
+            commit=llvm_version.revision,
+            tag=None,
+            branch=None,
+            version=self.latest_version,
+            timestamp=None,
+        ).fetch_remote()
+        self.external_data.set_new_version(new_version)
+
+
+class LLVMPrebuiltComponent(LLVMComponent):
+    NAME = "llvm-prebuilt"
+    DATA_CLASS = ExternalDataSource
+
+    _PREBUILT_URL_FORMAT = (
+        "https://commondatastorage.googleapis.com"
+        "/chromium-browser-clang/Linux_x64/clang-{revision}-{sub_revision}.tgz"
+    )
+
+    async def check(self) -> None:
+        assert isinstance(self.external_data, ExternalDataSource)
+
+        llvm_version = await self.get_llvm_version()
+
+        latest_url = self._PREBUILT_URL_FORMAT.format(
+            revision=llvm_version.revision, sub_revision=llvm_version.sub_revision
+        )
+        await self.update_external_source_version(latest_url)
+
+
+class ChromiumChecker(Checker):
+    CHECKER_DATA_TYPE = "chromium"
+    SUPPORTED_DATA_CLASSES = [ExternalData, ExternalGitRepo]
+
+    _COMPONENTS = {
+        c.NAME: c for c in (ChromiumComponent, LLVMGitComponent, LLVMPrebuiltComponent)
+    }
+
+    _CHROMIUM_VERSIONS_URL = "https://omahaproxy.appspot.com/all.json"
+    _CHROMIUM_VERSIONS_PARAMS = {"os": "linux", "channel": "stable"}
+
+    async def _get_latest_chromium(self) -> str:
+        async with self.session.get(
+            self._CHROMIUM_VERSIONS_URL, params=self._CHROMIUM_VERSIONS_PARAMS
+        ) as response:
+            result = await response.json()
+
+        assert len(result) == 1, result
+        assert len(result[0]["versions"]) == 1, result
+        return result[0]["versions"][0]["current_version"]
+
+    async def check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
+        assert self.should_check(external_data)
+
+        component_name = external_data.checker_data.get(
+            "component", ChromiumComponent.NAME
+        )
+        if component_name not in self._COMPONENTS:
+            raise ValueError(f"Invalid component {component_name}")
+
+        component_class = self._COMPONENTS[component_name]
+        if not isinstance(external_data, component_class.DATA_CLASS):
+            raise ValueError(f"Invalid source type for component {component_name}")
+
+        latest_version = await self._get_latest_chromium()
+        component = component_class(self.session, external_data, latest_version)
+        await component.check()

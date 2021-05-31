@@ -27,6 +27,7 @@ data in Flatpak manifests.
     - [JetBrains checker](#jetbrains-checker)
     - [Snapcraft checker](#snapcraft-checker)
     - [Rust checker](#rust-checker)
+    - [Chromium checker](#chromium-checker)
 - [License and Copyright](#license-and-copyright)
 
 ## Motivation
@@ -354,6 +355,29 @@ for [Rust](https://www.rust-lang.org/):
     "target": "target triple, for example: x86_64-unknown-linux-gnu"
 }
 ```
+
+### Chromium checker
+
+Special checker that will check for available updates to the
+[Chromium](https://www.chromium.org/) tarballs, as well as the toolchain
+binaries or sources used to build it.
+
+```json
+"x-checker-data": {
+    "type": "chromium",
+    "component": "chromium, llvm-prebuilt, or llvm-git; defaults to chromium"
+}
+```
+
+The following components are supported:
+
+- `chromium`: updates the Chromium tarball itself, used on URL-based sources
+  (e.g. `type: archive`).
+- `llvm-prebuilt`: updates a tarball pointing to the official LLVM prebuilt
+  toolchain archive matching the latest Chromium version. Used on URL-based
+  sources.
+- `llvm-git`: updates a `type: git` source for its commit to point to the LLVM
+  sources for the toolchain used by the latest Chromium version.
 
 ## License and Copyright
 
