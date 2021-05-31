@@ -1,0 +1,23 @@
+app-id: org.chromium.Chromium
+modules:
+  - name: chromium
+    sources:
+      - type: archive
+        url: https://commondatastorage.googleapis.com/chromium-browser-official/chromium-90.0.4430.212.tar.xz
+        sha256: abe11d0cb1ff21278aad2eec1a1e279d59176b15331804d7df1807446786d59e
+        x-checker-data:
+          type: chromium
+          component: chromium
+          is-main-source: true
+      - type: archive
+        url: https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-llvmorg-13-init-1559-g01b87444-3.tgz
+        sha256: 676448e180fb060d3983f24476a2136eac83c6011c600117686035634a2bbe26
+        x-checker-data:
+          type: chromium
+          component: llvm-prebuilt
+      - type: git
+        url: https://github.com/llvm/llvm-project
+        commit: 01b87444cb02c38147dccc7049b32675de860d47
+        x-checker-data:
+          type: chromium
+          component: llvm-git
