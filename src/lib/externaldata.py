@@ -42,14 +42,14 @@ class ExternalBase(abc.ABC):
     Abstract base for remote data sources, such as file or VCS repo
     """
 
-    Type = Enum("Type", "EXTRA_DATA FILE ARCHIVE GIT")
+    class Type(Enum):
+        EXTRA_DATA = "extra-data"
+        FILE = "file"
+        ARCHIVE = "archive"
+        GIT = "git"
 
-    TYPES = {
-        "file": Type.FILE,
-        "archive": Type.ARCHIVE,
-        "extra-data": Type.EXTRA_DATA,
-        "git": Type.GIT,
-    }
+        def __str__(self):
+            return self.value
 
     class State(Enum):
         UNKNOWN = 0
@@ -63,9 +63,14 @@ class ExternalBase(abc.ABC):
 
     @classmethod
     def from_source(cls, source_path, source):
-        url = source.get("url")
-        data_type = cls.TYPES.get(source.get("type"))
-        if url is None or data_type is None:
+        try:
+            url = source["url"]
+        except KeyError:
+            return None
+
+        try:
+            data_type = cls.Type(source.get("type"))
+        except ValueError:
             return None
 
         if data_type == cls.Type.GIT:
@@ -303,7 +308,7 @@ class ExternalGitRepo(ExternalBase):
         self.source_path = source_path
         self.filename = repo_name
         self.arches = arches
-        self.type = self.TYPES["git"]
+        self.type = self.Type.GIT
         self.checker_data = checker_data or {}
         self.current_version: ExternalGitRef
         self.current_version = ExternalGitRef(url, commit, tag, branch, None, None)

@@ -248,7 +248,6 @@ def open_pr(subject, body, branch, manifest_checker=None):
 
 
 def parse_cli_args(cli_args=None):
-    types = ["all"] + list(ExternalData.TYPES)
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "manifest", help="Flatpak manifest to check", type=os.path.abspath
@@ -277,8 +276,8 @@ def parse_cli_args(cli_args=None):
     parser.add_argument(
         "--filter-type",
         help="Only check external data of the given type",
-        choices=types,
-        default="all",
+        type=ExternalData.Type,
+        choices=list(ExternalData.Type),
     )
     return parser.parse_args(cli_args)
 
@@ -287,9 +286,8 @@ async def run_with_args(args):
     init_logging(logging.DEBUG if args.verbose else logging.INFO)
 
     manifest_checker = checker.ManifestChecker(args.manifest)
-    filter_type = ExternalData.TYPES.get(args.filter_type)
 
-    await manifest_checker.check(filter_type)
+    await manifest_checker.check(args.filter_type)
 
     outdated_num = print_outdated_external_data(manifest_checker)
 

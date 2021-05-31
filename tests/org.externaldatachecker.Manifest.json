@@ -17,6 +17,10 @@
             "name": "phony",
             "sources": [
                 {
+                    "type": "svn",
+                    "url": "nowhere"
+                },
+                {
                     "type": "file",
                     "only-arches": ["i386", "x86_64"],
                     "dest-filename": "another-file.txt",
