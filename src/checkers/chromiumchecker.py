@@ -116,14 +116,14 @@ class LLVMGitComponent(LLVMComponent):
 
         llvm_version = await self.get_llvm_version()
 
-        new_version = await ExternalGitRef(
+        new_version = ExternalGitRef(
             url=self.external_data.current_version.url,
             commit=llvm_version.revision,
             tag=None,
             branch=None,
             version=self.latest_version,
             timestamp=None,
-        ).fetch_remote()
+        )
         self.external_data.set_new_version(new_version)
 
 
