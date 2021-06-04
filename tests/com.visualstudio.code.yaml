@@ -1,0 +1,24 @@
+id: com.visualstudio.code
+modules:
+  - name: vscode
+    sources:
+      - type: extra-data
+        filename: code.rpm
+        only-arches: [x86_64]
+        url: http://packages.microsoft.com/repos/code/pool/main/c/code/code_1.55.2-1618307277_amd64.deb
+        sha256: e95b4a40c7fd77fbf197a30531101a7fc296b1f87a206e7062322404243caace
+        size: 71023804
+        x-checker-data:
+          type: rpm-repo
+          package-name: code
+          root: https://packages.microsoft.com/yumrepos/vscode/
+      - type: extra-data
+        filename: code.rpm
+        only-arches: [aarch64]
+        url: http://packages.microsoft.com/repos/code/pool/main/c/code/code_1.55.2-1618306574_arm64.deb
+        sha256: d2e3fab8d4213feb583e580ab1b1022ad8a903c299ea4c03e657b0f3e55df500
+        size: 69962978
+        x-checker-data:
+          type: rpm-repo
+          package-name: code
+          root: https://packages.microsoft.com/yumrepos/vscode/
