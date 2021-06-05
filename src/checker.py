@@ -182,6 +182,17 @@ class ManifestChecker:
     ):
         src_rel_path = os.path.relpath(data.source_path, self._root_manifest_dir)
         counter.started += 1
+        checkers = [i for i in (c() for c in self._checkers) if i.should_check(data)]
+        if not checkers:
+            counter.finished += 1
+            log.info(
+                "Skipped check [%d/%d] %s (from %s)",
+                counter.started,
+                counter.total,
+                data.filename,
+                src_rel_path,
+            )
+            return data
         log.info(
             "Started check [%d/%d] %s (from %s)",
             counter.started,
@@ -189,11 +200,12 @@ class ManifestChecker:
             data.filename,
             src_rel_path,
         )
-        for checker_cls in self._checkers:
-            checker = checker_cls()
-            if not checker.should_check(data):
-                continue
-            log.debug("Source %s: applying %s", data.filename, checker_cls.__name__)
+        for checker in checkers:
+            log.debug(
+                "Source %s: applying %s",
+                data.filename,
+                checker.__class__.__name__,
+            )
             async with checker:
                 await checker.check(data)
             if data.state != ExternalData.State.UNKNOWN:
@@ -201,14 +213,14 @@ class ManifestChecker:
                     "Source %s: got new state %s from %s, skipping remaining checkers",
                     data.filename,
                     data.state.name,
-                    checker_cls.__name__,
+                    checker.__class__.__name__,
                 )
                 break
             if data.new_version is not None:
                 log.debug(
                     "Source %s: got new version from %s, skipping remaining checkers",
                     data.filename,
-                    checker_cls.__name__,
+                    checker.__class__.__name__,
                 )
                 break
         counter.finished += 1
