@@ -35,10 +35,11 @@
 import logging
 import re
 import tempfile
+import typing as t
 
 import aiohttp
 
-from ..lib.externaldata import ExternalData, Checker
+from ..lib.externaldata import ExternalData, ExternalGitRepo, Checker
 from ..lib import utils
 
 log = logging.getLogger(__name__)
@@ -64,10 +65,13 @@ def extract_version(checker_data, url):
 class URLChecker(Checker):
     CHECKER_DATA_TYPE = "rotating-url"
 
-    def should_check(self, external_data):
-        return isinstance(external_data, ExternalData)
+    def should_check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
+        return isinstance(external_data, ExternalData) and (
+            external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE
+            or external_data.type == external_data.Type.EXTRA_DATA
+        )
 
-    async def check(self, external_data):
+    async def check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
         assert self.should_check(external_data)
 
         is_rotating = external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE
