@@ -34,7 +34,7 @@ class Component:
         assert latest_version is not None
 
     async def check(self) -> None:
-        raise NotImplemented
+        raise NotImplementedError
 
     async def update_external_source_version(self, latest_url):
         assert latest_url is not None
