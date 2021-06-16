@@ -130,7 +130,7 @@ class ManifestChecker:
             if isinstance(module, str):
                 module_path = os.path.join(os.path.dirname(path), module)
                 log.info(
-                    "Loading modules from %s",
+                    "Loading module from %s",
                     os.path.relpath(module_path, self._root_manifest_dir),
                 )
 
@@ -151,31 +151,28 @@ class ManifestChecker:
             self._collect_external_data(path=module_path, json_data=module)
 
             sources = module.get("sources", [])
-            external_sources = [s for s in sources if _external_source_filter(path, s)]
 
-            external_data = self._external_data.setdefault(module_path, [])
-            datas = ExternalDataSource.from_sources(module_path, sources)
-            external_data.extend(datas)
+            manifest_datas = self._external_data.setdefault(module_path, [])
+            module_datas = ExternalDataSource.from_sources(module_path, sources)
+            manifest_datas.extend(module_datas)
 
-            for external_source in external_sources:
-                external_source_path = os.path.join(
-                    os.path.dirname(path), external_source
-                )
+            for sp in filter(lambda s: _external_source_filter(path, s), sources):
+                external_source_path = os.path.join(os.path.dirname(path), sp)
                 log.info(
                     "Loading sources from %s",
                     os.path.relpath(external_source_path, self._root_manifest_dir),
                 )
                 external_manifest = self._read_manifest(external_source_path)
                 if isinstance(external_manifest, list):
-                    external_source_data = external_manifest
+                    external_sources = external_manifest
                 elif isinstance(external_manifest, dict):
-                    external_source_data = [external_manifest]
+                    external_sources = [external_manifest]
                 else:
                     raise TypeError(f"Invalid data type in {external_source_path}")
-                datas = ExternalDataSource.from_sources(
-                    external_source_path, external_source_data
+                external_source_datas = ExternalDataSource.from_sources(
+                    external_source_path, external_sources
                 )
-                self._external_data[external_source_path] = datas
+                self._external_data[external_source_path] = external_source_datas
 
     async def _check_data(
         self, counter: TasksCounter, data: t.Union[ExternalData, ExternalGitRepo]
