@@ -176,6 +176,15 @@ class ManifestChecker:
 
         manifest_datas = self._external_data.setdefault(module_path, [])
         module_datas = ExternalData.from_sources(module_path, sources)
+        for data in module_datas:
+            try:
+                same_source_data = next(
+                    d for d in manifest_datas if d != data and d.source == data.source
+                )
+            except StopIteration:
+                continue
+            log.warning("Found repeated source for %s ", data.filename)
+            data.inherit_from = same_source_data
         manifest_datas.extend(module_datas)
 
         for sp in filter(lambda s: _external_source_filter(module_path, s), sources):
@@ -263,12 +272,15 @@ class ManifestChecker:
         if filter_type is not None:
             external_data = [d for d in external_data if d.type == filter_type]
 
-        counter = self.TasksCounter(total=len(external_data))
+        counter = self.TasksCounter()
         check_tasks = []
         for data in external_data:
             if data.state != ExternalData.State.UNKNOWN:
                 continue
+            if data.inherit_from:
+                continue
             check_tasks.append(self._check_data(counter, data))
+        counter.total = len(check_tasks)
 
         log.info("Checking %s external data items", counter.total)
         ext_data_checked = await asyncio.gather(*check_tasks)
