@@ -57,12 +57,34 @@ class ExternalBase(abc.ABC):
         VALID = 1 << 1  # URL is reachable
         BROKEN = 1 << 2  # URL couldn't be reached
 
-    state: State
     type: Type
     filename: str
+    inherit_from: t.Optional[ExternalBase]
     current_version: t.Union[ExternalFile, ExternalGitRef]
     new_version: t.Optional[t.Union[ExternalFile, ExternalGitRef]]
     source: t.Mapping
+
+    def __init__(self):
+        self._state = self.State.UNKNOWN
+        self.inherit_from = None
+
+    @property
+    def state(self):
+        if self.inherit_from:
+            return self.inherit_from.state
+        return self._state
+
+    @state.setter
+    def state(self, value):
+        if self.inherit_from:
+            raise NotImplementedError
+        self._state = value
+
+    @state.deleter
+    def state(self):
+        if self.inherit_from:
+            raise NotImplementedError
+        del self._state
 
     @classmethod
     def from_source(cls, source_path: str, source: t.Dict):
@@ -158,6 +180,7 @@ class ExternalData(ExternalBase):
         arches=[],
         checker_data: dict = None,
     ):
+        super().__init__()
         self.source_path = source_path
         self.filename = filename
         self.arches = arches
@@ -200,12 +223,16 @@ class ExternalData(ExternalBase):
         return obj
 
     def update(self):
-        if self.new_version is not None:
-            self.source["url"] = self.new_version.url
-            self.source["sha256"] = self.new_version.checksum
+        if self.inherit_from:
+            new_version = self.inherit_from.new_version
+        else:
+            new_version = self.new_version
+        if new_version is not None:
+            self.source["url"] = new_version.url
+            self.source["sha256"] = new_version.checksum
             if self.source["type"] == "extra-data":
-                assert self.new_version.size is not None
-                self.source["size"] = self.new_version.size
+                assert new_version.size is not None
+                self.source["size"] = new_version.size
             # Remove size property for non-extra-data sources
             elif "size" in self.source:
                 log.warning(
@@ -289,6 +316,7 @@ class ExternalGitRepo(ExternalBase):
         arches=[],
         checker_data=None,
     ):
+        super().__init__()
         self.source_path = source_path
         self.filename = repo_name
         self.arches = arches
@@ -326,13 +354,17 @@ class ExternalGitRepo(ExternalBase):
         return obj
 
     def update(self):
-        if self.new_version is not None:
-            self.source["url"] = self.new_version.url
-            self.source["commit"] = self.new_version.commit
-            if self.new_version.tag is not None:
-                self.source["tag"] = self.new_version.tag
-            if self.new_version.branch is not None:
-                self.source["branch"] = self.new_version.branch
+        if self.inherit_from:
+            new_version = self.inherit_from.new_version
+        else:
+            new_version = self.new_version
+        if new_version is not None:
+            self.source["url"] = new_version.url
+            self.source["commit"] = new_version.commit
+            if new_version.tag is not None:
+                self.source["tag"] = new_version.tag
+            if new_version.branch is not None:
+                self.source["branch"] = new_version.branch
 
 
 class Checker:
