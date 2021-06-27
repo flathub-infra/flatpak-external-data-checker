@@ -102,9 +102,12 @@ class ExternalBase(abc.ABC):
         raise NotImplementedError
 
     def set_new_version(
-        self, new_version: t.Union[ExternalFile, ExternalGitRef], is_update=True
+        self, new_version: t.Union[ExternalFile, ExternalGitRef], is_update=None
     ):
         assert isinstance(new_version, type(self.current_version))
+
+        if is_update is None:
+            is_update = not self.current_version.is_same_version(new_version)  # type: ignore
 
         if self.current_version.matches(new_version):  # type: ignore
             if is_update:
@@ -144,6 +147,10 @@ class ExternalFile(t.NamedTuple):
             and self.checksum == other.checksum
             and (self.size is None or other.size is None or self.size == other.size)
         )
+
+    def is_same_version(self, other: ExternalFile):
+        assert isinstance(other, type(self))
+        return self.url == other.url
 
 
 class ExternalData(ExternalBase):
@@ -274,6 +281,14 @@ class ExternalGitRef(t.NamedTuple):
                 or self.branch == other.branch
             )
             # fmt: on
+        )
+
+    def is_same_version(self, other: ExternalGitRef):
+        assert isinstance(other, type(self))
+        return (
+            self.url == other.url
+            and self.tag == other.tag
+            and self.branch == other.branch
         )
 
 
