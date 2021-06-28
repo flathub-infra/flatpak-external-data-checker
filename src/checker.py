@@ -106,7 +106,7 @@ class ManifestChecker:
         self._root_manifest = self._read_manifest(self._root_manifest_path)
         assert isinstance(self._root_manifest, dict)
         # Map from manifest path to [ExternalData]
-        self._collect_external_data(self._root_manifest_path, self._root_manifest)
+        self._collect_external_data()
 
     def _read_manifest(self, manifest_path: str) -> t.Union[t.List, t.Dict]:
         contents = read_manifest(manifest_path)
@@ -119,60 +119,64 @@ class ManifestChecker:
         contents = self._manifest_contents[path]
         dump_manifest(contents, path)
 
-    def _collect_external_data(self, path, json_data):
-        modules = json_data.get("modules")
-        if modules is None:
-            return
-        elif not isinstance(modules, list):
-            log.error('"modules" in %s is not a list', path)
-            return
+    def _collect_external_data(self):
+        modules = self._root_manifest.get("modules", [])
+        assert isinstance(modules, list)
         for module in modules:
-            if isinstance(module, str):
-                module_path = os.path.join(os.path.dirname(path), module)
-                log.info(
-                    "Loading module from %s",
-                    os.path.relpath(module_path, self._root_manifest_dir),
-                )
+            self._collect_module_data(self._root_manifest_path, module)
 
-                try:
-                    module = self._read_manifest(module_path)
-                except GLib.Error as err:
-                    if err.matches(GLib.quark_from_string("g-file-error-quark"), 4):
-                        log.warning("Referenced file not found: %s", module)
-                        continue
+    def _collect_module_data(self, module_path: str, module: t.Union[str, t.Dict]):
+        if isinstance(module, str):
+            ext_module_path = os.path.join(os.path.dirname(module_path), module)
+            log.info(
+                "Loading module from %s",
+                os.path.relpath(ext_module_path, self._root_manifest_dir),
+            )
 
-                    raise
-                except FileNotFoundError:
-                    log.warning("Referenced file not found: %s", module)
-                    continue
+            try:
+                ext_module = self._read_manifest(ext_module_path)
+            except GLib.Error as err:
+                if err.matches(GLib.quark_from_string("g-file-error-quark"), 4):
+                    log.warning("Referenced file not found: %s", ext_module_path)
+                    return
+                raise
+            except FileNotFoundError:
+                log.warning("Referenced file not found: %s", ext_module_path)
+                return
+
+            assert isinstance(ext_module, dict), ext_module_path
+            return self._collect_module_data(ext_module_path, ext_module)
+
+        child_modules = module.get("modules", [])
+        if not isinstance(child_modules, list):
+            log.error('"modules" in %s is not a list', module_path)
+            child_modules = []
+        for child_module in child_modules:
+            self._collect_module_data(module_path=module_path, module=child_module)
+
+        sources = module.get("sources", [])
+
+        manifest_datas = self._external_data.setdefault(module_path, [])
+        module_datas = ExternalDataSource.from_sources(module_path, sources)
+        manifest_datas.extend(module_datas)
+
+        for sp in filter(lambda s: _external_source_filter(module_path, s), sources):
+            external_source_path = os.path.join(os.path.dirname(module_path), sp)
+            log.info(
+                "Loading sources from %s",
+                os.path.relpath(external_source_path, self._root_manifest_dir),
+            )
+            external_manifest = self._read_manifest(external_source_path)
+            if isinstance(external_manifest, list):
+                external_sources = external_manifest
+            elif isinstance(external_manifest, dict):
+                external_sources = [external_manifest]
             else:
-                module_path = path
-
-            self._collect_external_data(path=module_path, json_data=module)
-
-            sources = module.get("sources", [])
-
-            manifest_datas = self._external_data.setdefault(module_path, [])
-            module_datas = ExternalDataSource.from_sources(module_path, sources)
-            manifest_datas.extend(module_datas)
-
-            for sp in filter(lambda s: _external_source_filter(path, s), sources):
-                external_source_path = os.path.join(os.path.dirname(path), sp)
-                log.info(
-                    "Loading sources from %s",
-                    os.path.relpath(external_source_path, self._root_manifest_dir),
-                )
-                external_manifest = self._read_manifest(external_source_path)
-                if isinstance(external_manifest, list):
-                    external_sources = external_manifest
-                elif isinstance(external_manifest, dict):
-                    external_sources = [external_manifest]
-                else:
-                    raise TypeError(f"Invalid data type in {external_source_path}")
-                external_source_datas = ExternalDataSource.from_sources(
-                    external_source_path, external_sources
-                )
-                self._external_data[external_source_path] = external_source_datas
+                raise TypeError(f"Invalid data type in {external_source_path}")
+            external_source_datas = ExternalDataSource.from_sources(
+                external_source_path, external_sources
+            )
+            self._external_data[external_source_path] = external_source_datas
 
     async def _check_data(
         self, counter: TasksCounter, data: t.Union[ExternalData, ExternalGitRepo]
