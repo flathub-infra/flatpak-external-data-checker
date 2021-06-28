@@ -70,7 +70,11 @@ jobs:
 
       - name: Run mypy check
         run: |
-          python3 -m mypy --ignore-missing-imports src
+          python3 -m mypy \
+            --ignore-missing-imports \
+            --install-types \
+            --non-interactive \
+            src
 
   build-and-test-container:
     name: Build and test container
