@@ -23,6 +23,7 @@ import datetime
 import typing as t
 import asyncio
 from dataclasses import dataclass
+from enum import Enum
 
 from .checkers import ALL_CHECKERS
 from .lib.appdata import add_release_to_file
@@ -79,6 +80,10 @@ def _external_source_filter(manifest_path: str, source) -> t.Optional[bool]:
 
 
 class ManifestChecker:
+    class Kind(Enum):
+        MODULE = 0
+        APP = 1
+
     @dataclass
     class TasksCounter:
         started: int = 0
@@ -105,6 +110,17 @@ class ManifestChecker:
         # Top-level manifest contents
         self._root_manifest = self._read_manifest(self._root_manifest_path)
         assert isinstance(self._root_manifest, dict)
+        self.app_id: t.Optional[str]
+        self.app_id = self._root_manifest.get("id", self._root_manifest.get("app-id"))
+        # Determine manifest kind
+        if self.app_id and "modules" in self._root_manifest:
+            self.kind = self.Kind.APP
+        elif "name" in self._root_manifest and (
+            "sources" in self._root_manifest or "modules" in self._root_manifest
+        ):
+            self.kind = self.Kind.MODULE
+        else:
+            raise ValueError("Can't determine manifest kind")
         # Map from manifest path to [ExternalData]
         self._collect_external_data()
 
@@ -120,10 +136,13 @@ class ManifestChecker:
         dump_manifest(contents, path)
 
     def _collect_external_data(self):
-        modules = self._root_manifest.get("modules", [])
-        assert isinstance(modules, list)
-        for module in modules:
-            self._collect_module_data(self._root_manifest_path, module)
+        if self.kind == self.Kind.APP:
+            modules = self._root_manifest.get("modules", [])
+            assert isinstance(modules, list)
+            for module in modules:
+                self._collect_module_data(self._root_manifest_path, module)
+        elif self.kind == self.Kind.MODULE:
+            self._collect_module_data(self._root_manifest_path, self._root_manifest)
 
     def _collect_module_data(self, module_path: str, module: t.Union[str, t.Dict]):
         if isinstance(module, str):
@@ -301,14 +320,15 @@ class ManifestChecker:
             self._dump_manifest(path)
 
     def _update_appdata(self):
-        if "id" in self._root_manifest:
-            app_id = self._root_manifest["id"]
-        else:
-            app_id = self._root_manifest["app-id"]
+        if not self.app_id:
+            log.warning("No app ID, won't update appdata")
+            return
 
-        appdata = find_appdata_file(os.path.dirname(self._root_manifest_path), app_id)
+        appdata = find_appdata_file(
+            os.path.dirname(self._root_manifest_path), self.app_id
+        )
         if appdata is None:
-            log.debug("Appdata not found for %s", app_id)
+            log.debug("Appdata not found for %s", self.app_id)
             return
         log.info("Preparing to update appdata %s", appdata)
 
