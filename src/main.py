@@ -274,6 +274,11 @@ def parse_cli_args(cli_args=None):
         action="store_true",
     )
     parser.add_argument(
+        "--validate-only",
+        help="Do not apply updates, only check if metadata is valid",
+        action="store_true",
+    )
+    parser.add_argument(
         "--filter-type",
         help="Only check external data of the given type",
         type=ExternalData.Type,
@@ -290,6 +295,9 @@ async def run_with_args(args):
     await manifest_checker.check(args.filter_type)
 
     outdated_num = print_outdated_external_data(manifest_checker)
+
+    if args.validate_only:
+        return (outdated_num, False)
 
     if outdated_num > 0:
         if args.update or args.commit_only or args.edit_only:
@@ -311,6 +319,9 @@ async def run_with_args(args):
 
 
 def main():
-    outdated_num, updated = asyncio.run(run_with_args(parse_cli_args()))
+    args = parse_cli_args()
+    outdated_num, updated = asyncio.run(run_with_args(args))
+    if args.validate_only:
+        sys.exit(0)
     if outdated_num > 0 and not updated:
         sys.exit(1)
