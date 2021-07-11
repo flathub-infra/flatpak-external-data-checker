@@ -55,10 +55,26 @@ TAG_VERSION_SCHEMES = {
 
 class GitChecker(Checker):
     CHECKER_DATA_TYPE = "git"
+    CHECKER_DATA_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "tag-pattern": {"type": "string", "format": "regex"},
+            "version-scheme": {
+                "type": "string",
+                "enum": list(TAG_VERSION_SCHEMES),
+            },
+            "sort-tags": {"type": "boolean"},
+        },
+    }
     SUPPORTED_DATA_CLASSES = [ExternalGitRepo]
 
     def should_check(self, external_data):
         return isinstance(external_data, ExternalGitRepo)
+
+    async def validate_checker_data(self, external_data):
+        if external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE:
+            return await super().validate_checker_data(external_data)
+        return None
 
     async def check(self, external_data):
         assert self.should_check(external_data)
