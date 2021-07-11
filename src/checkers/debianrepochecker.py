@@ -90,6 +90,17 @@ def _get_timestamp_for_candidate(candidate):
 
 class DebianRepoChecker(Checker):
     CHECKER_DATA_TYPE = "debian-repo"
+    CHECKER_DATA_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "package-name": {"type": "string"},
+            "root": {"type": "string"},
+            "dist": {"type": "string"},
+            "component": {"type": "string"},
+            "source": {"type": "boolean"},
+        },
+        "required": ["package-name", "root", "dist"],
+    }
 
     async def check(self, external_data):
         assert self.should_check(external_data)
