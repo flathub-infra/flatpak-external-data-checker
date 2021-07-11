@@ -58,6 +58,22 @@ def parse_timestamp(date_string: t.Optional[str]) -> t.Optional[datetime]:
 
 class JSONChecker(HTMLChecker):
     CHECKER_DATA_TYPE = "json"
+    CHECKER_DATA_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "url": {"type": "string", "format": "uri"},
+            "tag-query": {"type": "string"},
+            "commit-query": {"type": "string"},
+            "version-query": {"type": "string"},
+            "url-query": {"type": "string"},
+            "timestamp-query": {"type": "string"},
+        },
+        "required": ["url"],
+        "anyOf": [
+            {"required": ["version-query", "url-query"]},
+            {"required": ["tag-query"]},
+        ],
+    }
     SUPPORTED_DATA_CLASSES = [ExternalData, ExternalGitRepo]
 
     async def check(self, external_data):
