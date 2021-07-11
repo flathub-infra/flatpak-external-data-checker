@@ -155,6 +155,17 @@ class ChromiumChecker(Checker):
         c.NAME: c for c in (ChromiumComponent, LLVMGitComponent, LLVMPrebuiltComponent)
     }
 
+    CHECKER_DATA_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "component": {
+                "type": "string",
+                "enum": list(_COMPONENTS),
+            },
+        },
+        "required": ["component"],
+    }
+
     _CHROMIUM_VERSIONS_URL = "https://omahaproxy.appspot.com/all.json"
     _CHROMIUM_VERSIONS_PARAMS = {"os": "linux", "channel": "stable"}
 
@@ -174,8 +185,6 @@ class ChromiumChecker(Checker):
         component_name = external_data.checker_data.get(
             "component", ChromiumComponent.NAME
         )
-        if component_name not in self._COMPONENTS:
-            raise ValueError(f"Invalid component {component_name}")
 
         component_class = self._COMPONENTS[component_name]
         if not isinstance(external_data, component_class.DATA_CLASS):
