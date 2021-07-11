@@ -17,6 +17,14 @@ log = logging.getLogger(__name__)
 
 class RPMRepoChecker(Checker):
     CHECKER_DATA_TYPE = "rpm-repo"
+    CHECKER_DATA_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "root": {"type": "string", "format": "uri"},
+            "package-name": {"type": "string"},
+        },
+        "required": ["root", "package-name"],
+    }
     _XMLNS = {
         "": "http://linux.duke.edu/metadata/common",
         "repo": "http://linux.duke.edu/metadata/repo",
