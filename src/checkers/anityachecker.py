@@ -3,7 +3,7 @@ import urllib.request
 import urllib.parse
 
 from ..lib.externaldata import ExternalData, ExternalGitRepo, ExternalGitRef
-from ..lib.utils import filter_versions
+from ..lib.utils import filter_versions, OPERATORS_SCHEMA
 from .htmlchecker import HTMLChecker
 
 log = logging.getLogger(__name__)
@@ -11,6 +11,21 @@ log = logging.getLogger(__name__)
 
 class AnityaChecker(HTMLChecker):
     CHECKER_DATA_TYPE = "anitya"
+    CHECKER_DATA_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "baseurl": {"type": "string"},
+            "project-id": {"type": "number"},
+            "stable-only": {"type": "boolean"},
+            "versions": OPERATORS_SCHEMA,
+            "url-template": {"type": "string"},
+            "tag-template": {"type": "string"},
+        },
+        "anyOf": [
+            {"required": ["project-id", "url-template"]},
+            {"required": ["project-id", "tag-template"]},
+        ],
+    }
     SUPPORTED_DATA_CLASSES = [ExternalData, ExternalGitRepo]
 
     async def check(self, external_data):
