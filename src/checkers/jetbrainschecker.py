@@ -8,6 +8,15 @@ log = logging.getLogger(__name__)
 
 class JetBrainsChecker(Checker):
     CHECKER_DATA_TYPE = "jetbrains"
+    CHECKER_DATA_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "code": {"type": "string"},
+            # TODO: add enum here
+            "release-type": {"type": "string"},
+        },
+        "required": ["code"],
+    }
 
     async def check(self, external_data):
         assert self.should_check(external_data)
