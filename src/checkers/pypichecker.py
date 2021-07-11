@@ -4,7 +4,7 @@ import re
 import typing as t
 
 from ..lib.externaldata import Checker, ExternalFile
-from ..lib.utils import filter_versions
+from ..lib.utils import filter_versions, OPERATORS_SCHEMA
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +35,15 @@ def _filter_downloads(
 
 class PyPIChecker(Checker):
     CHECKER_DATA_TYPE = "pypi"
+    CHECKER_DATA_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "packagetype": {"type": "string", "enum": ["sdist", "bdist_wheel"]},
+            "versions": OPERATORS_SCHEMA,
+        },
+        "required": ["name"],
+    }
 
     async def check(self, external_data):
         package_name = external_data.checker_data["name"]
