@@ -3,7 +3,7 @@ from urllib.parse import urljoin
 import typing as t
 
 from ..lib.externaldata import Checker, ExternalData, ExternalFile
-from ..lib.utils import filter_versions
+from ..lib.utils import filter_versions, OPERATORS_SCHEMA
 
 log = logging.getLogger(__name__)
 
@@ -27,6 +27,15 @@ def _is_stable(version: str) -> bool:
 
 class GNOMEChecker(Checker):
     CHECKER_DATA_TYPE = "gnome"
+    CHECKER_DATA_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "stable-only": {"type": "boolean"},
+            "versions": OPERATORS_SCHEMA,
+        },
+        "required": ["name"],
+    }
 
     async def check(self, external_data):
         external_data: ExternalData
