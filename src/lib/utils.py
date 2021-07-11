@@ -65,6 +65,12 @@ OPERATORS = {
     "==": operator.eq,
     "!=": operator.ne,
 }
+OPERATORS_SCHEMA = {
+    "type": "object",
+    "properties": {o: {"type": "string"} for o in list(OPERATORS)},
+    "additionalProperties": False,
+    "minProperties": 1,
+}
 
 
 def _extract_timestamp(info):
