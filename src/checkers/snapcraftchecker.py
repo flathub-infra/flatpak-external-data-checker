@@ -9,6 +9,14 @@ log = logging.getLogger(__name__)
 
 class SnapcraftChecker(Checker):
     CHECKER_DATA_TYPE = "snapcraft"
+    CHECKER_DATA_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "channel": {"type": "string"},
+        },
+        "required": ["name", "channel"],
+    }
 
     _arches = {"x86_64": "amd64", "aarch64": "arm64", "arm": "armhf", "i386": "i386"}
     _BLOCK_SIZE = 65536
