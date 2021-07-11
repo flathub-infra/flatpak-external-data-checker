@@ -64,12 +64,27 @@ def extract_version(checker_data, url):
 
 class URLChecker(Checker):
     CHECKER_DATA_TYPE = "rotating-url"
+    CHECKER_DATA_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "url": {"type": "string", "format": "uri"},
+            "pattern": {"type": "string", "format": "regex"},
+        },
+        "required": ["url"],
+    }
 
     def should_check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
         return isinstance(external_data, ExternalData) and (
             external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE
             or external_data.type == external_data.Type.EXTRA_DATA
         )
+
+    async def validate_checker_data(
+        self, external_data: t.Union[ExternalData, ExternalGitRepo]
+    ):
+        if external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE:
+            return await super().validate_checker_data(external_data)
+        return None
 
     async def check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
         assert self.should_check(external_data)
