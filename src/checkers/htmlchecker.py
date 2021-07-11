@@ -58,6 +58,28 @@ def _get_pattern(checker_data: t.Dict, pattern_name: str):
 
 class HTMLChecker(Checker):
     CHECKER_DATA_TYPE = "html"
+    CHECKER_DATA_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "url": {"type": "string", "format": "uri"},
+            "pattern": {"type": "string", "format": "regex"},
+            "version-pattern": {"type": "string", "format": "regex"},
+            "url-pattern": {"type": "string", "format": "regex"},
+            "url-template": {"type": "string", "format": "regex"},
+            "sort-matches": {"type": "boolean"},
+        },
+        "required": ["url"],
+        "anyOf": [
+            {"required": ["pattern"]},
+            {
+                "required": ["version-pattern"],
+                "anyOf": [
+                    {"required": ["url-pattern"]},
+                    {"required": ["url-template"]},
+                ],
+            },
+        ],
+    }
 
     async def check(self, external_data):
         assert self.should_check(external_data)
