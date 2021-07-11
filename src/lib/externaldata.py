@@ -28,6 +28,7 @@ import os
 import logging
 
 import aiohttp
+import jsonschema
 
 from . import utils
 
@@ -351,6 +352,7 @@ class ExternalGitRepoSource(ExternalGitRepo):
 
 class Checker:
     CHECKER_DATA_TYPE: t.Optional[str] = None
+    CHECKER_DATA_SCHEMA: t.Dict[str, t.Any]
     SUPPORTED_DATA_CLASSES: t.List[t.Type[ExternalBase]] = [ExternalData]
     session: aiohttp.ClientSession
 
@@ -370,6 +372,15 @@ class Checker:
         log.debug("Closing HTTP session for %s", self)
         await self.session.__aexit__(exc_type, exc_val, exc_tb)
 
+    def get_json_schema(  # pylint: disable=unused-argument
+        self, external_data: t.Union[ExternalData, ExternalGitRepo]
+    ) -> t.Dict[str, t.Any]:
+        if hasattr(self, "CHECKER_DATA_SCHEMA"):
+            return self.CHECKER_DATA_SCHEMA
+        raise NotImplementedError(
+            "If schema is not declared, this method must be overridden"
+        )
+
     def should_check(
         self, external_data: t.Union[ExternalData, ExternalGitRepo]
     ) -> bool:
@@ -381,6 +392,14 @@ class Checker:
             and external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE
         )
         return applicable and supported
+
+    async def validate_checker_data(
+        self, external_data: t.Union[ExternalData, ExternalGitRepo]
+    ):
+        assert any(isinstance(external_data, c) for c in self.SUPPORTED_DATA_CLASSES)
+        schema = self.get_json_schema(external_data)
+        if schema:
+            jsonschema.validate(external_data.checker_data, schema)
 
     async def check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
         pass

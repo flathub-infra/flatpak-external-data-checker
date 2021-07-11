@@ -47,6 +47,9 @@ NUM_NEW_VERSIONS = 2
 
 
 class DummyChecker(Checker):
+    def get_json_schema(self, external_data):
+        return None
+
     def should_check(self, external_data):
         return True
 

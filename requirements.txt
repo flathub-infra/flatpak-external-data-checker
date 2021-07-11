@@ -8,3 +8,4 @@ toml
 pyelftools
 aiohttp
 semver
+jsonschema

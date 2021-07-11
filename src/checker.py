@@ -226,6 +226,7 @@ class ManifestChecker:
                 data.filename,
                 checker.__class__.__name__,
             )
+            await checker.validate_checker_data(data)
             async with checker:
                 await checker.check(data)
             if data.state != ExternalData.State.UNKNOWN:
