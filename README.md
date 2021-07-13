@@ -8,28 +8,7 @@
 This is a tool for checking for outdated or broken links of external
 data in Flatpak manifests.
 
-## Table of contents
-
-- [Motivation](#motivation)
-- [Use](#use)
-    - [Installation](#installation)
-        - [Running in a container](#running-in-a-container)
-    - [Automatically submitting PRs](#automatically-submitting-prs)
-    - [Automatically merging PRs](#automatically-merging-prs)
-- [Changes to Flatpak manifests](#changes-to-flatpak-manifests)
-    - [URL checker](#url-checker)
-    - [HTML checker](#html-checker)
-    - [Git checker](#git-checker)
-    - [JSON checker](#json-checker)
-    - [Debian repo checker](#debian-repo-checker)
-    - [Anitya (release-monitoring) checker](#anitya-release-monitoring-checker)
-    - [GNOME checker](#gnome-checker)
-    - [PyPI checker](#pypi-checker)
-    - [JetBrains checker](#jetbrains-checker)
-    - [Snapcraft checker](#snapcraft-checker)
-    - [Rust checker](#rust-checker)
-    - [Chromium checker](#chromium-checker)
-- [License and Copyright](#license-and-copyright)
+---
 
 ## Motivation
 
