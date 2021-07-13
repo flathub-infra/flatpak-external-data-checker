@@ -12,7 +12,8 @@ data in Flatpak manifests.
 
 - [Motivation](#motivation)
 - [Use](#use)
-    - [Running in a container](#running-in-a-container)
+    - [Installation](#installation)
+        - [Running in a container](#running-in-a-container)
     - [Automatically submitting PRs](#automatically-submitting-prs)
     - [Automatically merging PRs](#automatically-merging-prs)
 - [Changes to Flatpak manifests](#changes-to-flatpak-manifests)
@@ -59,13 +60,25 @@ flatpak-external-data-checker MANIFEST_FILE
 
 it should display messages about any broken or outdated external data.
 
-### Running in a container
+### Installation
 
-**flatpak-external-data-checker** is avaiable as an
+This tool itself is available in flatpak format from Flathub. Install with
+
+```bash
+flatpak install --from https://dl.flathub.org/repo/appstream/org.flathub.flatpak-external-data-checker.flatpakref
+```
+
+And run with
+
+```bash
+flatpak run org.flathub.flatpak-external-data-checker MANIFEST_FILE
+```
+
+#### Running in a container
+
+**flatpak-external-data-checker** is also avaiable as an
 [OCI image](https://github.com/orgs/flathub/packages/container/package/flatpak-external-data-checker)
 from GitHub Container Registry.
-This is a convenient way to get all necessary dependencies regardless of your
-host system's distribution.
 
 You can use the `run-in-container.sh` helper script to set up needed CLI
 options for you and run the image using `podman`:
