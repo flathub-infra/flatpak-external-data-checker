@@ -209,7 +209,7 @@ class ManifestChecker:
                 "Skipped check [%d/%d] %s (from %s)",
                 counter.started,
                 counter.total,
-                data.filename,
+                data,
                 src_rel_path,
             )
             return data
@@ -217,13 +217,13 @@ class ManifestChecker:
             "Started check [%d/%d] %s (from %s)",
             counter.started,
             counter.total,
-            data.filename,
+            data,
             src_rel_path,
         )
         for checker in checkers:
             log.debug(
                 "Source %s: applying %s",
-                data.filename,
+                data,
                 checker.__class__.__name__,
             )
             await checker.validate_checker_data(data)
@@ -232,7 +232,7 @@ class ManifestChecker:
             if data.state != ExternalData.State.UNKNOWN:
                 log.debug(
                     "Source %s: got new state %s from %s, skipping remaining checkers",
-                    data.filename,
+                    data,
                     data.state.name,
                     checker.__class__.__name__,
                 )
@@ -240,7 +240,7 @@ class ManifestChecker:
             if data.new_version is not None:
                 log.debug(
                     "Source %s: got new version from %s, skipping remaining checkers",
-                    data.filename,
+                    data,
                     checker.__class__.__name__,
                 )
                 break
@@ -249,7 +249,7 @@ class ManifestChecker:
             "Finished check [%d/%d] %s (from %s)",
             counter.finished,
             counter.total,
-            data.filename,
+            data,
             src_rel_path,
         )
         return data
@@ -337,7 +337,7 @@ class ManifestChecker:
         for data in self.get_external_data():
             if data.checker_data.get(MAIN_SRC_PROP):
                 selected_data = data
-                log.info("Selected upstream source: %s", selected_data.filename)
+                log.info("Selected upstream source: %s", selected_data)
                 break
             elif data.source_path == self._root_manifest_path:
                 selected_data = data
@@ -345,7 +345,7 @@ class ManifestChecker:
             # Guess that the last external source in the root manifest is the one
             # corresponding to the main application bundle.
             assert selected_data is not None
-            log.warning("Guessed upstream source: %s", selected_data.filename)
+            log.warning("Guessed upstream source: %s", selected_data)
 
         last_update = selected_data.new_version
 
