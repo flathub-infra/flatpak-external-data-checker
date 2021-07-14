@@ -58,6 +58,7 @@ class ExternalBase(abc.ABC):
         BROKEN = 1 << 2  # URL couldn't be reached
 
     state: State
+    type: Type
     filename: str
     current_version: t.Union[ExternalFile, ExternalGitRef]
     new_version: t.Optional[t.Union[ExternalFile, ExternalGitRef]]
@@ -114,6 +115,9 @@ class ExternalBase(abc.ABC):
                 self.state = self.State.BROKEN
             self.new_version = new_version
 
+    def __str__(self):
+        return f"{self.type.value} {self.filename}"
+
 
 class ExternalFile(t.NamedTuple):
     url: str
@@ -154,29 +158,6 @@ class ExternalData(ExternalBase):
         self.new_version: t.Optional[ExternalFile]
         self.new_version = None
         self.state = ExternalData.State.UNKNOWN
-
-    def __str__(self):
-        version = self.new_version or self.current_version
-        info = (
-            "{filename}:\n"
-            "  State:   {state}\n"
-            "  Type:    {type}\n"
-            "  URL:     {url}\n"
-            "  SHA256:  {checksum}\n"
-            "  Size:    {size}\n"
-            "  Arches:  {arches}\n"
-            "  Checker: {checker_data}".format(
-                state=self.state.name,
-                filename=self.filename,
-                type=self.type.name,
-                url=version.url,
-                checksum=version.checksum,
-                size=version.size,
-                arches=self.arches,
-                checker_data=self.checker_data,
-            )
-        )
-        return info
 
     @abc.abstractmethod
     def update(self):
