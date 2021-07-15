@@ -57,7 +57,7 @@ def indir(path):
         os.chdir(old)
 
 
-def print_outdated_external_data(manifest_checker):
+def print_outdated_external_data(manifest_checker: checker.ManifestChecker):
     ext_data = manifest_checker.get_outdated_external_data()
     for data in ext_data:
         state_txt = (
@@ -65,30 +65,42 @@ def print_outdated_external_data(manifest_checker):
             if data.state == ExternalData.State.BROKEN
             else "CHANGE SOON"
         )
-        print("{}: {}".format(state_txt, data.filename))
         if data.new_version:
-            print(" Has a new version:")
             if data.type == ExternalData.Type.GIT:
-                print(
+                message_tmpl = (
+                    "{data_state}: {data_name}\n"
+                    " Has a new version:\n"
                     "  URL:       {url}\n"
                     "  Commit:    {commit}\n"
                     "  Tag:       {tag}\n"
                     "  Branch:    {branch}\n"
                     "  Version:   {version}\n"
-                    "  Timestamp: {timestamp}\n".format(**data.new_version._asdict())
+                    "  Timestamp: {timestamp}\n"
                 )
             else:
-                print(
+                message_tmpl = (
+                    "{data_state}: {data_name}\n"
+                    " Has a new version:\n"
                     "  URL:       {url}\n"
                     "  SHA256:    {checksum}\n"
                     "  Size:      {size}\n"
                     "  Version:   {version}\n"
-                    "  Timestamp: {timestamp}\n".format(**data.new_version._asdict())
+                    "  Timestamp: {timestamp}\n"
                 )
         elif data.state == ExternalData.State.BROKEN:
-            print(" Couldn't get new version for {}".format(data.current_version.url))
-        print("")
+            message_tmpl = (
+                # fmt: off
+                "{data_state}: {data_name}\n"
+                " Couldn't get new version for {url}\n"
+                # fmt: on
+            )
 
+        message = message_tmpl.format(
+            data_state=state_txt,
+            data_name=data.filename,
+            **(data.new_version or data.current_version)._asdict(),
+        )
+        print(message)
     return len(ext_data)
 
 
