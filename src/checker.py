@@ -29,7 +29,6 @@ from .checkers import ALL_CHECKERS
 from .lib.appdata import add_release_to_file
 from .lib.externaldata import (
     ExternalData,
-    ExternalDataSource,
     ExternalGitRepo,
     ExternalFile,
     ExternalGitRef,
@@ -176,7 +175,7 @@ class ManifestChecker:
         sources = module.get("sources", [])
 
         manifest_datas = self._external_data.setdefault(module_path, [])
-        module_datas = ExternalDataSource.from_sources(module_path, sources)
+        module_datas = ExternalData.from_sources(module_path, sources)
         manifest_datas.extend(module_datas)
 
         for sp in filter(lambda s: _external_source_filter(module_path, s), sources):
@@ -192,7 +191,7 @@ class ManifestChecker:
                 external_sources = [external_manifest]
             else:
                 raise TypeError(f"Invalid data type in {external_source_path}")
-            external_source_datas = ExternalDataSource.from_sources(
+            external_source_datas = ExternalData.from_sources(
                 external_source_path, external_sources
             )
             self._external_data[external_source_path] = external_source_datas
