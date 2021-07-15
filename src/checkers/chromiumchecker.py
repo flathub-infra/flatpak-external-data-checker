@@ -8,7 +8,6 @@ from ..lib.externaldata import (
     Checker,
     ExternalBase,
     ExternalData,
-    ExternalDataSource,
     ExternalGitRepo,
     ExternalGitRef,
 )
@@ -58,7 +57,7 @@ class Component:
 
 class ChromiumComponent(Component):
     NAME = "chromium"
-    DATA_CLASS = ExternalDataSource
+    DATA_CLASS = ExternalData
 
     _URL_FORMAT = (
         "https://commondatastorage.googleapis.com"
@@ -66,7 +65,7 @@ class ChromiumComponent(Component):
     )
 
     async def check(self) -> None:
-        assert isinstance(self.external_data, ExternalDataSource)
+        assert isinstance(self.external_data, ExternalData)
 
         latest_url = self._URL_FORMAT.format(version=self.latest_version)
         await self.update_external_source_version(latest_url)
@@ -129,7 +128,7 @@ class LLVMGitComponent(LLVMComponent):
 
 class LLVMPrebuiltComponent(LLVMComponent):
     NAME = "llvm-prebuilt"
-    DATA_CLASS = ExternalDataSource
+    DATA_CLASS = ExternalData
 
     _PREBUILT_URL_FORMAT = (
         "https://commondatastorage.googleapis.com"
@@ -137,7 +136,7 @@ class LLVMPrebuiltComponent(LLVMComponent):
     )
 
     async def check(self) -> None:
-        assert isinstance(self.external_data, ExternalDataSource)
+        assert isinstance(self.external_data, ExternalData)
 
         llvm_version = await self.get_llvm_version()
 
