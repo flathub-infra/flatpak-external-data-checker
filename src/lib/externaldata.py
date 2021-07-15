@@ -62,12 +62,11 @@ class ExternalBase(abc.ABC):
     filename: str
     current_version: t.Union[ExternalFile, ExternalGitRef]
     new_version: t.Optional[t.Union[ExternalFile, ExternalGitRef]]
+    source: t.Mapping
 
     @classmethod
-    def from_source(cls, source_path, source):
-        try:
-            url = source["url"]
-        except KeyError:
+    def from_source(cls, source_path: str, source: t.Dict):
+        if not source.get("url"):
             return None
 
         try:
@@ -75,24 +74,32 @@ class ExternalBase(abc.ABC):
         except ValueError:
             return None
 
+        data_cls: t.Type[ExternalBase]
         if data_type == cls.Type.GIT:
-            return ExternalGitRepoSource(source_path, source, url)
+            data_cls = ExternalGitRepo
+        else:
+            data_cls = ExternalData
 
-        return ExternalDataSource(source_path, source, data_type, url)
+        return data_cls.from_source_impl(source_path, source)
 
     @classmethod
-    def from_sources(cls, source_path, sources):
+    def from_sources(cls, source_path: str, sources: t.List[t.Union[str, t.Dict]]):
         external_data = []
 
         for source in sources:
             if isinstance(source, str):
                 continue
+            assert isinstance(source, dict), source
 
             data = cls.from_source(source_path, source)
             if data:
                 external_data.append(data)
 
         return external_data
+
+    @classmethod
+    def from_source_impl(cls, source_path: str, source: t.Dict) -> ExternalBase:
+        raise NotImplementedError
 
     def set_new_version(
         self, new_version: t.Union[ExternalFile, ExternalGitRef], is_update=True
@@ -114,6 +121,11 @@ class ExternalBase(abc.ABC):
                 log.warning("Source %s: remote data changed", self.filename)
                 self.state = self.State.BROKEN
             self.new_version = new_version
+
+    def update(self):
+        """If self.new_version is not None, writes back the necessary changes to the
+        original element from the manifest."""
+        raise NotImplementedError
 
     def __str__(self):
         return f"{self.type.value} {self.filename}"
@@ -159,20 +171,10 @@ class ExternalData(ExternalBase):
         self.new_version = None
         self.state = ExternalData.State.UNKNOWN
 
-    @abc.abstractmethod
-    def update(self):
-        """If self.new_version is not None, writes back the necessary changes to the
-        original element from the manifest."""
-
-
-class ExternalDataSource(ExternalData):
-    def __init__(
-        self,
-        source_path: str,
-        source: dict,
-        data_type: ExternalBase.Type,
-        url: str,
-    ):
+    @classmethod
+    def from_source_impl(cls, source_path: str, source: t.Dict) -> ExternalData:
+        data_type = cls.Type(source["type"])
+        url = source["url"]
         name = (
             source.get("filename")
             or source.get("dest-filename")
@@ -184,7 +186,7 @@ class ExternalDataSource(ExternalData):
         checker_data = source.get("x-checker-data", {})
         arches = checker_data.get("arches") or source.get("only-arches") or ["x86_64"]
 
-        super().__init__(
+        obj = cls(
             data_type,
             source_path,
             name,
@@ -194,8 +196,8 @@ class ExternalDataSource(ExternalData):
             arches,
             checker_data,
         )
-
-        self.source = source
+        obj.source = source
+        return obj
 
     def update(self):
         if self.new_version is not None:
@@ -298,9 +300,11 @@ class ExternalGitRepo(ExternalBase):
         self.new_version = None
         self.state = ExternalGitRepo.State.UNKNOWN
 
-
-class ExternalGitRepoSource(ExternalGitRepo):
-    def __init__(self, source_path: str, source: dict, url: str):
+    @classmethod
+    def from_source_impl(cls, source_path, source) -> ExternalGitRepo:
+        data_type = cls.Type(source["type"])
+        assert data_type == cls.Type.GIT, data_type
+        url = source["url"]
         repo_name = os.path.basename(url)
         commit = source.get("commit")
         tag = source.get("tag")
@@ -308,7 +312,7 @@ class ExternalGitRepoSource(ExternalGitRepo):
         checker_data = source.get("x-checker-data", {})
         arches = checker_data.get("arches") or source.get("only-arches") or ["x86_64"]
 
-        super().__init__(
+        obj = cls(
             source_path,
             repo_name,
             url,
@@ -318,8 +322,8 @@ class ExternalGitRepoSource(ExternalGitRepo):
             arches,
             checker_data,
         )
-
-        self.source = source
+        obj.source = source
+        return obj
 
     def update(self):
         if self.new_version is not None:
