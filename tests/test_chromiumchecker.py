@@ -5,7 +5,7 @@ from distutils.version import LooseVersion
 
 from src.checker import ManifestChecker
 from src.lib.externaldata import (
-    ExternalDataSource,
+    ExternalData,
     ExternalFile,
     ExternalGitRef,
     ExternalGitRepo,
@@ -31,7 +31,7 @@ class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
                 LooseVersion(data.new_version.version), LooseVersion("90.0.4430.212")
             )
 
-            if isinstance(data, ExternalDataSource):
+            if isinstance(data, ExternalData):
                 self.assertIsInstance(data.new_version, ExternalFile)
                 self.assertIsNotNone(data.new_version.checksum)
                 self.assertIsInstance(data.new_version.checksum, str)
