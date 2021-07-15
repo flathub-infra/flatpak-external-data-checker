@@ -372,3 +372,5 @@ def init_logging(level=logging.DEBUG):
     logging.basicConfig(
         level=level, format="+ %(asctime)s %(levelname)7s %(name)s: %(message)s"
     )
+    if level == logging.DEBUG:
+        logging.getLogger("github.Requester").setLevel(logging.INFO)
