@@ -34,6 +34,7 @@ import typing as t
 import operator
 from distutils.version import StrictVersion, LooseVersion
 import asyncio
+import shlex
 
 from collections import OrderedDict
 from ruamel.yaml import YAML
@@ -174,7 +175,7 @@ def clear_env(environ):
 
 
 def wrap_in_bwrap(cmdline, bwrap_args=None):
-    bwrap_cmd = ["bwrap", "--unshare-all"]
+    bwrap_cmd = ["bwrap", "--unshare-all", "--dev", "/dev"]
     for path in ("/usr", "/lib", "/lib64", "/bin", "/proc"):
         bwrap_cmd.extend(["--ro-bind", path, path])
     if bwrap_args is not None:
@@ -202,6 +203,102 @@ def check_bwrap():
         log.debug("bwrap unavailable: %s", err)
         return False
     return True
+
+
+class Command:
+    class SandboxPath(t.NamedTuple):
+        path: str
+        readonly: bool = False
+        optional: bool = False
+
+        @property
+        def bwrap_args(self) -> t.List[str]:
+            prefix = "ro-" if self.readonly else ""
+            suffix = "-try" if self.optional else ""
+            return [f"--{prefix}bind{suffix}", self.path, self.path]
+
+    argv: t.List[str]
+    cwd: str
+    sandbox: bool
+
+    def __init__(
+        self,
+        argv: t.List[str],
+        cwd: t.Optional[str] = None,
+        stdin: t.Optional[int] = subprocess.PIPE,
+        stdout: t.Optional[int] = subprocess.PIPE,
+        stderr: t.Optional[int] = None,
+        sandbox: t.Optional[bool] = None,
+        allow_network: bool = False,
+        allow_paths: t.Optional[t.List[t.Union[str, SandboxPath]]] = None,
+    ):
+        self.cwd = cwd or os.getcwd()
+        self.stdin = stdin
+        self.stdout = stdout
+        self.stderr = stderr
+        # If sandbox not explicitly enabled or disabled, try to use it if available,
+        # and proceed unsandboxed if sandbox is unavailable
+        if sandbox is None:
+            self.sandbox = check_bwrap()
+        else:
+            self.sandbox = sandbox
+        if self.sandbox:
+            bwrap_args = []
+            if allow_network:
+                bwrap_args.append("--share-net")
+            if allow_paths:
+                for path in allow_paths:
+                    if isinstance(path, str):
+                        mount = self.SandboxPath(path)
+                    else:
+                        mount = path
+                    bwrap_args.extend(mount.bwrap_args)
+            self.argv = wrap_in_bwrap(argv, bwrap_args)
+        else:
+            self.argv = argv
+        self._orig_argv = argv
+
+    def _log_cmd_run(self):
+        sanboxed = "sandboxed" if self.sandbox else "unsandboxed"
+        log.info("Running %s: %s", sanboxed, self)
+
+    async def run(self, input_data: t.Optional[bytes] = None) -> t.Tuple[bytes, bytes]:
+        self._log_cmd_run()
+        proc = await asyncio.create_subprocess_exec(
+            *self.argv,
+            cwd=self.cwd,
+            stdin=self.stdin,
+            stdout=self.stdout,
+            stderr=self.stderr,
+            env=clear_env(os.environ),
+        )
+        stdout, stderr = await proc.communicate(input=input_data)
+        if proc.returncode != 0:
+            assert proc.returncode is not None
+            raise subprocess.CalledProcessError(
+                returncode=proc.returncode,
+                cmd=self.argv,
+                output=stdout,
+                stderr=stderr,
+            )
+        return stdout, stderr
+
+    def run_sync(self, input_data: t.Optional[bytes] = None) -> t.Tuple[bytes, bytes]:
+        self._log_cmd_run()
+        proc = subprocess.run(
+            self.argv,
+            cwd=self.cwd,
+            input=input_data,
+            stdout=self.stdout,
+            stderr=self.stderr,
+            env=clear_env(os.environ),
+            check=False,
+        )
+        proc.check_returncode()
+        return proc.stdout, proc.stderr
+
+    def __str__(self):
+        return " ".join(shlex.quote(a) for a in self._orig_argv)
 
 
 async def git_ls_remote(url: str) -> t.Dict[str, str]:

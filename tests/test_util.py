@@ -20,15 +20,14 @@
 import unittest
 import subprocess
 import os
-import asyncio
 from datetime import datetime, timezone
 
 from src.lib.utils import (
     parse_github_url,
     strip_query,
-    clear_env,
     filter_versions,
     _extract_timestamp,
+    Command,
 )
 
 
@@ -67,22 +66,20 @@ class TestStripQuery(unittest.TestCase):
         self.assertEqual(strip_query(url), expected)
 
 
-class TestClearEnv(unittest.IsolatedAsyncioTestCase):
+class TestCommand(unittest.IsolatedAsyncioTestCase):
+    _SECRET_ENV_VAR = "SOME_TOKEN_HERE"
+
     def test_clear_env(self):
-        os.environ["SOME_TOKEN_HERE"] = "leaked"
-        # pylint: disable=subprocess-run-check
-        proc = subprocess.run(
-            'test -z "$SOME_TOKEN_HERE"', shell=True, env=clear_env(os.environ)
-        )
-        self.assertEqual(proc.returncode, 0)
+        os.environ[self._SECRET_ENV_VAR] = "leaked"
+        cmd = Command(["printenv", self._SECRET_ENV_VAR])
+        with self.assertRaises(subprocess.CalledProcessError):
+            cmd.run_sync()
 
     async def test_clear_env_async(self):
-        os.environ["SOME_TOKEN_HERE"] = "leaked"
-        proc = await asyncio.create_subprocess_shell(
-            'test -z "$SOME_TOKEN_HERE"', env=clear_env(os.environ)
-        )
-        await proc.wait()
-        self.assertEqual(proc.returncode, 0)
+        os.environ[self._SECRET_ENV_VAR] = "leaked"
+        cmd = Command(["printenv", self._SECRET_ENV_VAR])
+        with self.assertRaises(subprocess.CalledProcessError):
+            await cmd.run()
 
 
 class TestVersionFilter(unittest.TestCase):
