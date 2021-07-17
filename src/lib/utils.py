@@ -197,14 +197,11 @@ def run_command(argv, cwd=None, env=None, bwrap=True, bwrap_args=None):
 
 def check_bwrap():
     try:
-        p = run_command(["/bin/true"])
-        if p.returncode == 0:
-            return True
-    except FileNotFoundError:
-        pass
-
-    logging.warning("bwrap is not available")
-    return False
+        subprocess.run(wrap_in_bwrap(["/bin/true"]), check=True)
+    except (FileNotFoundError, subprocess.CalledProcessError) as err:
+        log.debug("bwrap unavailable: %s", err)
+        return False
+    return True
 
 
 async def git_ls_remote(url: str) -> t.Dict[str, str]:
