@@ -1,9 +1,7 @@
 import logging
-import os
 import re
 from datetime import datetime
 import typing as t
-import asyncio
 
 from ..lib import utils
 from ..lib.externaldata import ExternalData, ExternalGitRepo, ExternalGitRef
@@ -23,17 +21,7 @@ async def query_json(query, data, variables=None):
             var_args += ["--arg", var_name, var_value]
 
     jq_cmd = ["jq"] + var_args + ["-r", "-e", f"( {query} ) | ( {typecheck_q} )"]
-    if utils.check_bwrap():
-        jq_cmd = utils.wrap_in_bwrap(jq_cmd, bwrap_args=["--die-with-parent"])
-
-    jq_proc = await asyncio.create_subprocess_exec(
-        *jq_cmd,
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        env=utils.clear_env(os.environ),
-    )
-    jq_stdout, _ = await jq_proc.communicate(input=data)
-    assert jq_proc.returncode == 0
+    jq_stdout, _ = await utils.Command(jq_cmd).run(data)
     return jq_stdout.decode().strip()
 
 
