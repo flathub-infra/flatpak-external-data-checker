@@ -183,19 +183,6 @@ def wrap_in_bwrap(cmdline, bwrap_args=None):
     return bwrap_cmd + ["--"] + cmdline
 
 
-def run_command(argv, cwd=None, env=None, bwrap=True, bwrap_args=None):
-    if bwrap:
-        command = wrap_in_bwrap(argv, bwrap_args)
-    else:
-        command = argv
-    if env is None:
-        env = os.environ
-    p = subprocess.run(
-        command, cwd=cwd, env=env, stderr=subprocess.PIPE, encoding="utf-8"
-    )
-    return p
-
-
 def check_bwrap():
     try:
         subprocess.run(wrap_in_bwrap(["/bin/true"]), check=True)
@@ -339,29 +326,13 @@ def extract_appimage_version(basename, appimg_io: t.IO):
                 fp.write(chunk)
                 chunk = appimg_io.read(1024 ** 2)
 
-        bwrap = check_bwrap()
-        bwrap_args = [
-            "--bind",
-            tmpdir,
-            tmpdir,
-            "--die-with-parent",
-            "--new-session",
-        ]
-
-        args = ["unsquashfs", "-no-progress", appimage_path]
-
-        log.debug("$ %s", " ".join(args))
-        p = run_command(
-            args,
+        unsquashfs_cmd = Command(
+            ["unsquashfs", "-no-progress", appimage_path],
             cwd=tmpdir,
-            env=clear_env(os.environ),
-            bwrap=bwrap,
-            bwrap_args=bwrap_args,
+            allow_paths=[tmpdir],
+            stdout=None,
         )
-
-        if p.returncode != 0:
-            log.error("AppImage extraction failed\n%s", p.stderr)
-            p.check_returncode()
+        unsquashfs_cmd.run_sync()
 
         for desktop in glob.glob(os.path.join(tmpdir, "squashfs-root", "*.desktop")):
             kf = GLib.KeyFile()
