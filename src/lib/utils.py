@@ -51,7 +51,7 @@ log = logging.getLogger(__name__)
 
 # With the default urllib User-Agent, dl.discordapp.net returns 403
 USER_AGENT = (
-    "flatpak-external-data-checker "
+    "flatpak-external-data-checker/1.0 "
     "(+https://github.com/flathub/flatpak-external-data-checker)"
 )
 HEADERS = {"User-Agent": USER_AGENT}
@@ -119,11 +119,7 @@ async def get_extra_data_info_from_url(
     follow_redirects: bool = True,
     dest_io: t.Optional[t.IO] = None,
 ):
-    async with session.get(
-        url,
-        headers=HEADERS,
-        # auto_decompress=False,
-    ) as response:
+    async with session.get(url) as response:
         real_url = str(response.url)
         info = response.headers
         checksum = hashlib.sha256()

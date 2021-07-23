@@ -363,6 +363,7 @@ class Checker:
         log.debug("Starting HTTP session for %s", self)
         self.session = aiohttp.ClientSession(
             raise_for_status=True,
+            headers=utils.HEADERS,
             timeout=aiohttp.ClientTimeout(connect=TIMEOUT_CONNECT, total=TIMEOUT_TOTAL),
         )
         await self.session.__aenter__()
