@@ -139,6 +139,8 @@ class DebianRepoChecker(Checker):
             else:
                 package = cache[package_name]
                 candidate = package.candidate
+                assert candidate is not None
+                assert candidate.uri is not None
 
                 new_version = ExternalFile(
                     candidate.uri,
