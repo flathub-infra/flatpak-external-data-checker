@@ -163,6 +163,7 @@ class DebianRepoChecker(Checker):
         # server, but most packages this checker will be used for are not from these repos.
         # We'd have to open-code it.
         # https://salsa.debian.org/apt-team/python-apt/blob/master/apt/package.py#L1245-1417
+        assert candidate.uri
         return await get_timestamp_from_url(candidate.uri, self.session)
 
     @contextlib.contextmanager
