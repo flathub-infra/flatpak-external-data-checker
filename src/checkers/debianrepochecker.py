@@ -199,3 +199,5 @@ class DebianRepoChecker(Checker):
             cache.open()
 
             yield cache
+
+            cache.close()
