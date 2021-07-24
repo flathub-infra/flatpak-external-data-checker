@@ -30,16 +30,18 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import apt
-import apt_pkg
 import contextlib
 import logging
 import os
 import tempfile
 import urllib.parse
 import re
+import typing as t
 
-from ..lib.externaldata import Checker, ExternalFile
+import apt
+import apt_pkg
+
+from ..lib.externaldata import Checker, ExternalFile, ExternalData, ExternalGitRepo
 from ..lib.utils import get_timestamp_from_url
 
 apt_pkg.init()
@@ -93,7 +95,7 @@ class DebianRepoChecker(Checker):
         "required": ["package-name", "root", "dist"],
     }
 
-    async def check(self, external_data):
+    async def check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
         assert self.should_check(external_data)
 
         LOG.debug("Checking %s", external_data.filename)
@@ -112,6 +114,7 @@ class DebianRepoChecker(Checker):
             return
 
         arch = self._translate_arch(external_data.arches[0])
+        cache: apt.Cache
         with self._load_repo(root, dist, component, arch, src_pkg) as cache:
             if src_pkg:
                 src_record = apt_pkg.SourceRecords()
@@ -120,6 +123,7 @@ class DebianRepoChecker(Checker):
                     source_version, source_files = src_record.version, src_record.files
                 if not source_version:
                     raise ValueError(f"No source package {package_name}")
+                assert source_files is not None
 
                 source_file = next(f for f in source_files if f.type == "tar")
 
@@ -146,12 +150,12 @@ class DebianRepoChecker(Checker):
 
             external_data.set_new_version(new_version)
 
-    def _translate_arch(self, arch):
+    def _translate_arch(self, arch: str) -> str:
         # Because architecture names in Debian differ from Flatpak's
         arches = {"x86_64": "amd64", "arm": "armel", "aarch64": "arm64"}
         return arches.get(arch, arch)
 
-    async def _get_timestamp_for_candidate(self, candidate):
+    async def _get_timestamp_for_candidate(self, candidate: apt.Version):
         # TODO: fetch package, parse changelog, get the date from there.
         # python-apt can fetch changelogs from Debian and Ubuntu's changelog
         # server, but most packages this checker will be used for are not from these repos.
@@ -160,7 +164,9 @@ class DebianRepoChecker(Checker):
         return await get_timestamp_from_url(candidate.uri, self.session)
 
     @contextlib.contextmanager
-    def _load_repo(self, deb_root, dist, component, arch, source=False):
+    def _load_repo(
+        self, deb_root: str, dist: str, component: str, arch: str, source=False
+    ) -> t.Generator[apt.Cache, None, None]:
         with tempfile.TemporaryDirectory() as root:
             LOG.debug("Setting up apt directory structure in %s", root)
 
