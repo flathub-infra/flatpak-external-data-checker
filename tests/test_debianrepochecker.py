@@ -1,5 +1,6 @@
 import unittest
 import os
+import datetime
 
 from src.checker import ManifestChecker
 from src.lib.utils import init_logging
@@ -22,6 +23,8 @@ class TestDebianRepoChecker(unittest.IsolatedAsyncioTestCase):
             self.assertIsNotNone(data.new_version.url)
             self.assertIsNotNone(data.new_version.checksum)
             self.assertIsNotNone(data.new_version.version)
+            self.assertIsNotNone(data.new_version.timestamp)
+            self.assertIsInstance(data.new_version.timestamp, datetime.date)
             self.assertNotEqual(data.new_version.url, data.current_version.url)
             self.assertNotEqual(
                 data.new_version.checksum, data.current_version.checksum

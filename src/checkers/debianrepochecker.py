@@ -123,12 +123,14 @@ class DebianRepoChecker(Checker):
 
                 source_file = next(f for f in source_files if f.type == "tar")
 
+                src_url = urllib.parse.urljoin(root.rstrip("/") + "/", source_file.path)
+
                 new_version = ExternalFile(
-                    urllib.parse.urljoin(root.rstrip("/") + "/", source_file.path),
+                    src_url,
                     str(source_file.hashes.find("sha256")).split(":")[1],
                     source_file.size,
                     re.sub(r"^\d+:", "", source_version),  # Strip epoch if present
-                    timestamp=None,
+                    timestamp=await get_timestamp_from_url(src_url, self.session),
                 )
             else:
                 package = cache[package_name]
