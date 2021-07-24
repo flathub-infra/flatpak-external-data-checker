@@ -79,15 +79,6 @@ class LoggerAcquireProgress(apt.progress.text.AcquireProgress):
         return apt.progress.base.AcquireProgress.pulse(self, owner)
 
 
-def _get_timestamp_for_candidate(candidate):
-    # TODO: fetch package, parse changelog, get the date from there.
-    # python-apt can fetch changelogs from Debian and Ubuntu's changelog
-    # server, but most packages this checker will be used for are not from these repos.
-    # We'd have to open-code it.
-    # https://salsa.debian.org/apt-team/python-apt/blob/master/apt/package.py#L1245-1417
-    return get_timestamp_from_url(candidate.uri)
-
-
 class DebianRepoChecker(Checker):
     CHECKER_DATA_TYPE = "debian-repo"
     CHECKER_DATA_SCHEMA = {
@@ -148,7 +139,7 @@ class DebianRepoChecker(Checker):
                     candidate.sha256,
                     candidate.size,
                     candidate.version,
-                    timestamp=_get_timestamp_for_candidate(candidate),
+                    timestamp=await self._get_timestamp_for_candidate(candidate),
                 )
 
             external_data.set_new_version(new_version)
@@ -157,6 +148,14 @@ class DebianRepoChecker(Checker):
         # Because architecture names in Debian differ from Flatpak's
         arches = {"x86_64": "amd64", "arm": "armel", "aarch64": "arm64"}
         return arches.get(arch, arch)
+
+    async def _get_timestamp_for_candidate(self, candidate):
+        # TODO: fetch package, parse changelog, get the date from there.
+        # python-apt can fetch changelogs from Debian and Ubuntu's changelog
+        # server, but most packages this checker will be used for are not from these repos.
+        # We'd have to open-code it.
+        # https://salsa.debian.org/apt-team/python-apt/blob/master/apt/package.py#L1245-1417
+        return await get_timestamp_from_url(candidate.uri, self.session)
 
     @contextlib.contextmanager
     def _load_repo(self, deb_root, dist, component, arch, source=False):

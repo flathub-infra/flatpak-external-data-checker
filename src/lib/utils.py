@@ -105,12 +105,9 @@ def strip_query(url):
     return stripped
 
 
-def get_timestamp_from_url(url):
-    request = urllib.request.Request(url, headers=HEADERS, method="HEAD")
-    with urllib.request.urlopen(
-        request, timeout=externaldata.TIMEOUT_CONNECT
-    ) as response:
-        return _extract_timestamp(response.info())
+async def get_timestamp_from_url(url: str, session: aiohttp.ClientSession):
+    async with session.head(url, allow_redirects=True) as response:
+        return _extract_timestamp(response.headers)
 
 
 async def get_extra_data_info_from_url(
