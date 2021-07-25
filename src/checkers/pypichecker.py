@@ -5,6 +5,7 @@ import typing as t
 
 from ..lib import OPERATORS_SCHEMA
 from ..lib.externaldata import Checker, ExternalFile, ExternalBase
+from ..lib.checksums import MultiDigest
 from ..lib.utils import filter_versions
 from ..lib.errors import CheckerQueryError
 
@@ -69,9 +70,11 @@ class PyPIChecker(Checker):
                 f"Couldn't find {package_type} for package {package_name}"
             ) from err
 
+        checksum = MultiDigest.from_source(pypi_download["digests"])
+
         new_version = ExternalFile(
             url=pypi_download["url"],
-            checksum=pypi_download["digests"]["sha256"],
+            checksum=checksum,
             size=pypi_download["size"],
             version=pypi_version,
             timestamp=pypi_date,
