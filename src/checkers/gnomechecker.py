@@ -6,6 +6,7 @@ from yarl import URL
 
 from ..lib import OPERATORS_SCHEMA
 from ..lib.externaldata import Checker, ExternalBase, ExternalFile
+from ..lib.checksums import MultiDigest
 from ..lib.utils import filter_versions
 
 log = logging.getLogger(__name__)
@@ -88,7 +89,7 @@ class GNOMEChecker(Checker):
 
         new_version = ExternalFile(
             url=str(proj_url / tarball_path),
-            checksum=checksum,
+            checksum=MultiDigest(sha256=checksum),
             size=None,
             version=latest_version,
             timestamp=None,

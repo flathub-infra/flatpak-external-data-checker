@@ -24,6 +24,7 @@ from distutils.version import LooseVersion
 
 from src.lib.utils import init_logging
 from src.checker import ManifestChecker
+from src.lib.checksums import MultiDigest
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.gnome.baobab.json")
 
@@ -39,10 +40,12 @@ class TestGNOMEChecker(unittest.IsolatedAsyncioTestCase):
         for data in ext_data:
             self.assertIsNotNone(data.new_version)
             self.assertIsNotNone(data.new_version.checksum)
-            self.assertIsInstance(data.new_version.checksum, str)
+            self.assertIsInstance(data.new_version.checksum, MultiDigest)
             self.assertNotEqual(
                 data.new_version.checksum,
-                "0000000000000000000000000000000000000000000000000000000000000000",
+                MultiDigest(
+                    sha256="0000000000000000000000000000000000000000000000000000000000000000"
+                ),
             )
             self.assertIsNotNone(data.new_version.version)
             self.assertIsInstance(data.new_version.version, str)
