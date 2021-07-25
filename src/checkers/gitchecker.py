@@ -115,6 +115,14 @@ class GitChecker(Checker):
             sorted_tags = sorted(matching_tags)
         else:
             sorted_tags = matching_tags
+        if not sorted_tags:
+            log.error(
+                "%s has no tags matching '%s'",
+                external_data.current_version.url,
+                tag_pattern,
+            )
+            return
+
         latest_tag = sorted_tags[-1]
 
         new_version = ExternalGitRef(
