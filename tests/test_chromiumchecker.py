@@ -10,6 +10,7 @@ from src.lib.externaldata import (
     ExternalGitRef,
     ExternalGitRepo,
 )
+from src.lib.checksums import MultiDigest
 from src.lib.utils import init_logging
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.chromium.Chromium.yaml")
@@ -34,7 +35,7 @@ class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
             if isinstance(data, ExternalData):
                 self.assertIsInstance(data.new_version, ExternalFile)
                 self.assertIsNotNone(data.new_version.checksum)
-                self.assertIsInstance(data.new_version.checksum, str)
+                self.assertIsInstance(data.new_version.checksum, MultiDigest)
                 if data.filename.startswith("chromium-"):
                     self.assertRegex(
                         data.new_version.url,
@@ -42,7 +43,9 @@ class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
                     )
                     self.assertNotEqual(
                         data.new_version.checksum,
-                        "abe11d0cb1ff21278aad2eec1a1e279d59176b15331804d7df1807446786d59e",
+                        MultiDigest(
+                            sha256="abe11d0cb1ff21278aad2eec1a1e279d59176b15331804d7df1807446786d59e"
+                        ),
                     )
                 elif data.filename.startswith("clang-"):
                     self.assertRegex(
@@ -51,7 +54,9 @@ class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
                     )
                     self.assertNotEqual(
                         data.new_version.checksum,
-                        "676448e180fb060d3983f24476a2136eac83c6011c600117686035634a2bbe26",
+                        MultiDigest(
+                            sha256="676448e180fb060d3983f24476a2136eac83c6011c600117686035634a2bbe26"
+                        ),
                     )
                 else:
                     self.fail(f"unexpected extra-data filename {data.filename}")
