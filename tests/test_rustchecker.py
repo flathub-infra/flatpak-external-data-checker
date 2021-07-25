@@ -3,6 +3,7 @@ import unittest
 
 from src.checker import ManifestChecker
 from src.lib.utils import init_logging
+from src.lib.checksums import MultiDigest
 
 TEST_MANIFEST = os.path.join(
     os.path.dirname(__file__), "org.freedesktop.Sdk.Extension.rust-nightly.yml"
@@ -26,10 +27,12 @@ class TestRustChecker(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIsNone(data.new_version.size)
         self.assertIsNotNone(data.new_version.checksum)
-        self.assertIsInstance(data.new_version.checksum, str)
+        self.assertIsInstance(data.new_version.checksum, MultiDigest)
         self.assertNotEqual(
             data.new_version.checksum,
-            "24b4681187654778817652273a68a4d55f5090604cd14b1f1c3ff8785ad24b99",
+            MultiDigest(
+                sha256="24b4681187654778817652273a68a4d55f5090604cd14b1f1c3ff8785ad24b99"
+            ),
         )
 
 
