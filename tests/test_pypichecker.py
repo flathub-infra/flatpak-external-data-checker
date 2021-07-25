@@ -23,6 +23,7 @@ class TestPyPIChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNotNone(data.new_version.checksum)
                 self.assertIsNotNone(data.new_version.version)
                 self.assertNotEqual(data.new_version.url, data.current_version.url)
+                self.assertIsInstance(data.new_version.checksum, str)
                 self.assertNotEqual(
                     data.new_version.checksum, data.current_version.checksum
                 )
