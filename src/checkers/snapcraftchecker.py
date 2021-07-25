@@ -3,6 +3,7 @@ import logging
 import hashlib
 
 from ..lib.externaldata import ExternalBase, ExternalFile, Checker
+from ..lib.checksums import MultiHash
 
 log = logging.getLogger(__name__)
 
@@ -21,18 +22,18 @@ class SnapcraftChecker(Checker):
     _arches = {"x86_64": "amd64", "aarch64": "arm64", "arm": "armhf", "i386": "i386"}
     _BLOCK_SIZE = 65536
 
-    async def _get_sha256(self, url: str, sha3_384: str):
+    async def _get_digests(self, url: str, sha3_384: str):
         assert self.session is not None
-        sha2 = hashlib.sha256()
+        multihash = MultiHash()
         sha3 = hashlib.sha3_384()
 
         async with self.session.get(url) as response:
             async for data in response.content.iter_chunked(self._BLOCK_SIZE):
-                sha2.update(data)
+                multihash.update(data)
                 sha3.update(data)
 
         if sha3.hexdigest() == sha3_384:
-            return sha2.hexdigest()
+            return multihash.hexdigest()
 
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
@@ -55,14 +56,14 @@ class SnapcraftChecker(Checker):
 
         if external_data.current_version.url != data["download"]["url"]:
             log.debug("Downloading file from %s; may take a while", url)
-            sha256 = await self._get_sha256(
+            multidigest = await self._get_digests(
                 data["download"]["url"], data["download"]["sha3-384"]
             )
 
-            if sha256:
+            if multidigest:
                 new_version = ExternalFile(
                     url=data["download"]["url"],
-                    checksum=sha256,
+                    checksum=multidigest,
                     size=data["download"]["size"],
                     version=data["version"],
                     timestamp=datetime.datetime.strptime(
