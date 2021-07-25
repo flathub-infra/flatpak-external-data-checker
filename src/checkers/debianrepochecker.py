@@ -42,6 +42,7 @@ import apt
 import apt_pkg
 
 from ..lib.externaldata import Checker, ExternalFile, ExternalBase
+from ..lib.checksums import MultiDigest
 from ..lib.utils import get_timestamp_from_url
 
 apt_pkg.init()
@@ -57,8 +58,24 @@ APT_NEEDED_DIRS = (
     "var/lib/dpkg/updates",
     "var/lib/dpkg/info",
 )
+DEB_HASH_MAP = {
+    "SHA512": "sha512",
+    "SHA256": "sha256",
+    "SHA1": "sha1",
+    "MD5Sum": "md5",
+}
 
 LOG = logging.getLogger(__name__)
+
+
+def read_deb_hashes(deb_hashes: apt_pkg.HashStringList) -> MultiDigest:
+    digests: t.Dict[str, str] = {}
+    deb_hash: apt_pkg.HashString
+    for deb_hash in deb_hashes:  # type: ignore
+        hash_type = DEB_HASH_MAP.get(deb_hash.hashtype)
+        if hash_type:
+            digests[hash_type] = deb_hash.hashvalue
+    return MultiDigest.from_source(digests)
 
 
 class LoggerAcquireProgress(apt.progress.text.AcquireProgress):
@@ -131,7 +148,7 @@ class DebianRepoChecker(Checker):
 
                 new_version = ExternalFile(
                     url=src_url,
-                    checksum=str(source_file.hashes.find("sha256")).split(":")[1],
+                    checksum=read_deb_hashes(source_file.hashes),
                     size=source_file.size,
                     # Strip epoch if present
                     version=re.sub(r"^\d+:", "", source_version),
@@ -145,7 +162,10 @@ class DebianRepoChecker(Checker):
 
                 new_version = ExternalFile(
                     url=candidate.uri,
-                    checksum=candidate.sha256,
+                    # FIXME: apt.package.Version.{md5,sha1,sha256} can raise an exception
+                    # if given hash isn't set, while sha512 isn't accessible at all.
+                    # Raw hashes are handy, but accessible only through protected property.
+                    checksum=read_deb_hashes(candidate._records.hashes),
                     size=candidate.size,
                     version=candidate.version,
                     timestamp=await self._get_timestamp_for_candidate(candidate),
