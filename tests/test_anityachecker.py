@@ -4,6 +4,7 @@ from distutils.version import LooseVersion
 
 from src.checker import ManifestChecker
 from src.lib.externaldata import ExternalFile, ExternalGitRef
+from src.lib.checksums import MultiDigest
 from src.lib.utils import init_logging
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.flatpak.Flatpak.yml")
@@ -33,10 +34,12 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertIsInstance(data.new_version.size, int)
                 self.assertGreater(data.new_version.size, 0)
                 self.assertIsNotNone(data.new_version.checksum)
-                self.assertIsInstance(data.new_version.checksum, str)
+                self.assertIsInstance(data.new_version.checksum, MultiDigest)
                 self.assertNotEqual(
                     data.new_version.checksum,
-                    "90ed475f37584f646e9ef829932b2525d5c6fc2e0147e8d611bc50aa0e718598",
+                    MultiDigest(
+                        sha256="90ed475f37584f646e9ef829932b2525d5c6fc2e0147e8d611bc50aa0e718598"
+                    ),
                 )
             elif data.filename == "boost_1_74_0.tar.bz2":
                 self.assertIsNotNone(data.new_version)
@@ -52,10 +55,12 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertIsInstance(data.new_version.size, int)
                 self.assertGreater(data.new_version.size, 0)
                 self.assertIsNotNone(data.new_version.checksum)
-                self.assertIsInstance(data.new_version.checksum, str)
+                self.assertIsInstance(data.new_version.checksum, MultiDigest)
                 self.assertNotEqual(
                     data.new_version.checksum,
-                    "83bfc1507731a0906e387fc28b7ef5417d591429e51e788417fe9ff025e116b1",
+                    MultiDigest(
+                        sha256="83bfc1507731a0906e387fc28b7ef5417d591429e51e788417fe9ff025e116b1"
+                    ),
                 )
             elif data.filename == "flatpak-1.8.2.tar.xz":
                 self.assertIsNotNone(data.new_version)
@@ -71,10 +76,12 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertIsInstance(data.new_version.size, int)
                 self.assertGreater(data.new_version.size, 0)
                 self.assertIsNotNone(data.new_version.checksum)
-                self.assertIsInstance(data.new_version.checksum, str)
+                self.assertIsInstance(data.new_version.checksum, MultiDigest)
                 self.assertNotEqual(
                     data.new_version.checksum,
-                    "7926625df7c2282a5ee1a8b3c317af53d40a663b1bc6b18a2dc8747e265085b0",
+                    MultiDigest(
+                        sha256="7926625df7c2282a5ee1a8b3c317af53d40a663b1bc6b18a2dc8747e265085b0"
+                    ),
                 )
             elif data.filename == "ostree.git":
                 self.assertIsNotNone(data.new_version)
