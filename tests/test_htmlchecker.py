@@ -26,6 +26,7 @@ from distutils.version import LooseVersion
 
 from src.lib.utils import init_logging
 from src.checker import ManifestChecker
+from src.lib.checksums import MultiDigest
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.x.xeyes.yml")
 
@@ -68,10 +69,12 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(data.new_version.size, int)
         self.assertGreater(data.new_version.size, 0)
         self.assertIsNotNone(data.new_version.checksum)
-        self.assertIsInstance(data.new_version.checksum, str)
+        self.assertIsInstance(data.new_version.checksum, MultiDigest)
         self.assertNotEqual(
             data.new_version.checksum,
-            "0000000000000000000000000000000000000000000000000000000000000000",
+            MultiDigest(
+                sha256="0000000000000000000000000000000000000000000000000000000000000000"
+            ),
         )
 
     def _test_check_with_url_template(self, data):
@@ -85,10 +88,12 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(data.new_version.size, int)
         self.assertGreater(data.new_version.size, 0)
         self.assertIsNotNone(data.new_version.checksum)
-        self.assertIsInstance(data.new_version.checksum, str)
+        self.assertIsInstance(data.new_version.checksum, MultiDigest)
         self.assertEqual(
             data.new_version.checksum,
-            "d73b62f29eb98d850f16b76d759395180b860b613fbe1686b18eee99a6e3773f",
+            MultiDigest(
+                sha256="d73b62f29eb98d850f16b76d759395180b860b613fbe1686b18eee99a6e3773f"
+            ),
         )
 
     def _test_combo_pattern(self, data):
@@ -104,7 +109,9 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         )
         self.assertNotEqual(
             data.new_version.checksum,
-            "0000000000000000000000000000000000000000000000000000000000000000",
+            MultiDigest(
+                sha256="0000000000000000000000000000000000000000000000000000000000000000"
+            ),
         )
 
     def _test_combo_pattern_nosort(self, data):
@@ -120,7 +127,9 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         )
         self.assertNotEqual(
             data.new_version.checksum,
-            "0000000000000000000000000000000000000000000000000000000000000000",
+            MultiDigest(
+                sha256="0000000000000000000000000000000000000000000000000000000000000000"
+            ),
         )
 
     def _test_no_match(self, data):
