@@ -2,6 +2,7 @@ import datetime
 import logging
 
 from ..lib.externaldata import ExternalBase, ExternalFile, Checker
+from ..lib.checksums import MultiDigest
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class JetBrainsChecker(Checker):
 
         new_version = ExternalFile(
             url=release["link"],
-            checksum=checksum,
+            checksum=MultiDigest(sha256=checksum),
             size=release["size"],
             version=data["version"],
             timestamp=datetime.datetime.strptime(data["date"], "%Y-%m-%d"),
