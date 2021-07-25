@@ -67,6 +67,7 @@ def print_outdated_external_data(manifest_checker: checker.ManifestChecker):
             if data.state == ExternalData.State.BROKEN
             else "CHANGE SOON"
         )
+        checksums = {}
         if data.new_version:
             if data.type == ExternalData.Type.GIT:
                 message_tmpl = (
@@ -80,15 +81,20 @@ def print_outdated_external_data(manifest_checker: checker.ManifestChecker):
                     "  Timestamp: {timestamp}\n"
                 )
             else:
+                assert isinstance(data, ExternalData)
                 message_tmpl = (
                     "{data_state}: {data_name}\n"
                     " Has a new version:\n"
                     "  URL:       {url}\n"
-                    "  SHA256:    {checksum}\n"
+                    "  MD5:       {md5}\n"
+                    "  SHA1:      {sha1}\n"
+                    "  SHA256:    {sha256}\n"
+                    "  SHA512:    {sha512}\n"
                     "  Size:      {size}\n"
                     "  Version:   {version}\n"
                     "  Timestamp: {timestamp}\n"
                 )
+                checksums = data.new_version.checksum._asdict()
         elif data.state == ExternalData.State.BROKEN:
             message_tmpl = (
                 # fmt: off
@@ -100,7 +106,7 @@ def print_outdated_external_data(manifest_checker: checker.ManifestChecker):
         message = message_tmpl.format(
             data_state=state_txt,
             data_name=data.filename,
-            **(data.new_version or data.current_version)._asdict(),
+            **{**(data.new_version or data.current_version)._asdict(), **checksums},
         )
         print(message, flush=True)
     return len(ext_data)
