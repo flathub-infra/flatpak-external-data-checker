@@ -3,6 +3,7 @@ import os
 
 from src.checker import ManifestChecker
 from src.lib.utils import init_logging
+from src.lib.checksums import MultiDigest
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.unity.UnityHub.yaml")
 
@@ -22,10 +23,12 @@ class TestURLChecker(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(data.new_version.size, int)
         self.assertGreater(data.new_version.size, 0)
         self.assertIsNotNone(data.new_version.checksum)
-        self.assertIsInstance(data.new_version.checksum, str)
+        self.assertIsInstance(data.new_version.checksum, MultiDigest)
         self.assertNotEqual(
             data.new_version.checksum,
-            "0000000000000000000000000000000000000000000000000000000000000000",
+            MultiDigest(
+                sha256="0000000000000000000000000000000000000000000000000000000000000000"
+            ),
         )
         self.assertIsNotNone(data.new_version.version)
 
