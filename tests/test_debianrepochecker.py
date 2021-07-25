@@ -26,6 +26,7 @@ class TestDebianRepoChecker(unittest.IsolatedAsyncioTestCase):
             self.assertIsNotNone(data.new_version.timestamp)
             self.assertIsInstance(data.new_version.timestamp, datetime.date)
             self.assertNotEqual(data.new_version.url, data.current_version.url)
+            self.assertIsInstance(data.new_version.checksum, str)
             self.assertNotEqual(
                 data.new_version.checksum, data.current_version.checksum
             )
