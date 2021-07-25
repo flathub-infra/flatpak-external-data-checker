@@ -11,7 +11,7 @@
                 {
                     "type": "archive",
                     "url": "https://download.gnome.org/sources/alleyoop/0.9/alleyoop-0.9.8.tar.xz",
-                    "sha256sum": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
                     "x-checker-data": {
                         "type": "gnome",
                         "name": "alleyoop"
@@ -25,7 +25,7 @@
                 {
                     "type": "archive",
                     "url": "https://download.gnome.org/sources/pygobject/3.36/pygobject-3.36.0.tar.xz",
-                    "sha256sum": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
                     "x-checker-data": {
                         "type": "gnome",
                         "name": "pygobject",
