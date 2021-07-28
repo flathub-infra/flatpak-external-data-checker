@@ -35,6 +35,7 @@ from .lib.externaldata import (
     Checker,
 )
 from .lib.utils import read_manifest, dump_manifest
+from .lib.errors import CheckerError
 
 import logging
 import os
@@ -87,6 +88,7 @@ class ManifestChecker:
     class TasksCounter:
         started: int = 0
         finished: int = 0
+        failed: int = 0
         total: int = 0
 
     def __init__(self, manifest: str):
@@ -225,9 +227,22 @@ class ManifestChecker:
                 data,
                 checker.__class__.__name__,
             )
-            await checker.validate_checker_data(data)
-            async with checker:
-                await checker.check(data)
+            try:
+                await checker.validate_checker_data(data)
+                async with checker:
+                    await checker.check(data)
+            except CheckerError as err:
+                counter.failed += 1
+                log.error(
+                    "Failed to check %s with %s: %s",
+                    data,
+                    checker.__class__.__name__,
+                    err,
+                )
+                # TODO: Potentially we can proceed to the next applicable checker here,
+                # but applying checkers in sequence should be carefully tested.
+                # This is a safety switch: leave the data alone on error.
+                return data
             if data.state != ExternalData.State.UNKNOWN:
                 log.debug(
                     "Source %s: got new state %s from %s, skipping remaining checkers",
@@ -246,7 +261,7 @@ class ManifestChecker:
         counter.finished += 1
         log.info(
             "Finished check [%d/%d] %s (from %s)",
-            counter.finished,
+            counter.finished + counter.failed,
             counter.total,
             data,
             src_rel_path,
