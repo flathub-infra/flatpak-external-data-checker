@@ -31,6 +31,7 @@ import aiohttp
 import jsonschema
 
 from . import utils, TIMEOUT_CONNECT, TIMEOUT_TOTAL, HTTP_CLIENT_HEADERS
+from .errors import CheckerMetadataError, CheckerFetchError
 
 
 log = logging.getLogger(__name__)
@@ -254,12 +255,15 @@ class ExternalGitRef(t.NamedTuple):
         )
         refs = await utils.git_ls_remote(self.url)
 
-        if self.tag is not None:
-            got_commit = self._get_tagged_commit(refs, self.tag)
-        elif self.branch is not None:
-            got_commit = refs[f"refs/heads/{self.branch}"]
-        else:
-            got_commit = refs["HEAD"]
+        try:
+            if self.tag is not None:
+                got_commit = self._get_tagged_commit(refs, self.tag)
+            elif self.branch is not None:
+                got_commit = refs[f"refs/heads/{self.branch}"]
+            else:
+                got_commit = refs["HEAD"]
+        except KeyError as err:
+            raise CheckerFetchError(f"Ref not found in {self.url}") from err
 
         return self._replace(commit=got_commit)  # pylint: disable=no-member
 
@@ -397,8 +401,12 @@ class Checker:
     ):
         assert any(isinstance(external_data, c) for c in self.SUPPORTED_DATA_CLASSES)
         schema = self.get_json_schema(external_data)
-        if schema:
+        if not schema:
+            return
+        try:
             jsonschema.validate(external_data.checker_data, schema)
+        except jsonschema.ValidationError as err:
+            raise CheckerMetadataError("Invalid metadata schema") from err
 
     async def check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
         pass
