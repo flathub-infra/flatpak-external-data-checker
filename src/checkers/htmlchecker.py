@@ -27,17 +27,17 @@ import typing as t
 
 from ..lib import utils, NETWORK_ERRORS
 from ..lib.externaldata import ExternalData, Checker
+from ..lib.errors import CheckerMetadataError, CheckerQueryError, CheckerFetchError
 
 log = logging.getLogger(__name__)
 
 
 def _get_latest(
     html: str, pattern: re.Pattern, sort_key=t.Optional[t.Callable]
-) -> t.Optional[t.Union[str, t.Tuple[str, ...]]]:
+) -> t.Union[str, t.Tuple[str, ...]]:
     match = pattern.findall(html)
     if not match:
-        log.warning("%s did not match", pattern.pattern)
-        return None
+        raise CheckerQueryError(f"Pattern '{pattern.pattern}' didn't match anything")
     if sort_key is None or len(match) == 1:
         result = match[0]
     else:
@@ -47,11 +47,21 @@ def _get_latest(
     return result
 
 
-def _get_pattern(checker_data: t.Dict, pattern_name: str):
+def _get_pattern(checker_data: t.Dict, pattern_name: str, expected_groups=1):
     try:
-        return re.compile(checker_data[pattern_name])
+        pattern_str = checker_data[pattern_name]
     except KeyError:
         return None
+    try:
+        pattern = re.compile(pattern_str)
+    except re.error as err:
+        raise CheckerMetadataError(f"Invalid regex '{pattern_str}'") from err
+    if pattern.groups != expected_groups:
+        raise CheckerMetadataError(
+            f"Pattern '{pattern.pattern}' contains {pattern.groups} group(s) "
+            f"instead of {expected_groups}"
+        )
+    return pattern
 
 
 class HTMLChecker(Checker):
@@ -83,46 +93,37 @@ class HTMLChecker(Checker):
         assert self.should_check(external_data)
 
         url = external_data.checker_data["url"]
-        combo_pattern = _get_pattern(external_data.checker_data, "pattern")
-        version_pattern = _get_pattern(external_data.checker_data, "version-pattern")
-        url_pattern = _get_pattern(external_data.checker_data, "url-pattern")
+        combo_pattern = _get_pattern(external_data.checker_data, "pattern", 2)
+        version_pattern = _get_pattern(external_data.checker_data, "version-pattern", 1)
+        url_pattern = _get_pattern(external_data.checker_data, "url-pattern", 1)
         url_template = external_data.checker_data.get("url-template")
         sort_matches = external_data.checker_data.get("sort-matches", True)
         assert combo_pattern or (version_pattern and (url_pattern or url_template))
 
-        async with self.session.get(url) as response:
-            html = await response.text()
-
-        latest_version: t.Optional[str] = None
-        latest_url: t.Optional[str] = None
+        try:
+            async with self.session.get(url) as response:
+                html = await response.text()
+        except NETWORK_ERRORS as err:
+            raise CheckerQueryError from err
 
         if combo_pattern:
-            assert combo_pattern.groups == 2
-            latest_pair = _get_latest(
+            latest_url, latest_version = _get_latest(
                 html,
                 combo_pattern,
                 (lambda m: LooseVersion(m[1])) if sort_matches else None,
             )
-            if latest_pair:
-                latest_url, latest_version = latest_pair
-        elif version_pattern:
-            assert version_pattern.groups == 1
+        else:
+            assert version_pattern
             latest_version = _get_latest(
                 html, version_pattern, LooseVersion if sort_matches else None
             )
-            if latest_version and url_template:
+            if url_template:
                 latest_url = self._substitute_placeholders(url_template, latest_version)
-            elif url_pattern:
-                assert url_pattern.groups == 1
+            else:
+                assert url_pattern
                 latest_url = _get_latest(
                     html, url_pattern, LooseVersion if sort_matches else None
                 )
-
-        if not latest_version or not latest_url:
-            log.warning(
-                "Couldn't get version and/or URL for %s", external_data.filename
-            )
-            return
 
         abs_url = urllib.parse.urljoin(base=url, url=latest_url)
 
@@ -153,9 +154,8 @@ class HTMLChecker(Checker):
             new_version = await utils.get_extra_data_info_from_url(
                 latest_url, follow_redirects=follow_redirects, session=self.session
             )
-        except NETWORK_ERRORS as e:
-            log.warning("%s returned %s", latest_url, e)
-            external_data.state = ExternalData.State.BROKEN
+        except NETWORK_ERRORS as err:
+            raise CheckerFetchError from err
         else:
             new_version = new_version._replace(  # pylint: disable=no-member
                 version=latest_version
