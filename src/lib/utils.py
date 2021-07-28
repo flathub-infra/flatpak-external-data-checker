@@ -301,7 +301,7 @@ async def git_ls_remote(url: str) -> t.Dict[str, str]:
     return {r: c for c, r in (l.split() for l in git_stdout.splitlines())}
 
 
-def extract_appimage_version(appimg_io: t.IO):
+async def extract_appimage_version(appimg_io: t.IO):
     """
     Saves 'data' to a temporary file with the given basename, executes it (in a sandbox)
     with --appimage-extract to unpack it, and scrapes the version number out of the
@@ -320,7 +320,7 @@ def extract_appimage_version(appimg_io: t.IO):
             stdout=None,
         )
         log.info("Running %s", unsquashfs_cmd)
-        unsquashfs_cmd.run_sync()
+        await unsquashfs_cmd.run()
 
         for desktop in glob.glob(os.path.join(tmpdir, "squashfs-root", "*.desktop")):
             kf = GLib.KeyFile()

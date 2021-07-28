@@ -106,7 +106,7 @@ class URLChecker(Checker):
                     new_version = await utils.get_extra_data_info_from_url(
                         url, session=self.session, dest_io=tmpfile
                     )
-                    version_string = utils.extract_appimage_version(
+                    version_string = await utils.extract_appimage_version(
                         tmpfile,
                     )
             else:
