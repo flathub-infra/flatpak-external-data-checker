@@ -245,12 +245,7 @@ class Command:
             self.argv = argv
         self._orig_argv = argv
 
-    def _log_cmd_run(self):
-        sanboxed = "sandboxed" if self.sandbox else "unsandboxed"
-        log.info("Running %s: %s", sanboxed, self)
-
     async def run(self, input_data: t.Optional[bytes] = None) -> t.Tuple[bytes, bytes]:
-        self._log_cmd_run()
         proc = await asyncio.create_subprocess_exec(
             *self.argv,
             cwd=self.cwd,
@@ -271,7 +266,6 @@ class Command:
         return stdout, stderr
 
     def run_sync(self, input_data: t.Optional[bytes] = None) -> t.Tuple[bytes, bytes]:
-        self._log_cmd_run()
         proc = subprocess.run(
             self.argv,
             cwd=self.cwd,
@@ -332,6 +326,7 @@ def extract_appimage_version(basename, appimg_io: t.IO):
             allow_paths=[tmpdir],
             stdout=None,
         )
+        log.info("Running %s", unsquashfs_cmd)
         unsquashfs_cmd.run_sync()
 
         for desktop in glob.glob(os.path.join(tmpdir, "squashfs-root", "*.desktop")):
