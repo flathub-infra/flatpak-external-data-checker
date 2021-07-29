@@ -7,6 +7,7 @@ import semver
 
 from ..lib.externaldata import Checker, ExternalGitRepo, ExternalGitRef
 from ..lib.utils import git_ls_remote
+from ..lib.errors import CheckerQueryError, CheckerFetchError
 
 log = logging.getLogger(__name__)
 
@@ -115,15 +116,13 @@ class GitChecker(Checker):
             sorted_tags = sorted(matching_tags)
         else:
             sorted_tags = matching_tags
-        if not sorted_tags:
-            log.error(
-                "%s has no tags matching '%s'",
-                external_data.current_version.url,
-                tag_pattern,
-            )
-            return
 
-        latest_tag = sorted_tags[-1]
+        try:
+            latest_tag = sorted_tags[-1]
+        except IndexError as err:
+            raise CheckerQueryError(
+                f"{external_data.current_version.url} has no tags matching '{tag_pattern}'"
+            ) from err
 
         new_version = ExternalGitRef(
             url=external_data.current_version.url,
@@ -157,13 +156,8 @@ class GitChecker(Checker):
 
         try:
             remote_version = await external_data.current_version.fetch_remote()
-        except KeyError as err:
-            log.error(
-                "Couldn't get remote commit from %s: not found %s",
-                external_data.current_version.url,
-                err,
-            )
+        except CheckerFetchError:
             external_data.state = ExternalGitRepo.State.BROKEN
-            return
+            raise
 
         external_data.set_new_version(remote_version, is_update=False)
