@@ -39,6 +39,7 @@ import typing as t
 
 from ..lib.externaldata import ExternalData, ExternalGitRepo, Checker
 from ..lib import utils, NETWORK_ERRORS
+from ..lib.errors import CheckerFetchError
 
 log = logging.getLogger(__name__)
 
@@ -113,10 +114,10 @@ class URLChecker(Checker):
                 new_version = await utils.get_extra_data_info_from_url(
                     url, session=self.session
                 )
-        except NETWORK_ERRORS as e:
-            log.warning("%s returned %s", url, e)
-            external_data.state = ExternalData.State.BROKEN
-            return
+        except NETWORK_ERRORS as err:
+            if not is_rotating:
+                external_data.state = ExternalData.State.BROKEN
+            raise CheckerFetchError from err
 
         if is_rotating and not version_string:
             version_string = extract_version(
