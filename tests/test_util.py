@@ -69,7 +69,17 @@ class TestStripQuery(unittest.TestCase):
 
 
 class TestCommand(unittest.IsolatedAsyncioTestCase):
+    _PUBLIC_ENV_VAR = "NOTHING_SPECIAL_HERE"
     _SECRET_ENV_VAR = "SOME_TOKEN_HERE"
+    _TEST_ENV_VALUE = "leaked"
+
+    def setUp(self):
+        os.environ[self._PUBLIC_ENV_VAR] = self._TEST_ENV_VALUE
+        os.environ[self._SECRET_ENV_VAR] = self._TEST_ENV_VALUE
+
+    def tearDown(self):
+        del os.environ[self._PUBLIC_ENV_VAR]
+        del os.environ[self._SECRET_ENV_VAR]
 
     @contextmanager
     def _assert_timeout(self, timeout: float):
@@ -79,13 +89,19 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
         self.assertLess(elapsed, timeout)
 
     def test_clear_env(self):
-        os.environ[self._SECRET_ENV_VAR] = "leaked"
+        cmd = Command(["printenv", self._PUBLIC_ENV_VAR])
+        stdout = cmd.run_sync()[0].decode().strip()
+        self.assertEqual(stdout, self._TEST_ENV_VALUE)
+
         cmd = Command(["printenv", self._SECRET_ENV_VAR])
         with self.assertRaises(subprocess.CalledProcessError):
             cmd.run_sync()
 
     async def test_clear_env_async(self):
-        os.environ[self._SECRET_ENV_VAR] = "leaked"
+        cmd = Command(["printenv", self._PUBLIC_ENV_VAR])
+        stdout = (await cmd.run())[0].decode().strip()
+        self.assertEqual(stdout, self._TEST_ENV_VALUE)
+
         cmd = Command(["printenv", self._SECRET_ENV_VAR])
         with self.assertRaises(subprocess.CalledProcessError):
             await cmd.run()
