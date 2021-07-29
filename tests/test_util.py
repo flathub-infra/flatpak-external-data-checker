@@ -21,6 +21,8 @@ import unittest
 import subprocess
 import os
 from datetime import datetime, timezone
+from time import perf_counter
+from contextlib import contextmanager
 
 from src.lib.utils import (
     parse_github_url,
@@ -69,6 +71,13 @@ class TestStripQuery(unittest.TestCase):
 class TestCommand(unittest.IsolatedAsyncioTestCase):
     _SECRET_ENV_VAR = "SOME_TOKEN_HERE"
 
+    @contextmanager
+    def _assert_timeout(self, timeout: float):
+        start_time = perf_counter()
+        yield start_time
+        elapsed = perf_counter() - start_time
+        self.assertLess(elapsed, timeout)
+
     def test_clear_env(self):
         os.environ[self._SECRET_ENV_VAR] = "leaked"
         cmd = Command(["printenv", self._SECRET_ENV_VAR])
@@ -80,6 +89,18 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
         cmd = Command(["printenv", self._SECRET_ENV_VAR])
         with self.assertRaises(subprocess.CalledProcessError):
             await cmd.run()
+
+    def test_timeout(self):
+        cmd = Command(["sleep", "1"], timeout=0.2)
+        with self._assert_timeout(0.5):
+            with self.assertRaises(subprocess.TimeoutExpired):
+                cmd.run_sync()
+
+    async def test_timeout_async(self):
+        cmd = Command(["sleep", "1"], timeout=0.2)
+        with self._assert_timeout(0.5):
+            with self.assertRaises(subprocess.TimeoutExpired):
+                await cmd.run()
 
 
 class TestVersionFilter(unittest.TestCase):

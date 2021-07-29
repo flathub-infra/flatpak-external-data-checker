@@ -215,6 +215,7 @@ class Command:
         stdin: t.Optional[int] = subprocess.PIPE,
         stdout: t.Optional[int] = subprocess.PIPE,
         stderr: t.Optional[int] = None,
+        timeout: t.Optional[float] = None,
         sandbox: t.Optional[bool] = None,
         allow_network: bool = False,
         allow_paths: t.Optional[t.List[t.Union[str, SandboxPath]]] = None,
@@ -223,6 +224,7 @@ class Command:
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
+        self.timeout = timeout
         # If sandbox not explicitly enabled or disabled, try to use it if available,
         # and proceed unsandboxed if sandbox is unavailable
         if sandbox is None:
@@ -230,7 +232,7 @@ class Command:
         else:
             self.sandbox = sandbox
         if self.sandbox:
-            bwrap_args = []
+            bwrap_args = ["--die-with-parent"]
             if allow_network:
                 bwrap_args.append("--share-net")
             if allow_paths:
@@ -254,7 +256,17 @@ class Command:
             stderr=self.stderr,
             env=clear_env(os.environ),
         )
-        stdout, stderr = await proc.communicate(input=input_data)
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(input=input_data), self.timeout
+            )
+        except asyncio.TimeoutError as err:
+            proc.kill()
+            assert self.timeout is not None
+            raise subprocess.TimeoutExpired(
+                cmd=self.argv,
+                timeout=self.timeout,
+            ) from err
         if proc.returncode != 0:
             assert proc.returncode is not None
             raise subprocess.CalledProcessError(
@@ -272,6 +284,7 @@ class Command:
             input=input_data,
             stdout=self.stdout,
             stderr=self.stderr,
+            timeout=self.timeout,
             env=clear_env(os.environ),
             check=False,
         )
