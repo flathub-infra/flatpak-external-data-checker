@@ -6,6 +6,7 @@ import typing as t
 from ..lib import OPERATORS_SCHEMA
 from ..lib.externaldata import Checker, ExternalFile
 from ..lib.utils import filter_versions
+from ..lib.errors import CheckerQueryError
 
 log = logging.getLogger(__name__)
 
@@ -63,9 +64,10 @@ class PyPIChecker(Checker):
 
         try:
             pypi_version, pypi_download, pypi_date = downloads[-1]
-        except IndexError:
-            log.error("Couldn't find %s for package %s", package_type, package_name)
-            return
+        except IndexError as err:
+            raise CheckerQueryError(
+                f"Couldn't find {package_type} for package {package_name}"
+            ) from err
 
         new_version = ExternalFile(
             url=pypi_download["url"],
