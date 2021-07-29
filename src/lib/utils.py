@@ -298,6 +298,7 @@ class Command:
 async def git_ls_remote(url: str) -> t.Dict[str, str]:
     git_cmd = Command(
         ["git", "ls-remote", "--exit-code", url],
+        timeout=externaldata.TIMEOUT_CONNECT,
         allow_network=True,
         allow_paths=[
             Command.SandboxPath("/etc/ssl", True, True),
