@@ -14,6 +14,7 @@ from ..lib.externaldata import (
     ExternalGitRef,
 )
 from ..lib.utils import get_extra_data_info_from_url
+from ..lib.errors import CheckerMetadataError, CheckerFetchError
 
 log = logging.getLogger(__name__)
 
@@ -42,9 +43,8 @@ class Component:
 
         try:
             new_version = await get_extra_data_info_from_url(latest_url, self.session)
-        except NETWORK_ERRORS as e:
-            log.warning("%s returned %s", latest_url, e)
-            self.external_data.state = ExternalData.State.BROKEN
+        except NETWORK_ERRORS as err:
+            raise CheckerFetchError from err
         else:
             new_version = new_version._replace(  # pylint: disable=no-member
                 version=self.latest_version
@@ -184,7 +184,9 @@ class ChromiumChecker(Checker):
 
         component_class = self._COMPONENTS[component_name]
         if not isinstance(external_data, component_class.DATA_CLASS):
-            raise ValueError(f"Invalid source type for component {component_name}")
+            raise CheckerMetadataError(
+                f"Invalid source type for component {component_name}"
+            )
 
         latest_version = await self._get_latest_chromium()
         component = component_class(self.session, external_data, latest_version)
