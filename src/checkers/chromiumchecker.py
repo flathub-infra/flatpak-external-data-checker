@@ -1,9 +1,11 @@
-import aiohttp
 import base64
 import logging
 import re
 import typing as t
 
+import aiohttp
+
+from ..lib import NETWORK_ERRORS
 from ..lib.externaldata import (
     Checker,
     ExternalBase,
@@ -40,12 +42,7 @@ class Component:
 
         try:
             new_version = await get_extra_data_info_from_url(latest_url, self.session)
-        except (
-            aiohttp.ClientError,
-            aiohttp.ServerConnectionError,
-            aiohttp.ServerDisconnectedError,
-            aiohttp.ServerTimeoutError,
-        ) as e:
+        except NETWORK_ERRORS as e:
             log.warning("%s returned %s", latest_url, e)
             self.external_data.state = ExternalData.State.BROKEN
         else:

@@ -37,10 +37,8 @@ import re
 import tempfile
 import typing as t
 
-import aiohttp
-
 from ..lib.externaldata import ExternalData, ExternalGitRepo, Checker
-from ..lib import utils
+from ..lib import utils, NETWORK_ERRORS
 
 log = logging.getLogger(__name__)
 
@@ -115,12 +113,7 @@ class URLChecker(Checker):
                 new_version = await utils.get_extra_data_info_from_url(
                     url, session=self.session
                 )
-        except (
-            aiohttp.ClientError,
-            aiohttp.ServerConnectionError,
-            aiohttp.ServerDisconnectedError,
-            aiohttp.ServerTimeoutError,
-        ) as e:
+        except NETWORK_ERRORS as e:
             log.warning("%s returned %s", url, e)
             external_data.state = ExternalData.State.BROKEN
             return

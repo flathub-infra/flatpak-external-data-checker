@@ -25,9 +25,7 @@ from string import Template
 from distutils.version import LooseVersion
 import typing as t
 
-import aiohttp
-
-from ..lib import utils
+from ..lib import utils, NETWORK_ERRORS
 from ..lib.externaldata import ExternalData, Checker
 
 log = logging.getLogger(__name__)
@@ -155,12 +153,7 @@ class HTMLChecker(Checker):
             new_version = await utils.get_extra_data_info_from_url(
                 latest_url, follow_redirects=follow_redirects, session=self.session
             )
-        except (
-            aiohttp.ClientError,
-            aiohttp.ServerConnectionError,
-            aiohttp.ServerDisconnectedError,
-            aiohttp.ServerTimeoutError,
-        ) as e:
+        except NETWORK_ERRORS as e:
             log.warning("%s returned %s", latest_url, e)
             external_data.state = ExternalData.State.BROKEN
         else:

@@ -2,8 +2,9 @@ import logging
 from urllib.parse import urljoin
 import typing as t
 
+from ..lib import OPERATORS_SCHEMA
 from ..lib.externaldata import Checker, ExternalData, ExternalFile
-from ..lib.utils import filter_versions, OPERATORS_SCHEMA
+from ..lib.utils import filter_versions
 
 log = logging.getLogger(__name__)
 

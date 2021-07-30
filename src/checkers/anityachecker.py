@@ -2,8 +2,9 @@ import logging
 import urllib.request
 import urllib.parse
 
+from ..lib import OPERATORS_SCHEMA
 from ..lib.externaldata import ExternalData, ExternalGitRepo, ExternalGitRef
-from ..lib.utils import filter_versions, OPERATORS_SCHEMA
+from ..lib.utils import filter_versions
 from .htmlchecker import HTMLChecker
 
 log = logging.getLogger(__name__)

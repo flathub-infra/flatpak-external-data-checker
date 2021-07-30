@@ -31,7 +31,6 @@ import urllib.request
 import urllib.parse
 import copy
 import typing as t
-import operator
 from distutils.version import StrictVersion, LooseVersion
 import asyncio
 import shlex
@@ -41,7 +40,7 @@ from ruamel.yaml import YAML
 from elftools.elf.elffile import ELFFile
 import aiohttp
 
-from . import externaldata
+from . import externaldata, TIMEOUT_CONNECT, HTTP_CHUNK_SIZE, OPERATORS
 
 import gi
 
@@ -49,29 +48,6 @@ gi.require_version("Json", "1.0")
 from gi.repository import GLib, Json  # noqa: E402
 
 log = logging.getLogger(__name__)
-
-# With the default urllib User-Agent, dl.discordapp.net returns 403
-USER_AGENT = (
-    "flatpak-external-data-checker/1.0 "
-    "(+https://github.com/flathub/flatpak-external-data-checker)"
-)
-HEADERS = {"User-Agent": USER_AGENT}
-HTTP_CHUNK_SIZE = 1024 * 64
-
-OPERATORS = {
-    "<": operator.lt,
-    "<=": operator.le,
-    ">": operator.gt,
-    ">=": operator.ge,
-    "==": operator.eq,
-    "!=": operator.ne,
-}
-OPERATORS_SCHEMA = {
-    "type": "object",
-    "properties": {o: {"type": "string"} for o in list(OPERATORS)},
-    "additionalProperties": False,
-    "minProperties": 1,
-}
 
 
 def _extract_timestamp(info):
@@ -298,7 +274,7 @@ class Command:
 async def git_ls_remote(url: str) -> t.Dict[str, str]:
     git_cmd = Command(
         ["git", "ls-remote", "--exit-code", url],
-        timeout=externaldata.TIMEOUT_CONNECT,
+        timeout=TIMEOUT_CONNECT,
         allow_network=True,
         allow_paths=[
             Command.SandboxPath("/etc/ssl", True, True),

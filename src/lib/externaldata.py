@@ -30,11 +30,9 @@ import logging
 import aiohttp
 import jsonschema
 
-from . import utils
+from . import utils, TIMEOUT_CONNECT, TIMEOUT_TOTAL, HTTP_CLIENT_HEADERS
 
 
-TIMEOUT_CONNECT = 60
-TIMEOUT_TOTAL = 60 * 10
 log = logging.getLogger(__name__)
 
 
@@ -363,7 +361,7 @@ class Checker:
         log.debug("Starting HTTP session for %s", self)
         self.session = aiohttp.ClientSession(
             raise_for_status=True,
-            headers=utils.HEADERS,
+            headers=HTTP_CLIENT_HEADERS,
             timeout=aiohttp.ClientTimeout(connect=TIMEOUT_CONNECT, total=TIMEOUT_TOTAL),
         )
         await self.session.__aenter__()
