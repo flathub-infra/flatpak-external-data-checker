@@ -401,8 +401,6 @@ def dump_manifest(contents, manifest_path):
 
 
 def init_logging(level=logging.DEBUG):
-    logging.basicConfig(
-        level=level, format="%(levelname)-7s %(name)s: %(message)s"
-    )
+    logging.basicConfig(level=level, format="%(levelname)-7s %(name)s: %(message)s")
     if level == logging.DEBUG:
         logging.getLogger("github.Requester").setLevel(logging.INFO)
