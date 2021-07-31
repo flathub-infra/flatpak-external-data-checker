@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 
 
 def _get_latest(
-    html: str, pattern: re.Pattern, sort_key=t.Optional[t.Callable]
+    html: str, pattern: re.Pattern, sort_key: t.Optional[t.Callable] = None
 ) -> t.Union[str, t.Tuple[str, ...]]:
     match = pattern.findall(html)
     if not match:
@@ -91,6 +91,7 @@ class HTMLChecker(Checker):
 
     async def check(self, external_data):
         assert self.should_check(external_data)
+        assert isinstance(external_data, ExternalData)
 
         url = external_data.checker_data["url"]
         combo_pattern = _get_pattern(external_data.checker_data, "pattern", 2)
@@ -130,9 +131,10 @@ class HTMLChecker(Checker):
         await self._update_version(external_data, latest_version, abs_url)
 
     @staticmethod
-    def _substitute_placeholders(template_string, version):
+    def _substitute_placeholders(template_string: str, version: str) -> str:
         version_list = LooseVersion(version).version
         tmpl = Template(template_string)
+        tmpl_vars: t.Dict[str, t.Union[str, int]]
         tmpl_vars = {"version": version}
         for i, version_part in enumerate(version_list):
             tmpl_vars[f"version{i}"] = version_part
@@ -145,7 +147,11 @@ class HTMLChecker(Checker):
         return tmpl.substitute(**tmpl_vars)
 
     async def _update_version(
-        self, external_data, latest_version, latest_url, follow_redirects=False
+        self,
+        external_data: ExternalData,
+        latest_version: str,
+        latest_url: str,
+        follow_redirects: bool = False,
     ):
         assert latest_version is not None
         assert latest_url is not None
