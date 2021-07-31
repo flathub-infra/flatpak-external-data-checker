@@ -4,6 +4,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/flathub/flatpak-external-data-checker/badge.svg)](https://coveralls.io/github/flathub/flatpak-external-data-checker)
 [![Total alerts](https://img.shields.io/lgtm/alerts/g/flathub/flatpak-external-data-checker.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/flathub/flatpak-external-data-checker/alerts/)
 [![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/flathub/flatpak-external-data-checker.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/flathub/flatpak-external-data-checker/context:python)
+[![CodeFactor](https://www.codefactor.io/repository/github/flathub/flatpak-external-data-checker/badge)](https://www.codefactor.io/repository/github/flathub/flatpak-external-data-checker)
 
 This is a tool for checking for outdated or broken links of external
 data in Flatpak manifests.
