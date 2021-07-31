@@ -41,6 +41,7 @@ from elftools.elf.elffile import ELFFile
 import aiohttp
 
 from . import externaldata, TIMEOUT_CONNECT, HTTP_CHUNK_SIZE, OPERATORS
+from .errors import CheckerRemoteError
 
 import gi
 
@@ -64,7 +65,7 @@ def _extract_timestamp(info):
             return dt.datetime.strptime(date_str, date_fmt)
         except ValueError:
             continue
-    raise ValueError(date_str)
+    raise CheckerRemoteError(f"Cannot parse date/time: {date_str}")
 
 
 def strip_query(url):
