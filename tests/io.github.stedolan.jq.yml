@@ -49,3 +49,25 @@ modules:
           version-query: '.tag_name | sub("^[vV]"; "")'
           # This one should result in parse error
           timestamp-query: '.target_commitish'
+
+  - name: lib_webrtc
+    sources:
+      - type: git
+        url: https://github.com/desktop-app/lib_webrtc.git
+        commit: 810973807a7f492393e7f9b8ceb3a1e89dc7eb16
+        x-checker-data:
+          type: json
+          url: https://httpbingo.org/json
+          tag-query: .some_gibberish_query
+          version-query: '$tag | sub("^[vV]"; "")'
+
+  - name: tg_angle
+    sources:
+      - type: git
+        url: https://github.com/desktop-app/tg_angle.git
+        commit: 4b798c3fd44d48eb36eaee7d8ebfaf7c2b8a0229
+        x-checker-data:
+          type: json
+          url: https://httpbingo.org/404
+          tag-query: .some_gibberish_query
+

@@ -2,9 +2,11 @@ import logging
 import re
 from datetime import datetime
 import typing as t
+import subprocess
 
-from ..lib import utils
+from ..lib import utils, NETWORK_ERRORS
 from ..lib.externaldata import ExternalData, ExternalGitRepo, ExternalGitRef
+from ..lib.errors import CheckerQueryError
 from .htmlchecker import HTMLChecker
 
 log = logging.getLogger(__name__)
@@ -21,7 +23,10 @@ async def query_json(query, data, variables=None):
             var_args += ["--arg", var_name, var_value]
 
     jq_cmd = ["jq"] + var_args + ["-r", "-e", f"( {query} ) | ( {typecheck_q} )"]
-    jq_stdout, _ = await utils.Command(jq_cmd).run(data)
+    try:
+        jq_stdout, _ = await utils.Command(jq_cmd).run(data)
+    except subprocess.CalledProcessError as err:
+        raise CheckerQueryError("Error running jq") from err
     return jq_stdout.decode().strip()
 
 
@@ -40,8 +45,7 @@ def parse_timestamp(date_string: t.Optional[str]) -> t.Optional[datetime]:
     try:
         return datetime.fromisoformat(re.sub(r"Z$", "+00:00", date_string))
     except ValueError as err:
-        log.error("Failed to parse timestamp %s: %s", date_string, err)
-        return None
+        raise CheckerQueryError("Failed to parse timestamp") from err
 
 
 class JSONChecker(HTMLChecker):
@@ -68,8 +72,11 @@ class JSONChecker(HTMLChecker):
         assert self.should_check(external_data)
 
         json_url = external_data.checker_data["url"]
-        async with self.session.get(json_url) as response:
-            json_data = await response.read()
+        try:
+            async with self.session.get(json_url) as response:
+                json_data = await response.read()
+        except NETWORK_ERRORS as err:
+            raise CheckerQueryError from err
 
         if isinstance(external_data, ExternalGitRepo):
             return await self._check_git(json_data, external_data)
