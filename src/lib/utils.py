@@ -161,9 +161,18 @@ def wrap_in_bwrap(cmdline, bwrap_args=None):
 
 def check_bwrap():
     try:
-        subprocess.run(wrap_in_bwrap(["/bin/true"]), check=True)
-    except (FileNotFoundError, subprocess.CalledProcessError) as err:
+        subprocess.run(
+            wrap_in_bwrap(["/bin/true"]),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=True,
+        )
+    except FileNotFoundError as err:
         log.debug("bwrap unavailable: %s", err)
+        return False
+    except subprocess.CalledProcessError as err:
+        log.debug("bwrap unavailable: %s", err.output.strip())
         return False
     return True
 
