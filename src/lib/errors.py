@@ -4,10 +4,6 @@ import typing as t
 class FlatpakExternalDataCheckerError(Exception):
     """Base class for errors in the proram"""
 
-
-class CheckerError(FlatpakExternalDataCheckerError):
-    """Error checking a flatpak-builder source"""
-
     def __init__(self, message: t.Optional[str] = None):
         super().__init__(message)
         self.message = message or self.__doc__
@@ -16,6 +12,38 @@ class CheckerError(FlatpakExternalDataCheckerError):
         if self.__cause__ is not None:
             return f"{self.message}: {self.__cause__}"
         return self.message
+
+
+class ManifestError(FlatpakExternalDataCheckerError):
+    """Error processing flatpak-builder manifest"""
+
+
+class ManifestLoadError(ManifestError):
+    """Error loading flatpak-builder manifest"""
+
+
+class ManifestUpdateError(ManifestError):
+    """Error updating flatpak-builder manifest"""
+
+
+class AppdataError(ManifestError):
+    """Error processing metainfo.xml"""
+
+
+class AppdataLoadError(AppdataError, ManifestLoadError):
+    """Error loading metainfo.xml"""
+
+
+class AppdataNotFound(AppdataLoadError):
+    """Can't find metainfo.xml"""
+
+
+class AppdataUpdateError(AppdataError, ManifestUpdateError):
+    """Error updating metainfo.xml"""
+
+
+class CheckerError(FlatpakExternalDataCheckerError):
+    """Error checking a flatpak-builder source"""
 
 
 class CheckerMetadataError(CheckerError):
