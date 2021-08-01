@@ -107,8 +107,12 @@ class ManifestChecker:
 
         self._root_manifest_path = manifest
         self._root_manifest_dir = os.path.dirname(self._root_manifest_path)
+
         self._external_data: t.Dict[str, t.List[ExternalBase]]
         self._external_data = {}
+
+        self._errors: t.List[Exception]
+        self._errors = []
 
         # Initialize checkers
         self._checkers: t.List[t.Type[Checker]]
@@ -274,6 +278,7 @@ class ManifestChecker:
                 await checker.validate_checker_data(data)
                 await checker.check(data)
             except CheckerError as err:
+                self._errors.append(err)
                 counter.failed += 1
                 log.error(
                     "Failed to check %s with %s: %s",
@@ -348,6 +353,13 @@ class ManifestChecker:
             for datas in self._external_data.values()
             for data in datas
             if only_type is None or data.type == only_type
+        ]
+
+    def get_errors(self, only_type: t.Optional[t.Type[Exception]] = None):
+        """Return a list of errors occured while checking/updating the manifest"""
+
+        return [
+            e for e in self._errors if only_type is None or isinstance(e, only_type)
         ]
 
     def get_outdated_external_data(self):
@@ -460,6 +472,7 @@ class ManifestChecker:
             except AppdataNotFound as err:
                 log.info("Not updating appdata: %s", err)
             except AppdataError as err:
+                self._errors.append(err)
                 log.error(err)
 
         return list(changes)
