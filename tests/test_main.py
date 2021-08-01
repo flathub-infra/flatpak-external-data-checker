@@ -39,6 +39,6 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
 
     async def test_full_run(self):
         args1 = main.parse_cli_args(["--update", "--commit-only", self.manifest_path])
-        self.assertEqual(await main.run_with_args(args1), (2, True))
+        self.assertEqual(await main.run_with_args(args1), (2, 0, True))
         args2 = main.parse_cli_args([self.manifest_path])
-        self.assertEqual(await main.run_with_args(args2), (0, False))
+        self.assertEqual(await main.run_with_args(args2), (0, 0, False))
