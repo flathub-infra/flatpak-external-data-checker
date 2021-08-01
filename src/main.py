@@ -100,7 +100,7 @@ def print_outdated_external_data(manifest_checker: checker.ManifestChecker):
             data_name=data.filename,
             **(data.new_version or data.current_version)._asdict(),
         )
-        print(message)
+        print(message, flush=True)
     return len(ext_data)
 
 
