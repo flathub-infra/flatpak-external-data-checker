@@ -30,6 +30,8 @@ import os
 import subprocess
 import sys
 import asyncio
+from enum import IntFlag
+import typing as t
 
 from github import Github
 
@@ -102,6 +104,12 @@ def print_outdated_external_data(manifest_checker: checker.ManifestChecker):
         )
         print(message, flush=True)
     return len(ext_data)
+
+
+def print_errors(manifest_checker: checker.ManifestChecker) -> int:
+    # TODO: Actually do pretty-print collected errors
+    errors = manifest_checker.get_errors()
+    return len(errors)
 
 
 def check_call(args):
@@ -285,8 +293,8 @@ def parse_cli_args(cli_args=None):
         action="store_true",
     )
     parser.add_argument(
-        "--validate-only",
-        help="Do not apply updates, only check if metadata is valid",
+        "--check-outdated",
+        help="Exit with non-zero status if outdated sources were found and not updated",
         action="store_true",
     )
     parser.add_argument(
@@ -298,8 +306,11 @@ def parse_cli_args(cli_args=None):
     return parser.parse_args(cli_args)
 
 
-async def run_with_args(args):
+async def run_with_args(args: argparse.Namespace) -> t.Tuple[int, int, bool]:
     init_logging(logging.DEBUG if args.verbose else logging.INFO)
+
+    should_update = args.update or args.commit_only or args.edit_only
+    did_update = False
 
     manifest_checker = checker.ManifestChecker(args.manifest)
 
@@ -307,32 +318,38 @@ async def run_with_args(args):
 
     outdated_num = print_outdated_external_data(manifest_checker)
 
-    if args.validate_only:
-        return (outdated_num, False)
+    if should_update and outdated_num > 0:
+        changes = manifest_checker.update_manifests()
+        if changes and not args.edit_only:
+            with indir(os.path.dirname(args.manifest)):
+                subject, body, branch = commit_changes(changes)
+                if not args.commit_only:
+                    open_pr(subject, body, branch, manifest_checker=manifest_checker)
+        did_update = True
 
-    if outdated_num > 0:
-        if args.update or args.commit_only or args.edit_only:
-            changes = manifest_checker.update_manifests()
-            if args.edit_only:
-                return (outdated_num, True)
-            if changes:
-                with indir(os.path.dirname(args.manifest)):
-                    subject, body, branch = commit_changes(changes)
-                    if not args.commit_only:
-                        open_pr(
-                            subject, body, branch, manifest_checker=manifest_checker
-                        )
-                return (outdated_num, True)
+    errors_num = print_errors(manifest_checker)
 
-            log.warning("Can't automatically fix any of the above issues")
+    log.log(
+        logging.WARNING if errors_num else logging.INFO,
+        "Check finished with %i error(s)",
+        errors_num,
+    )
 
-    return (outdated_num, False)
+    return outdated_num, errors_num, did_update
+
+
+class ResultCode(IntFlag):
+    SUCCESS = 0
+    ERROR = 1
+    OUTDATED = 2
 
 
 def main():
+    res = ResultCode.SUCCESS
     args = parse_cli_args()
-    outdated_num, updated = asyncio.run(run_with_args(args))
-    if args.validate_only:
-        sys.exit(0)
-    if outdated_num > 0 and not updated:
-        sys.exit(1)
+    outdated_num, errors_num, updated = asyncio.run(run_with_args(args))
+    if errors_num:
+        res |= ResultCode.ERROR
+    if args.check_outdated and not updated and outdated_num > 0:
+        res |= ResultCode.OUTDATED
+    sys.exit(res)
