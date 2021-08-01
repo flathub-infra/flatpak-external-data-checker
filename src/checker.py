@@ -35,7 +35,7 @@ from .lib.externaldata import (
     Checker,
 )
 from .lib.utils import read_manifest, dump_manifest
-from .lib.errors import CheckerError
+from .lib.errors import CheckerError, AppdataError, AppdataNotFound, AppdataLoadError
 
 import logging
 import os
@@ -336,15 +336,14 @@ class ManifestChecker:
 
     def _update_appdata(self):
         if not self.app_id:
-            log.warning("No app ID, won't update appdata")
-            return
+            raise AppdataNotFound(f"No app ID in {self._root_manifest_path}")
 
         appdata = find_appdata_file(
             os.path.dirname(self._root_manifest_path), self.app_id
         )
         if appdata is None:
-            log.debug("Appdata not found for %s", self.app_id)
-            return
+            raise AppdataNotFound(f"Can't find appdata file matching {self.app_id}")
+
         log.info("Preparing to update appdata %s", appdata)
 
         selected_data = None
@@ -361,6 +360,7 @@ class ManifestChecker:
             assert selected_data is not None
             log.warning("Guessed upstream source: %s", selected_data)
 
+        last_update: t.Union[ExternalFile, ExternalGitRef]
         last_update = selected_data.new_version
 
         version_changed = (
@@ -395,7 +395,8 @@ class ManifestChecker:
                     appdata, last_update.version, timestamp.strftime("%F")
                 )
             except SAXParseException as err:
-                log.error(str(err))
+                # XXX: Pylint thinks that SAXParseException isn't an Exception, why?
+                raise AppdataLoadError from err  # pylint: disable=bad-exception-context
         else:
             log.debug("Version didn't change, not adding release")
 
@@ -407,6 +408,11 @@ class ManifestChecker:
         for path, datas in self._external_data.items():
             self._update_manifest(path, datas, changes)
         if changes:
-            self._update_appdata()
+            try:
+                self._update_appdata()
+            except AppdataNotFound as err:
+                log.info("Not updating appdata: %s", err)
+            except AppdataError as err:
+                log.error(err)
 
         return list(changes)
