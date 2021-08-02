@@ -41,7 +41,7 @@ from elftools.elf.elffile import ELFFile
 import aiohttp
 
 from . import externaldata, TIMEOUT_CONNECT, HTTP_CHUNK_SIZE, OPERATORS
-from .errors import CheckerRemoteError
+from .errors import CheckerRemoteError, CheckerQueryError
 
 import gi
 
@@ -292,7 +292,10 @@ async def git_ls_remote(url: str) -> t.Dict[str, str]:
             Command.SandboxPath("/etc/resolv.conf", True, False),
         ],
     )
-    git_stdout_raw, _ = await git_cmd.run()
+    try:
+        git_stdout_raw, _ = await git_cmd.run()
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as err:
+        raise CheckerQueryError("Listing Git remote failed") from err
     git_stdout = git_stdout_raw.decode()
 
     return {r: c for c, r in (l.split() for l in git_stdout.splitlines())}
