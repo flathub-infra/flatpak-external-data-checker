@@ -5,7 +5,7 @@ from distutils.version import LooseVersion
 
 import semver
 
-from ..lib.externaldata import Checker, ExternalGitRepo, ExternalGitRef
+from ..lib.externaldata import Checker, ExternalData, ExternalGitRepo, ExternalGitRef
 from ..lib.utils import git_ls_remote
 from ..lib.errors import CheckerQueryError, CheckerFetchError
 
@@ -69,23 +69,25 @@ class GitChecker(Checker):
     }
     SUPPORTED_DATA_CLASSES = [ExternalGitRepo]
 
-    def should_check(self, external_data):
+    def should_check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
         return isinstance(external_data, ExternalGitRepo)
 
-    async def validate_checker_data(self, external_data):
+    async def validate_checker_data(
+        self, external_data: t.Union[ExternalData, ExternalGitRepo]
+    ):
         if external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE:
             return await super().validate_checker_data(external_data)
         return None
 
-    async def check(self, external_data):
+    async def check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
         assert self.should_check(external_data)
-        external_data: ExternalGitRepo
+        assert isinstance(external_data, ExternalGitRepo)
         if external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE:
             return await self._check_has_new(external_data)
         return await self._check_still_valid(external_data)
 
     @staticmethod
-    async def _check_has_new(external_data):
+    async def _check_has_new(external_data: ExternalGitRepo):
         tag_pattern = external_data.checker_data.get(
             "tag-pattern", r"^(?:[vV])?(\d[\d\w.-]+\d)"
         )
@@ -135,7 +137,7 @@ class GitChecker(Checker):
         external_data.set_new_version(new_version)
 
     @staticmethod
-    async def _check_still_valid(external_data):
+    async def _check_still_valid(external_data: ExternalGitRepo):
         if (
             external_data.current_version.commit is not None
             and external_data.current_version.tag is None
