@@ -358,22 +358,8 @@ class Checker:
     SUPPORTED_DATA_CLASSES: t.List[t.Type[ExternalBase]] = [ExternalData]
     session: aiohttp.ClientSession
 
-    def __init__(self):
-        self.session = None
-
-    async def __aenter__(self):
-        log.debug("Starting HTTP session for %s", self)
-        self.session = aiohttp.ClientSession(
-            raise_for_status=True,
-            headers=HTTP_CLIENT_HEADERS,
-            timeout=aiohttp.ClientTimeout(connect=TIMEOUT_CONNECT, total=TIMEOUT_TOTAL),
-        )
-        await self.session.__aenter__()
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        log.debug("Closing HTTP session for %s", self)
-        await self.session.__aexit__(exc_type, exc_val, exc_tb)
+    def __init__(self, session: aiohttp.ClientSession):
+        self.session = session
 
     def get_json_schema(  # pylint: disable=unused-argument
         self, external_data: t.Union[ExternalData, ExternalGitRepo]
