@@ -25,7 +25,10 @@ import asyncio
 from dataclasses import dataclass
 from enum import Enum
 
+import aiohttp
+
 from .checkers import ALL_CHECKERS
+from .lib import HTTP_CLIENT_HEADERS, TIMEOUT_CONNECT, TIMEOUT_TOTAL
 from .lib.appdata import add_release_to_file
 from .lib.externaldata import (
     ExternalData,
@@ -199,11 +202,14 @@ class ManifestChecker:
             self._external_data[external_source_path] = external_source_datas
 
     async def _check_data(
-        self, counter: TasksCounter, data: t.Union[ExternalData, ExternalGitRepo]
+        self,
+        counter: TasksCounter,
+        http_session: aiohttp.ClientSession,
+        data: t.Union[ExternalData, ExternalGitRepo],
     ):
         src_rel_path = os.path.relpath(data.source_path, self._root_manifest_dir)
         counter.started += 1
-        checkers = [c() for c in self._checkers if c.should_check(data)]
+        checkers = [c(http_session) for c in self._checkers if c.should_check(data)]
         if not checkers:
             counter.finished += 1
             log.info(
@@ -229,8 +235,7 @@ class ManifestChecker:
             )
             try:
                 await checker.validate_checker_data(data)
-                async with checker:
-                    await checker.check(data)
+                await checker.check(data)
             except CheckerError as err:
                 counter.failed += 1
                 log.error(
@@ -279,14 +284,19 @@ class ManifestChecker:
             external_data = [d for d in external_data if d.type == filter_type]
 
         counter = self.TasksCounter(total=len(external_data))
-        check_tasks = []
-        for data in external_data:
-            if data.state != ExternalData.State.UNKNOWN:
-                continue
-            check_tasks.append(self._check_data(counter, data))
+        async with aiohttp.ClientSession(
+            raise_for_status=True,
+            headers=HTTP_CLIENT_HEADERS,
+            timeout=aiohttp.ClientTimeout(connect=TIMEOUT_CONNECT, total=TIMEOUT_TOTAL),
+        ) as http_session:
+            check_tasks = []
+            for data in external_data:
+                if data.state != ExternalData.State.UNKNOWN:
+                    continue
+                check_tasks.append(self._check_data(counter, http_session, data))
 
-        log.info("Checking %s external data items", counter.total)
-        ext_data_checked = await asyncio.gather(*check_tasks)
+            log.info("Checking %s external data items", counter.total)
+            ext_data_checked = await asyncio.gather(*check_tasks)
 
         return list(set(ext_data_checked))
 
