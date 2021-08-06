@@ -203,7 +203,7 @@ class ManifestChecker:
     ):
         src_rel_path = os.path.relpath(data.source_path, self._root_manifest_dir)
         counter.started += 1
-        checkers = [i for i in (c() for c in self._checkers) if i.should_check(data)]
+        checkers = [c() for c in self._checkers if c.should_check(data)]
         if not checkers:
             counter.finished += 1
             log.info(
