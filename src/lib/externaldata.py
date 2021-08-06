@@ -409,4 +409,4 @@ class Checker:
             raise CheckerMetadataError("Invalid metadata schema") from err
 
     async def check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
-        pass
+        raise NotImplementedError
