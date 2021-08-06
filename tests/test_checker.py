@@ -50,7 +50,8 @@ class DummyChecker(Checker):
     def get_json_schema(self, external_data):
         return None
 
-    def should_check(self, external_data):
+    @classmethod
+    def should_check(cls, external_data):
         return True
 
     async def check(self, external_data):

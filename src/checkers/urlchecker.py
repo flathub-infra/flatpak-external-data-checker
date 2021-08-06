@@ -72,9 +72,10 @@ class URLChecker(Checker):
         "required": ["url"],
     }
 
-    def should_check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
+    @classmethod
+    def should_check(cls, external_data: t.Union[ExternalData, ExternalGitRepo]):
         return isinstance(external_data, ExternalData) and (
-            external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE
+            external_data.checker_data.get("type") == cls.CHECKER_DATA_TYPE
             or external_data.type == external_data.Type.EXTRA_DATA
         )
 

@@ -384,15 +384,16 @@ class Checker:
             "If schema is not declared, this method must be overridden"
         )
 
+    @classmethod
     def should_check(
-        self, external_data: t.Union[ExternalData, ExternalGitRepo]
+        cls, external_data: t.Union[ExternalData, ExternalGitRepo]
     ) -> bool:
         supported = any(
-            isinstance(external_data, c) for c in self.SUPPORTED_DATA_CLASSES
+            isinstance(external_data, c) for c in cls.SUPPORTED_DATA_CLASSES
         )
         applicable = (
-            self.CHECKER_DATA_TYPE is not None
-            and external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE
+            cls.CHECKER_DATA_TYPE is not None
+            and external_data.checker_data.get("type") == cls.CHECKER_DATA_TYPE
         )
         return applicable and supported
 

@@ -69,7 +69,8 @@ class GitChecker(Checker):
     }
     SUPPORTED_DATA_CLASSES = [ExternalGitRepo]
 
-    def should_check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
+    @classmethod
+    def should_check(cls, external_data: t.Union[ExternalData, ExternalGitRepo]):
         return isinstance(external_data, ExternalGitRepo)
 
     async def validate_checker_data(
