@@ -162,8 +162,8 @@ class HTMLChecker(Checker):
             )
         except NETWORK_ERRORS as err:
             raise CheckerFetchError from err
-        else:
-            new_version = new_version._replace(  # pylint: disable=no-member
-                version=latest_version
-            )
-            external_data.set_new_version(new_version)
+
+        new_version = new_version._replace(
+            version=latest_version  # pylint: disable=no-member
+        )
+        external_data.set_new_version(new_version)
