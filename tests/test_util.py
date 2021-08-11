@@ -23,12 +23,17 @@ import os
 from datetime import datetime, timezone
 from time import perf_counter
 from contextlib import contextmanager
+import re
 
+import aiohttp
+
+from src.lib.errors import CheckerError
 from src.lib.utils import (
     parse_github_url,
     strip_query,
     filter_versions,
     _extract_timestamp,
+    get_extra_data_info_from_url,
     Command,
 )
 
@@ -195,6 +200,26 @@ class TestParseHTTPDate(unittest.TestCase):
     @unittest.expectedFailure
     def test_parse_invalid(self):
         self.assertIsNotNone(_extract_timestamp({"Date": "some broken string"}))
+
+
+class TestDownload(unittest.IsolatedAsyncioTestCase):
+    _CONTENT_TYPE = "application/x-fedc-test"
+    http: aiohttp.ClientSession
+
+    async def asyncSetUp(self):
+        self.http = aiohttp.ClientSession(raise_for_status=True)
+        await self.http.__aenter__()
+
+    async def asyncTearDown(self):
+        await self.http.close()
+
+    async def test_wrong_content_type(self):
+        with self.assertRaises(CheckerError):
+            await get_extra_data_info_from_url(
+                url=f"https://httpbin.org/response-headers?Content-Type={self._CONTENT_TYPE}",
+                session=self.http,
+                content_type_deny=[re.compile(f"^{self._CONTENT_TYPE}$")],
+            )
 
 
 if __name__ == "__main__":
