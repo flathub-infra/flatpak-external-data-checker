@@ -83,13 +83,11 @@ class ExternalBase(abc.ABC):
 
     @classmethod
     def from_sources(
-        cls, source_path: str, sources: t.List[t.Union[str, t.Dict]]
+        cls, source_path: str, sources: t.List[t.Dict]
     ) -> t.List[ExternalBase]:
         external_data = []
 
         for source in sources:
-            if isinstance(source, str):
-                continue
             assert isinstance(source, dict), source
 
             data = cls.from_source(source_path, source)
