@@ -31,6 +31,7 @@ from .checkers import ALL_CHECKERS
 from .lib import HTTP_CLIENT_HEADERS, TIMEOUT_CONNECT, TIMEOUT_TOTAL
 from .lib.appdata import add_release_to_file
 from .lib.externaldata import (
+    ExternalBase,
     ExternalData,
     ExternalGitRepo,
     ExternalFile,
@@ -97,7 +98,7 @@ class ManifestChecker:
     def __init__(self, manifest: str):
         self._root_manifest_path = manifest
         self._root_manifest_dir = os.path.dirname(self._root_manifest_path)
-        self._external_data: t.Dict[str, t.List[t.Union[ExternalData, ExternalGitRepo]]]
+        self._external_data: t.Dict[str, t.List[ExternalBase]]
         self._external_data = {}
 
         # Initialize checkers
@@ -175,8 +176,7 @@ class ManifestChecker:
         sources = module.get("sources", [])
 
         manifest_datas = self._external_data.setdefault(module_path, [])
-        module_datas = ExternalData.from_sources(module_path, sources)
-        manifest_datas.extend(module_datas)
+        manifest_datas.extend(ExternalData.from_sources(module_path, sources))
 
         for sp in filter(lambda s: _external_source_filter(module_path, s), sources):
             external_source_path = os.path.join(os.path.dirname(module_path), sp)

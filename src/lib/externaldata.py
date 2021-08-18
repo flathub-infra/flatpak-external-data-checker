@@ -30,7 +30,7 @@ import logging
 import aiohttp
 import jsonschema
 
-from . import utils, TIMEOUT_CONNECT, TIMEOUT_TOTAL, HTTP_CLIENT_HEADERS
+from . import utils
 from .errors import CheckerMetadataError, CheckerFetchError
 
 
@@ -64,7 +64,7 @@ class ExternalBase(abc.ABC):
     source: t.Mapping
 
     @classmethod
-    def from_source(cls, source_path: str, source: t.Dict):
+    def from_source(cls, source_path: str, source: t.Dict) -> t.Optional[ExternalBase]:
         if not source.get("url"):
             return None
 
@@ -82,7 +82,9 @@ class ExternalBase(abc.ABC):
         return data_cls.from_source_impl(source_path, source)
 
     @classmethod
-    def from_sources(cls, source_path: str, sources: t.List[t.Union[str, t.Dict]]):
+    def from_sources(
+        cls, source_path: str, sources: t.List[t.Union[str, t.Dict]]
+    ) -> t.List[ExternalBase]:
         external_data = []
 
         for source in sources:
