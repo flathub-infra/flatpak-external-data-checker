@@ -158,13 +158,8 @@ class ManifestChecker:
 
             try:
                 ext_module = self._read_manifest(ext_module_path)
-            except GLib.Error as err:
-                if err.matches(GLib.quark_from_string("g-file-error-quark"), 4):
-                    log.warning("Referenced file not found: %s", ext_module_path)
-                    return
-                raise
-            except FileNotFoundError:
-                log.warning("Referenced file not found: %s", ext_module_path)
+            except FileNotFoundError as err:
+                log.warning("Referenced file not found: %s", err)
                 return
 
             assert isinstance(ext_module, dict), ext_module_path

@@ -371,7 +371,12 @@ def read_json_manifest(manifest_path):
     # Round-trip through json-glib to get rid of comments, multi-line
     # strings, and any other invalid JSON
     parser = Json.Parser()
-    parser.load_from_file(manifest_path)
+    try:
+        parser.load_from_file(manifest_path)
+    except GLib.Error as err:
+        if err.matches(GLib.file_error_quark(), GLib.FileError.NOENT):
+            raise FileNotFoundError(err.message) from err  # pylint: disable=no-member
+        raise
     root = parser.get_root()
     clean_manifest = Json.to_string(root, False)
 
