@@ -67,9 +67,7 @@ def find_appdata_file(directory, appid):
     return None
 
 
-def _external_source_filter(manifest_path: str, source) -> t.Optional[bool]:
-    if not isinstance(source, str):
-        return None
+def _external_source_filter(manifest_path: str, source: str) -> bool:
     source_path = os.path.join(os.path.dirname(manifest_path), source)
     source_size = os.stat(source_path).st_size
     if source_size > MAX_MANIFEST_SIZE:
@@ -173,12 +171,27 @@ class ManifestChecker:
         for child_module in child_modules:
             self._collect_module_data(module_path=module_path, module=child_module)
 
-        sources = module.get("sources", [])
-
         manifest_datas = self._external_data.setdefault(module_path, [])
+
+        sources: t.List[t.Dict] = []
+        source_paths: t.List[str] = []
+        for source in module.get("sources", []):
+            # Find external sources (path strings) first
+            if isinstance(source, str):
+                if _external_source_filter(module_path, source):
+                    source_paths.append(source)
+                continue
+            assert isinstance(source, dict)
+            # Next, collect only unique sources
+            # NOTE here we rely on ruamel.yaml to make YAML aliases into
+            # pointers to the same dict object ridden from YAML anchor
+            if any(d.source is source for d in manifest_datas):
+                continue
+            sources.append(source)
+
         manifest_datas.extend(ExternalData.from_sources(module_path, sources))
 
-        for sp in filter(lambda s: _external_source_filter(module_path, s), sources):
+        for sp in source_paths:
             external_source_path = os.path.join(os.path.dirname(module_path), sp)
             log.info(
                 "Loading sources from %s",

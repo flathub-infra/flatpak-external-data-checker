@@ -109,6 +109,7 @@ class TestExternalDataChecker(unittest.IsolatedAsyncioTestCase):
         contents,
         expected_new_contents,
         expected_updates,
+        expected_data_count=1,
         new_release=True,
     ):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -124,6 +125,10 @@ class TestExternalDataChecker(unittest.IsolatedAsyncioTestCase):
                 f.write("""<application></application>""")
 
             checker = ManifestChecker(manifest)
+            self.assertEqual(
+                len(checker.get_external_data()),
+                expected_data_count,
+            )
             checker._checkers = [UpdateEverythingChecker]
             await checker.check()
             updates = checker.update_manifests()
@@ -201,7 +206,8 @@ modules:
   - name: the-blank-line-below-should-be-preserved
 
   - name: foo
-    sources:
+    # Anchor
+    sources: &foo-sources
       - type: extra-data                  # Cool comments
         filename: UnityHubSetup.AppImage  # Very nice
         url: https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.AppImage
@@ -217,6 +223,10 @@ modules:
         size: 63236599
         only-arches:
           - x86_64
+
+  - name: foo-32bit
+    # Alias
+    sources: *foo-sources
 """.lstrip()
         expected_new_contents = f"""
 id: com.example.App
@@ -224,7 +234,8 @@ modules:
   - name: the-blank-line-below-should-be-preserved
 
   - name: foo
-    sources:
+    # Anchor
+    sources: &foo-sources
       - type: extra-data                  # Cool comments
         filename: UnityHubSetup.AppImage  # Very nice
         url: https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.AppImage
@@ -240,12 +251,17 @@ modules:
         size: {UpdateEverythingChecker.SIZE}
         only-arches:
           - x86_64
+
+  - name: foo-32bit
+    # Alias
+    sources: *foo-sources
 """.lstrip()
         await self._test_update(
             filename,
             contents,
             expected_new_contents,
             ["Update UnityHubSetup.AppImage to 1.2.3.4"],
+            expected_data_count=2,
         )
 
     async def test_update_no_new_version(self):
