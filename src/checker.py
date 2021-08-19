@@ -171,43 +171,40 @@ class ManifestChecker:
         for child_module in child_modules:
             self._collect_module_data(module_path=module_path, module=child_module)
 
-        manifest_datas = self._external_data.setdefault(module_path, [])
+        self._collect_source_data(module_path, module.get("sources", []))
 
-        sources: t.List[t.Dict] = []
-        source_paths: t.List[str] = []
-        for source in module.get("sources", []):
-            # Find external sources (path strings) first
-            if isinstance(source, str):
-                if _external_source_filter(module_path, source):
-                    source_paths.append(source)
-                continue
-            assert isinstance(source, dict)
-            # Next, collect only unique sources
-            # NOTE here we rely on ruamel.yaml to make YAML aliases into
-            # pointers to the same dict object ridden from YAML anchor
-            if any(d.source is source for d in manifest_datas):
-                continue
-            sources.append(source)
+    def _collect_source_data(
+        self,
+        source_path: str,
+        source: t.Union[str, t.Dict, t.List[t.Union[str, t.Dict]]],
+    ):
+        if isinstance(source, list):
+            for child_source in source:
+                assert isinstance(child_source, (str, dict))
+                self._collect_source_data(source_path, child_source)
+            return
 
-        manifest_datas.extend(ExternalData.from_sources(module_path, sources))
+        if isinstance(source, str):
+            if _external_source_filter(source_path, source):
+                ext_source_path = os.path.join(os.path.dirname(source_path), source)
+                log.info(
+                    "Loading sources from %s",
+                    os.path.relpath(ext_source_path, self._root_manifest_dir),
+                )
+                ext_source = self._read_manifest(ext_source_path)
+                self._collect_source_data(ext_source_path, ext_source)
+            return
 
-        for sp in source_paths:
-            external_source_path = os.path.join(os.path.dirname(module_path), sp)
-            log.info(
-                "Loading sources from %s",
-                os.path.relpath(external_source_path, self._root_manifest_dir),
-            )
-            external_manifest = self._read_manifest(external_source_path)
-            if isinstance(external_manifest, list):
-                external_sources = external_manifest
-            elif isinstance(external_manifest, dict):
-                external_sources = [external_manifest]
-            else:
-                raise TypeError(f"Invalid data type in {external_source_path}")
-            external_source_datas = ExternalData.from_sources(
-                external_source_path, external_sources
-            )
-            self._external_data[external_source_path] = external_source_datas
+        assert isinstance(source, dict)
+        # Collect only sources we didn't collect previously
+        # NOTE here we rely on ruamel.yaml to make YAML aliases into
+        # pointers to the same dict object ridden from YAML anchor
+        manifest_datas = self._external_data.setdefault(source_path, [])
+        if any(d.source is source for d in manifest_datas):
+            return
+        data = ExternalData.from_source(source_path, source)
+        if data:
+            manifest_datas.append(data)
 
     async def _check_data(
         self,
