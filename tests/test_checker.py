@@ -208,7 +208,8 @@ modules:
   - name: foo
     # Anchor
     sources: &foo-sources
-      - type: extra-data                  # Cool comments
+      - &foo-i386
+        type: extra-data                  # Cool comments
         filename: UnityHubSetup.AppImage  # Very nice
         url: https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.AppImage
         sha256: c521e2caf2ce8c8302cc9d8f385648c7d8c76ae29ac24ec0c0ffd3cd67a915fc
@@ -223,6 +224,8 @@ modules:
         size: 63236599
         only-arches:
           - x86_64
+
+      - *foo-i386
 
   - name: foo-32bit
     # Alias
@@ -236,7 +239,8 @@ modules:
   - name: foo
     # Anchor
     sources: &foo-sources
-      - type: extra-data                  # Cool comments
+      - &foo-i386
+        type: extra-data                  # Cool comments
         filename: UnityHubSetup.AppImage  # Very nice
         url: https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.AppImage
         sha256: {UpdateEverythingChecker.CHECKSUM}
@@ -251,6 +255,8 @@ modules:
         size: {UpdateEverythingChecker.SIZE}
         only-arches:
           - x86_64
+
+      - *foo-i386
 
   - name: foo-32bit
     # Alias

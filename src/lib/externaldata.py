@@ -82,21 +82,6 @@ class ExternalBase(abc.ABC):
         return data_cls.from_source_impl(source_path, source)
 
     @classmethod
-    def from_sources(
-        cls, source_path: str, sources: t.List[t.Dict]
-    ) -> t.List[ExternalBase]:
-        external_data = []
-
-        for source in sources:
-            assert isinstance(source, dict), source
-
-            data = cls.from_source(source_path, source)
-            if data:
-                external_data.append(data)
-
-        return external_data
-
-    @classmethod
     def from_source_impl(cls, source_path: str, source: t.Dict) -> ExternalBase:
         raise NotImplementedError
 
