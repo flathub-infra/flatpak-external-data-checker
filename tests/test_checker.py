@@ -330,6 +330,76 @@ sources:
             new_release=False,
         )
 
+    async def test_update_single_source(self):
+        filename = "foo-source.yaml"
+        contents = """
+type: extra-data
+filename: some-deb.deb
+url: https://phony-url.phony/some-deb_1.2.3.4-1_amd64.deb
+sha256: 0000000000000000000000000000000000000000000000000000000000000000
+size: 0
+""".lstrip()
+        expected_new_contents = f"""
+type: extra-data
+filename: some-deb.deb
+url: https://phony-url.phony/some-deb_1.2.3.4-1_amd64.deb
+sha256: {UpdateEverythingChecker.CHECKSUM}
+size: {UpdateEverythingChecker.SIZE}
+""".lstrip()
+        await self._test_update(
+            filename,
+            contents,
+            expected_new_contents,
+            ["Update some-deb.deb to 1.2.3.4"],
+            new_release=False,
+        )
+
+    async def test_update_sources(self):
+        filename = "foo-sources.json"
+        contents = """
+[
+    {
+        "type": "extra-data",
+        "filename": "some-deb.deb",
+        "url": "https://phony-url.phony/some-deb_1.2.3.4-1_amd64.deb",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "size": 0
+    },
+    {
+        "type": "extra-data",
+        "filename": "some-deb.deb",
+        "url": "https://phony-url.phony/some-deb_1.2.3.4-1_amd64.deb",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "size": 0
+    }
+]
+""".lstrip()
+        expected_new_contents = f"""
+[
+    {{
+        "type": "extra-data",
+        "filename": "some-deb.deb",
+        "url": "https://phony-url.phony/some-deb_1.2.3.4-1_amd64.deb",
+        "sha256": "{UpdateEverythingChecker.CHECKSUM}",
+        "size": {UpdateEverythingChecker.SIZE}
+    }},
+    {{
+        "type": "extra-data",
+        "filename": "some-deb.deb",
+        "url": "https://phony-url.phony/some-deb_1.2.3.4-1_amd64.deb",
+        "sha256": "{UpdateEverythingChecker.CHECKSUM}",
+        "size": {UpdateEverythingChecker.SIZE}
+    }}
+]""".lstrip()
+        await self._test_update(
+            filename,
+            contents,
+            expected_new_contents,
+            ["Update some-deb.deb to 1.2.3.4"],
+            expected_data_count=2,
+            new_release=False,
+        )
+
     async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = await checker.check()

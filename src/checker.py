@@ -23,7 +23,7 @@ import datetime
 import typing as t
 import asyncio
 from dataclasses import dataclass
-from enum import Enum
+from enum import IntEnum
 
 import aiohttp
 
@@ -86,9 +86,12 @@ def _external_source_filter(manifest_path: str, source: str) -> bool:
 
 
 class ManifestChecker:
-    class Kind(Enum):
-        MODULE = 0
+    class Kind(IntEnum):
+        UNKNOWN = 0
         APP = 1
+        MODULE = 2
+        SOURCE = 4
+        SOURCES = 8
 
     @dataclass
     class TasksCounter:
@@ -98,6 +101,10 @@ class ManifestChecker:
         total: int = 0
 
     def __init__(self, manifest: str):
+        self.kind = self.Kind.UNKNOWN
+        self.app_id: t.Optional[str]
+        self.app_id = None
+
         self._root_manifest_path = manifest
         self._root_manifest_dir = os.path.dirname(self._root_manifest_path)
         self._external_data: t.Dict[str, t.List[ExternalBase]]
@@ -116,20 +123,31 @@ class ManifestChecker:
 
         # Top-level manifest contents
         self._root_manifest = self._read_manifest(self._root_manifest_path)
+        self._load_root_manifest()
+
+        # Map from manifest path to [ExternalData]
+        self._collect_external_data()
+
+    def _load_root_manifest(self):
+        if isinstance(self._root_manifest, list):
+            self.kind = self.Kind.SOURCES
+            return
         assert isinstance(self._root_manifest, dict)
-        self.app_id: t.Optional[str]
-        self.app_id = self._root_manifest.get("id", self._root_manifest.get("app-id"))
-        # Determine manifest kind
-        if self.app_id and "modules" in self._root_manifest:
+        if "id" in self._root_manifest or "app-id" in self._root_manifest:
             self.kind = self.Kind.APP
-        elif "name" in self._root_manifest and (
+            self.app_id = self._root_manifest.get(
+                "id", self._root_manifest.get("app-id")
+            )
+            return
+        if "name" in self._root_manifest and (
             "sources" in self._root_manifest or "modules" in self._root_manifest
         ):
             self.kind = self.Kind.MODULE
-        else:
-            raise ValueError("Can't determine manifest kind")
-        # Map from manifest path to [ExternalData]
-        self._collect_external_data()
+            return
+        if "type" in self._root_manifest:
+            self.kind = self.Kind.SOURCE
+            return
+        raise ManifestLoadError("Can't determine manifest kind")
 
     def _read_manifest(self, manifest_path: str) -> t.Union[t.List, t.Dict]:
         if manifest_path in self._manifest_contents:
@@ -152,6 +170,8 @@ class ManifestChecker:
                 self._collect_module_data(self._root_manifest_path, module)
         elif self.kind == self.Kind.MODULE:
             self._collect_module_data(self._root_manifest_path, self._root_manifest)
+        elif self.kind in [self.Kind.SOURCE, self.Kind.SOURCES]:
+            self._collect_source_data(self._root_manifest_path, self._root_manifest)
 
     def _collect_module_data(self, module_path: str, module: t.Union[str, t.Dict]):
         if isinstance(module, str):
