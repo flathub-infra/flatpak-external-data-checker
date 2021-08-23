@@ -96,6 +96,13 @@
                 "phony-external-source-single-item.json",
                 "phony-too-large-generated-sources.json"
             ]
+        },
+        {
+            "name": "same-source-ref",
+            "sources": [
+                /* Make sure we don't collect the same source multiple times */
+                "phony-external-source.json"
+            ]
         }
     ]
 }

@@ -126,6 +126,8 @@ class ManifestChecker:
         self._collect_external_data()
 
     def _read_manifest(self, manifest_path: str) -> t.Union[t.List, t.Dict]:
+        if manifest_path in self._manifest_contents:
+            return self._manifest_contents[manifest_path]
         contents = read_manifest(manifest_path)
         self._manifest_contents[manifest_path] = contents
         return contents
