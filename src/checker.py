@@ -39,7 +39,13 @@ from .lib.externaldata import (
     Checker,
 )
 from .lib.utils import read_manifest, dump_manifest
-from .lib.errors import CheckerError, AppdataError, AppdataNotFound, AppdataLoadError
+from .lib.errors import (
+    CheckerError,
+    AppdataError,
+    AppdataNotFound,
+    AppdataLoadError,
+    ManifestLoadError,
+)
 
 import logging
 import os
@@ -177,14 +183,20 @@ class ManifestChecker:
         self,
         source_path: str,
         source: t.Union[str, t.Dict, t.List[t.Union[str, t.Dict]]],
+        is_external: bool = False,  # This source mf was referenced from another mf
     ):
         if isinstance(source, list):
             for child_source in source:
                 assert isinstance(child_source, (str, dict))
-                self._collect_source_data(source_path, child_source)
+                self._collect_source_data(source_path, child_source, is_external)
             return
 
         if isinstance(source, str):
+            if is_external:
+                raise ManifestLoadError(
+                    "Nested external source manifests not allowed: "
+                    f"{source} referenced from {source_path}"
+                )
             if _external_source_filter(source_path, source):
                 ext_source_path = os.path.join(os.path.dirname(source_path), source)
                 log.info(
@@ -192,7 +204,7 @@ class ManifestChecker:
                     os.path.relpath(ext_source_path, self._root_manifest_dir),
                 )
                 ext_source = self._read_manifest(ext_source_path)
-                self._collect_source_data(ext_source_path, ext_source)
+                self._collect_source_data(ext_source_path, ext_source, is_external=True)
             return
 
         assert isinstance(source, dict)
