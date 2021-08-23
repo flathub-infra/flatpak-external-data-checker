@@ -45,8 +45,6 @@ import logging
 import os
 from xml.sax import SAXParseException
 
-from gi.repository import GLib
-
 
 MAIN_SRC_PROP = "is-main-source"
 MAX_MANIFEST_SIZE = 1024 * 100
