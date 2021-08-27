@@ -1,6 +1,7 @@
 import logging
-from urllib.parse import urljoin
 import typing as t
+
+from yarl import URL
 
 from ..lib import OPERATORS_SCHEMA
 from ..lib.externaldata import Checker, ExternalData, ExternalFile
@@ -8,7 +9,7 @@ from ..lib.utils import filter_versions
 
 log = logging.getLogger(__name__)
 
-GNOME_MIRROR = "https://download.gnome.org/"
+GNOME_MIRROR = URL("https://download.gnome.org/")
 
 
 def _parse_checksums(text: str) -> t.Dict[str, str]:
@@ -45,8 +46,8 @@ class GNOMEChecker(Checker):
         constraints = external_data.checker_data.get("versions", {}).items()
         assert isinstance(project_name, str)
 
-        proj_url = urljoin(GNOME_MIRROR, f"sources/{project_name}/")
-        async with self.session.get(urljoin(proj_url, "cache.json")) as cache_resp:
+        proj_url = GNOME_MIRROR / "sources" / project_name
+        async with self.session.get(proj_url / "cache.json") as cache_resp:
             cache_json = await cache_resp.json()
         _, downloads, versions, _ = cache_json
 
@@ -69,19 +70,18 @@ class GNOMEChecker(Checker):
 
         proj_files = downloads[project_name][latest_version]
 
-        tarball = next(
+        tarball_path = next(
             proj_files[prop]
             for prop in ["tar.xz", "tar.bz2", "tar.gz"]
             if prop in proj_files
         )
-        async with self.session.get(
-            urljoin(proj_url, proj_files["sha256sum"])
-        ) as cs_resp:
+
+        async with self.session.get(proj_url / proj_files["sha256sum"]) as cs_resp:
             checksums = _parse_checksums(await cs_resp.text())
-        checksum = checksums[tarball.split("/")[-1]]
+        checksum = checksums[tarball_path.split("/")[-1]]
 
         new_version = ExternalFile(
-            url=urljoin(proj_url, tarball),
+            url=str(proj_url / tarball_path),
             checksum=checksum,
             size=None,
             version=latest_version,
