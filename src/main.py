@@ -253,7 +253,7 @@ def open_pr(
     for pr in open_prs:
         log.info("Found open PR: %s", pr.html_url)
 
-        if origin_repo.permissions.push and (automerge or force_automerge):
+        if automerge or force_automerge:
             pr_commit = pr.head.repo.get_commit(pr.head.sha)
             if pr_commit.get_combined_status().state == "success" and pr.mergeable:
                 log.info("PR passed CI and is mergeable, merging %s", pr.html_url)
