@@ -1,4 +1,5 @@
 import logging
+import re
 import typing as t
 
 from yarl import URL
@@ -70,13 +71,18 @@ class GNOMEChecker(Checker):
 
         proj_files = downloads[project_name][latest_version]
 
-        tarball_path = next(
-            proj_files[prop]
+        tarball_type, tarball_path = next(
+            (prop, proj_files[prop])
             for prop in ["tar.xz", "tar.bz2", "tar.gz"]
             if prop in proj_files
         )
 
-        async with self.session.get(proj_url / proj_files["sha256sum"]) as cs_resp:
+        checksum_path = proj_files.get(
+            "sha256sum",
+            re.sub(f"\\.{tarball_type}$", ".sha256sum", tarball_path),
+        )
+
+        async with self.session.get(proj_url / checksum_path) as cs_resp:
             checksums = _parse_checksums(await cs_resp.text())
         checksum = checksums[tarball_path.split("/")[-1]]
 
