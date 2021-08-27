@@ -171,7 +171,12 @@ AUTOMERGE_DUE_TO_BROKEN_URLS = (
 )
 
 
-def open_pr(subject, body, branch, manifest_checker=None):
+def open_pr(
+    subject: str,
+    body: str,
+    branch: str,
+    manifest_checker: checker.ManifestChecker = None,
+):
     try:
         github_token = os.environ["GITHUB_TOKEN"]
     except KeyError:
