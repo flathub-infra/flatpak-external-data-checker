@@ -171,7 +171,13 @@ AUTOMERGE_DUE_TO_BROKEN_URLS = (
 )
 
 
-def open_pr(subject, body, branch, manifest_checker=None):
+def open_pr(
+    subject: str,
+    body: str,
+    branch: str,
+    manifest_checker: checker.ManifestChecker = None,
+    fork: t.Optional[bool] = None,
+):
     try:
         github_token = os.environ["GITHUB_TOKEN"]
     except KeyError:
@@ -189,8 +195,14 @@ def open_pr(subject, body, branch, manifest_checker=None):
     )
     origin_repo = g.get_repo(parse_github_url(origin_url))
 
-    if origin_repo.permissions.push:
-        log.debug("origin repo is writable")
+    if fork is True:
+        log.debug("creating fork (as requested)")
+        repo = user.create_fork(origin_repo)
+    elif fork is False:
+        log.debug("not creating fork (as requested)")
+        repo = origin_repo
+    elif origin_repo.permissions.push:
+        log.debug("origin repo is writable; not creating fork")
         repo = origin_repo
     else:
         log.debug("origin repo not writable; creating fork")
@@ -241,7 +253,7 @@ def open_pr(subject, body, branch, manifest_checker=None):
     for pr in open_prs:
         log.info("Found open PR: %s", pr.html_url)
 
-        if origin_repo.permissions.push and (automerge or force_automerge):
+        if automerge or force_automerge:
             pr_commit = pr.head.repo.get_commit(pr.head.sha)
             if pr_commit.get_combined_status().state == "success" and pr.mergeable:
                 log.info("PR passed CI and is mergeable, merging %s", pr.html_url)
@@ -303,6 +315,33 @@ def parse_cli_args(cli_args=None):
         type=ExternalData.Type,
         choices=list(ExternalData.Type),
     )
+
+    fork = parser.add_argument_group(
+        "control forking behaviour",
+        "By default, %(prog)s pushes directly to the GitHub repo if the GitHub "
+        "token has permission to do so, and creates a fork if not.",
+    ).add_mutually_exclusive_group()
+    fork.add_argument(
+        "--always-fork",
+        action="store_const",
+        const=True,
+        dest="fork",
+        help=(
+            "Always push to a fork, even if the user has write access to the "
+            "upstream repo"
+        ),
+    )
+    fork.add_argument(
+        "--never-fork",
+        action="store_const",
+        const=False,
+        dest="fork",
+        help=(
+            "Never push to a fork, even if this means failing to push to the "
+            "upstream repo"
+        ),
+    )
+
     return parser.parse_args(cli_args)
 
 
@@ -324,7 +363,13 @@ async def run_with_args(args: argparse.Namespace) -> t.Tuple[int, int, bool]:
             with indir(os.path.dirname(args.manifest)):
                 subject, body, branch = commit_changes(changes)
                 if not args.commit_only:
-                    open_pr(subject, body, branch, manifest_checker=manifest_checker)
+                    open_pr(
+                        subject,
+                        body,
+                        branch,
+                        manifest_checker=manifest_checker,
+                        fork=args.fork,
+                    )
         did_update = True
 
     errors_num = print_errors(manifest_checker)

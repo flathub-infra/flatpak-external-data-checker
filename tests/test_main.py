@@ -42,3 +42,21 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await main.run_with_args(args1), (2, 0, True))
         args2 = main.parse_cli_args([self.manifest_path])
         self.assertEqual(await main.run_with_args(args2), (0, 0, False))
+
+
+class TestForceForkTristate(unittest.TestCase):
+    def test_neither_fork_arg(self):
+        args = main.parse_cli_args([TEST_MANIFEST])
+        self.assertIsNone(args.fork)
+
+    def test_always_fork_arg(self):
+        args = main.parse_cli_args(["--always-fork", TEST_MANIFEST])
+        self.assertTrue(args.fork)
+
+    def test_never_fork_arg(self):
+        args = main.parse_cli_args(["--never-fork", TEST_MANIFEST])
+        self.assertFalse(args.fork)
+
+    def test_both_fork_args(self):
+        with self.assertRaises(SystemExit):
+            main.parse_cli_args(["--always-fork", "--never-fork", TEST_MANIFEST])
