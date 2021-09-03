@@ -5,7 +5,7 @@ import typing as t
 from yarl import URL
 
 from ..lib import OPERATORS_SCHEMA
-from ..lib.externaldata import Checker, ExternalData, ExternalFile
+from ..lib.externaldata import Checker, ExternalBase, ExternalFile
 from ..lib.utils import filter_versions
 
 log = logging.getLogger(__name__)
@@ -40,8 +40,7 @@ class GNOMEChecker(Checker):
         "required": ["name"],
     }
 
-    async def check(self, external_data):
-        external_data: ExternalData
+    async def check(self, external_data: ExternalBase):
         project_name = external_data.checker_data["name"]
         stable_only = external_data.checker_data.get("stable-only", True)
         constraints = external_data.checker_data.get("versions", {}).items()
