@@ -59,9 +59,11 @@ class ExternalBase(abc.ABC):
     state: State
     type: Type
     filename: str
+    arches: t.List[str]
     current_version: t.Union[ExternalFile, ExternalGitRef]
     new_version: t.Optional[t.Union[ExternalFile, ExternalGitRef]]
     source: t.Mapping
+    checker_data: t.Mapping
 
     @classmethod
     def from_source(cls, source_path: str, source: t.Dict) -> t.Optional[ExternalBase]:
@@ -347,7 +349,7 @@ class Checker:
         self.session = session
 
     def get_json_schema(  # pylint: disable=unused-argument
-        self, external_data: t.Union[ExternalData, ExternalGitRepo]
+        self, external_data: ExternalBase
     ) -> t.Dict[str, t.Any]:
         if hasattr(self, "CHECKER_DATA_SCHEMA"):
             return self.CHECKER_DATA_SCHEMA
@@ -356,9 +358,7 @@ class Checker:
         )
 
     @classmethod
-    def should_check(
-        cls, external_data: t.Union[ExternalData, ExternalGitRepo]
-    ) -> bool:
+    def should_check(cls, external_data: ExternalBase) -> bool:
         supported = any(
             isinstance(external_data, c) for c in cls.SUPPORTED_DATA_CLASSES
         )
@@ -368,9 +368,7 @@ class Checker:
         )
         return applicable and supported
 
-    async def validate_checker_data(
-        self, external_data: t.Union[ExternalData, ExternalGitRepo]
-    ):
+    async def validate_checker_data(self, external_data: ExternalBase):
         assert any(isinstance(external_data, c) for c in self.SUPPORTED_DATA_CLASSES)
         schema = self.get_json_schema(external_data)
         if not schema:
@@ -380,5 +378,5 @@ class Checker:
         except jsonschema.ValidationError as err:
             raise CheckerMetadataError("Invalid metadata schema") from err
 
-    async def check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
+    async def check(self, external_data: ExternalBase):
         raise NotImplementedError
