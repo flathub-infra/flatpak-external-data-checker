@@ -5,7 +5,12 @@ import typing as t
 import subprocess
 
 from ..lib import utils, NETWORK_ERRORS
-from ..lib.externaldata import ExternalData, ExternalGitRepo, ExternalGitRef
+from ..lib.externaldata import (
+    ExternalBase,
+    ExternalData,
+    ExternalGitRepo,
+    ExternalGitRef,
+)
 from ..lib.errors import CheckerQueryError
 from .htmlchecker import HTMLChecker
 
@@ -68,7 +73,7 @@ class JSONChecker(HTMLChecker):
     }
     SUPPORTED_DATA_CLASSES = [ExternalData, ExternalGitRepo]
 
-    async def check(self, external_data):
+    async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
 
         json_url = external_data.checker_data["url"]
@@ -81,6 +86,7 @@ class JSONChecker(HTMLChecker):
         if isinstance(external_data, ExternalGitRepo):
             return await self._check_git(json_data, external_data)
         else:
+            assert isinstance(external_data, ExternalData)
             return await self._check_data(json_data, external_data)
 
     async def _check_data(self, json_data: bytes, external_data: ExternalData):
