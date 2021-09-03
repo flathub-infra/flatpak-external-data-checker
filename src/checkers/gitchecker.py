@@ -5,7 +5,7 @@ from distutils.version import LooseVersion
 
 import semver
 
-from ..lib.externaldata import Checker, ExternalData, ExternalGitRepo, ExternalGitRef
+from ..lib.externaldata import Checker, ExternalBase, ExternalGitRepo, ExternalGitRef
 from ..lib.utils import git_ls_remote
 from ..lib.errors import CheckerQueryError, CheckerFetchError
 
@@ -70,17 +70,15 @@ class GitChecker(Checker):
     SUPPORTED_DATA_CLASSES = [ExternalGitRepo]
 
     @classmethod
-    def should_check(cls, external_data: t.Union[ExternalData, ExternalGitRepo]):
+    def should_check(cls, external_data: ExternalBase):
         return isinstance(external_data, ExternalGitRepo)
 
-    async def validate_checker_data(
-        self, external_data: t.Union[ExternalData, ExternalGitRepo]
-    ):
+    async def validate_checker_data(self, external_data: ExternalBase):
         if external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE:
             return await super().validate_checker_data(external_data)
         return None
 
-    async def check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
+    async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
         assert isinstance(external_data, ExternalGitRepo)
         if external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE:
