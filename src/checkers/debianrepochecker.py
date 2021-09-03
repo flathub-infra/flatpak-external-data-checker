@@ -41,7 +41,7 @@ import typing as t
 import apt
 import apt_pkg
 
-from ..lib.externaldata import Checker, ExternalFile, ExternalData, ExternalGitRepo
+from ..lib.externaldata import Checker, ExternalFile, ExternalBase
 from ..lib.utils import get_timestamp_from_url
 
 apt_pkg.init()
@@ -95,7 +95,7 @@ class DebianRepoChecker(Checker):
         "required": ["package-name", "root", "dist"],
     }
 
-    async def check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
+    async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
 
         LOG.debug("Checking %s", external_data.filename)
