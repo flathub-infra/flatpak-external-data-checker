@@ -2,7 +2,7 @@ import datetime
 import logging
 import hashlib
 
-from ..lib.externaldata import ExternalFile, Checker
+from ..lib.externaldata import ExternalBase, ExternalFile, Checker
 
 log = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class SnapcraftChecker(Checker):
         if sha3.hexdigest() == sha3_384:
             return sha2.hexdigest()
 
-    async def check(self, external_data):
+    async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
 
         name = external_data.checker_data["name"]
