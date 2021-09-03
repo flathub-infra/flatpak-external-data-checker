@@ -9,7 +9,7 @@ import typing as t
 
 from defusedxml import ElementTree
 
-from ..lib.externaldata import ExternalData, ExternalGitRepo, Checker, ExternalFile
+from ..lib.externaldata import ExternalBase, Checker, ExternalFile
 
 
 log = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ class RPMRepoChecker(Checker):
             ),
         )
 
-    async def check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
+    async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
 
         repo_root = external_data.checker_data["root"].rstrip("/") + "/"
