@@ -4,7 +4,7 @@ import re
 import typing as t
 
 from ..lib import OPERATORS_SCHEMA
-from ..lib.externaldata import Checker, ExternalFile
+from ..lib.externaldata import Checker, ExternalFile, ExternalBase
 from ..lib.utils import filter_versions
 from ..lib.errors import CheckerQueryError
 
@@ -47,7 +47,7 @@ class PyPIChecker(Checker):
         "required": ["name"],
     }
 
-    async def check(self, external_data):
+    async def check(self, external_data: ExternalBase):
         package_name = external_data.checker_data["name"]
         package_type = external_data.checker_data.get("packagetype", "sdist")
         constraints = external_data.checker_data.get("versions", {}).items()
