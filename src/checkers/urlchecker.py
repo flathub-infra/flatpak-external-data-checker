@@ -35,9 +35,8 @@
 import logging
 import re
 import tempfile
-import typing as t
 
-from ..lib.externaldata import ExternalData, ExternalGitRepo, Checker
+from ..lib.externaldata import ExternalBase, ExternalData, Checker
 from ..lib import utils, NETWORK_ERRORS
 from ..lib.errors import CheckerFetchError
 
@@ -73,20 +72,18 @@ class URLChecker(Checker):
     }
 
     @classmethod
-    def should_check(cls, external_data: t.Union[ExternalData, ExternalGitRepo]):
+    def should_check(cls, external_data: ExternalBase):
         return isinstance(external_data, ExternalData) and (
             external_data.checker_data.get("type") == cls.CHECKER_DATA_TYPE
             or external_data.type == external_data.Type.EXTRA_DATA
         )
 
-    async def validate_checker_data(
-        self, external_data: t.Union[ExternalData, ExternalGitRepo]
-    ):
+    async def validate_checker_data(self, external_data: ExternalBase):
         if external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE:
             return await super().validate_checker_data(external_data)
         return None
 
-    async def check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
+    async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
 
         is_rotating = external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE
