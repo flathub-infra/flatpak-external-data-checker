@@ -175,7 +175,7 @@ class ChromiumChecker(Checker):
         assert len(result[0]["versions"]) == 1, result
         return result[0]["versions"][0]["current_version"]
 
-    async def check(self, external_data: t.Union[ExternalData, ExternalGitRepo]):
+    async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
 
         component_name = external_data.checker_data.get(
