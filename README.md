@@ -136,6 +136,21 @@ HTML page which contains this information:
 }
 ```
 
+If the HTML page contains multiple versions with download links,
+set single pattern containing two nested match groups for both url and version:
+
+```json
+"x-checker-data": {
+    "type": "html",
+    "url": "https://sourceforge.net/projects/qrupdate/rss",
+    "pattern": "<link>(https://sourceforge.net/.+/qrupdate-([\\d\\.]+\\d).tar.gz)/download</link>"
+}
+```
+
+To disable sorting and get first matched version/url, set `sort-matches` to `false`.
+
+#### URL templates
+
 The HTML checker also supports building the download URL using
 the retrieved version string, its components according to the Python
 [LooseVersion](http://epydoc.sourceforge.net/stdlib/distutils.version.LooseVersion-class.html)
@@ -169,19 +184,6 @@ If the placeholder is immediately followed by an underscore, you need to add bra
     "url-template": "https://www.example.com/$version0.$version1/v${version0}_${version1}_version2.tar.gz"
 }
 ```
-
-If the HTML page contains multiple versions with download links,
-set single pattern containing two nested match groups for both url and version:
-
-```json
-"x-checker-data": {
-    "type": "html",
-    "url": "https://sourceforge.net/projects/qrupdate/rss",
-    "pattern": "<link>(https://sourceforge.net/.+/qrupdate-([\\d\\.]+\\d).tar.gz)/download</link>"
-}
-```
-
-To disable sorting and get first matched version/url, set `sort-matches` to `false`.
 
 ### Git checker
 
@@ -256,8 +258,8 @@ to, e.g. where "type": "extra-data" is declared):
 project by Fedora. It supports multiple backends for retrieving version information 
 from different services, including GitHub, GitLab, Sourceforge, etc.
 To use the **AnityaChecker**, specify numeric project ID on release-monitoring.org
-and add a template for source download URL. This checker supports the same placeholders
-as the **HTMLChecker**:
+and add a template for source download URL.
+[Template syntax](#URL-templates) is the same as for the **HTMLChecker**:
 
 ```json
 "x-checker-data": {
