@@ -74,14 +74,20 @@ class JSONChecker(HTMLChecker):
     async def _query_sequence(
         self,
         json_data: bytes,
-        queries: t.List[t.Tuple[str, t.Optional[str]]],
+        queries: t.Iterable[t.Tuple[str, str]],
     ) -> t.Dict[str, str]:
         results: t.Dict[str, str] = {}
         for result_key, query in queries:
-            if not query:
-                continue
             results[result_key] = await query_json(query, json_data, results)
         return results
+
+    @staticmethod
+    def _read_q_seq(checker_data: t.Mapping, sequence: t.List[str]):
+        for query_name in sequence:
+            q_prop = f"{query_name}-query"
+            if q_prop not in checker_data:
+                continue
+            yield (query_name, checker_data[q_prop])
 
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
@@ -99,12 +105,7 @@ class JSONChecker(HTMLChecker):
         checker_data = external_data.checker_data
         results = await self._query_sequence(
             json_data,
-            [
-                ("tag", checker_data.get("tag-query")),
-                ("commit", checker_data.get("commit-query")),
-                ("version", checker_data["version-query"]),
-                ("url", checker_data["url-query"]),
-            ],
+            self._read_q_seq(checker_data, ["tag", "commit", "version", "url"]),
         )
         latest_version = results["version"]
         latest_url = results["url"]
@@ -117,12 +118,7 @@ class JSONChecker(HTMLChecker):
         checker_data = external_data.checker_data
         results = await self._query_sequence(
             json_data,
-            [
-                ("tag", checker_data["tag-query"]),
-                ("commit", checker_data.get("commit-query")),
-                ("version", checker_data.get("version-query")),
-                ("timestamp", checker_data.get("timestamp-query")),
-            ],
+            self._read_q_seq(checker_data, ["tag", "commit", "version", "timestamp"]),
         )
         new_version = ExternalGitRef(
             external_data.current_version.url,
