@@ -34,17 +34,6 @@ async def query_json(query: str, data: bytes, variables: t.Dict[str, str]) -> st
     return jq_stdout.decode().strip()
 
 
-async def query_sequence(
-    json_data: bytes, queries: t.List[t.Tuple[str, t.Optional[str]]]
-) -> t.Dict[str, str]:
-    results: t.Dict[str, str] = {}
-    for result_key, query in queries:
-        if not query:
-            continue
-        results[result_key] = await query_json(query, json_data, results)
-    return results
-
-
 def parse_timestamp(date_string: t.Optional[str]) -> t.Optional[datetime]:
     if date_string is None:
         return None
@@ -74,15 +63,31 @@ class JSONChecker(HTMLChecker):
     }
     SUPPORTED_DATA_CLASSES = [ExternalData, ExternalGitRepo]
 
+    async def _get_json(self, url: str) -> bytes:
+        log.debug("Get JSON from %s", url)
+        try:
+            async with self.session.get(url) as response:
+                return await response.read()
+        except NETWORK_ERRORS as err:
+            raise CheckerQueryError from err
+
+    async def _query_sequence(
+        self,
+        json_data: bytes,
+        queries: t.List[t.Tuple[str, t.Optional[str]]],
+    ) -> t.Dict[str, str]:
+        results: t.Dict[str, str] = {}
+        for result_key, query in queries:
+            if not query:
+                continue
+            results[result_key] = await query_json(query, json_data, results)
+        return results
+
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
 
         json_url = external_data.checker_data["url"]
-        try:
-            async with self.session.get(json_url) as response:
-                json_data = await response.read()
-        except NETWORK_ERRORS as err:
-            raise CheckerQueryError from err
+        json_data = await self._get_json(json_url)
 
         if isinstance(external_data, ExternalGitRepo):
             return await self._check_git(json_data, external_data)
@@ -92,7 +97,7 @@ class JSONChecker(HTMLChecker):
 
     async def _check_data(self, json_data: bytes, external_data: ExternalData):
         checker_data = external_data.checker_data
-        results = await query_sequence(
+        results = await self._query_sequence(
             json_data,
             [
                 ("tag", checker_data.get("tag-query")),
@@ -110,7 +115,7 @@ class JSONChecker(HTMLChecker):
 
     async def _check_git(self, json_data: bytes, external_data: ExternalGitRepo):
         checker_data = external_data.checker_data
-        results = await query_sequence(
+        results = await self._query_sequence(
             json_data,
             [
                 ("tag", checker_data["tag-query"]),
