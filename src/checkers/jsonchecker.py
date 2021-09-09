@@ -50,10 +50,15 @@ class JSONChecker(HTMLChecker):
         "properties": {
             "url": {"type": "string", "format": "uri"},
             "tag-query": {"type": "string"},
+            "tag-data-url": {"type": "string"},
             "commit-query": {"type": "string"},
+            "commit-data-url": {"type": "string"},
             "version-query": {"type": "string"},
+            "version-data-url": {"type": "string"},
             "url-query": {"type": "string"},
+            "url-data-url": {"type": "string"},
             "timestamp-query": {"type": "string"},
+            "timestamp-data-url": {"type": "string"},
         },
         "required": ["url"],
         "anyOf": [
@@ -74,11 +79,14 @@ class JSONChecker(HTMLChecker):
     async def _query_sequence(
         self,
         json_data: bytes,
-        queries: t.Iterable[t.Tuple[str, str]],
+        queries: t.Iterable[t.Tuple[str, str, t.Optional[str]]],
     ) -> t.Dict[str, str]:
         results: t.Dict[str, str] = {}
-        for result_key, query in queries:
-            results[result_key] = await query_json(query, json_data, results)
+        for result_key, value_query, url_query in queries:
+            if url_query:
+                url = await query_json(url_query, json_data, results)
+                json_data = await self._get_json(url)
+            results[result_key] = await query_json(value_query, json_data, results)
         return results
 
     @staticmethod
@@ -87,7 +95,8 @@ class JSONChecker(HTMLChecker):
             q_prop = f"{query_name}-query"
             if q_prop not in checker_data:
                 continue
-            yield (query_name, checker_data[q_prop])
+            url_prop = f"{query_name}-data-url"
+            yield (query_name, checker_data[q_prop], checker_data.get(url_prop))
 
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)

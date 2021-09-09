@@ -36,6 +36,18 @@ modules:
           tag-query: '.tag_name'
           version-query: '.tag_name | sub("^[vV]"; "")'
 
+  - name: openal-soft
+    sources:
+      - type: git
+        url: https://github.com/kcat/openal-soft.git
+        x-checker-data:
+          type: json
+          url: https://api.github.com/repos/kcat/openal-soft/git/refs/tags
+          commit-query: last | .object.sha
+          tag-query: last | .ref | split("/") | last
+          timestamp-data-url: last | .object.url
+          timestamp-query: .committer.date
+
   - name: tdesktop
     sources:
       - type: git

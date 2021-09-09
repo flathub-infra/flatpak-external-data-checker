@@ -1,5 +1,6 @@
 import os
 import unittest
+import datetime
 
 from src.checker import ManifestChecker
 from src.lib.utils import init_logging
@@ -16,7 +17,7 @@ class TestJSONChecker(unittest.IsolatedAsyncioTestCase):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = await checker.check()
 
-        self.assertEqual(len(ext_data), 6)
+        self.assertEqual(len(ext_data), 7)
         for data in ext_data:
             self.assertIsNotNone(data)
             if data.filename == "jq-1.4.tar.gz":
@@ -56,6 +57,13 @@ class TestJSONChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertNotEqual(data.new_version.tag, data.current_version.tag)
                 self.assertIsNotNone(data.new_version.version)
                 self.assertIsNone(data.new_version.timestamp)
+            elif data.filename == "openal-soft.git":
+                self.assertIsInstance(data.new_version, ExternalGitRef)
+                self.assertEqual(data.current_version.url, data.new_version.url)
+                self.assertIsNotNone(data.new_version.tag)
+                self.assertIsNotNone(data.new_version.commit)
+                self.assertIsNotNone(data.new_version.timestamp)
+                self.assertIsInstance(data.new_version.timestamp, datetime.datetime)
             elif data.filename == "tdesktop.git":
                 self.assertIsNone(data.new_version)
             elif data.filename == "lib_webrtc.git":
