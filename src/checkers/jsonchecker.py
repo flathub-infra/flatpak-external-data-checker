@@ -17,15 +17,14 @@ from .htmlchecker import HTMLChecker
 log = logging.getLogger(__name__)
 
 
-async def query_json(query, data, variables=None):
+async def query_json(query: str, data: bytes, variables: t.Dict[str, str]) -> str:
     typecheck_q = (
         '.|type as $rt | if $rt=="string" or $rt=="number" then . else error($rt) end'
     )
 
     var_args = []
-    if variables is not None:
-        for var_name, var_value in variables.items():
-            var_args += ["--arg", var_name, var_value]
+    for var_name, var_value in variables.items():
+        var_args += ["--arg", var_name, var_value]
 
     jq_cmd = ["jq"] + var_args + ["-r", "-e", f"( {query} ) | ( {typecheck_q} )"]
     try:
@@ -35,8 +34,10 @@ async def query_json(query, data, variables=None):
     return jq_stdout.decode().strip()
 
 
-async def query_sequence(json_data, queries):
-    results = {}
+async def query_sequence(
+    json_data: bytes, queries: t.List[t.Tuple[str, t.Optional[str]]]
+) -> t.Dict[str, str]:
+    results: t.Dict[str, str] = {}
     for result_key, query in queries:
         if not query:
             continue
