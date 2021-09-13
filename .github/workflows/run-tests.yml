@@ -10,7 +10,7 @@ on:
 
 env:
   DOCKER_REGISTRY: ghcr.io
-  DOCKER_IMAGE: flathub/flatpak-external-data-checker
+  DOCKER_IMAGE: ${{ github.repository }}
 
 jobs:
   check-formatting:
@@ -118,8 +118,8 @@ jobs:
         uses: docker/login-action@v1
         with:
           registry: ${{ env.DOCKER_REGISTRY }}
-          username: flathubbot
-          password: ${{ secrets.REGISTRY_TOKEN }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push image to registry
         if: github.event_name != 'pull_request'
