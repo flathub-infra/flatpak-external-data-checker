@@ -375,6 +375,7 @@ class ManifestChecker:
         ]
 
     def _update_manifest(self, path, datas, changes):
+        path_has_changes = False
         for data in datas:
             if data.new_version is None:
                 continue
@@ -388,8 +389,9 @@ class ManifestChecker:
                 message = "Update {}".format(data.filename)
 
             changes[message] = None
+            path_has_changes = True
 
-        if changes:
+        if path_has_changes:
             log.info("Updating %s", path)
             self._dump_manifest(path)
 
