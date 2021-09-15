@@ -247,7 +247,10 @@ class Command:
                 proc.communicate(input=input_data), self.timeout
             )
         except asyncio.TimeoutError as err:
-            proc.kill()
+            try:
+                proc.kill()
+            except OSError as kill_err:
+                log.warning("Failed to terminate timed out process: %s", kill_err)
             assert self.timeout is not None
             raise subprocess.TimeoutExpired(
                 cmd=self.argv,
