@@ -94,16 +94,26 @@ async def get_extra_data_info_from_url(
     follow_redirects: bool = True,
     dest_io: t.Optional[t.IO] = None,
 ):
-    async with session.get(url) as response:
-        real_url = str(response.url)
-        info = response.headers
-        checksum = hashlib.sha256()
-        size = 0
-        async for chunk in response.content.iter_chunked(HTTP_CHUNK_SIZE):
-            checksum.update(chunk)
-            size += len(chunk)
-            if dest_io is not None:
-                dest_io.write(chunk)
+    async with aiohttp.ClientSession(
+        connector=session.connector,
+        connector_owner=False,
+        cookie_jar=session.cookie_jar,
+        trace_configs=session.trace_configs,
+        timeout=session.timeout,
+        headers=session.headers,
+        raise_for_status=True,
+        auto_decompress=False,
+    ) as new_session:
+        async with new_session.get(url) as response:
+            real_url = str(response.url)
+            info = response.headers
+            checksum = hashlib.sha256()
+            size = 0
+            async for chunk in response.content.iter_chunked(HTTP_CHUNK_SIZE):
+                checksum.update(chunk)
+                size += len(chunk)
+                if dest_io is not None:
+                    dest_io.write(chunk)
 
     external_file = externaldata.ExternalFile(
         strip_query(real_url if follow_redirects else url),
