@@ -304,36 +304,26 @@ async def git_ls_remote(url: str) -> t.Dict[str, str]:
     return {r: c for c, r in (l.split() for l in git_stdout.splitlines())}
 
 
-def extract_appimage_version(basename, appimg_io: t.IO):
+async def extract_appimage_version(appimg_io: t.IO):
     """
     Saves 'data' to a temporary file with the given basename, executes it (in a sandbox)
     with --appimage-extract to unpack it, and scrapes the version number out of the
     first .desktop file it finds.
     """
+    assert appimg_io.name
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        appimage_path = os.path.join(tmpdir, basename)
-
         header = ELFFile(appimg_io).header
         offset = header["e_shoff"] + header["e_shnum"] * header["e_shentsize"]
-        appimg_io.seek(offset)
-
-        log.info("Writing %s to %s with offset %i", basename, appimage_path, offset)
-
-        with open(appimage_path, "wb") as fp:
-            chunk = appimg_io.read(1024 ** 2)
-            while chunk:
-                fp.write(chunk)
-                chunk = appimg_io.read(1024 ** 2)
 
         unsquashfs_cmd = Command(
-            ["unsquashfs", "-no-progress", appimage_path],
+            ["unsquashfs", "-no-progress", "-offset", str(offset), appimg_io.name],
             cwd=tmpdir,
-            allow_paths=[tmpdir],
+            allow_paths=[tmpdir, appimg_io.name],
             stdout=None,
         )
         log.info("Running %s", unsquashfs_cmd)
-        unsquashfs_cmd.run_sync()
+        await unsquashfs_cmd.run()
 
         for desktop in glob.glob(os.path.join(tmpdir, "squashfs-root", "*.desktop")):
             kf = GLib.KeyFile()

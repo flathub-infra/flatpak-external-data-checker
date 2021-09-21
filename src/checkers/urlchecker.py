@@ -100,12 +100,11 @@ class URLChecker(Checker):
 
         try:
             if url.endswith(".AppImage"):
-                with tempfile.TemporaryFile("w+b") as tmpfile:
+                with tempfile.NamedTemporaryFile("w+b") as tmpfile:
                     new_version = await utils.get_extra_data_info_from_url(
                         url, session=self.session, dest_io=tmpfile
                     )
-                    version_string = utils.extract_appimage_version(
-                        external_data.filename,
+                    version_string = await utils.extract_appimage_version(
                         tmpfile,
                     )
             else:
