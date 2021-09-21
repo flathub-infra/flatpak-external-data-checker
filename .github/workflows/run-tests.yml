@@ -123,12 +123,9 @@ jobs:
 
       - name: Push image to registry
         if: github.event_name != 'pull_request'
-        run: |
-          docker image tag \
-            ${{ env.DOCKER_IMAGE }}:build \
-            ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${GITHUB_SHA::7}
-          docker image tag \
-            ${{ env.DOCKER_IMAGE }}:build \
-            ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:latest
-          docker image push --all-tags \
-            ${DOCKER_REGISTRY}/${DOCKER_IMAGE}
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile
+          tags: ${{ env.DOCKER_IMAGE }}:latest
+          push: true
