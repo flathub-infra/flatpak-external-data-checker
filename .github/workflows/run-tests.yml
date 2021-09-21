@@ -127,5 +127,5 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          tags: ${{ env.DOCKER_IMAGE }}:latest
+          tags: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:latest
           push: true
