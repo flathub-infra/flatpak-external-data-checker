@@ -48,7 +48,8 @@ class GNOMEChecker(Checker):
 
         proj_url = GNOME_MIRROR / "sources" / project_name
         async with self.session.get(proj_url / "cache.json") as cache_resp:
-            cache_json = await cache_resp.json()
+            # Some mirrors may sand invalid content-type; don't reuire it to be application/json
+            cache_json = await cache_resp.json(content_type=None)
         _, downloads, versions, _ = cache_json
 
         filtered_versions = versions[project_name]
