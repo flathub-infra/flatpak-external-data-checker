@@ -102,6 +102,7 @@ async def get_extra_data_info_from_url(
         trace_configs=session.trace_configs,
         timeout=session.timeout,
         headers=session.headers,
+        skip_auto_headers=[aiohttp.hdrs.ACCEPT_ENCODING],
         raise_for_status=True,
         auto_decompress=False,
     ) as new_session:
