@@ -25,7 +25,12 @@ from string import Template
 from distutils.version import LooseVersion
 import typing as t
 
-from ..lib import utils, NETWORK_ERRORS
+from ..lib import (
+    utils,
+    NETWORK_ERRORS,
+    WRONG_CONTENT_TYPES_FILE,
+    WRONG_CONTENT_TYPES_ARCHIVE,
+)
 from ..lib.externaldata import ExternalData, Checker
 from ..lib.errors import CheckerMetadataError, CheckerQueryError, CheckerFetchError
 
@@ -156,14 +161,22 @@ class HTMLChecker(Checker):
         assert latest_version is not None
         assert latest_url is not None
 
+        if external_data.type == ExternalData.Type.ARCHIVE:
+            wrong_content_types = WRONG_CONTENT_TYPES_ARCHIVE
+        else:
+            wrong_content_types = WRONG_CONTENT_TYPES_FILE
+
         try:
             new_version = await utils.get_extra_data_info_from_url(
-                latest_url, follow_redirects=follow_redirects, session=self.session
+                url=latest_url,
+                follow_redirects=follow_redirects,
+                session=self.session,
+                content_type_deny=wrong_content_types,
             )
         except NETWORK_ERRORS as err:
             raise CheckerFetchError from err
-        else:
-            new_version = new_version._replace(  # pylint: disable=no-member
-                version=latest_version
-            )
-            external_data.set_new_version(new_version)
+
+        new_version = new_version._replace(
+            version=latest_version  # pylint: disable=no-member
+        )
+        external_data.set_new_version(new_version)

@@ -1,3 +1,4 @@
+import re
 import operator
 
 import aiohttp
@@ -22,6 +23,14 @@ NETWORK_ERRORS = (
     aiohttp.ServerDisconnectedError,
     aiohttp.ServerTimeoutError,
 )
+
+WRONG_CONTENT_TYPES_FILE = [
+    re.compile(r"^text/html$"),
+    re.compile(r"^application/xhtml(\+.+)?$"),
+]
+WRONG_CONTENT_TYPES_ARCHIVE = [
+    re.compile(r"^text/.*$"),
+] + WRONG_CONTENT_TYPES_FILE
 
 OPERATORS = {
     "<": operator.lt,

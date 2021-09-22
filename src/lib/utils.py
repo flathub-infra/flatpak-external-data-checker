@@ -41,7 +41,7 @@ from elftools.elf.elffile import ELFFile
 import aiohttp
 
 from . import externaldata, TIMEOUT_CONNECT, HTTP_CHUNK_SIZE, OPERATORS
-from .errors import CheckerRemoteError, CheckerQueryError
+from .errors import CheckerRemoteError, CheckerQueryError, CheckerFetchError
 
 import gi
 
@@ -93,6 +93,7 @@ async def get_extra_data_info_from_url(
     session: aiohttp.ClientSession,
     follow_redirects: bool = True,
     dest_io: t.Optional[t.IO] = None,
+    content_type_deny: t.Optional[t.Iterable[re.Pattern]] = None,
 ):
     async with aiohttp.ClientSession(
         connector=session.connector,
@@ -107,6 +108,17 @@ async def get_extra_data_info_from_url(
         async with new_session.get(url) as response:
             real_url = str(response.url)
             info = response.headers
+
+            content_type = info.get(aiohttp.hdrs.CONTENT_TYPE)
+            if (
+                content_type is not None
+                and content_type_deny is not None
+                and any(r.match(content_type) for r in content_type_deny)
+            ):
+                raise CheckerFetchError(
+                    f"Wrong content type '{content_type}' received from '{url}'"
+                )
+
             checksum = hashlib.sha256()
             size = 0
             async for chunk in response.content.iter_chunked(HTTP_CHUNK_SIZE):
