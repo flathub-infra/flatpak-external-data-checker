@@ -21,6 +21,12 @@
                     "url": "nowhere"
                 },
                 {
+                    "type": "extra-data",
+                    "filename": "invalid-checker-data",
+                    "url": "nowhere",
+                    "x-checker-data": [{}]
+                },
+                {
                     "type": "file",
                     "dest-filename": "ignoreme.txt",
                     "url": "https://httpbingo.org/status/200",
