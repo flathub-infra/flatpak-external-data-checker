@@ -26,6 +26,14 @@ class ManifestUpdateError(ManifestError):
     """Error updating flatpak-builder manifest"""
 
 
+class SourceLoadError(ManifestLoadError):
+    """Error loading flatpak-builder source item"""
+
+
+class SourceUnsupported(SourceLoadError):
+    """Don't know how to handle flatpak-builder source item"""
+
+
 class AppdataError(ManifestError):
     """Error processing metainfo.xml"""
 
