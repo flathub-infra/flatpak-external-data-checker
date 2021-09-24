@@ -45,6 +45,8 @@ from .lib.errors import (
     AppdataNotFound,
     AppdataLoadError,
     ManifestLoadError,
+    SourceLoadError,
+    SourceUnsupported,
 )
 
 import logging
@@ -238,8 +240,14 @@ class ManifestChecker:
         manifest_datas = self._external_data.setdefault(source_path, [])
         if any(d.source is source for d in manifest_datas):
             return
-        data = ExternalData.from_source(source_path, source)
-        if data:
+        try:
+            data = ExternalData.from_source(source_path, source)
+        except SourceUnsupported as err:
+            log.debug(err)
+        except SourceLoadError as err:
+            self._errors.append(err)
+            log.error(err)
+        else:
             manifest_datas.append(data)
 
     async def _check_data(
