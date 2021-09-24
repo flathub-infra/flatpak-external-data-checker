@@ -31,8 +31,25 @@ import aiohttp
 import jsonschema
 
 from . import utils
-from .errors import CheckerMetadataError, CheckerFetchError
+from .errors import (
+    CheckerMetadataError,
+    CheckerFetchError,
+    SourceLoadError,
+    SourceUnsupported,
+)
 
+CHECKER_DATA_SCHEMA_COMMON = {
+    "type": "object",
+    "properties": {
+        "type": {"type": "string"},
+        "is-main-source": {"type": "boolean"},
+        "arches": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+    },
+    "required": ["type"],
+}
 
 log = logging.getLogger(__name__)
 
@@ -41,6 +58,15 @@ class ExternalBase(abc.ABC):
     """
     Abstract base for remote data sources, such as file or VCS repo
     """
+
+    SOURCE_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "type": {"type": "string"},
+            "x-checker-data": CHECKER_DATA_SCHEMA_COMMON,
+        },
+        "required": ["type"],
+    }
 
     class Type(Enum):
         EXTRA_DATA = "extra-data"
@@ -66,14 +92,19 @@ class ExternalBase(abc.ABC):
     checker_data: t.Mapping
 
     @classmethod
-    def from_source(cls, source_path: str, source: t.Dict) -> t.Optional[ExternalBase]:
+    def from_source(cls, source_path: str, source: t.Dict) -> ExternalBase:
+        try:
+            jsonschema.validate(source, cls.SOURCE_SCHEMA)
+        except jsonschema.ValidationError as err:
+            raise SourceLoadError("Error reading source") from err
+
         if not source.get("url"):
-            return None
+            raise SourceUnsupported('Data is not external: no "url" property')
 
         try:
-            data_type = cls.Type(source.get("type"))
-        except ValueError:
-            return None
+            data_type = cls.Type(source["type"])
+        except ValueError as err:
+            raise SourceUnsupported("Can't handle source") from err
 
         data_cls: t.Type[ExternalBase]
         if data_type == cls.Type.GIT:
