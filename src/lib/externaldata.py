@@ -98,13 +98,13 @@ class ExternalBase(abc.ABC):
         except jsonschema.ValidationError as err:
             raise SourceLoadError("Error reading source") from err
 
-        if not source.get("url"):
-            raise SourceUnsupported('Data is not external: no "url" property')
-
         try:
             data_type = cls.Type(source["type"])
         except ValueError as err:
             raise SourceUnsupported("Can't handle source") from err
+
+        if not source.get("url"):
+            raise SourceUnsupported('Data is not external: no "url" property')
 
         data_cls: t.Type[ExternalBase]
         if data_type == cls.Type.GIT:
