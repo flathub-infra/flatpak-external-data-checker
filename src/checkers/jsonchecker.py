@@ -3,6 +3,9 @@ import re
 from datetime import datetime
 import typing as t
 import subprocess
+import os
+
+from yarl import URL
 
 from ..lib import utils, NETWORK_ERRORS
 from ..lib.externaldata import (
@@ -68,10 +71,18 @@ class JSONChecker(HTMLChecker):
     }
     SUPPORTED_DATA_CLASSES = [ExternalData, ExternalGitRepo]
 
-    async def _get_json(self, url: str) -> bytes:
+    async def _get_json(self, url: t.Union[str, URL]) -> bytes:
         log.debug("Get JSON from %s", url)
+        url = URL(url)
+
+        headers = {}
+        if url.host == "api.github.com":
+            github_token = os.environ.get("GITHUB_TOKEN")
+            if github_token:
+                headers["Authorization"] = f"token {github_token}"
+
         try:
-            async with self.session.get(url) as response:
+            async with self.session.get(url, headers=headers) as response:
                 return await response.read()
         except NETWORK_ERRORS as err:
             raise CheckerQueryError from err
