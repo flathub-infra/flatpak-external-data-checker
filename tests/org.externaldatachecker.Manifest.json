@@ -22,6 +22,15 @@
                 },
                 {
                     "type": "extra-data",
+                    "url": "file:///etc/passwd",
+                    "sha256": "000000000000000000000000000000000000000000000000000000000000000000"
+                },
+                {
+                    "type": "file",
+                    "url": "data:nothing"
+                },
+                {
+                    "type": "extra-data",
                     "filename": "invalid-checker-data",
                     "url": "nowhere",
                     "x-checker-data": [{}]

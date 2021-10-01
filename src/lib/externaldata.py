@@ -28,6 +28,7 @@ import os
 import logging
 
 import aiohttp
+from yarl import URL
 import jsonschema
 
 from . import utils
@@ -198,11 +199,15 @@ class ExternalData(ExternalBase):
     @classmethod
     def from_source_impl(cls, source_path: str, source: t.Dict) -> ExternalData:
         data_type = cls.Type(source["type"])
-        url = source["url"]
+        url = URL(source["url"])
+
+        if url.scheme not in ["http", "https"]:
+            raise SourceUnsupported(f"Unsupported URL scheme {url.scheme}")
+
         name = (
             source.get("filename")
             or source.get("dest-filename")
-            or os.path.basename(url)
+            or os.path.basename(url.path)
         )
 
         sha256sum = source.get("sha256")
@@ -214,7 +219,7 @@ class ExternalData(ExternalBase):
             data_type,
             source_path,
             name,
-            url,
+            str(url),
             sha256sum,
             size,
             arches,
