@@ -92,10 +92,6 @@ class URLChecker(Checker):
         else:
             url = external_data.current_version.url
 
-        if url.startswith("data:"):
-            log.debug("Skipping data URL")
-            return
-
         version_string = None
 
         try:
