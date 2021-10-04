@@ -199,7 +199,8 @@ class ExternalData(ExternalBase):
     @classmethod
     def from_source_impl(cls, source_path: str, source: t.Dict) -> ExternalData:
         data_type = cls.Type(source["type"])
-        url = URL(source["url"])
+        url_str = source["url"]
+        url = URL(url_str)
 
         if url.scheme not in ["http", "https"]:
             raise SourceUnsupported(f"Unsupported URL scheme {url.scheme}")
@@ -219,7 +220,7 @@ class ExternalData(ExternalBase):
             data_type,
             source_path,
             name,
-            str(url),
+            url_str,
             sha256sum,
             size,
             arches,
