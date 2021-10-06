@@ -17,7 +17,7 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = await checker.check()
 
-        self.assertEqual(len(ext_data), 4)
+        self.assertEqual(len(ext_data), 5)
         for data in ext_data:
             if data.filename == "ghostscript-9.26.tar.xz":
                 self.assertIsNotNone(data.new_version)
@@ -92,6 +92,8 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertNotEqual(
                     data.new_version.commit, data.current_version.commit
                 )
+            elif data.filename == "gr-iqbal.git":
+                self.assertIsNone(data.new_version)
             else:
                 self.fail(f"Unknown data {data.filename}")
 
