@@ -10,6 +10,7 @@ from ..lib.externaldata import (
     ExternalGitRef,
 )
 from ..lib.utils import filter_versions
+from ..lib.errors import CheckerQueryError
 from .htmlchecker import HTMLChecker
 
 log = logging.getLogger(__name__)
@@ -55,7 +56,10 @@ class AnityaChecker(HTMLChecker):
                 versions = result["versions"]
             if constraints:
                 versions = filter_versions(versions, constraints, sort=False)
-            latest_version = versions[0]
+            try:
+                latest_version = versions[0]
+            except IndexError as err:
+                raise CheckerQueryError("Can't find matching version") from err
         else:
             latest_version = result["latest_version"]
 

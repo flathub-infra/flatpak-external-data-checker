@@ -44,3 +44,20 @@ modules:
           type: anitya
           project-id: 1157
           url-template: https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs$version0$version1$version2/ghostscript-$version.tar.xz
+
+  - name: gnuradio-iqbal
+    buildsystem: cmake
+    sources:
+      - type: git
+        url: https://github.com/osmocom/gr-iqbal.git
+        tag: v0.38.2
+        commit: fbee239a6fb36dd2fb564f6e6a0d393c4bc844db
+        x-checker-data:
+          type: anitya
+          project-id: 14456
+          stable-only: true
+          # Version filter that can't match any verion
+          versions:
+            '>': '0.38.2'
+            '<': '0.38.1'
+          tag-template: v$version
