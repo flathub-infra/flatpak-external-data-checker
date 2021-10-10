@@ -32,7 +32,6 @@ from .lib import HTTP_CLIENT_HEADERS, TIMEOUT_CONNECT, TIMEOUT_TOTAL
 from .lib.appdata import add_release_to_file
 from .lib.externaldata import (
     ExternalBase,
-    ExternalData,
     ExternalGitRepo,
     ExternalFile,
     ExternalGitRef,
@@ -131,7 +130,7 @@ class ManifestChecker:
         self._root_manifest = self._read_manifest(self._root_manifest_path)
         self._load_root_manifest()
 
-        # Map from manifest path to [ExternalData]
+        # Map from manifest path to [ExternalBase]
         self._collect_external_data()
 
     def _load_root_manifest(self):
@@ -241,7 +240,7 @@ class ManifestChecker:
         if any(d.source is source for d in manifest_datas):
             return
         try:
-            data = ExternalData.from_source(source_path, source)
+            data = ExternalBase.from_source(source_path, source)
         except SourceUnsupported as err:
             log.debug(err)
         except SourceLoadError as err:
@@ -254,7 +253,7 @@ class ManifestChecker:
         self,
         counter: TasksCounter,
         http_session: aiohttp.ClientSession,
-        data: t.Union[ExternalData, ExternalGitRepo],
+        data: ExternalBase,
     ):
         src_rel_path = os.path.relpath(data.source_path, self._root_manifest_dir)
         counter.started += 1
@@ -298,7 +297,7 @@ class ManifestChecker:
                 # but applying checkers in sequence should be carefully tested.
                 # This is a safety switch: leave the data alone on error.
                 return data
-            if data.state != ExternalData.State.UNKNOWN:
+            if data.state != ExternalBase.State.UNKNOWN:
                 log.debug(
                     "Source %s: got new state %s from %s, skipping remaining checkers",
                     data,
@@ -341,7 +340,7 @@ class ManifestChecker:
         ) as http_session:
             check_tasks = []
             for data in external_data:
-                if data.state != ExternalData.State.UNKNOWN:
+                if data.state != ExternalBase.State.UNKNOWN:
                     continue
                 check_tasks.append(self._check_data(counter, http_session, data))
 
@@ -379,7 +378,7 @@ class ManifestChecker:
         return [
             data
             for data in self.get_external_data()
-            if data.state == ExternalData.State.BROKEN or data.new_version
+            if data.state == ExternalBase.State.BROKEN or data.new_version
         ]
 
     def _update_manifest(self, path, datas, changes):
