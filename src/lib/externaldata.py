@@ -90,6 +90,7 @@ class ExternalBase(abc.ABC):
     current_version: t.Union[ExternalFile, ExternalGitRef]
     new_version: t.Optional[t.Union[ExternalFile, ExternalGitRef]]
     source: t.Mapping
+    source_path: str
     checker_data: t.Mapping
 
     @classmethod
@@ -178,7 +179,6 @@ class ExternalData(ExternalBase):
     def __init__(
         self,
         data_type: ExternalBase.Type,
-        source_path: str,
         filename: str,
         url: str,
         checksum: str = None,
@@ -186,7 +186,6 @@ class ExternalData(ExternalBase):
         arches=[],
         checker_data: dict = None,
     ):
-        self.source_path = source_path
         self.filename = filename
         self.arches = arches
         self.type = data_type
@@ -221,7 +220,6 @@ class ExternalData(ExternalBase):
 
         obj = cls(
             data_type,
-            source_path,
             name,
             url_str,
             sha256sum,
@@ -230,6 +228,7 @@ class ExternalData(ExternalBase):
             checker_data,
         )
         obj.source = source
+        obj.source_path = source_path
         return obj
 
     def update(self):
@@ -324,7 +323,6 @@ class ExternalGitRef(t.NamedTuple):
 class ExternalGitRepo(ExternalBase):
     def __init__(
         self,
-        source_path: str,
         repo_name: str,
         url: str,
         commit: str = None,
@@ -333,7 +331,6 @@ class ExternalGitRepo(ExternalBase):
         arches=[],
         checker_data=None,
     ):
-        self.source_path = source_path
         self.filename = repo_name
         self.arches = arches
         self.type = self.Type.GIT
@@ -357,7 +354,6 @@ class ExternalGitRepo(ExternalBase):
         arches = checker_data.get("arches") or source.get("only-arches") or ["x86_64"]
 
         obj = cls(
-            source_path,
             repo_name,
             url,
             commit,
@@ -367,6 +363,7 @@ class ExternalGitRepo(ExternalBase):
             checker_data,
         )
         obj.source = source
+        obj.source_path = source_path
         return obj
 
     def update(self):
