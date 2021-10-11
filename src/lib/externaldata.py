@@ -90,6 +90,7 @@ class ExternalBase(abc.ABC):
     current_version: t.Union[ExternalFile, ExternalGitRef]
     new_version: t.Optional[t.Union[ExternalFile, ExternalGitRef]]
     source: t.Mapping
+    source_path: str
     checker_data: t.Mapping
 
     @classmethod
@@ -107,11 +108,7 @@ class ExternalBase(abc.ABC):
         if not source.get("url"):
             raise SourceUnsupported('Data is not external: no "url" property')
 
-        data_cls: t.Type[ExternalBase]
-        if data_type == cls.Type.GIT:
-            data_cls = ExternalGitRepo
-        else:
-            data_cls = ExternalData
+        data_cls = cls.data_classes()[data_type]
 
         return data_cls.from_source_impl(source_path, source)
 
@@ -143,6 +140,15 @@ class ExternalBase(abc.ABC):
                 self.state = self.State.BROKEN
             self.new_version = new_version
 
+    @classmethod
+    def data_classes(cls) -> t.Dict[Type, t.Type[ExternalBase]]:
+        classes = {}
+        if hasattr(cls, "type"):
+            classes[cls.type] = cls
+        for subclass in cls.__subclasses__():
+            classes.update(subclass.data_classes())
+        return classes
+
     def update(self):
         """If self.new_version is not None, writes back the necessary changes to the
         original element from the manifest."""
@@ -150,6 +156,9 @@ class ExternalBase(abc.ABC):
 
     def __str__(self):
         return f"{self.type.value} {self.filename}"
+
+    def __repr__(self):
+        return f"<{type(self).__name__} {self}>"
 
 
 class ExternalFile(t.NamedTuple):
@@ -174,8 +183,6 @@ class ExternalFile(t.NamedTuple):
 class ExternalData(ExternalBase):
     def __init__(
         self,
-        data_type: ExternalBase.Type,
-        source_path: str,
         filename: str,
         url: str,
         checksum: str = None,
@@ -183,11 +190,8 @@ class ExternalData(ExternalBase):
         arches=[],
         checker_data: dict = None,
     ):
-        self.source_path = source_path
         self.filename = filename
         self.arches = arches
-        self.type = data_type
-        assert data_type != self.Type.GIT
         self.checker_data = checker_data or {}
         assert size is None or isinstance(size, int)
         self.current_version: ExternalFile
@@ -199,6 +203,7 @@ class ExternalData(ExternalBase):
     @classmethod
     def from_source_impl(cls, source_path: str, source: t.Dict) -> ExternalData:
         data_type = cls.Type(source["type"])
+        assert data_type == cls.type, data_type
         url_str = source["url"]
         url = URL(url_str)
 
@@ -217,8 +222,6 @@ class ExternalData(ExternalBase):
         arches = checker_data.get("arches") or source.get("only-arches") or ["x86_64"]
 
         obj = cls(
-            data_type,
-            source_path,
             name,
             url_str,
             sha256sum,
@@ -227,6 +230,7 @@ class ExternalData(ExternalBase):
             checker_data,
         )
         obj.source = source
+        obj.source_path = source_path
         return obj
 
     def update(self):
@@ -244,6 +248,18 @@ class ExternalData(ExternalBase):
                     self.source_path,
                 )
                 self.source.pop("size", None)
+
+
+class FileSource(ExternalData):
+    type = ExternalBase.Type.FILE
+
+
+class ArchiveSource(ExternalData):
+    type = ExternalBase.Type.ARCHIVE
+
+
+class ExtraDataSource(ExternalData):
+    type = ExternalBase.Type.EXTRA_DATA
 
 
 class ExternalGitRef(t.NamedTuple):
@@ -319,9 +335,10 @@ class ExternalGitRef(t.NamedTuple):
 
 
 class ExternalGitRepo(ExternalBase):
+    type = ExternalBase.Type.GIT
+
     def __init__(
         self,
-        source_path: str,
         repo_name: str,
         url: str,
         commit: str = None,
@@ -330,10 +347,8 @@ class ExternalGitRepo(ExternalBase):
         arches=[],
         checker_data=None,
     ):
-        self.source_path = source_path
         self.filename = repo_name
         self.arches = arches
-        self.type = self.Type.GIT
         self.checker_data = checker_data or {}
         self.current_version: ExternalGitRef
         self.current_version = ExternalGitRef(url, commit, tag, branch, None, None)
@@ -344,7 +359,7 @@ class ExternalGitRepo(ExternalBase):
     @classmethod
     def from_source_impl(cls, source_path, source) -> ExternalGitRepo:
         data_type = cls.Type(source["type"])
-        assert data_type == cls.Type.GIT, data_type
+        assert data_type == cls.type, data_type
         url = source["url"]
         repo_name = os.path.basename(url)
         commit = source.get("commit")
@@ -354,7 +369,6 @@ class ExternalGitRepo(ExternalBase):
         arches = checker_data.get("arches") or source.get("only-arches") or ["x86_64"]
 
         obj = cls(
-            source_path,
             repo_name,
             url,
             commit,
@@ -364,6 +378,7 @@ class ExternalGitRepo(ExternalBase):
             checker_data,
         )
         obj.source = source
+        obj.source_path = source_path
         return obj
 
     def update(self):
