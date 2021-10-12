@@ -112,9 +112,6 @@ class BuilderSource(abc.ABC):
         except ValueError as err:
             raise SourceUnsupported("Can't handle source") from err
 
-        if not source.get("url"):
-            raise SourceUnsupported('Data is not external: no "url" property')
-
         data_cls = cls.data_classes()[data_type]
 
         return data_cls.from_source_impl(source_path, source)
@@ -131,6 +128,14 @@ class ExternalBase(BuilderSource):
 
     current_version: t.Union[ExternalFile, ExternalGitRef]
     new_version: t.Optional[t.Union[ExternalFile, ExternalGitRef]]
+
+    @classmethod
+    def from_source(cls: t.Type[_BS], source_path: str, source: t.Dict) -> _BS:
+        if not source.get("url"):
+            raise SourceUnsupported('Data is not external: no "url" property')
+
+        # FIXME: https://github.com/python/mypy/issues/9282
+        return super().from_source(source_path, source)  # type: ignore
 
     def set_new_version(
         self, new_version: t.Union[ExternalFile, ExternalGitRef], is_update=None
