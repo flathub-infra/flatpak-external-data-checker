@@ -129,11 +129,11 @@ async def get_extra_data_info_from_url(
                     dest_io.write(chunk)
 
     external_file = externaldata.ExternalFile(
-        strip_query(real_url if follow_redirects else url),
-        checksum.hexdigest(),
-        size,
-        None,
-        _extract_timestamp(info),
+        url=strip_query(real_url if follow_redirects else url),
+        checksum=checksum.hexdigest(),
+        size=size,
+        version=None,
+        timestamp=_extract_timestamp(info),
     )
 
     return external_file
