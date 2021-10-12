@@ -39,7 +39,7 @@ from .errors import (
     SourceUnsupported,
 )
 
-_BS = t.TypeVar("_BS", bound="ExternalBase")
+_BS = t.TypeVar("_BS", bound="BuilderSource")
 
 CHECKER_DATA_SCHEMA_COMMON = {
     "type": "object",
@@ -57,10 +57,8 @@ CHECKER_DATA_SCHEMA_COMMON = {
 log = logging.getLogger(__name__)
 
 
-class ExternalBase(abc.ABC):
-    """
-    Abstract base for remote data sources, such as file or VCS repo
-    """
+class BuilderSource(abc.ABC):
+    """flatpak-builder source item"""
 
     SOURCE_SCHEMA = {
         "type": "object",
@@ -89,11 +87,18 @@ class ExternalBase(abc.ABC):
     type: Type
     filename: str
     arches: t.List[str]
-    current_version: t.Union[ExternalFile, ExternalGitRef]
-    new_version: t.Optional[t.Union[ExternalFile, ExternalGitRef]]
     source: t.Mapping
     source_path: str
     checker_data: t.Mapping
+
+    @classmethod
+    def data_classes(cls: t.Type[_BS]) -> t.Dict[Type, t.Type[_BS]]:
+        classes = {}
+        if hasattr(cls, "type"):
+            classes[cls.type] = cls
+        for subclass in cls.__subclasses__():
+            classes.update(subclass.data_classes())
+        return classes
 
     @classmethod
     def from_source(cls: t.Type[_BS], source_path: str, source: t.Dict) -> _BS:
@@ -118,6 +123,15 @@ class ExternalBase(abc.ABC):
     def from_source_impl(cls: t.Type[_BS], source_path: str, source: t.Dict) -> _BS:
         raise NotImplementedError
 
+
+class ExternalBase(BuilderSource):
+    """
+    Abstract base for remote data sources, such as file or VCS repo
+    """
+
+    current_version: t.Union[ExternalFile, ExternalGitRef]
+    new_version: t.Optional[t.Union[ExternalFile, ExternalGitRef]]
+
     def set_new_version(
         self, new_version: t.Union[ExternalFile, ExternalGitRef], is_update=None
     ):
@@ -141,15 +155,6 @@ class ExternalBase(abc.ABC):
                 log.warning("Source %s: remote data changed", self.filename)
                 self.state = self.State.BROKEN
             self.new_version = new_version
-
-    @classmethod
-    def data_classes(cls: t.Type[_BS]) -> t.Dict[Type, t.Type[_BS]]:
-        classes = {}
-        if hasattr(cls, "type"):
-            classes[cls.type] = cls
-        for subclass in cls.__subclasses__():
-            classes.update(subclass.data_classes())
-        return classes
 
     def update(self):
         """If self.new_version is not None, writes back the necessary changes to the
