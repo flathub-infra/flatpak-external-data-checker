@@ -23,7 +23,7 @@ import abc
 from enum import Enum
 import datetime
 import typing as t
-
+import dataclasses
 import os
 import logging
 
@@ -40,6 +40,7 @@ from .errors import (
 )
 
 _BS = t.TypeVar("_BS", bound="BuilderSource")
+_ES = t.TypeVar("_ES", bound="ExternalState")
 
 CHECKER_DATA_SCHEMA_COMMON = {
     "type": "object",
@@ -121,13 +122,32 @@ class BuilderSource(abc.ABC):
         raise NotImplementedError
 
 
+@dataclasses.dataclass(frozen=True)
+class ExternalState(abc.ABC):
+    url: str
+    version: t.Optional[str]
+    timestamp: t.Optional[datetime.datetime]
+
+    def _replace(self: _ES, **kwargs) -> _ES:
+        return dataclasses.replace(self, **kwargs)
+
+    def _asdict(self) -> t.Dict[str, t.Any]:
+        return dataclasses.asdict(self)
+
+    def matches(self: _ES, other: _ES) -> bool:
+        raise NotImplementedError
+
+    def is_same_version(self: _ES, other: _ES) -> bool:
+        raise NotImplementedError
+
+
 class ExternalBase(BuilderSource):
     """
     Abstract base for remote data sources, such as file or VCS repo
     """
 
-    current_version: t.Union[ExternalFile, ExternalGitRef]
-    new_version: t.Optional[t.Union[ExternalFile, ExternalGitRef]]
+    current_version: ExternalState
+    new_version: t.Optional[ExternalState]
 
     @classmethod
     def from_source(cls: t.Type[_BS], source_path: str, source: t.Dict) -> _BS:
@@ -137,15 +157,13 @@ class ExternalBase(BuilderSource):
         # FIXME: https://github.com/python/mypy/issues/9282
         return super().from_source(source_path, source)  # type: ignore
 
-    def set_new_version(
-        self, new_version: t.Union[ExternalFile, ExternalGitRef], is_update=None
-    ):
+    def set_new_version(self, new_version: ExternalState, is_update=None):
         assert isinstance(new_version, type(self.current_version))
 
         if is_update is None:
-            is_update = not self.current_version.is_same_version(new_version)  # type: ignore
+            is_update = not self.current_version.is_same_version(new_version)
 
-        if self.current_version.matches(new_version):  # type: ignore
+        if self.current_version.matches(new_version):
             if is_update:
                 log.debug("Source %s: no update found", self.filename)
             else:
@@ -173,12 +191,10 @@ class ExternalBase(BuilderSource):
         return f"<{type(self).__name__} {self}>"
 
 
-class ExternalFile(t.NamedTuple):
-    url: str
+@dataclasses.dataclass(frozen=True)
+class ExternalFile(ExternalState):
     checksum: t.Optional[str]
     size: t.Optional[int]
-    version: t.Optional[str]
-    timestamp: t.Optional[datetime.datetime]
 
     def matches(self, other: ExternalFile):
         return (
@@ -280,13 +296,11 @@ class ExtraDataSource(ExternalData):
     type = ExternalBase.Type.EXTRA_DATA
 
 
-class ExternalGitRef(t.NamedTuple):
-    url: str
+@dataclasses.dataclass(frozen=True)
+class ExternalGitRef(ExternalState):
     commit: t.Optional[str]
     tag: t.Optional[str]
     branch: t.Optional[str]
-    version: t.Optional[str]
-    timestamp: t.Optional[datetime.datetime]
 
     def _get_tagged_commit(self, refs: t.Dict[str, str], tag: str) -> str:
         annotated_tag_commit = refs.get(f"refs/tags/{tag}")
