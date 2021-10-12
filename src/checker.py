@@ -32,7 +32,6 @@ from .lib import HTTP_CLIENT_HEADERS, TIMEOUT_CONNECT, TIMEOUT_TOTAL
 from .lib.appdata import add_release_to_file
 from .lib.externaldata import (
     ExternalBase,
-    ExternalGitRepo,
     ExternalFile,
     ExternalGitRef,
     Checker,
