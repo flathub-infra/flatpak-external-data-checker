@@ -61,11 +61,11 @@ class SnapcraftChecker(Checker):
 
             if sha256:
                 new_version = ExternalFile(
-                    data["download"]["url"],
-                    sha256,
-                    data["download"]["size"],
-                    data["version"],
-                    datetime.datetime.strptime(
+                    url=data["download"]["url"],
+                    checksum=sha256,
+                    size=data["download"]["size"],
+                    version=data["version"],
+                    timestamp=datetime.datetime.strptime(
                         data["channel"]["released-at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                     ),
                 )
