@@ -141,12 +141,12 @@ class JSONChecker(HTMLChecker):
             self._read_q_seq(checker_data, ["tag", "commit", "version", "timestamp"]),
         )
         new_version = ExternalGitRef(
-            external_data.current_version.url,
-            results.get("commit"),
-            results["tag"],
-            None,
-            results.get("version"),
-            parse_timestamp(results.get("timestamp")),
+            url=external_data.current_version.url,
+            commit=results.get("commit"),
+            tag=results["tag"],
+            branch=None,
+            version=results.get("version"),
+            timestamp=parse_timestamp(results.get("timestamp")),
         )
 
         if new_version.commit is None:
