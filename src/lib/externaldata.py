@@ -209,6 +209,9 @@ class ExternalFile(ExternalState):
 
 
 class ExternalData(ExternalBase):
+    current_version: ExternalFile
+    new_version: t.Optional[ExternalFile]
+
     def __init__(
         self,
         filename: str,
@@ -222,7 +225,6 @@ class ExternalData(ExternalBase):
         self.arches = arches
         self.checker_data = checker_data or {}
         assert size is None or isinstance(size, int)
-        self.current_version: ExternalFile
         self.current_version = ExternalFile(
             url=url,
             checksum=checksum,
@@ -230,7 +232,6 @@ class ExternalData(ExternalBase):
             version=None,
             timestamp=None,
         )
-        self.new_version: t.Optional[ExternalFile]
         self.new_version = None
         self.state = ExternalData.State.UNKNOWN
 
@@ -369,6 +370,9 @@ class ExternalGitRef(ExternalState):
 class ExternalGitRepo(ExternalBase):
     type = ExternalBase.Type.GIT
 
+    current_version: ExternalGitRef
+    new_version: t.Optional[ExternalGitRef]
+
     def __init__(
         self,
         repo_name: str,
@@ -382,7 +386,6 @@ class ExternalGitRepo(ExternalBase):
         self.filename = repo_name
         self.arches = arches
         self.checker_data = checker_data or {}
-        self.current_version: ExternalGitRef
         self.current_version = ExternalGitRef(
             url=url,
             commit=commit,
@@ -391,7 +394,6 @@ class ExternalGitRepo(ExternalBase):
             version=None,
             timestamp=None,
         )
-        self.new_version: t.Optional[ExternalGitRef]
         self.new_version = None
         self.state = ExternalGitRepo.State.UNKNOWN
 
