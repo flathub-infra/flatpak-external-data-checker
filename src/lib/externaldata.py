@@ -195,7 +195,13 @@ class ExternalData(ExternalBase):
         self.checker_data = checker_data or {}
         assert size is None or isinstance(size, int)
         self.current_version: ExternalFile
-        self.current_version = ExternalFile(url, checksum, size, None, None)
+        self.current_version = ExternalFile(
+            url=url,
+            checksum=checksum,
+            size=size,
+            version=None,
+            timestamp=None,
+        )
         self.new_version: t.Optional[ExternalFile]
         self.new_version = None
         self.state = ExternalData.State.UNKNOWN
@@ -351,7 +357,14 @@ class ExternalGitRepo(ExternalBase):
         self.arches = arches
         self.checker_data = checker_data or {}
         self.current_version: ExternalGitRef
-        self.current_version = ExternalGitRef(url, commit, tag, branch, None, None)
+        self.current_version = ExternalGitRef(
+            url=url,
+            commit=commit,
+            tag=tag,
+            branch=branch,
+            version=None,
+            timestamp=None,
+        )
         self.new_version: t.Optional[ExternalGitRef]
         self.new_version = None
         self.state = ExternalGitRepo.State.UNKNOWN
