@@ -130,10 +130,11 @@ class DebianRepoChecker(Checker):
                 src_url = urllib.parse.urljoin(root.rstrip("/") + "/", source_file.path)
 
                 new_version = ExternalFile(
-                    src_url,
-                    str(source_file.hashes.find("sha256")).split(":")[1],
-                    source_file.size,
-                    re.sub(r"^\d+:", "", source_version),  # Strip epoch if present
+                    url=src_url,
+                    checksum=str(source_file.hashes.find("sha256")).split(":")[1],
+                    size=source_file.size,
+                    # Strip epoch if present
+                    version=re.sub(r"^\d+:", "", source_version),
                     timestamp=await get_timestamp_from_url(src_url, self.session),
                 )
             else:
@@ -143,10 +144,10 @@ class DebianRepoChecker(Checker):
                 assert candidate.uri is not None
 
                 new_version = ExternalFile(
-                    candidate.uri,
-                    candidate.sha256,
-                    candidate.size,
-                    candidate.version,
+                    url=candidate.uri,
+                    checksum=candidate.sha256,
+                    size=candidate.size,
+                    version=candidate.version,
                     timestamp=await self._get_timestamp_for_candidate(candidate),
                 )
 
