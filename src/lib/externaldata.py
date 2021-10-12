@@ -39,6 +39,8 @@ from .errors import (
     SourceUnsupported,
 )
 
+_BS = t.TypeVar("_BS", bound="ExternalBase")
+
 CHECKER_DATA_SCHEMA_COMMON = {
     "type": "object",
     "properties": {
@@ -94,7 +96,7 @@ class ExternalBase(abc.ABC):
     checker_data: t.Mapping
 
     @classmethod
-    def from_source(cls, source_path: str, source: t.Dict) -> ExternalBase:
+    def from_source(cls: t.Type[_BS], source_path: str, source: t.Dict) -> _BS:
         try:
             jsonschema.validate(source, cls.SOURCE_SCHEMA)
         except jsonschema.ValidationError as err:
@@ -113,7 +115,7 @@ class ExternalBase(abc.ABC):
         return data_cls.from_source_impl(source_path, source)
 
     @classmethod
-    def from_source_impl(cls, source_path: str, source: t.Dict) -> ExternalBase:
+    def from_source_impl(cls: t.Type[_BS], source_path: str, source: t.Dict) -> _BS:
         raise NotImplementedError
 
     def set_new_version(
@@ -141,7 +143,7 @@ class ExternalBase(abc.ABC):
             self.new_version = new_version
 
     @classmethod
-    def data_classes(cls) -> t.Dict[Type, t.Type[ExternalBase]]:
+    def data_classes(cls: t.Type[_BS]) -> t.Dict[Type, t.Type[_BS]]:
         classes = {}
         if hasattr(cls, "type"):
             classes[cls.type] = cls
