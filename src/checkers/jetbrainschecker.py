@@ -38,11 +38,11 @@ class JetBrainsChecker(Checker):
             checksum = result.split(" ")[0]
 
         new_version = ExternalFile(
-            release["link"],
-            checksum,
-            release["size"],
-            data["version"],
-            datetime.datetime.strptime(data["date"], "%Y-%m-%d"),
+            url=release["link"],
+            checksum=checksum,
+            size=release["size"],
+            version=data["version"],
+            timestamp=datetime.datetime.strptime(data["date"], "%Y-%m-%d"),
         )
 
         external_data.set_new_version(new_version)
