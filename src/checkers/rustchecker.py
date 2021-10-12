@@ -50,10 +50,10 @@ class RustChecker(Checker):
 
         if target["available"]:
             new_version = ExternalFile(
-                target["xz_url"],
-                target["xz_hash"],
-                None,
-                appstream_version,
-                release_date,
+                url=target["xz_url"],
+                checksum=target["xz_hash"],
+                size=None,
+                version=appstream_version,
+                timestamp=release_date,
             )
             external_data.set_new_version(new_version)
