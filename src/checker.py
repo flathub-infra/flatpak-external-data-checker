@@ -427,7 +427,6 @@ class ManifestChecker:
             assert selected_data is not None
             log.warning("Guessed upstream source: %s", selected_data)
 
-        last_update: t.Union[ExternalFile, ExternalGitRef]
         last_update = selected_data.new_version
 
         version_changed = (

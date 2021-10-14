@@ -23,7 +23,7 @@ import abc
 from enum import Enum
 import datetime
 import typing as t
-
+import dataclasses
 import os
 import logging
 
@@ -38,6 +38,9 @@ from .errors import (
     SourceLoadError,
     SourceUnsupported,
 )
+
+_BS = t.TypeVar("_BS", bound="BuilderSource")
+_ES = t.TypeVar("_ES", bound="ExternalState")
 
 CHECKER_DATA_SCHEMA_COMMON = {
     "type": "object",
@@ -55,10 +58,8 @@ CHECKER_DATA_SCHEMA_COMMON = {
 log = logging.getLogger(__name__)
 
 
-class ExternalBase(abc.ABC):
-    """
-    Abstract base for remote data sources, such as file or VCS repo
-    """
+class BuilderSource(abc.ABC):
+    """flatpak-builder source item"""
 
     SOURCE_SCHEMA = {
         "type": "object",
@@ -87,14 +88,21 @@ class ExternalBase(abc.ABC):
     type: Type
     filename: str
     arches: t.List[str]
-    current_version: t.Union[ExternalFile, ExternalGitRef]
-    new_version: t.Optional[t.Union[ExternalFile, ExternalGitRef]]
     source: t.Mapping
     source_path: str
     checker_data: t.Mapping
 
     @classmethod
-    def from_source(cls, source_path: str, source: t.Dict) -> ExternalBase:
+    def data_classes(cls: t.Type[_BS]) -> t.Dict[Type, t.Type[_BS]]:
+        classes = {}
+        if hasattr(cls, "type"):
+            classes[cls.type] = cls
+        for subclass in cls.__subclasses__():
+            classes.update(subclass.data_classes())
+        return classes
+
+    @classmethod
+    def from_source(cls: t.Type[_BS], source_path: str, source: t.Dict) -> _BS:
         try:
             jsonschema.validate(source, cls.SOURCE_SCHEMA)
         except jsonschema.ValidationError as err:
@@ -105,26 +113,57 @@ class ExternalBase(abc.ABC):
         except ValueError as err:
             raise SourceUnsupported("Can't handle source") from err
 
-        if not source.get("url"):
-            raise SourceUnsupported('Data is not external: no "url" property')
-
         data_cls = cls.data_classes()[data_type]
 
         return data_cls.from_source_impl(source_path, source)
 
     @classmethod
-    def from_source_impl(cls, source_path: str, source: t.Dict) -> ExternalBase:
+    def from_source_impl(cls: t.Type[_BS], source_path: str, source: t.Dict) -> _BS:
         raise NotImplementedError
 
-    def set_new_version(
-        self, new_version: t.Union[ExternalFile, ExternalGitRef], is_update=None
-    ):
+
+@dataclasses.dataclass(frozen=True)
+class ExternalState(abc.ABC):
+    url: str
+    version: t.Optional[str]
+    timestamp: t.Optional[datetime.datetime]
+
+    def _replace(self: _ES, **kwargs) -> _ES:
+        return dataclasses.replace(self, **kwargs)
+
+    def _asdict(self) -> t.Dict[str, t.Any]:
+        return dataclasses.asdict(self)
+
+    def matches(self: _ES, other: _ES) -> bool:
+        raise NotImplementedError
+
+    def is_same_version(self: _ES, other: _ES) -> bool:
+        raise NotImplementedError
+
+
+class ExternalBase(BuilderSource):
+    """
+    Abstract base for remote data sources, such as file or VCS repo
+    """
+
+    current_version: ExternalState
+    new_version: t.Optional[ExternalState]
+
+    @classmethod
+    def from_source(cls: t.Type[_BS], source_path: str, source: t.Dict) -> _BS:
+        if not source.get("url"):
+            raise SourceUnsupported('Data is not external: no "url" property')
+
+        # FIXME: https://github.com/python/mypy/issues/9282
+        return super().from_source(source_path, source)  # type: ignore
+
+    def set_new_version(self, new_version: ExternalState, is_update=None):
         assert isinstance(new_version, type(self.current_version))
 
         if is_update is None:
-            is_update = not self.current_version.is_same_version(new_version)  # type: ignore
+            is_update = not self.current_version.is_same_version(new_version)
 
-        if self.current_version.matches(new_version):  # type: ignore
+        if self.current_version.matches(new_version):
             if is_update:
                 log.debug("Source %s: no update found", self.filename)
             else:
@@ -140,15 +179,6 @@ class ExternalBase(abc.ABC):
                 self.state = self.State.BROKEN
             self.new_version = new_version
 
-    @classmethod
-    def data_classes(cls) -> t.Dict[Type, t.Type[ExternalBase]]:
-        classes = {}
-        if hasattr(cls, "type"):
-            classes[cls.type] = cls
-        for subclass in cls.__subclasses__():
-            classes.update(subclass.data_classes())
-        return classes
-
     def update(self):
         """If self.new_version is not None, writes back the necessary changes to the
         original element from the manifest."""
@@ -161,12 +191,10 @@ class ExternalBase(abc.ABC):
         return f"<{type(self).__name__} {self}>"
 
 
-class ExternalFile(t.NamedTuple):
-    url: str
+@dataclasses.dataclass(frozen=True)
+class ExternalFile(ExternalState):
     checksum: t.Optional[str]
     size: t.Optional[int]
-    version: t.Optional[str]
-    timestamp: t.Optional[datetime.datetime]
 
     def matches(self, other: ExternalFile):
         return (
@@ -181,6 +209,9 @@ class ExternalFile(t.NamedTuple):
 
 
 class ExternalData(ExternalBase):
+    current_version: ExternalFile
+    new_version: t.Optional[ExternalFile]
+
     def __init__(
         self,
         filename: str,
@@ -194,7 +225,6 @@ class ExternalData(ExternalBase):
         self.arches = arches
         self.checker_data = checker_data or {}
         assert size is None or isinstance(size, int)
-        self.current_version: ExternalFile
         self.current_version = ExternalFile(
             url=url,
             checksum=checksum,
@@ -202,7 +232,6 @@ class ExternalData(ExternalBase):
             version=None,
             timestamp=None,
         )
-        self.new_version: t.Optional[ExternalFile]
         self.new_version = None
         self.state = ExternalData.State.UNKNOWN
 
@@ -268,13 +297,11 @@ class ExtraDataSource(ExternalData):
     type = ExternalBase.Type.EXTRA_DATA
 
 
-class ExternalGitRef(t.NamedTuple):
-    url: str
+@dataclasses.dataclass(frozen=True)
+class ExternalGitRef(ExternalState):
     commit: t.Optional[str]
     tag: t.Optional[str]
     branch: t.Optional[str]
-    version: t.Optional[str]
-    timestamp: t.Optional[datetime.datetime]
 
     def _get_tagged_commit(self, refs: t.Dict[str, str], tag: str) -> str:
         annotated_tag_commit = refs.get(f"refs/tags/{tag}")
@@ -343,6 +370,9 @@ class ExternalGitRef(t.NamedTuple):
 class ExternalGitRepo(ExternalBase):
     type = ExternalBase.Type.GIT
 
+    current_version: ExternalGitRef
+    new_version: t.Optional[ExternalGitRef]
+
     def __init__(
         self,
         repo_name: str,
@@ -356,7 +386,6 @@ class ExternalGitRepo(ExternalBase):
         self.filename = repo_name
         self.arches = arches
         self.checker_data = checker_data or {}
-        self.current_version: ExternalGitRef
         self.current_version = ExternalGitRef(
             url=url,
             commit=commit,
@@ -365,7 +394,6 @@ class ExternalGitRepo(ExternalBase):
             version=None,
             timestamp=None,
         )
-        self.new_version: t.Optional[ExternalGitRef]
         self.new_version = None
         self.state = ExternalGitRepo.State.UNKNOWN
 
