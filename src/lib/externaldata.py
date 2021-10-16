@@ -441,14 +441,15 @@ class Checker:
     def __init__(self, session: aiohttp.ClientSession):
         self.session = session
 
-    def get_json_schema(  # pylint: disable=unused-argument
-        self, external_data: ExternalBase
-    ) -> t.Dict[str, t.Any]:
-        if hasattr(self, "CHECKER_DATA_SCHEMA"):
-            return self.CHECKER_DATA_SCHEMA
-        raise NotImplementedError(
-            "If schema is not declared, this method must be overridden"
-        )
+    # pylint: disable=unused-argument
+    @classmethod
+    def get_json_schema(self, data_class: t.Type[ExternalBase]) -> t.Dict[str, t.Any]:
+        if not hasattr(self, "CHECKER_DATA_SCHEMA"):
+            raise NotImplementedError(
+                "If schema is not declared, this method must be overridden"
+            )
+
+        return self.CHECKER_DATA_SCHEMA
 
     @classmethod
     def should_check(cls, external_data: ExternalBase) -> bool:
@@ -463,7 +464,7 @@ class Checker:
 
     async def validate_checker_data(self, external_data: ExternalBase):
         assert any(isinstance(external_data, c) for c in self.SUPPORTED_DATA_CLASSES)
-        schema = self.get_json_schema(external_data)
+        schema = self.get_json_schema(type(external_data))
         if not schema:
             return
         try:
