@@ -1,4 +1,5 @@
 import logging
+import typing as t
 
 from yarl import URL
 
@@ -28,12 +29,17 @@ class AnityaChecker(HTMLChecker):
             "url-template": {"type": "string"},
             "tag-template": {"type": "string"},
         },
-        "anyOf": [
-            {"required": ["project-id", "url-template"]},
-            {"required": ["project-id", "tag-template"]},
-        ],
     }
     SUPPORTED_DATA_CLASSES = [ExternalData, ExternalGitRepo]
+
+    @classmethod
+    def get_json_schema(cls, data_class: t.Type[ExternalBase]):
+        schema = super().get_json_schema(data_class).copy()
+        if issubclass(data_class, ExternalGitRepo):
+            schema["required"] = ["project-id", "tag-template"]
+        else:
+            schema["required"] = ["project-id", "url-template"]
+        return schema
 
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
