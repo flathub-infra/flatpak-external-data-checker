@@ -64,12 +64,17 @@ class JSONChecker(HTMLChecker):
             "timestamp-data-url": {"type": "string"},
         },
         "required": ["url"],
-        "anyOf": [
-            {"required": ["version-query", "url-query"]},
-            {"required": ["tag-query"]},
-        ],
     }
     SUPPORTED_DATA_CLASSES = [ExternalData, ExternalGitRepo]
+
+    @classmethod
+    def get_json_schema(cls, data_class: t.Type[ExternalBase]):
+        schema = super().get_json_schema(data_class).copy()
+        if issubclass(data_class, ExternalGitRepo):
+            schema["required"] = ["tag-query"]
+        else:
+            schema["required"] = ["version-query", "url-query"]
+        return schema
 
     async def _get_json(self, url: t.Union[str, URL]) -> bytes:
         log.debug("Get JSON from %s", url)
