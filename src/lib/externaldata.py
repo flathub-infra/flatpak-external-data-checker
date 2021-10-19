@@ -84,8 +84,8 @@ class BuilderSource(abc.ABC):
         VALID = 1 << 1  # URL is reachable
         BROKEN = 1 << 2  # URL couldn't be reached
 
+    type: t.ClassVar[Type]
     state: State
-    type: Type
     filename: str
     arches: t.List[str]
     source: t.Mapping
