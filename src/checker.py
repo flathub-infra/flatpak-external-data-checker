@@ -253,7 +253,7 @@ class ManifestChecker:
         counter: TasksCounter,
         http_session: aiohttp.ClientSession,
         data: ExternalBase,
-    ):
+    ) -> ExternalBase:
         src_rel_path = os.path.relpath(data.source_path, self._root_manifest_dir)
         counter.started += 1
         checkers = [c(http_session) for c in self._checkers if c.should_check(data)]
@@ -321,12 +321,13 @@ class ManifestChecker:
         )
         return data
 
-    async def check(self, filter_type=None):
+    async def check(self, filter_type=None) -> t.List[ExternalBase]:
         """Perform the check for all the external data in the manifest
 
         It initializes an internal list of all the external data objects
         found in the manifest.
         """
+        external_data: t.List[ExternalBase]
         external_data = sum(self._external_data.values(), [])
         if filter_type is not None:
             external_data = [d for d in external_data if d.type == filter_type]
@@ -348,7 +349,7 @@ class ManifestChecker:
 
         return list(set(ext_data_checked))
 
-    def get_external_data(self, only_type=None):
+    def get_external_data(self, only_type=None) -> t.List[ExternalBase]:
         """Returns the list of the external data found in the manifest
 
         Should be called after the 'check' method.
@@ -361,14 +362,17 @@ class ManifestChecker:
             if only_type is None or data.type == only_type
         ]
 
-    def get_errors(self, only_type: t.Optional[t.Type[Exception]] = None):
+    def get_errors(
+        self,
+        only_type: t.Optional[t.Type[Exception]] = None,
+    ) -> t.List[Exception]:
         """Return a list of errors occured while checking/updating the manifest"""
 
         return [
             e for e in self._errors if only_type is None or isinstance(e, only_type)
         ]
 
-    def get_outdated_external_data(self):
+    def get_outdated_external_data(self) -> t.List[ExternalBase]:
         """Returns a list of the outdated external data
 
         Outdated external data are the ones that either are broken
@@ -466,10 +470,11 @@ class ManifestChecker:
         else:
             log.debug("Version didn't change, not adding release")
 
-    def update_manifests(self):
+    def update_manifests(self) -> t.List[str]:
         """Updates references to external data in manifests."""
         # We want a list, without duplicates; Python provides an
         # insertion-order-preserving dictionary so we use that.
+        changes: t.Dict[str, t.Any]
         changes = OrderedDict()
         for path, datas in self._external_data.items():
             self._update_manifest(path, datas, changes)
