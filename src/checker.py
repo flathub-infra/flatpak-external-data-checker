@@ -347,7 +347,7 @@ class ManifestChecker:
             log.info("Checking %s external data items", counter.total)
             ext_data_checked = await asyncio.gather(*check_tasks)
 
-        return list(set(ext_data_checked))
+        return ext_data_checked
 
     def get_external_data(self, only_type=None) -> t.List[ExternalBase]:
         """Returns the list of the external data found in the manifest
