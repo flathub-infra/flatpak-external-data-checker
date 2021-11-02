@@ -58,6 +58,7 @@ CHECKER_DATA_SCHEMA_COMMON = {
 log = logging.getLogger(__name__)
 
 
+@dataclasses.dataclass
 class BuilderSource(abc.ABC):
     """flatpak-builder source item"""
 
@@ -84,8 +85,8 @@ class BuilderSource(abc.ABC):
         VALID = 1 << 1  # URL is reachable
         BROKEN = 1 << 2  # URL couldn't be reached
 
+    type: t.ClassVar[Type]
     state: State
-    type: Type
     filename: str
     arches: t.List[str]
     source: t.Mapping
@@ -141,6 +142,7 @@ class ExternalState(abc.ABC):
         raise NotImplementedError
 
 
+@dataclasses.dataclass
 class ExternalBase(BuilderSource):
     """
     Abstract base for remote data sources, such as file or VCS repo
@@ -208,32 +210,10 @@ class ExternalFile(ExternalState):
         return self.url == other.url
 
 
+@dataclasses.dataclass
 class ExternalData(ExternalBase):
     current_version: ExternalFile
     new_version: t.Optional[ExternalFile]
-
-    def __init__(
-        self,
-        filename: str,
-        url: str,
-        checksum: str = None,
-        size: int = None,
-        arches=[],
-        checker_data: dict = None,
-    ):
-        self.filename = filename
-        self.arches = arches
-        self.checker_data = checker_data or {}
-        assert size is None or isinstance(size, int)
-        self.current_version = ExternalFile(
-            url=url,
-            checksum=checksum,
-            size=size,
-            version=None,
-            timestamp=None,
-        )
-        self.new_version = None
-        self.state = ExternalData.State.UNKNOWN
 
     @classmethod
     def from_source_impl(cls, source_path: str, source: t.Dict) -> ExternalData:
@@ -257,15 +237,21 @@ class ExternalData(ExternalBase):
         arches = checker_data.get("arches") or source.get("only-arches") or ["x86_64"]
 
         obj = cls(
+            cls.State.UNKNOWN,
             name,
-            url_str,
-            sha256sum,
-            size,
             arches,
+            source,
+            source_path,
             checker_data,
+            ExternalFile(
+                url=url_str,
+                checksum=sha256sum,
+                size=size,
+                version=None,
+                timestamp=None,
+            ),
+            None,
         )
-        obj.source = source
-        obj.source_path = source_path
         return obj
 
     def update(self):
@@ -285,14 +271,17 @@ class ExternalData(ExternalBase):
                 self.source.pop("size", None)
 
 
+@dataclasses.dataclass
 class FileSource(ExternalData):
     type = ExternalBase.Type.FILE
 
 
+@dataclasses.dataclass
 class ArchiveSource(ExternalData):
     type = ExternalBase.Type.ARCHIVE
 
 
+@dataclasses.dataclass
 class ExtraDataSource(ExternalData):
     type = ExternalBase.Type.EXTRA_DATA
 
@@ -367,35 +356,12 @@ class ExternalGitRef(ExternalState):
         )
 
 
+@dataclasses.dataclass
 class ExternalGitRepo(ExternalBase):
     type = ExternalBase.Type.GIT
 
     current_version: ExternalGitRef
     new_version: t.Optional[ExternalGitRef]
-
-    def __init__(
-        self,
-        repo_name: str,
-        url: str,
-        commit: str = None,
-        tag: str = None,
-        branch: str = None,
-        arches=[],
-        checker_data=None,
-    ):
-        self.filename = repo_name
-        self.arches = arches
-        self.checker_data = checker_data or {}
-        self.current_version = ExternalGitRef(
-            url=url,
-            commit=commit,
-            tag=tag,
-            branch=branch,
-            version=None,
-            timestamp=None,
-        )
-        self.new_version = None
-        self.state = ExternalGitRepo.State.UNKNOWN
 
     @classmethod
     def from_source_impl(cls, source_path, source) -> ExternalGitRepo:
@@ -410,16 +376,22 @@ class ExternalGitRepo(ExternalBase):
         arches = checker_data.get("arches") or source.get("only-arches") or ["x86_64"]
 
         obj = cls(
+            cls.State.UNKNOWN,
             repo_name,
-            url,
-            commit,
-            tag,
-            branch,
             arches,
+            source,
+            source_path,
             checker_data,
+            ExternalGitRef(
+                url=url,
+                commit=commit,
+                tag=tag,
+                branch=branch,
+                version=None,
+                timestamp=None,
+            ),
+            None,
         )
-        obj.source = source
-        obj.source_path = source_path
         return obj
 
     def update(self):
