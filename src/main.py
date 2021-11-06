@@ -341,6 +341,11 @@ def parse_cli_args(cli_args=None):
             "upstream repo"
         ),
     )
+    parser.add_argument(
+        "--unsafe",
+        help="Enable unsafe features; use only with manifests from trusted sources",
+        action="store_true",
+    )
 
     return parser.parse_args(cli_args)
 
@@ -351,7 +356,7 @@ async def run_with_args(args: argparse.Namespace) -> t.Tuple[int, int, bool]:
     should_update = args.update or args.commit_only or args.edit_only
     did_update = False
 
-    manifest_checker = checker.ManifestChecker(args.manifest)
+    manifest_checker = checker.ManifestChecker(args.manifest, args.unsafe)
 
     await manifest_checker.check(args.filter_type)
 

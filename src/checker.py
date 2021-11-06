@@ -100,10 +100,12 @@ class ManifestChecker:
         failed: int = 0
         total: int = 0
 
-    def __init__(self, manifest: str):
+    def __init__(self, manifest: str, unsafe_enabled: bool = False):
         self.kind = self.Kind.UNKNOWN
         self.app_id: t.Optional[str]
         self.app_id = None
+
+        self.unsafe_enabled = unsafe_enabled
 
         self._root_manifest_path = manifest
         self._root_manifest_dir = os.path.dirname(self._root_manifest_path)
