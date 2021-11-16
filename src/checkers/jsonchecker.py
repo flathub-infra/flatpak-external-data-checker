@@ -94,14 +94,16 @@ class JSONChecker(HTMLChecker):
 
     async def _query_sequence(
         self,
-        json_data: bytes,
+        init_json_data: bytes,
         queries: t.Iterable[t.Tuple[str, str, t.Optional[str]]],
     ) -> t.Dict[str, str]:
         results: t.Dict[str, str] = {}
         for result_key, value_query, url_query in queries:
             if url_query:
-                url = await query_json(url_query, json_data, results)
+                url = await query_json(url_query, init_json_data, results)
                 json_data = await self._get_json(url)
+            else:
+                json_data = init_json_data
             results[result_key] = await query_json(value_query, json_data, results)
         return results
 
