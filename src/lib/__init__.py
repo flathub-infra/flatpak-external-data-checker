@@ -32,6 +32,8 @@ WRONG_CONTENT_TYPES_ARCHIVE = [
     re.compile(r"^text/.*$"),
 ] + WRONG_CONTENT_TYPES_FILE
 
+FILE_URL_SCHEMES = ["http", "https"]
+
 OPERATORS = {
     "<": operator.lt,
     "<=": operator.le,

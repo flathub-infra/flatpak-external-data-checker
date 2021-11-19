@@ -31,7 +31,7 @@ import aiohttp
 from yarl import URL
 import jsonschema
 
-from . import utils
+from . import utils, FILE_URL_SCHEMES
 from .errors import (
     CheckerMetadataError,
     CheckerFetchError,
@@ -222,7 +222,7 @@ class ExternalData(ExternalBase):
         url_str = source["url"]
         url = URL(url_str)
 
-        if url.scheme not in ["http", "https"]:
+        if url.scheme not in FILE_URL_SCHEMES:
             raise SourceUnsupported(f"Unsupported URL scheme {url.scheme}")
 
         name = (
