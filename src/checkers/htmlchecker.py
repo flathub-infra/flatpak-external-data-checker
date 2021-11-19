@@ -152,7 +152,10 @@ class HTMLChecker(Checker):
                 tmpl_vars["minor"] = version_part
             elif i == 2:
                 tmpl_vars["patch"] = version_part
-        return tmpl.substitute(**tmpl_vars)
+        try:
+            return tmpl.substitute(**tmpl_vars)
+        except (KeyError, ValueError) as err:
+            raise CheckerMetadataError("Error substituting template") from err
 
     async def _update_version(
         self,
