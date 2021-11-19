@@ -25,11 +25,14 @@ from string import Template
 from distutils.version import LooseVersion
 import typing as t
 
+from yarl import URL
+
 from ..lib import (
     utils,
     NETWORK_ERRORS,
     WRONG_CONTENT_TYPES_FILE,
     WRONG_CONTENT_TYPES_ARCHIVE,
+    FILE_URL_SCHEMES,
 )
 from ..lib.externaldata import ExternalData, Checker
 from ..lib.errors import CheckerMetadataError, CheckerQueryError, CheckerFetchError
@@ -165,6 +168,10 @@ class HTMLChecker(Checker):
             wrong_content_types = WRONG_CONTENT_TYPES_ARCHIVE
         else:
             wrong_content_types = WRONG_CONTENT_TYPES_FILE
+
+        latest_url_scheme = URL(latest_url).scheme
+        if latest_url_scheme not in FILE_URL_SCHEMES:
+            raise CheckerMetadataError(f"Invalid URL scheme {latest_url_scheme}")
 
         try:
             new_version = await utils.get_extra_data_info_from_url(
