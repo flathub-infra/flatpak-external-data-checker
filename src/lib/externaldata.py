@@ -89,9 +89,9 @@ class BuilderSource(abc.ABC):
     state: State
     filename: str
     arches: t.List[str]
-    source: t.Mapping
+    source: t.Dict[str, t.Any]
     source_path: str
-    checker_data: t.Mapping
+    checker_data: t.Dict[str, t.Any]
 
     @classmethod
     def data_classes(cls: t.Type[_BS]) -> t.Dict[Type, t.Type[_BS]]:
