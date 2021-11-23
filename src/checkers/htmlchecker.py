@@ -34,28 +34,32 @@ from ..lib import (
     WRONG_CONTENT_TYPES_ARCHIVE,
     FILE_URL_SCHEMES,
 )
-from ..lib.externaldata import ExternalData, Checker
+from ..lib.externaldata import ExternalBase, ExternalData, Checker
 from ..lib.errors import CheckerMetadataError, CheckerQueryError, CheckerFetchError
 
 log = logging.getLogger(__name__)
 
 
 def _get_latest(
-    html: str, pattern: re.Pattern, sort_key: t.Optional[t.Callable] = None
-) -> t.Union[str, t.Tuple[str, ...]]:
-    match = pattern.findall(html)
-    if not match:
+    html: str,
+    pattern: re.Pattern,
+    sort_key: t.Optional[t.Callable[[re.Match], t.Any]] = None,
+) -> re.Match:
+    matches = list(pattern.finditer(html))
+    if not matches:
         raise CheckerQueryError(f"Pattern '{pattern.pattern}' didn't match anything")
-    if sort_key is None or len(match) == 1:
-        result = match[0]
+    if sort_key is None or len(matches) == 1:
+        result = matches[0]
     else:
         log.debug("%s matched multiple times, selected latest", pattern.pattern)
-        result = max(match, key=sort_key)
+        result = max(matches, key=sort_key)
     log.debug("%s matched %s", pattern.pattern, result)
     return result
 
 
-def _get_pattern(checker_data: t.Dict, pattern_name: str, expected_groups=1):
+def _get_pattern(
+    checker_data: t.Dict, pattern_name: str, expected_groups: int = 1
+) -> t.Optional[re.Pattern]:
     try:
         pattern_str = checker_data[pattern_name]
     except KeyError:
@@ -97,7 +101,7 @@ class HTMLChecker(Checker):
         ],
     }
 
-    async def check(self, external_data):
+    async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
         assert isinstance(external_data, ExternalData)
 
@@ -119,20 +123,24 @@ class HTMLChecker(Checker):
             latest_url, latest_version = _get_latest(
                 html,
                 combo_pattern,
-                (lambda m: LooseVersion(m[1])) if sort_matches else None,
-            )
+                (lambda m: LooseVersion(m.group(2))) if sort_matches else None,
+            ).group(1, 2)
         else:
             assert version_pattern
             latest_version = _get_latest(
-                html, version_pattern, LooseVersion if sort_matches else None
-            )
+                html,
+                version_pattern,
+                (lambda m: LooseVersion(m.group(1))) if sort_matches else None,
+            ).group(1)
             if url_template:
                 latest_url = self._substitute_placeholders(url_template, latest_version)
             else:
                 assert url_pattern
                 latest_url = _get_latest(
-                    html, url_pattern, LooseVersion if sort_matches else None
-                )
+                    html,
+                    url_pattern,
+                    (lambda m: LooseVersion(m.group(1))) if sort_matches else None,
+                ).group(1)
 
         abs_url = urllib.parse.urljoin(base=url, url=latest_url)
 
