@@ -117,8 +117,11 @@ def check_call(args):
     subprocess.check_call(args)
 
 
-def commit_changes(changes):
+def commit_changes(
+    changes: t.List[str],
+) -> t.Tuple[str, t.Optional[str], str, t.Optional[str]]:
     log.info("Committing updates")
+    body: t.Optional[str]
     if len(changes) > 1:
         subject = "Update {} modules".format(len(changes))
         body = "\n".join(changes)
@@ -127,6 +130,14 @@ def commit_changes(changes):
         subject = changes[0]
         body = None
         message = subject
+
+    # Remember the base branch
+    base_branch: t.Optional[str]
+    base_branch = subprocess.check_output(
+        ["git", "branch", "--show-current"], text=True
+    ).strip()
+    if not base_branch:
+        base_branch = None
 
     # Moved to detached HEAD
     check_call(["git", "checkout", "HEAD@{0}"])
@@ -147,7 +158,7 @@ def commit_changes(changes):
     except subprocess.CalledProcessError:
         # If not, create it
         check_call(["git", "checkout", "-b", branch])
-    return subject, body, branch
+    return subject, body, branch, base_branch
 
 
 DISCLAIMER = (
@@ -173,8 +184,9 @@ AUTOMERGE_DUE_TO_BROKEN_URLS = (
 
 def open_pr(
     subject: str,
-    body: str,
+    body: t.Optional[str],
     branch: str,
+    base: t.Optional[str] = None,
     manifest_checker: checker.ManifestChecker = None,
     fork: t.Optional[bool] = None,
 ):
@@ -210,7 +222,9 @@ def open_pr(
 
     remote_url = f"https://{github_token}:x-oauth-basic@github.com/{repo.full_name}"
 
-    base = origin_repo.default_branch
+    if base is None:
+        base = origin_repo.default_branch
+
     head = "{}:{}".format(repo.owner.login, branch)
     pr_message = ((body or "") + "\n\n" + DISCLAIMER).strip()
 
@@ -268,6 +282,12 @@ def open_pr(
 
     check_call(["git", "push", "-u", remote_url, branch])
 
+    log.info(
+        "Creating pull request in %s from head `%s` to base `%s`",
+        origin_repo.html_url,
+        head,
+        base,
+    )
     pr = origin_repo.create_pull(
         subject,
         pr_message,
@@ -366,12 +386,13 @@ async def run_with_args(args: argparse.Namespace) -> t.Tuple[int, int, bool]:
         changes = manifest_checker.update_manifests()
         if changes and not args.edit_only:
             with indir(os.path.dirname(args.manifest)):
-                subject, body, branch = commit_changes(changes)
+                subject, body, branch, base_branch = commit_changes(changes)
                 if not args.commit_only:
                     open_pr(
                         subject,
                         body,
                         branch,
+                        base_branch,
                         manifest_checker=manifest_checker,
                         fork=args.fork,
                     )
