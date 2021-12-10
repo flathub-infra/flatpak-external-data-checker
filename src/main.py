@@ -134,8 +134,8 @@ def commit_changes(changes):
 
     # Find a stable identifier for the contents of the tree, to avoid
     # sending the same PR twice.
-    tree = subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"])
-    branch = "update-{}".format(tree.decode("ascii")[:7])
+    tree = subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], text=True)
+    branch = f"update-{tree[:7]}"
 
     try:
         # Check if the branch already exists
