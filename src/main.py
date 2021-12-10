@@ -117,9 +117,15 @@ def check_call(args):
     subprocess.check_call(args)
 
 
-def commit_changes(
-    changes: t.List[str],
-) -> t.Tuple[str, t.Optional[str], str, t.Optional[str]]:
+class CommittedChanges(t.NamedTuple):
+    subject: str
+    body: t.Optional[str]
+    commit: str
+    branch: str
+    base_branch: t.Optional[str]
+
+
+def commit_changes(changes: t.List[str]) -> CommittedChanges:
     log.info("Committing updates")
     body: t.Optional[str]
     if len(changes) > 1:
@@ -145,7 +151,9 @@ def commit_changes(
 
     # Find a stable identifier for the contents of the tree, to avoid
     # sending the same PR twice.
-    tree = subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], text=True)
+    tree = subprocess.check_output(
+        ["git", "rev-parse", "HEAD^{tree}"], text=True
+    ).strip()
     branch = f"update-{tree[:7]}"
 
     try:
@@ -158,7 +166,13 @@ def commit_changes(
     except subprocess.CalledProcessError:
         # If not, create it
         check_call(["git", "checkout", "-b", branch])
-    return subject, body, branch, base_branch
+    return CommittedChanges(
+        subject=subject,
+        body=body,
+        commit=tree,
+        branch=branch,
+        base_branch=base_branch,
+    )
 
 
 DISCLAIMER = (
@@ -183,10 +197,7 @@ AUTOMERGE_DUE_TO_BROKEN_URLS = (
 
 
 def open_pr(
-    subject: str,
-    body: t.Optional[str],
-    branch: str,
-    base: t.Optional[str] = None,
+    change: CommittedChanges,
     manifest_checker: checker.ManifestChecker = None,
     fork: t.Optional[bool] = None,
 ):
@@ -196,7 +207,7 @@ def open_pr(
         log.error("GITHUB_TOKEN environment variable is not set")
         sys.exit(1)
 
-    log.info("Opening pull request for branch %s", branch)
+    log.info("Opening pull request for branch %s", change.branch)
     g = Github(github_token)
     user = g.get_user()
 
@@ -222,11 +233,10 @@ def open_pr(
 
     remote_url = f"https://{github_token}:x-oauth-basic@github.com/{repo.full_name}"
 
-    if base is None:
-        base = origin_repo.default_branch
+    base = change.base_branch or origin_repo.default_branch
 
-    head = "{}:{}".format(repo.owner.login, branch)
-    pr_message = ((body or "") + "\n\n" + DISCLAIMER).strip()
+    head = "{}:{}".format(repo.owner.login, change.branch)
+    pr_message = ((change.body or "") + "\n\n" + DISCLAIMER).strip()
 
     try:
         with open("flathub.json") as f:
@@ -280,7 +290,7 @@ def open_pr(
 
         return
 
-    check_call(["git", "push", "-u", remote_url, branch])
+    check_call(["git", "push", "-u", remote_url, change.branch])
 
     log.info(
         "Creating pull request in %s from head `%s` to base `%s`",
@@ -289,7 +299,7 @@ def open_pr(
         base,
     )
     pr = origin_repo.create_pull(
-        subject,
+        change.subject,
         pr_message,
         base,
         head,
@@ -386,13 +396,10 @@ async def run_with_args(args: argparse.Namespace) -> t.Tuple[int, int, bool]:
         changes = manifest_checker.update_manifests()
         if changes and not args.edit_only:
             with indir(os.path.dirname(args.manifest)):
-                subject, body, branch, base_branch = commit_changes(changes)
+                committed_changes = commit_changes(changes)
                 if not args.commit_only:
                     open_pr(
-                        subject,
-                        body,
-                        branch,
-                        base_branch,
+                        committed_changes,
                         manifest_checker=manifest_checker,
                         fork=args.fork,
                     )
