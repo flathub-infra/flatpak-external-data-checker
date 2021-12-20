@@ -68,6 +68,18 @@ def _extract_timestamp(info):
     raise CheckerRemoteError(f"Cannot parse date/time: {date_str}")
 
 
+def _check_newline(fp):
+    original_position = fp.tell()
+    fp.seek(0, os.SEEK_END)
+    fp.seek(fp.tell() - 1, os.SEEK_SET)
+    last_char = fp.read()
+    fp.seek(original_position, os.SEEK_SET)
+    if last_char == "\n":
+        return True
+    else:
+        return False
+
+
 def strip_query(url):
     """Sanitizes the query string from the given URL, if any. Parameters whose
     names begin with an underscore are assumed to be tracking identifiers and
@@ -425,13 +437,18 @@ def dump_manifest(contents, manifest_path):
     """Writes back 'contents' to 'manifest_path'.
 
     For YAML, we make a best-effort attempt to preserve
-    formatting; for JSON, we use the canonical 4-space indentation."""
+    formatting; for JSON, we use the canonical 4-space indentation,
+    but add a trailing newline if originally present."""
     _, ext = os.path.splitext(manifest_path)
+    with open(manifest_path, "r") as fp:
+        newline = _check_newline(fp)
     with open(manifest_path, "w", encoding="utf-8") as fp:
         if ext in (".yaml", ".yml"):
             _yaml.dump(contents, fp)
         else:
             json.dump(obj=contents, fp=fp, indent=4)
+            if newline:
+                fp.write("\n")
 
 
 def init_logging(level=logging.DEBUG):
