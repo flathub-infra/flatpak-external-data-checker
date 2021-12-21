@@ -24,7 +24,6 @@ from enum import Enum
 import datetime
 import typing as t
 import dataclasses
-import os
 import logging
 
 import aiohttp
@@ -151,6 +150,12 @@ class ExternalBase(BuilderSource):
     current_version: ExternalState
     new_version: t.Optional[ExternalState]
 
+    @staticmethod
+    def _name_from_url(url: t.Union[str, URL]) -> str:
+        if not isinstance(url, URL):
+            url = URL(url)
+        return next(p for p in reversed(url.parts) if p)
+
     @classmethod
     def from_source(cls: t.Type[_BS], source_path: str, source: t.Dict) -> _BS:
         if not source.get("url"):
@@ -228,7 +233,7 @@ class ExternalData(ExternalBase):
         name = (
             source.get("filename")
             or source.get("dest-filename")
-            or os.path.basename(url.path)
+            or cls._name_from_url(url)
         )
 
         sha256sum = source.get("sha256")
@@ -368,7 +373,7 @@ class ExternalGitRepo(ExternalBase):
         data_type = cls.Type(source["type"])
         assert data_type == cls.type, data_type
         url = source["url"]
-        repo_name = os.path.basename(url)
+        repo_name = cls._name_from_url(url)
         commit = source.get("commit")
         tag = source.get("tag")
         branch = source.get("branch")
