@@ -33,6 +33,7 @@ from lxml.etree import XMLSyntaxError
 from .lib import HTTP_CLIENT_HEADERS, TIMEOUT_CONNECT, TIMEOUT_TOTAL
 from .lib.appdata import add_release_to_file
 from .lib.externaldata import (
+    BuilderModule,
     ExternalBase,
     ExternalFile,
     ExternalGitRef,
@@ -109,6 +110,7 @@ class ManifestChecker:
         self._root_manifest_path = manifest
         self._root_manifest_dir = os.path.dirname(self._root_manifest_path)
 
+        self._modules: t.Dict[str, t.List[BuilderModule]] = {}
         self._external_data: t.Dict[str, t.List[ExternalBase]]
         self._external_data = {}
 
@@ -178,7 +180,12 @@ class ManifestChecker:
         elif self.kind in [self.Kind.SOURCE, self.Kind.SOURCES]:
             self._collect_source_data(self._root_manifest_path, self._root_manifest)
 
-    def _collect_module_data(self, module_path: str, module: t.Union[str, t.Dict]):
+    def _collect_module_data(
+        self,
+        module_path: str,
+        module: t.Union[str, t.Dict],
+        parent: t.Optional[BuilderModule] = None,
+    ):
         if isinstance(module, str):
             ext_module_path = os.path.join(os.path.dirname(module_path), module)
             log.info(
@@ -193,27 +200,33 @@ class ManifestChecker:
                 return
 
             assert isinstance(ext_module, dict), ext_module_path
-            return self._collect_module_data(ext_module_path, ext_module)
+            return self._collect_module_data(ext_module_path, ext_module, parent=parent)
+
+        module_obj = BuilderModule.from_manifest(module_path, module, parent)
+        self._modules.setdefault(module_path, []).append(module_obj)
 
         child_modules = module.get("modules", [])
         if not isinstance(child_modules, list):
             log.error('"modules" in %s is not a list', module_path)
             child_modules = []
         for child_module in child_modules:
-            self._collect_module_data(module_path=module_path, module=child_module)
+            self._collect_module_data(module_path, child_module, parent=module_obj)
 
-        self._collect_source_data(module_path, module.get("sources", []))
+        self._collect_source_data(module_path, module.get("sources", []), module_obj)
 
     def _collect_source_data(
         self,
         source_path: str,
         source: t.Union[str, t.Dict, t.List[t.Union[str, t.Dict]]],
+        module: t.Optional[BuilderModule] = None,
         is_external: bool = False,  # This source mf was referenced from another mf
     ):
         if isinstance(source, list):
             for child_source in source:
                 assert isinstance(child_source, (str, dict))
-                self._collect_source_data(source_path, child_source, is_external)
+                self._collect_source_data(
+                    source_path, child_source, module, is_external
+                )
             return
 
         if isinstance(source, str):
@@ -229,7 +242,9 @@ class ManifestChecker:
                     os.path.relpath(ext_source_path, self._root_manifest_dir),
                 )
                 ext_source = self._read_manifest(ext_source_path)
-                self._collect_source_data(ext_source_path, ext_source, is_external=True)
+                self._collect_source_data(
+                    ext_source_path, ext_source, module, is_external=True
+                )
             return
 
         assert isinstance(source, dict)
@@ -237,10 +252,20 @@ class ManifestChecker:
         # NOTE here we rely on ruamel.yaml to make YAML aliases into
         # pointers to the same dict object ridden from YAML anchor
         manifest_datas = self._external_data.setdefault(source_path, [])
-        if any(d.source is source for d in manifest_datas):
-            return
         try:
-            data = ExternalBase.from_source(source_path, source)
+            data = next(d for d in manifest_datas if d.source is source)
+        except StopIteration:
+            # Didn't find this source previously loaded, proceed to loading it
+            pass
+        else:
+            # Found this source previously loaded, add it to the module
+            log.debug("Source %s already loaded, first seen from %s", data, data.module)
+            if module:
+                module.sources.append(data)
+            return
+
+        try:
+            data = ExternalBase.from_source(source_path, source, module)
         except SourceUnsupported as err:
             log.debug(err)
         except SourceLoadError as err:
