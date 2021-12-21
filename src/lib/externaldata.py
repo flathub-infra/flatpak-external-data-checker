@@ -37,6 +37,7 @@ from .errors import (
 )
 from .checksums import MultiDigest
 
+_BM = t.TypeVar("_BM", bound="BuilderModule")
 _BS = t.TypeVar("_BS", bound="BuilderSource")
 _ES = t.TypeVar("_ES", bound="ExternalState")
 
@@ -54,6 +55,32 @@ CHECKER_DATA_SCHEMA_COMMON = {
 }
 
 log = logging.getLogger(__name__)
+
+
+@dataclasses.dataclass
+class BuilderModule:
+    name: str
+    module: t.Dict[str, t.Any]
+    module_path: str
+    parent: t.Optional[BuilderModule] = None
+    sources: t.List[BuilderSource] = dataclasses.field(default_factory=lambda: [])
+
+    @classmethod
+    def from_manifest(
+        cls: t.Type[_BM],
+        module_path: str,
+        module: t.Dict,
+        parent: t.Optional[BuilderModule] = None,
+    ) -> _BM:
+        return cls(
+            name=module["name"],
+            module=module,
+            module_path=module_path,
+            parent=parent,
+        )
+
+    def __str__(self):
+        return self.name
 
 
 @dataclasses.dataclass
@@ -94,6 +121,12 @@ class BuilderSource(abc.ABC):
     source: t.Dict[str, t.Any]
     source_path: str
     checker_data: t.Dict[str, t.Any]
+    module: t.Optional[BuilderModule]
+
+    def __post_init__(self):
+        if self.module:
+            if self not in self.module.sources:
+                self.module.sources.append(self)
 
     @classmethod
     def data_classes(cls: t.Type[_BS]) -> t.Dict[Type, t.Type[_BS]]:
@@ -105,7 +138,12 @@ class BuilderSource(abc.ABC):
         return classes
 
     @classmethod
-    def from_source(cls: t.Type[_BS], source_path: str, source: t.Dict) -> _BS:
+    def from_source(
+        cls: t.Type[_BS],
+        source_path: str,
+        source: t.Dict,
+        module: t.Optional[BuilderModule] = None,
+    ) -> _BS:
         try:
             jsonschema.validate(source, cls.SOURCE_SCHEMA)
         except jsonschema.ValidationError as err:
@@ -118,10 +156,15 @@ class BuilderSource(abc.ABC):
 
         data_cls = cls.data_classes()[data_type]
 
-        return data_cls.from_source_impl(source_path, source)
+        return data_cls.from_source_impl(source_path, source, module)
 
     @classmethod
-    def from_source_impl(cls: t.Type[_BS], source_path: str, source: t.Dict) -> _BS:
+    def from_source_impl(
+        cls: t.Type[_BS],
+        source_path: str,
+        source: t.Dict,
+        module: t.Optional[BuilderModule] = None,
+    ) -> _BS:
         raise NotImplementedError
 
     def __str__(self):
@@ -166,12 +209,17 @@ class ExternalBase(BuilderSource):
         return next(p for p in reversed(url.parts) if p)
 
     @classmethod
-    def from_source(cls: t.Type[_BS], source_path: str, source: t.Dict) -> _BS:
+    def from_source(
+        cls: t.Type[_BS],
+        source_path: str,
+        source: t.Dict,
+        module: t.Optional[BuilderModule] = None,
+    ) -> _BS:
         if not source.get("url"):
             raise SourceUnsupported('Data is not external: no "url" property')
 
         # FIXME: https://github.com/python/mypy/issues/9282
-        return super().from_source(source_path, source)  # type: ignore
+        return super().from_source(source_path, source, module)  # type: ignore
 
     def set_new_version(self, new_version: ExternalState, is_update: bool = True):
         assert isinstance(new_version, type(self.current_version))
@@ -228,7 +276,12 @@ class ExternalData(ExternalBase):
     new_version: t.Optional[ExternalFile]
 
     @classmethod
-    def from_source_impl(cls, source_path: str, source: t.Dict) -> ExternalData:
+    def from_source_impl(
+        cls,
+        source_path: str,
+        source: t.Dict,
+        module: t.Optional[BuilderModule] = None,
+    ) -> ExternalData:
         data_type = cls.Type(source["type"])
         assert data_type == cls.type, data_type
         url_str = source["url"]
@@ -255,6 +308,7 @@ class ExternalData(ExternalBase):
             source,
             source_path,
             checker_data,
+            module,
             ExternalFile(
                 url=url_str,
                 checksum=checksum,
@@ -376,7 +430,12 @@ class ExternalGitRepo(ExternalBase):
     new_version: t.Optional[ExternalGitRef]
 
     @classmethod
-    def from_source_impl(cls, source_path, source) -> ExternalGitRepo:
+    def from_source_impl(
+        cls,
+        source_path: str,
+        source: t.Dict,
+        module: t.Optional[BuilderModule] = None,
+    ) -> ExternalGitRepo:
         data_type = cls.Type(source["type"])
         assert data_type == cls.type, data_type
         url = source["url"]
@@ -394,6 +453,7 @@ class ExternalGitRepo(ExternalBase):
             source,
             source_path,
             checker_data,
+            module,
             ExternalGitRef(
                 url=url,
                 commit=commit,
