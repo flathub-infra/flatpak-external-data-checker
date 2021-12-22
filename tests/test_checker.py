@@ -392,7 +392,8 @@ size: {UpdateEverythingChecker.SIZE}
         "sha256": "{UpdateEverythingChecker.CHECKSUM}",
         "size": {UpdateEverythingChecker.SIZE}
     }}
-]""".lstrip()
+]
+""".lstrip()
         await self._test_update(
             filename,
             contents,
