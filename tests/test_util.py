@@ -24,6 +24,8 @@ from datetime import datetime, timezone
 from time import perf_counter
 from contextlib import contextmanager
 import re
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import aiohttp
 
@@ -35,6 +37,7 @@ from src.lib.utils import (
     _extract_timestamp,
     get_extra_data_info_from_url,
     Command,
+    dump_manifest,
 )
 
 
@@ -220,6 +223,74 @@ class TestDownload(unittest.IsolatedAsyncioTestCase):
                 session=self.http,
                 content_type_deny=[re.compile(f"^{self._CONTENT_TYPE}$")],
             )
+
+
+EDITORCONFIG_SAMPLE_DATA = {"first": 1, "second": [2, 3]}
+# fmt: off
+EDITORCONFIG_STYLES = [
+# 2-space with newline
+("""
+[*.json]
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+""",
+# ---
+"""{
+  "first": 1,
+  "second": [
+    2,
+    3
+  ]
+}
+"""),
+# Tab without newline
+("""
+[*.json]
+indent_style = tab
+insert_final_newline = false
+""",
+# ---
+"""{
+	"first": 1,
+	"second": [
+		2,
+		3
+	]
+}"""),
+# No preference, default to 4-space without newline
+(None,
+# ---
+"""{
+    "first": 1,
+    "second": [
+        2,
+        3
+    ]
+}"""),
+]
+# fmt: on
+
+
+class TestDumpManifest(unittest.TestCase):
+    tmpdir: TemporaryDirectory
+
+    def setUp(self):
+        self.tmpdir = TemporaryDirectory()
+
+    def tearDown(self):
+        self.tmpdir.cleanup()
+
+    def test_editorconfig(self):
+        for i, _style in enumerate(EDITORCONFIG_STYLES):
+            econfig, expected_data = _style
+            path = Path(self.tmpdir.name) / str(i) / f"{i}.json"
+            path.parent.mkdir(parents=True)
+            if econfig:
+                (path.parent / ".editorconfig").write_text(econfig)
+            path.write_text("{}")  # Can be anything, just the file need to pre-exist
+            dump_manifest(EDITORCONFIG_SAMPLE_DATA, path)
+            self.assertEqual(path.read_text(), expected_data)
 
 
 if __name__ == "__main__":

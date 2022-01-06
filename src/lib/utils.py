@@ -39,6 +39,7 @@ from collections import OrderedDict
 from ruamel.yaml import YAML
 from elftools.elf.elffile import ELFFile
 import aiohttp
+import editorconfig
 
 from . import externaldata, TIMEOUT_CONNECT, HTTP_CHUNK_SIZE, OPERATORS
 from .errors import CheckerRemoteError, CheckerQueryError, CheckerFetchError
@@ -440,13 +441,32 @@ def dump_manifest(contents: t.Dict, manifest_path: t.Union[Path, str]):
     formatting; for JSON, we use the canonical 4-space indentation,
     but add a trailing newline if originally present."""
     manifest_path = Path(manifest_path)
-    with manifest_path.open("r") as fp:
-        newline = _check_newline(fp)
+
+    assert manifest_path.is_absolute()
+    conf = editorconfig.get_properties(manifest_path)
+
+    # Determine indentation preference
+    indent: t.Union[str, int]
+    if conf.get("indent_style") == "space":
+        indent = int(conf.get("indent_size", 4))
+    elif conf.get("indent_style") == "tab":
+        indent = "\t"
+    else:
+        indent = 4
+
+    # Determine trailing newline preference
+    newline: t.Optional[bool]
+    if "insert_final_newline" in conf:
+        newline = {"true": True, "false": False}.get(conf["insert_final_newline"])
+    else:
+        with manifest_path.open("r") as fp:
+            newline = _check_newline(fp)
+
     with manifest_path.open("w", encoding="utf-8") as fp:
         if manifest_path.suffix in (".yaml", ".yml"):
             _yaml.dump(contents, fp)
         else:
-            json.dump(obj=contents, fp=fp, indent=4)
+            json.dump(obj=contents, fp=fp, indent=indent)
             if newline:
                 fp.write("\n")
 

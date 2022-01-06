@@ -87,6 +87,12 @@ from the tool can be forcefully enabled by setting
 `automerge-flathubbot-prs` to `true` in `flathub.json`,
 or it can be completely disabled by setting `automerge-flathubbot-prs` to `false`.
 
+### Formatting manifests
+
+The tool respects some of [EditorConfig](https://editorconfig.org/) settings.
+If your preferred manifest formatting is different from the default (4-space indentation for JSON),
+create (and commit) a `.editorconfig` file near the manifest.
+
 ## Changes to Flatpak manifests
 
 For simple checks to see if a URL is broken, no changes are needed.  However,
