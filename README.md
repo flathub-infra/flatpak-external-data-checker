@@ -103,7 +103,7 @@ insert_final_newline = true
 
 Unfortunately, it is not feasible to preserve JSON-GLib's non-standard `/* */` syntax for comments. As an alternative, dictionary keys beginning with `//` are ignored by `flatpak-builder` and can be used for comments in many cases.
 
-For YAML files, this tool attempts to preserve existing formatting and comments automatically. `.editorconfig` is not used.
+For YAML files, this tool attempts to preserve existing formatting and comments automatically. `.editorconfig` is not used. We recommend you follow the [Flathub YAML Style Guide](https://github.com/flathub/flathub/wiki/YAML-Style-Guide).
 
 ## Changes to Flatpak manifests
 
