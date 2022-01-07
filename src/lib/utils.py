@@ -156,7 +156,14 @@ def filter_versions(
             try:
                 match = oper(StrictVersion(version_str), StrictVersion(version_limit))
             except ValueError:
-                match = oper(LooseVersion(version_str), LooseVersion(version_limit))
+                try:
+                    match = oper(LooseVersion(version_str), LooseVersion(version_limit))
+                except TypeError as err:
+                    log.debug(
+                        "Comparison of loose versions failed due to type mismatch: %s",
+                        err,
+                    )
+                    match = False
             matches.append(match)
         if all(matches):
             new_versions.append(version)
