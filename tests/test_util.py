@@ -154,6 +154,10 @@ class TestVersionFilter(unittest.TestCase):
             filter_versions(["1.a", "1.b", "1.c"], [(">=", "1.b")]),
             ["1.b", "1.c"],
         )
+        self.assertEqual(
+            filter_versions(["3.1.0", "2.2.0", "1.12.0", "start"], [("<", "2.0.0")]),
+            ["1.12.0"],
+        )
 
     def test_sort(self):
         self.assertEqual(
