@@ -87,6 +87,24 @@ from the tool can be forcefully enabled by setting
 `automerge-flathubbot-prs` to `true` in `flathub.json`,
 or it can be completely disabled by setting `automerge-flathubbot-prs` to `false`.
 
+### Formatting manifests
+
+When writing back JSON files, this tool defaults to four-space indentation, preserving or omitting a trailing newline based on the source file. If you prefer a different formatting, create and commit an `.editorconfig` file describing your preferred formatting for `.json` files. At present, this tool respects a subset of [EditorConfig](https://editorconfig.org/) settings:
+
+```ini
+root = true
+
+[*.json]
+indent_style = space
+# Only integer values are supported; ignored if indent_style=tab
+indent_size = 2
+insert_final_newline = true
+```
+
+Unfortunately, it is not feasible to preserve JSON-GLib's non-standard `/* */` syntax for comments. As an alternative, dictionary keys beginning with `//` are ignored by `flatpak-builder` and can be used for comments in many cases.
+
+For YAML files, this tool attempts to preserve existing formatting and comments automatically. `.editorconfig` is not used.
+
 ## Changes to Flatpak manifests
 
 For simple checks to see if a URL is broken, no changes are needed.  However,

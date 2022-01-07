@@ -19,7 +19,6 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import datetime as dt
-import glob
 import hashlib
 import json
 import logging
@@ -34,11 +33,13 @@ import typing as t
 from distutils.version import StrictVersion, LooseVersion
 import asyncio
 import shlex
+from pathlib import Path
 
 from collections import OrderedDict
 from ruamel.yaml import YAML
 from elftools.elf.elffile import ELFFile
 import aiohttp
+import editorconfig
 
 from . import externaldata, TIMEOUT_CONNECT, HTTP_CHUNK_SIZE, OPERATORS
 from .errors import CheckerRemoteError, CheckerQueryError, CheckerFetchError
@@ -360,9 +361,9 @@ async def extract_appimage_version(appimg_io: t.IO):
         log.info("Running %s", unsquashfs_cmd)
         await unsquashfs_cmd.run()
 
-        for desktop in glob.glob(os.path.join(tmpdir, "squashfs-root", "*.desktop")):
+        for desktop in (Path(tmpdir) / "squashfs-root").glob("*.desktop"):
             kf = GLib.KeyFile()
-            kf.load_from_file(desktop, GLib.KeyFileFlags.NONE)
+            kf.load_from_file(str(desktop), GLib.KeyFileFlags.NONE)
             return kf.get_string(GLib.KEY_FILE_DESKTOP_GROUP, "X-AppImage-Version")
 
 
@@ -391,7 +392,7 @@ def parse_github_url(url):
         raise ValueError(f"{url!r} doesn't look like a Git URL")
 
 
-def read_json_manifest(manifest_path):
+def read_json_manifest(manifest_path: Path):
     """Read manifest from 'manifest_path', which may contain C-style
     comments or multi-line strings (accepted by json-glib and hence
     flatpak-builder, but not Python's json module)."""
@@ -400,7 +401,7 @@ def read_json_manifest(manifest_path):
     # strings, and any other invalid JSON
     parser = Json.Parser()
     try:
-        parser.load_from_file(manifest_path)
+        parser.load_from_file(str(manifest_path))
     except GLib.Error as err:
         if err.matches(GLib.file_error_quark(), GLib.FileError.NOENT):
             raise FileNotFoundError(err.message) from err  # pylint: disable=no-member
@@ -418,35 +419,54 @@ _yaml = YAML()
 _yaml.indent(mapping=2, sequence=4, offset=2)
 
 
-def read_yaml_manifest(manifest_path):
+def read_yaml_manifest(manifest_path: Path):
     """Read a YAML manifest from 'manifest_path'."""
-    with open(manifest_path, "r") as f:
+    with manifest_path.open("r") as f:
         return _yaml.load(f)
 
 
-def read_manifest(manifest_path):
+def read_manifest(manifest_path: t.Union[Path, str]):
     """Reads a JSON or YAML manifest from 'manifest_path'."""
-    _, ext = os.path.splitext(manifest_path)
-    if ext in (".yaml", ".yml"):
+    manifest_path = Path(manifest_path)
+    if manifest_path.suffix in (".yaml", ".yml"):
         return read_yaml_manifest(manifest_path)
     else:
         return read_json_manifest(manifest_path)
 
 
-def dump_manifest(contents, manifest_path):
+def dump_manifest(contents: t.Dict, manifest_path: t.Union[Path, str]):
     """Writes back 'contents' to 'manifest_path'.
 
     For YAML, we make a best-effort attempt to preserve
     formatting; for JSON, we use the canonical 4-space indentation,
     but add a trailing newline if originally present."""
-    _, ext = os.path.splitext(manifest_path)
-    with open(manifest_path, "r") as fp:
-        newline = _check_newline(fp)
-    with open(manifest_path, "w", encoding="utf-8") as fp:
-        if ext in (".yaml", ".yml"):
+    manifest_path = Path(manifest_path)
+
+    assert manifest_path.is_absolute()
+    conf = editorconfig.get_properties(manifest_path)
+
+    # Determine indentation preference
+    indent: t.Union[str, int]
+    if conf.get("indent_style") == "space":
+        indent = int(conf.get("indent_size", 4))
+    elif conf.get("indent_style") == "tab":
+        indent = "\t"
+    else:
+        indent = 4
+
+    # Determine trailing newline preference
+    newline: t.Optional[bool]
+    if "insert_final_newline" in conf:
+        newline = {"true": True, "false": False}.get(conf["insert_final_newline"])
+    else:
+        with manifest_path.open("r") as fp:
+            newline = _check_newline(fp)
+
+    with manifest_path.open("w", encoding="utf-8") as fp:
+        if manifest_path.suffix in (".yaml", ".yml"):
             _yaml.dump(contents, fp)
         else:
-            json.dump(obj=contents, fp=fp, indent=4)
+            json.dump(obj=contents, fp=fp, indent=indent)
             if newline:
                 fp.write("\n")
 

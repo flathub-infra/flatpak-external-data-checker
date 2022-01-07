@@ -9,3 +9,4 @@ pyelftools
 aiohttp
 semver
 jsonschema
+editorconfig
