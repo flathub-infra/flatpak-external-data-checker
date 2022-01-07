@@ -116,6 +116,16 @@ and automatically add it to releases list in metainfo. To specify which source
 is the app upstream source, set property `is-main-source` to `true` in the
 checker metadata for that source.
 
+### Version constraining
+
+The checkers can support version constraining, making it possible to e.g. limit
+version checking to a certain major version. The property is `versions`. It
+should contain key-value pairs where the key is the comparison operator (one of
+`<`, `>`, `<=`, `>=`, `==`, `!=`), and the value is the version to compare with
+So, `{"<": "3.38.0", "!=": "3.37.1"}` means *"any version less than 3.38.0
+except 3.37.1"*. All constraints must match simultaneously, i.e. if one doesn't
+match -> version is rejected.
+
 ### URL checker
 
 If the upstream vendor has an URL that redirects to the latest version of the
@@ -289,10 +299,13 @@ and add a template for source download URL.
     "type": "anitya",
     "project-id": 6377,
     "stable-only": false,
+    "versions": {"<": "1.12.0"},
     "url-template": "https://github.com/flatpak/flatpak/releases/download/$version/flatpak-$version.tar.xz"
 }
 ```
 Set `stable-only` to `true` to retrieve latest stable version (as recognized by Anitya).
+
+The [`versions`](#version-constraining) property is supported.
 
 For git type sources, instead of `url-template`, set `tag-template` to derive git tag from version.
 
@@ -313,11 +326,7 @@ Check for latest source tarball for a GNOME project.
 
 Set `stable-only` to `false` to check for pre-releases, too.
 
-You can also set version constraints in `versions` property (optional).  
-It should contain key-value pairs where key is the comparison operator
-(one of `<`, `>`, `<=`, `>=`, `==`, `!=`), and the value is the version to compare with.
-So, `{"<": "3.38.0", "!=": "3.37.1"}` means *"any version less than 3.38.0 except 3.37.1"*.
-All constraints must match simultaneously, i.e. if one doesn't match - version is rejected.
+The [`versions`](#version-constraining) property is supported.
 
 ### PyPI checker
 
@@ -333,6 +342,8 @@ Check for Python package updates on PyPI.
 By default it will check for source package (`sdist` package type).
 To check for binary package instead, set `packagetype` to `bdist_wheel`
 (only noarch wheels are supported currently).
+
+The [`versions`](#version-constraining) property is supported.
 
 ### Electron Auto Update checker
 
