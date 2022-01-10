@@ -19,17 +19,18 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import unittest
-from io import StringIO
+from io import BytesIO
 
 from src.lib.appdata import add_release
 
 
 class TestAddRelease(unittest.TestCase):
     def _do_test(self, before, expected):
-        in_ = StringIO(before)
-        out = StringIO()
+        in_ = BytesIO(before.encode())
+        out = BytesIO()
         add_release(in_, out, "4.5.6", "2020-02-02")
-        self.assertMultiLineEqual(out.getvalue(), expected)
+        # FIXME lxml pretty print always adds trailing newline
+        self.assertMultiLineEqual(expected + "\n", out.getvalue().decode())
 
     def test_simple(self):
         self._do_test(
@@ -172,6 +173,7 @@ class TestAddRelease(unittest.TestCase):
 EmailAddress: billg@example.com
 SentUpstream: 2014-05-22
 -->
+  <name>First element needed</name>
 </application>
             """.strip(),
             """
@@ -182,6 +184,7 @@ SentUpstream: 2014-05-22
 EmailAddress: billg@example.com
 SentUpstream: 2014-05-22
 -->
+  <name>First element needed</name>
   <releases>
     <release version="4.5.6" date="2020-02-02"/>
   </releases>

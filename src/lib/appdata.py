@@ -23,123 +23,67 @@ preserving as much formatting as is feasible and inserting that element if it is
 missing.
 """
 
-from io import StringIO
-from defusedxml.sax import make_parser
-from xml.sax.handler import property_lexical_handler
-from xml.sax.saxutils import XMLFilterBase, XMLGenerator
+import io
+import typing as t
+
+import lxml.etree as ET
 
 
-class AddVersionFilter(XMLFilterBase):
-    def __init__(self, version, date, parent=None):
-        super().__init__(parent)
-
-        self._version = version
-        self._date = date
-        self._context = []
-        self._emitted_release = False
-        self._releases_padding = ""
-
-    @property
-    def outside_root_element(self):
-        return not self._context
-
-    @property
-    def _in_releases(self):
-        return self._context[1:] == ["releases"]
-
-    def _emit_release(self):
-        super().startElement("release", {"version": self._version, "date": self._date})
-        # TODO: add placeholder <description> if other <release> entries have one
-        super().endElement("release")
-        super().characters(self._releases_padding)
-        self._emitted_release = True
-
-    def startElement(self, name, attrs):
-        if self._in_releases and not self._emitted_release:
-            self._emit_release()
-
-        super().startElement(name, attrs)
-
-        self._context.append(name)
-
-    def characters(self, chars):
-        if self._in_releases and not self._emitted_release and chars.isspace():
-            self._releases_padding += chars
-
-        super().characters(chars)
-
-    def endElement(self, name):
-        if self._in_releases and not self._emitted_release:
-            super().characters("\n    ")
-            self._emit_release()
-            super().characters("\n  ")
-
-        self._context.pop()
-
-        if not self._context and not self._emitted_release:
-            # No <releases> found; synthesize one
-            super().characters("  ")
-            super().startElement("releases", {})
-            super().characters("\n    ")
-            self._emit_release()
-            super().characters("\n  ")
-            super().endElement("releases")
-            super().characters("\n")
-
-        super().endElement(name)
+DEFAULT_INDENT = "  "
 
 
-class VerbatimLexicalHandler:
-    """Implements the poorly-documented LexicalHandler interface."""
-
-    def __init__(self, reader, stream):
-        self._reader = reader
-        self._stream = stream
-
-    def comment(self, text):
-        self._stream.write("<!--")
-        self._stream.write(text)
-        self._stream.write("-->")
-
-        # Aggravating hack alert!
-        #
-        # appdata files often include a copyright comment between the <?xml
-        # declaration and the root element. In some cases, there are two.
-        # Unfortunately, there is no representation in the SAX API for
-        # whitespace that occurs outside any element, and there's normally
-        # a newline between the comment and the opening element (or the next
-        # comment).
-        #
-        # Work around this by writing a newline in this case; this requires some
-        # coordination between the reader and this writer.
-        if self._reader.outside_root_element:
-            self._stream.write("\n")
-
-    def startCDATA(self, *args):
-        raise NotImplementedError
-
-    def endCDATA(self, *args):
-        raise NotImplementedError
-
-    def endDTD(self, *args):
-        raise NotImplementedError
+def _fill_padding(ele: ET.Element):
+    parent = ele.getparent()
+    index = parent.index(ele)
+    level = sum(1 for _ in ele.iterancestors())
+    if len(parent) > 1:
+        if index == len(parent) - 1:
+            if len(parent) > 2:
+                ele.tail = parent[index - 1].tail
+                parent[index - 1].tail = parent[index - 2].tail
+            else:
+                ele.tail = "\n" + DEFAULT_INDENT * (level - 1)
+                parent[index - 1].tail = parent.text
+        else:
+            ele.tail = parent.text
+    else:
+        parent.text = "\n" + DEFAULT_INDENT * level
+        ele.tail = "\n" + DEFAULT_INDENT * (level - 1)
 
 
-def add_release(in_path_or_stream, out, version, date):
-    reader = AddVersionFilter(version, date, make_parser())
-    lexical_handler = VerbatimLexicalHandler(reader, out)
-    handler = XMLGenerator(out, encoding="UTF-8", short_empty_elements=True)
-    reader.setContentHandler(handler)
-    reader.setProperty(property_lexical_handler, lexical_handler)
-    reader.parse(in_path_or_stream)
+def add_release(
+    src: t.Union[t.IO, str],
+    dst: t.Union[t.IO, str],
+    version: str,
+    date: str,
+):
+    tree = ET.parse(src)
+    root = tree.getroot()
+
+    releases = root.find("releases")
+
+    if releases is None:
+        releases = ET.Element("releases")
+        root.append(releases)
+        _fill_padding(releases)
+
+    release = ET.Element("release", version=version, date=date)
+    releases.insert(0, release)
+    _fill_padding(release)
+
+    tree.write(
+        dst,
+        # XXX: lxml uses single quotes for doctype line if generated with
+        # xml_declaration=True,
+        doctype='<?xml version="1.0" encoding="UTF-8"?>',
+        encoding="utf-8",
+        pretty_print=True,
+    )
 
 
-def add_release_to_file(appdata_path, version, date):
-    with StringIO() as buf:
+def add_release_to_file(appdata_path: str, version: str, date: str):
+    with io.BytesIO() as buf:
         add_release(appdata_path, buf, version, date)
 
-        with open(appdata_path, "w") as f:
-            xml = buf.getvalue()
-            f.write(xml)
-            if not xml.endswith("\n"):
-                f.write("\n")
+        with open(appdata_path, "wb") as f:
+            f.write(buf.getvalue())

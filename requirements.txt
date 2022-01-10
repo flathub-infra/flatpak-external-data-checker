@@ -10,3 +10,4 @@ aiohttp
 semver
 jsonschema
 editorconfig
+lxml
