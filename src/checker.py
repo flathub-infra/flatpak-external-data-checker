@@ -24,8 +24,11 @@ import typing as t
 import asyncio
 from dataclasses import dataclass
 from enum import IntEnum
+import logging
+import os
 
 import aiohttp
+from lxml.etree import XMLSyntaxError
 
 from .checkers import ALL_CHECKERS
 from .lib import HTTP_CLIENT_HEADERS, TIMEOUT_CONNECT, TIMEOUT_TOTAL
@@ -46,10 +49,6 @@ from .lib.errors import (
     SourceLoadError,
     SourceUnsupported,
 )
-
-import logging
-import os
-from xml.sax import SAXParseException
 
 
 MAIN_SRC_PROP = "is-main-source"
@@ -466,9 +465,8 @@ class ManifestChecker:
                 add_release_to_file(
                     appdata, last_update.version, timestamp.strftime("%F")
                 )
-            except SAXParseException as err:
-                # XXX: Pylint thinks that SAXParseException isn't an Exception, why?
-                raise AppdataLoadError from err  # pylint: disable=bad-exception-context
+            except XMLSyntaxError as err:
+                raise AppdataLoadError from err
         else:
             log.debug("Version didn't change, not adding release")
 
