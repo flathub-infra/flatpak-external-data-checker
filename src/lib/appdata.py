@@ -57,7 +57,8 @@ def add_release(
     version: str,
     date: str,
 ):
-    tree = ET.parse(src)
+    parser = ET.XMLParser(load_dtd=False, resolve_entities=False)
+    tree = ET.parse(src, parser=parser)
     root = tree.getroot()
 
     releases = root.find("releases")
