@@ -8,7 +8,7 @@ import os
 
 from yarl import URL
 
-from ..lib import utils, NETWORK_ERRORS
+from ..lib import utils
 from ..lib.externaldata import (
     ExternalBase,
     ExternalData,
@@ -16,19 +16,19 @@ from ..lib.externaldata import (
     ExternalGitRef,
 )
 from ..lib.errors import CheckerQueryError
-from ..lib.checkers import Checker
+from ..lib.checkers import Checker, JSONType
 
 log = logging.getLogger(__name__)
 
 
-async def query_json(query: str, data: bytes, variables: t.Dict[str, str]) -> str:
+async def _jq(query: str, data: JSONType, variables: t.Dict[str, str]) -> str:
     var_args = []
     for var_name, var_value in variables.items():
         var_args += ["--arg", var_name, var_value]
 
     jq_cmd = ["jq"] + var_args + ["-e", query]
     try:
-        jq_stdout, _ = await utils.Command(jq_cmd).run(data)
+        jq_stdout, _ = await utils.Command(jq_cmd).run(json.dumps(data).encode())
     except subprocess.CalledProcessError as err:
         raise CheckerQueryError("Error running jq") from err
 
@@ -93,35 +93,34 @@ class JSONChecker(Checker):
             ]
         return schema
 
-    async def _get_json(self, url: t.Union[str, URL]) -> bytes:
-        log.debug("Get JSON from %s", url)
+    async def _get_json(
+        self,
+        url: t.Union[str, URL],
+        headers: t.Dict[str, str] = None,
+    ) -> JSONType:
         url = URL(url)
 
-        headers = {}
+        headers = headers.copy() if headers else {}
         if url.host == "api.github.com":
             github_token = os.environ.get("GITHUB_TOKEN")
             if github_token:
                 headers["Authorization"] = f"token {github_token}"
 
-        try:
-            async with self.session.get(url, headers=headers) as response:
-                return await response.read()
-        except NETWORK_ERRORS as err:
-            raise CheckerQueryError from err
+        return await super()._get_json(url, headers)
 
     async def _query_sequence(
         self,
-        init_json_data: bytes,
+        init_json_data: JSONType,
         queries: t.Iterable[_Query],
     ) -> t.Dict[str, str]:
         results: t.Dict[str, str] = {}
         for query in queries:
             if query.url_expr:
-                url = await query_json(query.url_expr, init_json_data, results)
+                url = await _jq(query.url_expr, init_json_data, results)
                 json_data = await self._get_json(url)
             else:
                 json_data = init_json_data
-            results[query.name] = await query_json(query.value_expr, json_data, results)
+            results[query.name] = await _jq(query.value_expr, json_data, results)
         return results
 
     @staticmethod
@@ -152,7 +151,7 @@ class JSONChecker(Checker):
             assert isinstance(external_data, ExternalData)
             return await self._check_data(json_data, external_data)
 
-    async def _check_data(self, json_data: bytes, external_data: ExternalData):
+    async def _check_data(self, json_data: JSONType, external_data: ExternalData):
         checker_data = external_data.checker_data
         results = await self._query_sequence(
             json_data,
@@ -172,7 +171,7 @@ class JSONChecker(Checker):
             timestamp=latest_timestamp,
         )
 
-    async def _check_git(self, json_data: bytes, external_data: ExternalGitRepo):
+    async def _check_git(self, json_data: JSONType, external_data: ExternalGitRepo):
         checker_data = external_data.checker_data
         results = await self._query_sequence(
             json_data,
