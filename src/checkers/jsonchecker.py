@@ -1,4 +1,5 @@
 import logging
+import json
 import re
 from datetime import datetime
 import typing as t
@@ -21,20 +22,25 @@ log = logging.getLogger(__name__)
 
 
 async def query_json(query: str, data: bytes, variables: t.Dict[str, str]) -> str:
-    typecheck_q = (
-        '.|type as $rt | if $rt=="string" or $rt=="number" then . else error($rt) end'
-    )
-
     var_args = []
     for var_name, var_value in variables.items():
         var_args += ["--arg", var_name, var_value]
 
-    jq_cmd = ["jq"] + var_args + ["-r", "-e", f"( {query} ) | ( {typecheck_q} )"]
+    jq_cmd = ["jq"] + var_args + ["-e", query]
     try:
         jq_stdout, _ = await utils.Command(jq_cmd).run(data)
     except subprocess.CalledProcessError as err:
         raise CheckerQueryError("Error running jq") from err
-    return jq_stdout.decode().strip()
+
+    try:
+        result = json.loads(jq_stdout)
+    except json.JSONDecodeError as err:
+        raise CheckerQueryError("Error reading jq output") from err
+
+    if isinstance(result, (str, int, float)):
+        return str(result)
+
+    raise CheckerQueryError(f"Invalid jq output type {type(result)}")
 
 
 def parse_timestamp(date_string: t.Optional[str]) -> t.Optional[datetime]:
