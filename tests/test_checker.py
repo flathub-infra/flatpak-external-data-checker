@@ -23,8 +23,6 @@ import logging
 import os
 import unittest
 import tempfile
-import hashlib
-import gzip
 
 from xml.dom import minidom
 
@@ -440,20 +438,11 @@ size: {UpdateEverythingChecker.SIZE}
             relative_redirect.new_version.url,
             "https://httpbingo.org/base64/MzAtNTAgZmVyYWwgaG9ncyEK",
         )
-        # XXX: We can't tell httpbingo to encode or not the content. Currently it sends
-        # gzipped response, but check for and accept plain response as well, just in case
-        hogs_data = "30-50 feral hogs!\n".encode("ascii")
-        hogs_compr = gzip.compress(hogs_data, mtime=0, compresslevel=1)
-        self.assertIn(
+        self.assertEqual(
             relative_redirect.new_version.checksum,
-            [
-                hashlib.sha256(hogs_data).hexdigest(),
-                hashlib.sha256(hogs_compr).hexdigest(),
-            ],
+            "e4d67702da4eeeb2f15629b65bf6767c028a511839c14ed44d9f34479eaa2b94",
         )
-        self.assertIn(
-            relative_redirect.new_version.size, [len(hogs_data), len(hogs_compr)]
-        )
+        self.assertEqual(relative_redirect.new_version.size, 18)
 
         # this URL is a redirect, but since it is not a rotating-url the URL
         # should not be updated.

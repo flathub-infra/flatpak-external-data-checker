@@ -75,7 +75,7 @@
                 {
                     "type": "extra-data",
                     "filename": "hogs.txt",
-                    "url": "https://httpbin.org/base64/MzAtNTAgZmVyYWwgaG9ncyEK",
+                    "url": "https://httpbingo.org/base64/MzAtNTAgZmVyYWwgaG9ncyEK",
                     "sha256": "e4d67702da4eeeb2f15629b65bf6767c028a511839c14ed44d9f34479eaa2b94",
                     "size": 18
                 },
