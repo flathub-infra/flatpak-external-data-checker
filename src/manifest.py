@@ -297,11 +297,11 @@ class ManifestChecker:
                 # but applying checkers in sequence should be carefully tested.
                 # This is a safety switch: leave the data alone on error.
                 return data
-            if data.state != ExternalBase.State.UNKNOWN:
+            if data.state != data.State.UNKNOWN:
                 log.debug(
-                    "Source %s: got new state %s from %s, skipping remaining checkers",
+                    "Source %s: got new %s from %s, skipping remaining checkers",
                     data,
-                    data.state.name,
+                    data.state,
                     checker.__class__.__name__,
                 )
                 break
@@ -341,7 +341,7 @@ class ManifestChecker:
         ) as http_session:
             check_tasks = []
             for data in external_data:
-                if data.state != ExternalBase.State.UNKNOWN:
+                if data.state != data.State.UNKNOWN:
                     continue
                 check_tasks.append(self._check_data(counter, http_session, data))
 
@@ -382,7 +382,7 @@ class ManifestChecker:
         return [
             data
             for data in self.get_external_data()
-            if data.state == ExternalBase.State.BROKEN or data.new_version
+            if data.State.BROKEN in data.state or data.new_version
         ]
 
     def _update_manifest(self, path, datas, changes):

@@ -159,7 +159,7 @@ class GitChecker(Checker):
         try:
             remote_version = await external_data.current_version.fetch_remote()
         except CheckerFetchError:
-            external_data.state = ExternalGitRepo.State.BROKEN
+            external_data.state |= external_data.State.BROKEN
             raise
 
         external_data.set_new_version(remote_version, is_update=False)

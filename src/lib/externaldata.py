@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 import abc
-from enum import Enum
+from enum import Enum, IntFlag
 import datetime
 import typing as t
 import dataclasses
@@ -69,7 +69,7 @@ class BuilderSource(abc.ABC):
         "required": ["type"],
     }
 
-    class Type(Enum):
+    class Type(str, Enum):
         EXTRA_DATA = "extra-data"
         FILE = "file"
         ARCHIVE = "archive"
@@ -78,10 +78,14 @@ class BuilderSource(abc.ABC):
         def __str__(self):
             return self.value
 
-    class State(Enum):
+    class State(IntFlag):
         UNKNOWN = 0
+        # Current version state
         VALID = 1 << 1  # URL is reachable
         BROKEN = 1 << 2  # URL couldn't be reached
+        # New version state
+        LATEST = 1 << 3
+        OUTDATED = 1 << 4
 
     type: t.ClassVar[Type]
     state: State
@@ -172,17 +176,19 @@ class ExternalBase(BuilderSource):
         if self.current_version.matches(new_version):
             if is_update:
                 log.debug("Source %s: no update found", self.filename)
+                self.state |= self.State.LATEST
             else:
                 log.debug("Source %s: no remote data change", self.filename)
-            self.state = self.State.VALID
+            self.state |= self.State.VALID
         else:
             if is_update:
                 log.info(
                     "Source %s: got new version %s", self.filename, new_version.version
                 )
+                self.state |= self.State.OUTDATED
             else:
                 log.warning("Source %s: remote data changed", self.filename)
-                self.state = self.State.BROKEN
+                self.state |= self.State.BROKEN
             self.new_version = new_version
 
     def update(self):

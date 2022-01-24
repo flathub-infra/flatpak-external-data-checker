@@ -61,19 +61,19 @@ class TestGitChecker(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertFalse(data.current_version.matches(data.new_version))
             elif data.filename == "qt-virustotal-uploader.git":
-                self.assertEqual(data.state, data.State.VALID)
+                self.assertIn(data.State.VALID, data.state)
                 self.assertIsNone(data.new_version)
             elif data.filename == "protobuf-c.git":
                 self.assertEqual(data.state, data.State.UNKNOWN)
                 self.assertIsNone(data.new_version)
             elif data.filename == "yara.git":
-                self.assertEqual(data.state, data.State.BROKEN)
+                self.assertIn(data.State.BROKEN, data.state)
                 self.assertIsNone(data.new_version)
             elif data.filename == "yara-python.git":
                 self.assertEqual(data.state, data.State.UNKNOWN)
                 self.assertIsNone(data.new_version)
             elif data.filename == "vt-py.git":
-                self.assertEqual(data.state, data.State.VALID)
+                self.assertIn(data.State.VALID, data.state)
                 self.assertIsNone(data.new_version)
             elif data.filename == "extra-cmake-modules.git":
                 self.assertIsNotNone(data.new_version)
