@@ -5,6 +5,7 @@ import re
 import toml
 
 from ..lib.externaldata import ExternalBase, ExternalFile, Checker
+from ..lib.checksums import MultiDigest
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ class RustChecker(Checker):
         if target["available"]:
             new_version = ExternalFile(
                 url=target["xz_url"],
-                checksum=target["xz_hash"],
+                checksum=MultiDigest(sha256=target["xz_hash"]),
                 size=None,
                 version=appstream_version,
                 timestamp=release_date,

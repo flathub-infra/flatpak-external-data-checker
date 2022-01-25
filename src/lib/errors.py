@@ -34,6 +34,10 @@ class SourceUnsupported(SourceLoadError):
     """Don't know how to handle flatpak-builder source item"""
 
 
+class SourceUpdateError(ManifestUpdateError):
+    """Error updating flatpak-builder source"""
+
+
 class AppdataError(ManifestError):
     """Error processing metainfo.xml"""
 

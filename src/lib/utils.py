@@ -19,7 +19,6 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import datetime as dt
-import hashlib
 import json
 import logging
 import os
@@ -43,6 +42,7 @@ import editorconfig
 
 from . import externaldata, TIMEOUT_CONNECT, HTTP_CHUNK_SIZE, OPERATORS
 from .errors import CheckerRemoteError, CheckerQueryError, CheckerFetchError
+from .checksums import MultiHash
 
 import gi
 
@@ -122,7 +122,7 @@ async def get_extra_data_info_from_url(
                 f"Wrong content type '{content_type}' received from '{url}'"
             )
 
-        checksum = hashlib.sha256()
+        checksum = MultiHash()
         size = 0
         async for chunk in response.content.iter_chunked(HTTP_CHUNK_SIZE):
             checksum.update(chunk)

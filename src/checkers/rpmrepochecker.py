@@ -10,6 +10,7 @@ import typing as t
 from defusedxml import ElementTree
 
 from ..lib.externaldata import ExternalBase, Checker, ExternalFile
+from ..lib.checksums import MultiDigest
 
 
 log = logging.getLogger(__name__)
@@ -32,21 +33,23 @@ class RPMRepoChecker(Checker):
     }
 
     @classmethod
-    def _get_child_prop(cls, parent: Element, child: str, prop: t.Optional[str] = None):
+    def _get_child_prop(cls, parent: Element, child: str, prop: str):
         child_el = parent.find(child, cls._XMLNS)
         assert child_el is not None, child
-        if prop is None:
-            value = child_el.text
-        else:
-            value = child_el.get(prop)
+        value = child_el.get(prop)
         assert value is not None, prop
         return value
 
     @classmethod
     def external_file_from_xml(cls, rpm: Element, repo_root: str):
+        digests = {}
+        for cs_elem in rpm.findall("checksum", cls._XMLNS):
+            cs_elem_type = cs_elem.get("type")
+            if cs_elem_type:
+                digests[cs_elem_type] = cs_elem.text
         return ExternalFile(
             url=urljoin(repo_root, cls._get_child_prop(rpm, "location", "href")),
-            checksum=cls._get_child_prop(rpm, 'checksum[@type="sha256"]'),
+            checksum=MultiDigest.from_source(digests),
             size=int(cls._get_child_prop(rpm, "size", "archive")),
             version=cls._get_child_prop(rpm, "version", "ver"),
             timestamp=datetime.utcfromtimestamp(
