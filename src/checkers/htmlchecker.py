@@ -23,8 +23,10 @@ import re
 import urllib.parse
 from string import Template
 from distutils.version import LooseVersion
+import codecs
 import typing as t
 
+import aiohttp
 from yarl import URL
 
 from ..lib import (
@@ -101,10 +103,34 @@ class HTMLChecker(Checker):
         ],
     }
 
+    @staticmethod
+    async def _get_encoding(response: aiohttp.ClientResponse) -> str:
+        # Loosely based on aiohttp.ClientResponse.get_encoding, but
+        # avoids expensive charset detection via chardet.detect() call;
+        # if we didn't get a proper charset right away,
+        # we're most likely facing a HTTP response that isn't textual
+        ctype = response.headers.get(aiohttp.hdrs.CONTENT_TYPE, "").lower()
+        mimetype = aiohttp.helpers.parse_mimetype(ctype)
+        encoding = mimetype.parameters.get("charset")
+        if encoding:
+            try:
+                codecs.lookup(encoding)
+            except LookupError as err:
+                raise CheckerFetchError(
+                    f'Unknown encoding "{encoding}" from {response.url}'
+                ) from err
+        else:
+            encoding = "utf-8"
+        return encoding
+
     async def _get_text(self, url: t.Union[URL, str]) -> str:
         try:
             async with self.session.get(url) as response:
-                return await response.text()
+                encoding = await self._get_encoding(response)
+                try:
+                    return await response.text(encoding=encoding)
+                except UnicodeDecodeError as err:
+                    raise CheckerFetchError from err
         except NETWORK_ERRORS as err:
             raise CheckerQueryError from err
 

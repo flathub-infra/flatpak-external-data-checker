@@ -31,6 +31,7 @@ from src.lib.utils import init_logging
 from src.checker import ManifestChecker
 from src.lib.checksums import MultiDigest
 from src.checkers import HTMLChecker
+from src.lib.errors import CheckerError
 
 
 class TestHTMLTools(unittest.IsolatedAsyncioTestCase):
@@ -61,6 +62,9 @@ class TestHTMLTools(unittest.IsolatedAsyncioTestCase):
                 await checker._get_text(self._encoded_url(sample.encode(charset))),
                 sample,
             )
+
+        with self.assertRaises(CheckerError):
+            await checker._get_text("https://httpbin.org/image/jpeg")
 
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.x.xeyes.yml")
