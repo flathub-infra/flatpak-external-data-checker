@@ -1,4 +1,3 @@
-from urllib.parse import urljoin
 import io
 import gzip
 from datetime import datetime
@@ -6,6 +5,7 @@ import logging
 from distutils.version import LooseVersion
 from xml.etree.ElementTree import Element
 
+from yarl import URL
 from defusedxml import ElementTree
 
 from ..lib.externaldata import ExternalBase, ExternalFile
@@ -41,14 +41,14 @@ class RPMRepoChecker(Checker):
         return value
 
     @classmethod
-    def external_file_from_xml(cls, rpm: Element, repo_root: str):
+    def external_file_from_xml(cls, rpm: Element, repo_root: URL):
         digests = {}
         for cs_elem in rpm.findall("checksum", cls._XMLNS):
             cs_elem_type = cs_elem.get("type")
             if cs_elem_type:
                 digests[cs_elem_type] = cs_elem.text
         return ExternalFile(
-            url=urljoin(repo_root, cls._get_child_prop(rpm, "location", "href")),
+            url=str(repo_root.join(URL(cls._get_child_prop(rpm, "location", "href")))),
             checksum=MultiDigest.from_source(digests),
             size=int(cls._get_child_prop(rpm, "size", "archive")),
             version=cls._get_child_prop(rpm, "version", "ver"),
@@ -60,11 +60,11 @@ class RPMRepoChecker(Checker):
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
 
-        repo_root = external_data.checker_data["root"].rstrip("/") + "/"
+        repo_root = URL(external_data.checker_data["root"].rstrip("/") + "/")
         package_name = external_data.checker_data["package-name"]
         package_arch = external_data.arches[0]
 
-        repomd_xml_url = urljoin(repo_root, "repodata/repomd.xml")
+        repomd_xml_url = repo_root.join(URL("repodata/repomd.xml"))
         log.debug("Loading %s", repomd_xml_url)
         async with self.session.get(repomd_xml_url) as resp:
             repomd_xml = ElementTree.fromstring(await resp.text())
@@ -73,7 +73,7 @@ class RPMRepoChecker(Checker):
             'repo:data[@type="primary"]/repo:location', self._XMLNS
         )
 
-        primary_xml_url = urljoin(repo_root, primary_location_el.get("href"))
+        primary_xml_url = repo_root.join(URL(primary_location_el.get("href")))
         log.debug("Loading %s", primary_xml_url)
         async with self.session.get(primary_xml_url) as resp:
             with io.BytesIO(await resp.read()) as compressed:
