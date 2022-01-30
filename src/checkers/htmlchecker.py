@@ -101,6 +101,13 @@ class HTMLChecker(Checker):
         ],
     }
 
+    async def _get_text(self, url: t.Union[URL, str]) -> str:
+        try:
+            async with self.session.get(url) as response:
+                return await response.text()
+        except NETWORK_ERRORS as err:
+            raise CheckerQueryError from err
+
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
         assert isinstance(external_data, ExternalData)
@@ -113,11 +120,7 @@ class HTMLChecker(Checker):
         sort_matches = external_data.checker_data.get("sort-matches", True)
         assert combo_pattern or (version_pattern and (url_pattern or url_template))
 
-        try:
-            async with self.session.get(url) as response:
-                html = await response.text()
-        except NETWORK_ERRORS as err:
-            raise CheckerQueryError from err
+        html = await self._get_text(url)
 
         if combo_pattern:
             latest_url, latest_version = _get_latest(
