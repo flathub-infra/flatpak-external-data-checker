@@ -23,6 +23,7 @@ import re
 import urllib.parse
 from string import Template
 from distutils.version import LooseVersion
+import io
 import codecs
 import typing as t
 
@@ -127,10 +128,17 @@ class HTMLChecker(Checker):
         try:
             async with self.session.get(url) as response:
                 encoding = await self._get_encoding(response)
-                try:
-                    return await response.text(encoding=encoding)
-                except UnicodeDecodeError as err:
-                    raise CheckerFetchError from err
+                # We use streaming decoding in order to get decode error and abort the check
+                # as early as possible, without preloading the whole raw contents into memory
+                decoder_cls = codecs.getincrementaldecoder(encoding)
+                decoder = decoder_cls(errors="strict")
+                with io.StringIO() as buf:
+                    async for chunk, _ in response.content.iter_chunks():
+                        try:
+                            buf.write(decoder.decode(chunk))
+                        except UnicodeDecodeError as err:
+                            raise CheckerQueryError from err
+                    return buf.getvalue()
         except NETWORK_ERRORS as err:
             raise CheckerQueryError from err
 
