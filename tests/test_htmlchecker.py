@@ -21,12 +21,47 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import os
+import base64
 import unittest
 from distutils.version import LooseVersion
+
+import aiohttp
 
 from src.lib.utils import init_logging
 from src.checker import ManifestChecker
 from src.lib.checksums import MultiDigest
+from src.checkers import HTMLChecker
+
+
+class TestHTMLTools(unittest.IsolatedAsyncioTestCase):
+    SAMPLES = {
+        "utf-8": "🙋, 🌍!\n…"
+        # TODO we want to test other encodings, but httbin(go)/base64/ supports only utf-8
+    }
+
+    async def asyncSetUp(self):
+        self.session = aiohttp.ClientSession(
+            raise_for_status=True, timeout=aiohttp.ClientTimeout(total=5)
+        )
+
+    async def asyncTearDown(self):
+        await self.session.close()
+
+    def _encoded_url(self, data: bytes):
+        return (
+            "https://httpbin.org/base64/"
+            + base64.b64encode(data, altchars=b"-_").decode()
+        )
+
+    async def test_get_text(self):
+        checker = HTMLChecker(self.session)
+
+        for charset, sample in self.SAMPLES.items():
+            self.assertEqual(
+                await checker._get_text(self._encoded_url(sample.encode(charset))),
+                sample,
+            )
+
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.x.xeyes.yml")
 
