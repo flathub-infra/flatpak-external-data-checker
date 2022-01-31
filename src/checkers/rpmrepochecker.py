@@ -33,28 +33,26 @@ class RPMRepoChecker(Checker):
     }
 
     @classmethod
-    def _get_child_prop(cls, parent: Element, child: str, prop: str):
-        child_el = parent.find(child, cls._XMLNS)
-        assert child_el is not None, child
-        value = child_el.get(prop)
-        assert value is not None, prop
-        return value
+    def _file_from_xml(cls, rpm: Element, repo_root: URL):
+        def child_prop(child: str, prop: str):
+            child_el = rpm.find(child, cls._XMLNS)
+            assert child_el is not None, child
+            value = child_el.get(prop)
+            assert value is not None, prop
+            return value
 
-    @classmethod
-    def external_file_from_xml(cls, rpm: Element, repo_root: URL):
         digests = {}
         for cs_elem in rpm.findall("checksum", cls._XMLNS):
             cs_elem_type = cs_elem.get("type")
             if cs_elem_type:
                 digests[cs_elem_type] = cs_elem.text
+
         return ExternalFile(
-            url=str(repo_root.join(URL(cls._get_child_prop(rpm, "location", "href")))),
+            url=str(repo_root.join(URL(child_prop("location", "href")))),
             checksum=MultiDigest.from_source(digests),
-            size=int(cls._get_child_prop(rpm, "size", "archive")),
-            version=cls._get_child_prop(rpm, "version", "ver"),
-            timestamp=datetime.utcfromtimestamp(
-                int(cls._get_child_prop(rpm, "time", "file"))
-            ),
+            size=int(child_prop("size", "archive")),
+            version=child_prop("version", "ver"),
+            timestamp=datetime.utcfromtimestamp(int(child_prop("time", "file"))),
         )
 
     async def check(self, external_data: ExternalBase):
@@ -85,7 +83,7 @@ class RPMRepoChecker(Checker):
         for package_el in primary_xml.findall(
             f'package[name="{package_name}"][arch="{package_arch}"]', self._XMLNS
         ):
-            external_files.append(self.external_file_from_xml(package_el, repo_root))
+            external_files.append(self._file_from_xml(package_el, repo_root))
 
         new_version = max(external_files, key=lambda e: LooseVersion(e.version))
 
