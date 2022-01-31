@@ -1,16 +1,12 @@
-import io
-import gzip
 from datetime import datetime
 import logging
 from distutils.version import LooseVersion
-from xml.etree.ElementTree import Element
 
 from yarl import URL
-from defusedxml import ElementTree
 
 from ..lib.externaldata import ExternalBase, ExternalFile
 from ..lib.checksums import MultiDigest
-from . import Checker
+from . import Checker, XMLElement
 
 
 log = logging.getLogger(__name__)
@@ -33,7 +29,7 @@ class RPMRepoChecker(Checker):
     }
 
     @classmethod
-    def _file_from_xml(cls, rpm: Element, repo_root: URL):
+    def _file_from_xml(cls, rpm: XMLElement, repo_root: URL):
         def child_prop(child: str, prop: str):
             child_el = rpm.find(child, cls._XMLNS)
             assert child_el is not None, child
@@ -63,20 +59,14 @@ class RPMRepoChecker(Checker):
         package_arch = external_data.arches[0]
 
         repomd_xml_url = repo_root.join(URL("repodata/repomd.xml"))
-        log.debug("Loading %s", repomd_xml_url)
-        async with self.session.get(repomd_xml_url) as resp:
-            repomd_xml = ElementTree.fromstring(await resp.text())
+        repomd_xml = await self._get_xml(repomd_xml_url)
 
         primary_location_el = repomd_xml.find(
             'repo:data[@type="primary"]/repo:location', self._XMLNS
         )
 
         primary_xml_url = repo_root.join(URL(primary_location_el.get("href")))
-        log.debug("Loading %s", primary_xml_url)
-        async with self.session.get(primary_xml_url) as resp:
-            with io.BytesIO(await resp.read()) as compressed:
-                with gzip.GzipFile(fileobj=compressed) as decompressed:
-                    primary_xml = ElementTree.parse(decompressed)
+        primary_xml = await self._get_xml(primary_xml_url)
 
         log.debug("Looking up package %s arch %s", package_name, package_arch)
         external_files = []
