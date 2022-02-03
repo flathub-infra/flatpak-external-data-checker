@@ -140,6 +140,11 @@ The version number for the latest version can be detected in two ways:
   version. (This follows the convention used by
   [`debian/watch`](https://wiki.debian.org/debian/watch) files.)
 
+Some upstream vendors may add unwanted GET query parameters to
+the download URL, such as identifiers for counting unique downloads.
+This may result in URL change without change in the actual data.
+To remove GET query parameters, set `strip-query` property to `true`.
+
 ### HTML checker
 
 Both the version number and the download URL will be gathered from a static
