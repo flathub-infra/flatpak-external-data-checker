@@ -3,7 +3,7 @@ import typing as t
 
 from yarl import URL
 
-from ..lib import OPERATORS_SCHEMA
+from ..lib import OPERATORS_SCHEMA, NETWORK_ERRORS
 from ..lib.externaldata import (
     ExternalBase,
     ExternalData,
@@ -52,8 +52,11 @@ class AnityaChecker(HTMLChecker):
         constraints = external_data.checker_data.get("versions", {}).items()
 
         query = {"project_id": external_data.checker_data["project-id"]}
-        async with self.session.get(versions_url % query) as response:
-            result = await response.json()
+        try:
+            async with self.session.get(versions_url % query) as response:
+                result = await response.json()
+        except NETWORK_ERRORS as err:
+            raise CheckerQueryError from err
 
         if stable_only or constraints:
             if stable_only:
