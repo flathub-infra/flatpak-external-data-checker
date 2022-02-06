@@ -63,13 +63,13 @@ def print_outdated_external_data(manifest_checker: checker.ManifestChecker):
     ext_data = manifest_checker.get_outdated_external_data()
     for data in ext_data:
         state_txt = (
-            data.state.name
-            if data.state == ExternalData.State.BROKEN
-            else "CHANGE SOON"
+            data.state.name if data.state == data.State.BROKEN else "CHANGE SOON"
         )
-        checksums = {}
+        message_tmpl = ""
+        message_args = {}
         if data.new_version:
-            if data.type == ExternalData.Type.GIT:
+            if data.type == data.Type.GIT:
+                assert data.new_version
                 message_tmpl = (
                     "{data_state}: {data_name}\n"
                     " Has a new version:\n"
@@ -80,8 +80,10 @@ def print_outdated_external_data(manifest_checker: checker.ManifestChecker):
                     "  Version:   {version}\n"
                     "  Timestamp: {timestamp}\n"
                 )
+                message_args = data.new_version._asdict()
             else:
                 assert isinstance(data, ExternalData)
+                assert data.new_version
                 message_tmpl = (
                     "{data_state}: {data_name}\n"
                     " Has a new version:\n"
@@ -94,19 +96,23 @@ def print_outdated_external_data(manifest_checker: checker.ManifestChecker):
                     "  Version:   {version}\n"
                     "  Timestamp: {timestamp}\n"
                 )
-                checksums = data.new_version.checksum._asdict()
-        elif data.state == ExternalData.State.BROKEN:
+                message_args = {
+                    **data.new_version._asdict(),
+                    **data.new_version.checksum._asdict(),
+                }
+        elif data.state == data.State.BROKEN:
             message_tmpl = (
                 # fmt: off
                 "{data_state}: {data_name}\n"
                 " Couldn't get new version for {url}\n"
                 # fmt: on
             )
+            message_args = data.current_version._asdict()
 
         message = message_tmpl.format(
             data_state=state_txt,
             data_name=data.filename,
-            **{**(data.new_version or data.current_version)._asdict(), **checksums},
+            **message_args,
         )
         print(message, flush=True)
     return len(ext_data)
