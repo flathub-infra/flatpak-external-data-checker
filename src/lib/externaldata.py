@@ -124,6 +124,12 @@ class BuilderSource(abc.ABC):
     def from_source_impl(cls: t.Type[_BS], source_path: str, source: t.Dict) -> _BS:
         raise NotImplementedError
 
+    def __str__(self):
+        return f"{self.type.value} {self.filename}"
+
+    def __repr__(self):
+        return f"<{type(self).__name__} {self}>"
+
 
 @dataclasses.dataclass(frozen=True)
 class ExternalState(abc.ABC):
@@ -195,12 +201,6 @@ class ExternalBase(BuilderSource):
         """If self.new_version is not None, writes back the necessary changes to the
         original element from the manifest."""
         raise NotImplementedError
-
-    def __str__(self):
-        return f"{self.type.value} {self.filename}"
-
-    def __repr__(self):
-        return f"<{type(self).__name__} {self}>"
 
 
 @dataclasses.dataclass(frozen=True)
