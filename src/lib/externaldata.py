@@ -168,7 +168,10 @@ class BuilderSource(abc.ABC):
         raise NotImplementedError
 
     def __str__(self):
-        return f"{self.type.value} {self.filename}"
+        name = self.filename
+        if self.module:
+            name = f"{self.module.name}/{name}"
+        return f"{self.type.value} {name}"
 
     def __repr__(self):
         return f"<{type(self).__name__} {self}>"
