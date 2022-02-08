@@ -24,16 +24,27 @@ missing.
 """
 
 import io
+import sys
 import typing as t
 
-import lxml.etree as ET
+# pylint: disable=wrong-import-position
+if sys.version_info >= (3, 10):
+    from typing import TypeAlias
+else:
+    from typing_extensions import TypeAlias
+# pylint: enable=wrong-import-position
 
+import lxml.etree as ElementTree
+
+
+XMLElement: TypeAlias = ElementTree._Element  # pylint: disable=protected-access
 
 DEFAULT_INDENT = "  "
 
 
-def _fill_padding(ele: ET.Element):
+def _fill_padding(ele: XMLElement):
     parent = ele.getparent()
+    assert parent is not None
     index = parent.index(ele)
     level = sum(1 for _ in ele.iterancestors())
     if len(parent) > 1:
@@ -57,18 +68,18 @@ def add_release(
     version: str,
     date: str,
 ):
-    parser = ET.XMLParser(load_dtd=False, resolve_entities=False)
-    tree = ET.parse(src, parser=parser)
+    parser = ElementTree.XMLParser(load_dtd=False, resolve_entities=False)
+    tree = ElementTree.parse(src, parser=parser)
     root = tree.getroot()
 
     releases = root.find("releases")
 
     if releases is None:
-        releases = ET.Element("releases")
+        releases = ElementTree.Element("releases")
         root.append(releases)
         _fill_padding(releases)
 
-    release = ET.Element("release", version=version, date=date)
+    release = ElementTree.Element("release", version=version, date=date)
     releases.insert(0, release)
     _fill_padding(release)
 
@@ -76,7 +87,7 @@ def add_release(
         dst,
         # XXX: lxml uses single quotes for doctype line if generated with
         # xml_declaration=True,
-        doctype='<?xml version="1.0" encoding="UTF-8"?>',
+        doctype='<?xml version="1.0" encoding="UTF-8"?>',  # type: ignore[call-arg]
         encoding="utf-8",
         pretty_print=True,
     )
