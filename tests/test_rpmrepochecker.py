@@ -1,7 +1,7 @@
 import unittest
 import os
 
-from src.checker import ManifestChecker
+from src.manifest import ManifestChecker
 from src.lib.utils import init_logging
 from src.lib.checksums import MultiDigest
 

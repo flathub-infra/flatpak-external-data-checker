@@ -23,7 +23,7 @@ import unittest
 from distutils.version import LooseVersion
 
 from src.lib.utils import init_logging
-from src.checker import ManifestChecker
+from src.manifest import ManifestChecker
 from src.lib.checksums import MultiDigest
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.gnome.baobab.json")

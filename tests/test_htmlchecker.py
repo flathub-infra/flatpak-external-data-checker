@@ -28,7 +28,7 @@ from distutils.version import LooseVersion
 import aiohttp
 
 from src.lib.utils import init_logging
-from src.checker import ManifestChecker
+from src.manifest import ManifestChecker
 from src.lib.checksums import MultiDigest
 from src.checkers import HTMLChecker
 from src.lib.errors import CheckerError

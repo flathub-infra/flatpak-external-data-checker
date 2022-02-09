@@ -2,7 +2,7 @@ import os
 import unittest
 from distutils.version import LooseVersion
 
-from src.checker import ManifestChecker
+from src.manifest import ManifestChecker
 from src.lib.externaldata import ExternalFile, ExternalGitRef
 from src.lib.checksums import MultiDigest
 from src.lib.utils import init_logging
