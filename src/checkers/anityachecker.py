@@ -12,12 +12,12 @@ from ..lib.externaldata import (
 )
 from ..lib.utils import filter_versions
 from ..lib.errors import CheckerQueryError
-from .htmlchecker import HTMLChecker
+from ..lib.checkers import Checker
 
 log = logging.getLogger(__name__)
 
 
-class AnityaChecker(HTMLChecker):
+class AnityaChecker(Checker):
     CHECKER_DATA_TYPE = "anitya"
     CHECKER_DATA_SCHEMA = {
         "type": "object",
