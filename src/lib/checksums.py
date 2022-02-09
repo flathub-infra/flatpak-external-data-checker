@@ -23,6 +23,11 @@ class MultiDigest(t.NamedTuple):
         assert digests, source
         return cls(**digests)
 
+    @property
+    def digests(self) -> t.Set[str]:
+        # pylint: disable=no-member
+        return {k for k in self._fields if getattr(self, k) is not None}
+
     def __eq__(self, other):
         assert isinstance(other, type(self)), other
         # Iterate digest types from strongest to weakest,

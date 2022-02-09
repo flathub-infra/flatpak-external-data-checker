@@ -1,0 +1,19 @@
+id: fedc.test.ElectronChecker
+modules:
+  - name: etcher
+    sources:
+      - type: file
+        url: https://github.com/balena-io/etcher/releases/download/v1.7.2/balenaEtcher-1.7.2-x64.AppImage
+        sha512: 360142fb3e6a0b67f17f2cd1bf90e8c9663a5e4658bae9ed754081315fa8034d68cddffa6419ae4bde5eb60a9ccfed8c8236c9a939cd5b1f9131e28bdf3924c2
+        x-checker-data:
+          type: electron-updater
+          url: https://github.com/balena-io/etcher/releases/latest/download/latest-linux.yml
+  
+  - name: Lunar-Client
+    sources:
+      - type: extra-data
+        url: https://launcherupdates.lunarclientcdn.com/Lunar%20Client-2.9.2.AppImage
+        sha256: a005879b62395fe71d7ad5b01ee7fc7fe43b59629bd83f23cee35380a13ba8c8
+        x-checker-data:
+          type: electron-updater
+          url: https://launcherupdates.lunarclientcdn.com/latest-linux.yml

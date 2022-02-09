@@ -23,12 +23,16 @@ import logging
 import os
 import unittest
 import tempfile
-
+import hashlib
+import base64
 from xml.dom import minidom
+
+import aiohttp
 
 from src.lib.utils import init_logging
 from src.lib.externaldata import ExternalData, Checker
 from src.lib.checksums import MultiDigest
+from src.lib.errors import CheckerFetchError
 from src.checker import ManifestChecker
 
 TEST_MANIFEST = os.path.join(
@@ -461,6 +465,47 @@ size: {UpdateEverythingChecker.SIZE}
                 return data
         else:
             return None
+
+
+class TestCheckerHelpers(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        init_logging()
+
+    async def asyncSetUp(self):
+        self.http = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=10), raise_for_status=True
+        )
+
+    async def asyncTearDown(self):
+        await self.http.close()
+
+    @staticmethod
+    def _get_url(data):
+        return "https://httpbin.org/base64/" + base64.b64encode(data).decode("ascii")
+
+    async def test_complete_digests(self):
+        CORRECT = "Correct".encode()
+        WRONG = "Wrong".encode()
+
+        checker = DummyChecker(self.http)
+        sha256 = hashlib.sha256(CORRECT).hexdigest()
+        sha512 = hashlib.sha512(CORRECT).hexdigest()
+
+        checksum = await checker._complete_digests(
+            self._get_url(CORRECT), MultiDigest(sha512=sha512)
+        )
+        self.assertEqual(checksum.sha256, sha256)
+        self.assertEqual(checksum.sha512, sha512)
+
+        with self.assertRaises(CheckerFetchError):
+            await checker._complete_digests(
+                self._get_url(WRONG), MultiDigest(sha512=sha512)
+            )
+
+        with self.assertRaises(CheckerFetchError):
+            await checker._complete_digests(
+                "https://httpbin.org/base64/status/404", MultiDigest(sha512=sha512)
+            )
 
 
 if __name__ == "__main__":
