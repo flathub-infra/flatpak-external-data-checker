@@ -23,12 +23,15 @@ from .externaldata import (
 )
 from .errors import (
     CheckerMetadataError,
+    CheckerQueryError,
     CheckerFetchError,
 )
 from .checksums import (
     MultiHash,
     MultiDigest,
 )
+
+JSONType = t.Union[str, int, float, bool, None, t.Dict[str, t.Any], t.List[t.Any]]
 
 log = logging.getLogger(__name__)
 
@@ -77,6 +80,21 @@ class Checker:
         raise NotImplementedError
 
     # Various helplers for checkers; assumed to be safely usable only from subclasses
+
+    async def _get_json(
+        self,
+        url: t.Union[str, URL],
+        headers: t.Dict[str, str] = None,
+    ) -> JSONType:
+        url = URL(url)
+        log.debug("Loading JSON from %s", url)
+        if headers is None:
+            headers = {}
+        try:
+            async with self.session.get(url, headers=headers) as response:
+                return await response.json()
+        except NETWORK_ERRORS as err:
+            raise CheckerQueryError from err
 
     @staticmethod
     def _substitute_placeholders(template_string: str, version: str) -> str:
