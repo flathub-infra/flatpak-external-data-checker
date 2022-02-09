@@ -6,9 +6,10 @@ from yarl import URL
 
 from ..lib import OPERATORS_SCHEMA, NETWORK_ERRORS
 from ..lib.errors import CheckerQueryError
-from ..lib.externaldata import Checker, ExternalBase, ExternalFile
+from ..lib.externaldata import ExternalBase, ExternalFile
 from ..lib.checksums import MultiDigest
 from ..lib.utils import filter_versions
+from ..lib.checkers import Checker
 
 log = logging.getLogger(__name__)
 

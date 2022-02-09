@@ -41,9 +41,10 @@ import typing as t
 import apt
 import apt_pkg
 
-from ..lib.externaldata import Checker, ExternalFile, ExternalBase
+from ..lib.externaldata import ExternalFile, ExternalBase
 from ..lib.checksums import MultiDigest
 from ..lib.utils import get_timestamp_from_url
+from ..lib.checkers import Checker
 
 apt_pkg.init()
 

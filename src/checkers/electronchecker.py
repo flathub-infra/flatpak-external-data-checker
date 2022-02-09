@@ -8,13 +8,13 @@ import ruamel.yaml
 
 from ..lib import NETWORK_ERRORS
 from ..lib.externaldata import (
-    Checker,
     ExternalBase,
     ExternalData,
     ExternalFile,
 )
 from ..lib.errors import CheckerQueryError
 from ..lib.checksums import MultiDigest
+from ..lib.checkers import Checker
 from .jsonchecker import parse_timestamp
 
 yaml = ruamel.yaml.YAML(typ="safe")

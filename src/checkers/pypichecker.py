@@ -4,10 +4,11 @@ import re
 import typing as t
 
 from ..lib import OPERATORS_SCHEMA
-from ..lib.externaldata import Checker, ExternalFile, ExternalBase
+from ..lib.externaldata import ExternalFile, ExternalBase
 from ..lib.checksums import MultiDigest
 from ..lib.utils import filter_versions
 from ..lib.errors import CheckerQueryError
+from ..lib.checkers import Checker
 
 log = logging.getLogger(__name__)
 

@@ -37,8 +37,9 @@ from ..lib import (
     WRONG_CONTENT_TYPES_ARCHIVE,
     FILE_URL_SCHEMES,
 )
-from ..lib.externaldata import ExternalBase, ExternalData, Checker
+from ..lib.externaldata import ExternalBase, ExternalData
 from ..lib.errors import CheckerMetadataError, CheckerQueryError, CheckerFetchError
+from ..lib.checkers import Checker
 
 log = logging.getLogger(__name__)
 
