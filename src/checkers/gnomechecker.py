@@ -4,7 +4,8 @@ import typing as t
 
 from yarl import URL
 
-from ..lib import OPERATORS_SCHEMA
+from ..lib import OPERATORS_SCHEMA, NETWORK_ERRORS
+from ..lib.errors import CheckerQueryError
 from ..lib.externaldata import Checker, ExternalBase, ExternalFile
 from ..lib.checksums import MultiDigest
 from ..lib.utils import filter_versions
@@ -48,9 +49,12 @@ class GNOMEChecker(Checker):
         assert isinstance(project_name, str)
 
         proj_url = GNOME_MIRROR / "sources" / project_name
-        async with self.session.get(proj_url / "cache.json") as cache_resp:
-            # Some mirrors may sand invalid content-type; don't reuire it to be application/json
-            cache_json = await cache_resp.json(content_type=None)
+        try:
+            async with self.session.get(proj_url / "cache.json") as cache_resp:
+                # Some mirrors may sand invalid content-type; don't require it to be application/json
+                cache_json = await cache_resp.json(content_type=None)
+        except NETWORK_ERRORS as err:
+            raise CheckerQueryError from err
         _, downloads, versions, _ = cache_json
 
         filtered_versions = versions[project_name]
