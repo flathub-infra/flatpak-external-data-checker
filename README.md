@@ -334,6 +334,22 @@ By default it will check for source package (`sdist` package type).
 To check for binary package instead, set `packagetype` to `bdist_wheel`
 (only noarch wheels are supported currently).
 
+### Electron Auto Update checker
+
+Electron [auto update](https://www.electron.build/auto-update.html) mechanism uses remotely stored
+metadata files to check for updates. This metadata can be tracked for Flatpak manifest updates.
+
+```yaml
+x-checker-data:
+  type: electron-updater
+  url: https://example.com/download/latest-linux.yml
+```
+
+The `url`, if set, must link to a Electron Auto Update metadata file (usually `latest-linux.yml`).  
+If `url` is omitted, the checker will try to guess it based on the current source url.
+
+Make sure to use `sha512` checksum for the source, unless it's an `extra-data` (which supports `sha256` only).
+
 ### JetBrains checker
 
 Special checker that will check for available updates
