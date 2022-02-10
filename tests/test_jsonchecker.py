@@ -2,7 +2,7 @@ import os
 import unittest
 import datetime
 
-from src.checker import ManifestChecker
+from src.manifest import ManifestChecker
 from src.lib.utils import init_logging
 from src.lib.externaldata import ExternalFile, ExternalGitRef
 from src.lib.checksums import MultiDigest

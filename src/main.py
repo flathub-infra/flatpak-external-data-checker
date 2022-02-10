@@ -37,7 +37,7 @@ from github import Github
 
 from .lib.utils import parse_github_url, init_logging
 from .lib.externaldata import ExternalData
-from . import checker
+from . import manifest
 
 
 log = logging.getLogger(__name__)
@@ -59,7 +59,7 @@ def indir(path):
         os.chdir(old)
 
 
-def print_outdated_external_data(manifest_checker: checker.ManifestChecker):
+def print_outdated_external_data(manifest_checker: manifest.ManifestChecker):
     ext_data = manifest_checker.get_outdated_external_data()
     for data in ext_data:
         state_txt = (
@@ -118,7 +118,7 @@ def print_outdated_external_data(manifest_checker: checker.ManifestChecker):
     return len(ext_data)
 
 
-def print_errors(manifest_checker: checker.ManifestChecker) -> int:
+def print_errors(manifest_checker: manifest.ManifestChecker) -> int:
     # TODO: Actually do pretty-print collected errors
     errors = manifest_checker.get_errors()
     return len(errors)
@@ -210,7 +210,7 @@ AUTOMERGE_DUE_TO_BROKEN_URLS = (
 
 def open_pr(
     change: CommittedChanges,
-    manifest_checker: checker.ManifestChecker = None,
+    manifest_checker: manifest.ManifestChecker = None,
     fork: t.Optional[bool] = None,
 ):
     try:
@@ -398,7 +398,7 @@ async def run_with_args(args: argparse.Namespace) -> t.Tuple[int, int, bool]:
     should_update = args.update or args.commit_only or args.edit_only
     did_update = False
 
-    manifest_checker = checker.ManifestChecker(args.manifest, args.unsafe)
+    manifest_checker = manifest.ManifestChecker(args.manifest, args.unsafe)
 
     await manifest_checker.check(args.filter_type)
 

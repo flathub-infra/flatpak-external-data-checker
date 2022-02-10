@@ -30,10 +30,11 @@ from xml.dom import minidom
 import aiohttp
 
 from src.lib.utils import init_logging
-from src.lib.externaldata import ExternalData, Checker
+from src.lib.externaldata import ExternalData
+from src.lib.checkers import Checker
 from src.lib.checksums import MultiDigest
 from src.lib.errors import CheckerFetchError
-from src.checker import ManifestChecker
+from src.manifest import ManifestChecker
 
 TEST_MANIFEST = os.path.join(
     os.path.dirname(__file__),

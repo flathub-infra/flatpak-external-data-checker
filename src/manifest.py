@@ -30,14 +30,12 @@ import os
 import aiohttp
 from lxml.etree import XMLSyntaxError
 
-from .checkers import ALL_CHECKERS
 from .lib import HTTP_CLIENT_HEADERS, TIMEOUT_CONNECT, TIMEOUT_TOTAL
 from .lib.appdata import add_release_to_file
 from .lib.externaldata import (
     ExternalBase,
     ExternalFile,
     ExternalGitRef,
-    Checker,
 )
 from .lib.utils import read_manifest, dump_manifest
 from .lib.errors import (
@@ -49,6 +47,8 @@ from .lib.errors import (
     SourceLoadError,
     SourceUnsupported,
 )
+from .lib.checkers import Checker
+from .checkers import ALL_CHECKERS
 
 
 MAIN_SRC_PROP = "is-main-source"

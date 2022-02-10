@@ -15,7 +15,7 @@ from ..lib.externaldata import (
     ExternalGitRef,
 )
 from ..lib.errors import CheckerQueryError
-from .htmlchecker import HTMLChecker
+from ..lib.checkers import Checker
 
 log = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ def parse_timestamp(date_string: t.Optional[str]) -> t.Optional[datetime]:
         raise CheckerQueryError("Failed to parse timestamp") from err
 
 
-class JSONChecker(HTMLChecker):
+class JSONChecker(Checker):
     CHECKER_DATA_TYPE = "json"
     CHECKER_DATA_SCHEMA = {
         "type": "object",

@@ -9,8 +9,9 @@ import typing as t
 
 from defusedxml import ElementTree
 
-from ..lib.externaldata import ExternalBase, Checker, ExternalFile
+from ..lib.externaldata import ExternalBase, ExternalFile
 from ..lib.checksums import MultiDigest
+from ..lib.checkers import Checker
 
 
 log = logging.getLogger(__name__)

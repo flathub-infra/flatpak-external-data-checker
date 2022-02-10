@@ -4,8 +4,9 @@ import re
 
 import toml
 
-from ..lib.externaldata import ExternalBase, ExternalFile, Checker
+from ..lib.externaldata import ExternalBase, ExternalFile
 from ..lib.checksums import MultiDigest
+from ..lib.checkers import Checker
 
 log = logging.getLogger(__name__)
 
