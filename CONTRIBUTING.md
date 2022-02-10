@@ -41,9 +41,6 @@ whose only dependency is the `podman` command:
 # Run one suite of tests
 ./run-in-container.sh python3 -m unittest tests.test_appdata
 
-# Apply code formatting
-./run-in-container.sh black .
-
 # More information
 ./run-in-container.sh python3 -m unittest --help
 ```
