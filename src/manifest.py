@@ -56,6 +56,7 @@ from .checkers import ALL_CHECKERS
 
 
 MAIN_SRC_PROP = "is-main-source"
+IMPORTANT_SRC_PROP = "is-important"
 MAX_MANIFEST_SIZE = 1024 * 100
 
 
@@ -78,6 +79,7 @@ def find_appdata_file(directory, appid):
 class CheckerOptions:
     allow_unsafe: bool = False
     max_manifest_size: int = MAX_MANIFEST_SIZE
+    require_important_update: bool = False
 
 
 class ManifestChecker:
@@ -495,27 +497,7 @@ class ManifestChecker:
 
         last_update = selected_data.new_version
 
-        version_changed = (
-            last_update is not None
-            and last_update.version is not None
-            and (
-                (
-                    isinstance(last_update, ExternalFile)
-                    and (
-                        last_update.url != selected_data.current_version.url
-                        # TODO We can't reliably tell if the appimage version stayed the same
-                        # without downloading it, so just assume it changed
-                        or last_update.url.endswith(".AppImage")
-                    )
-                )
-                or (
-                    isinstance(last_update, ExternalGitRef)
-                    and last_update.tag != selected_data.current_version.tag
-                )
-            )
-        )
-
-        if version_changed:
+        if selected_data.has_version_changed:
             log.info("Version changed, adding release to %s", appdata)
             if last_update.timestamp is None:
                 log.warning("Using current time in appdata release")
@@ -532,20 +514,46 @@ class ManifestChecker:
             log.debug("Version didn't change, not adding release")
 
     def update_manifests(self) -> t.List[str]:
-        """Updates references to external data in manifests."""
+        """Updates references to external data in manifests.
+        If require_important_update is True, only update the manifest
+        if at least one source with IMPORTANT_SRC_PROP or MAIN_SRC_PROP received an update."""
         # We want a list, without duplicates; Python provides an
         # insertion-order-preserving dictionary so we use that.
         changes: t.Dict[str, t.Any]
         changes = OrderedDict()
-        for path, datas in self._external_data.items():
-            self._update_manifest(path, datas, changes)
-        if changes:
-            try:
-                self._update_appdata()
-            except AppdataNotFound as err:
-                log.info("Not updating appdata: %s", err)
-            except AppdataError as err:
-                self._errors.append(err)
-                log.error(err)
+
+        found_important_update = None
+
+        if self.opts.require_important_update:
+
+            for data in self.get_external_data():
+                important = data.checker_data.get(IMPORTANT_SRC_PROP)
+                main = data.checker_data.get(MAIN_SRC_PROP)
+                if important or (main and important != False):
+                    log.debug("Found an important source: %s", data)
+
+                    found_important_update = data.has_version_changed
+
+                    if found_important_update:
+                        log.info(
+                            "Update found for important source: %s, updating manifest",
+                            data,
+                        )
+                        break
+
+        if found_important_update or found_important_update is None:
+            for path, datas in self._external_data.items():
+                self._update_manifest(path, datas, changes)
+            if changes:
+                try:
+                    self._update_appdata()
+                except AppdataNotFound as err:
+                    log.info("Not updating appdata: %s", err)
+                except AppdataError as err:
+                    self._errors.append(err)
+                    log.error(err)
+
+        else:
+            log.info("No important source had an update, not updating manifest")
 
         return list(changes)

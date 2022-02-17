@@ -47,6 +47,7 @@ CHECKER_DATA_SCHEMA_COMMON = {
     "properties": {
         "type": {"type": "string"},
         "is-main-source": {"type": "boolean"},
+        "is-important": {"type": "boolean"},
         "arches": {
             "type": "array",
             "items": {"type": "string"},
@@ -275,6 +276,11 @@ class ExternalBase(BuilderSource):
 
             self.new_version = new_version
 
+    @property
+    def has_version_changed(self) -> bool:
+        """Detect if some external data had a version change"""
+        raise NotImplementedError
+
     def update(self):
         """If self.new_version is not None, writes back the necessary changes to the
         original element from the manifest."""
@@ -371,6 +377,21 @@ class ExternalData(ExternalBase):
                     self.source_path,
                 )
                 self.source.pop("size", None)
+
+    @property
+    def has_version_changed(self) -> bool:
+        update = self.new_version
+        return (
+            update is not None
+            and update.version is not None
+            and isinstance(update, ExternalFile)
+            and (
+                update.url != self.current_version.url
+                # TODO We can't reliably tell if the appimage version stayed the same
+                # without downloading it, so just assume it changed
+                or update.url.endswith(".AppImage")
+            )
+        )
 
 
 @dataclasses.dataclass
@@ -501,6 +522,16 @@ class ExternalGitRepo(ExternalBase):
             None,
         )
         return obj
+
+    @property
+    def has_version_changed(self) -> bool:
+        update = self.new_version
+        return (
+            update is not None
+            and update.version is not None
+            and isinstance(update, ExternalGitRef)
+            and update.tag != self.current_version.tag
+        )
 
     def update(self):
         if self.new_version is not None:
