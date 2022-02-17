@@ -123,6 +123,12 @@ to Git and open a GitHub pull request. In order to do this, it requires
 a [GitHub access token](https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line),
 specified in the `GITHUB_TOKEN` environment variable.
 
+### Selectively submitting PRs
+
+The tool will by default open PRs if at least one source is updated. Alternatively, the tool can be configured to only open PRs if at least one "important" source is updated. This can avoid unwanted PRs, e.g. PRs that only update a single library.
+
+To only open PRs when at least one important source is updated, first set `require-important-update` to `true` in `flathub.json`. If using a custom workflow, instead pass `--require-important-update` to the tool. Then, set property `is-important` to `true` in the checker metadata for any important source(s). Sources with `is-main-source` in their checker metadata are also considered important.
+
 ### Automatically merging PRs
 
 The tool will also automatically merge previously opened pull request for
