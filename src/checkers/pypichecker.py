@@ -33,6 +33,10 @@ def _filter_downloads(
                 continue
             if download["python_version"] not in ["source", "py3", "py2.py3"]:
                 continue
+            if download["packagetype"] == "bdist_wheel":
+                # Make sure we get only noarch wheels
+                if not download["filename"].endswith("-any.whl"):
+                    continue
             date = datetime.fromisoformat(download["upload_time_iso_8601"].rstrip("Z"))
             yield (pypi_version, download, date)
 
