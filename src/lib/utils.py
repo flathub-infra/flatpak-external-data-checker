@@ -108,7 +108,10 @@ async def get_extra_data_info_from_url(
     dest_io: t.Optional[t.IO] = None,
     content_type_deny: t.Optional[t.Iterable[re.Pattern]] = None,
 ):
-    async with session.get(url) as response:
+    async with session.get(
+        url,
+        skip_auto_headers=[aiohttp.hdrs.ACCEPT_ENCODING],
+    ) as response:
         real_url = str(response.url)
         info = response.headers
 
