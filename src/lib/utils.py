@@ -143,7 +143,9 @@ async def get_extra_data_info_from_url(
 
     return external_file
 
+
 _VersionObj = t.TypeVar("_VersionObj")
+
 
 def filter_versions(
     versions: t.Iterable[_VersionObj],
