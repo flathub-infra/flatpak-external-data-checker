@@ -167,11 +167,8 @@ class ExternalBase(BuilderSource):
         # FIXME: https://github.com/python/mypy/issues/9282
         return super().from_source(source_path, source)  # type: ignore
 
-    def set_new_version(self, new_version: ExternalState, is_update=None):
+    def set_new_version(self, new_version: ExternalState, is_update: bool = True):
         assert isinstance(new_version, type(self.current_version))
-
-        if is_update is None:
-            is_update = not self.current_version.is_same_version(new_version)
 
         if self.current_version.matches(new_version):
             if is_update:
@@ -181,14 +178,17 @@ class ExternalBase(BuilderSource):
                 log.debug("Source %s: no remote data change", self.filename)
             self.state |= self.State.VALID
         else:
-            if is_update:
+            if self.current_version.is_same_version(new_version):
+                log.warning("Source %s: remote data changed", self.filename)
+                if is_update:
+                    self.state |= self.State.LATEST
+                self.state |= self.State.BROKEN
+            elif is_update:
                 log.info(
                     "Source %s: got new version %s", self.filename, new_version.version
                 )
                 self.state |= self.State.OUTDATED
-            else:
-                log.warning("Source %s: remote data changed", self.filename)
-                self.state |= self.State.BROKEN
+
             self.new_version = new_version
 
     def update(self):
