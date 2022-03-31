@@ -25,7 +25,11 @@ def _parse_checksums(text: str) -> t.Dict[str, str]:
 
 
 def _is_stable(version: str) -> bool:
-    major, minor = version.split(".")[:2]
+    ver_list = version.split(".")
+    if len(ver_list) < 2:
+        # Single number, e.g. "41"
+        return True
+    major, minor = ver_list[:2]
     if int(major) >= 40:
         return minor not in ["alpha", "beta", "rc"]
     return (int(minor) % 2) == 0

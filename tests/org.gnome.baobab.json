@@ -50,6 +50,20 @@
                     }
                 }
             ]
+        },
+        {
+            "name" : "gedit",
+            "sources" : [
+                {
+                    "type": "archive",
+                    "url": "https://download.gnome.org/sources/gedit/40/gedit-40.1.tar.xz",
+                    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "x-checker-data": {
+                        "type": "gnome",
+                        "name": "gedit"
+                    }
+                }
+            ]
         }
     ]
 }
