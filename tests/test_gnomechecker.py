@@ -25,6 +25,7 @@ from distutils.version import LooseVersion
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
 from src.lib.checksums import MultiDigest
+from src.checkers.gnomechecker import _is_stable
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.gnome.baobab.json")
 
@@ -32,6 +33,19 @@ TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.gnome.baobab.json")
 class TestGNOMEChecker(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         init_logging()
+
+    def test_is_stable(self):
+        self.assertFalse(_is_stable("1.9.0"))
+        self.assertTrue(_is_stable("3.28.0"))
+        self.assertFalse(_is_stable("3.29.0"))
+        self.assertTrue(_is_stable("41"))
+        self.assertTrue(_is_stable("41.1"))
+        self.assertTrue(_is_stable("41.2"))
+        self.assertTrue(_is_stable("4.1"))
+        self.assertTrue(_is_stable("4.2"))
+        self.assertFalse(_is_stable("4.rc"))
+        self.assertFalse(_is_stable("4.2.beta"))
+        self.assertFalse(_is_stable("4.alpha.0"))
 
     async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)

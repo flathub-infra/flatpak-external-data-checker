@@ -30,9 +30,13 @@ def _is_stable(version: str) -> bool:
         # Single number, e.g. "41"
         return True
     major, minor = ver_list[:2]
-    if int(major) >= 40:
-        return minor not in ["alpha", "beta", "rc"]
-    return (int(minor) % 2) == 0
+    if set(ver_list[1:]) & {"alpha", "beta", "rc"}:
+        return False
+    if int(major) < 40 and len(ver_list) > 2:
+        return (int(minor) % 2) == 0
+    # XXX If we didn't see any indication that the version is a prerelease,
+    # assume it's a normal (stable) release
+    return True
 
 
 class GNOMEChecker(Checker):
