@@ -75,7 +75,7 @@ class UpdateEverythingChecker(DummyChecker):
     TIMESTAMP = dt.datetime(2019, 8, 28, 0, 0, 0)
 
     async def check(self, external_data):
-        external_data.state = ExternalData.State.BROKEN
+        external_data.state |= external_data.State.BROKEN
         external_data.new_version = external_data.current_version._replace(
             size=self.SIZE,
             checksum=MultiDigest(sha256=self.CHECKSUM),

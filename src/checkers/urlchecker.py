@@ -119,7 +119,7 @@ class URLChecker(Checker):
                 )
         except NETWORK_ERRORS as err:
             if not is_rotating:
-                external_data.state = ExternalData.State.BROKEN
+                external_data.state |= external_data.State.BROKEN
             raise CheckerFetchError from err
 
         if is_rotating and not version_string:

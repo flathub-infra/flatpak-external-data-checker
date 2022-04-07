@@ -62,9 +62,7 @@ def indir(path):
 def print_outdated_external_data(manifest_checker: manifest.ManifestChecker):
     ext_data = manifest_checker.get_outdated_external_data()
     for data in ext_data:
-        state_txt = (
-            data.state.name if data.state == data.State.BROKEN else "CHANGE SOON"
-        )
+        state_txt = data.state.name or str(data.state)
         message_tmpl = ""
         message_args = {}
         if data.new_version:
@@ -100,7 +98,7 @@ def print_outdated_external_data(manifest_checker: manifest.ManifestChecker):
                     **data.new_version._asdict(),
                     **data.new_version.checksum._asdict(),
                 }
-        elif data.state == data.State.BROKEN:
+        elif data.State.BROKEN in data.state:
             message_tmpl = (
                 # fmt: off
                 "{data_state}: {data_name}\n"
@@ -265,8 +263,8 @@ def open_pr(
         and manifest_checker
         # …and at least one source is broken and has an update
         and any(
-            data.type == ExternalData.Type.EXTRA_DATA
-            and data.state == ExternalData.State.BROKEN
+            data.type == data.Type.EXTRA_DATA
+            and data.State.BROKEN in data.state
             and data.new_version
             for data in manifest_checker.get_outdated_external_data()
         )
