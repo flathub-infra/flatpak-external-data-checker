@@ -151,6 +151,13 @@ class Checker:
         assert latest_version is not None
         assert latest_url is not None
 
+        if (
+            latest_url == external_data.current_version.url
+            and external_data.type != external_data.Type.EXTRA_DATA
+        ):
+            external_data.state |= external_data.State.LATEST
+            return
+
         if external_data.type == ExternalData.Type.ARCHIVE:
             wrong_content_types = WRONG_CONTENT_TYPES_ARCHIVE
         else:
