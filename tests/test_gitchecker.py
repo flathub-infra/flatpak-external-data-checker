@@ -45,7 +45,7 @@ class TestGitChecker(unittest.IsolatedAsyncioTestCase):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = await checker.check()
 
-        self.assertEqual(len(ext_data), 8)
+        self.assertEqual(len(ext_data), 10)
         for data in ext_data:
             self.assertIsInstance(data, ExternalGitRepo)
             self.assertIsInstance(data.current_version, ExternalGitRef)
@@ -87,6 +87,10 @@ class TestGitChecker(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertRegex(data.new_version.tag, r"^[vV][\d.]+$")
                 self.assertRegex(data.new_version.version, r"^[\d.]+$")
+            elif data.filename == "bluez-qt.git":
+                self.assertEqual(data.new_version.tag, "v5.90.0")
+            elif data.filename == "easyeffects.git":
+                self.assertEqual(data.new_version.tag, "v4.8.5")
             else:
                 self.fail(f"Unknown data {data.filename}")
             self._test_update_data(data, copy.deepcopy(data.source))
