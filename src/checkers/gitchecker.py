@@ -5,8 +5,9 @@ from distutils.version import LooseVersion
 
 import semver
 
+from ..lib import OPERATORS_SCHEMA
 from ..lib.externaldata import ExternalBase, ExternalGitRepo, ExternalGitRef
-from ..lib.utils import git_ls_remote
+from ..lib.utils import git_ls_remote, filter_versions
 from ..lib.errors import CheckerQueryError, CheckerFetchError
 from ..lib.checkers import Checker
 
@@ -61,6 +62,7 @@ class GitChecker(Checker):
         "type": "object",
         "properties": {
             "tag-pattern": {"type": "string", "format": "regex"},
+            "versions": OPERATORS_SCHEMA,
             "version-scheme": {
                 "type": "string",
                 "enum": list(TAG_VERSION_SCHEMES),
@@ -96,6 +98,8 @@ class GitChecker(Checker):
 
         version_scheme = external_data.checker_data.get("version-scheme", "loose")
         tag_cls = TAG_VERSION_SCHEMES[version_scheme]
+        sort_tags = external_data.checker_data.get("sort-tags", True)
+        constraints = external_data.checker_data.get("versions", {}).items()
 
         matching_tags = []
         refs = await git_ls_remote(external_data.current_version.url)
@@ -114,7 +118,14 @@ class GitChecker(Checker):
             version = tag_match.group(1)
             matching_tags.append(tag_cls(commit, tag, annotated, version))
 
-        if external_data.checker_data.get("sort-tags", True):
+        if constraints:
+            sorted_tags = filter_versions(
+                matching_tags,
+                constraints=constraints,
+                to_string=lambda t: t.version,
+                sort=sort_tags,
+            )
+        elif sort_tags:
             sorted_tags = sorted(matching_tags)
         else:
             sorted_tags = matching_tags

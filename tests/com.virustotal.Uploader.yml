@@ -70,3 +70,29 @@ modules:
         url: "https://github.com/VirusTotal/qt-virustotal-uploader.git"
         tag: v1.2
         commit: be03674181c512b8c8935be104a42b90ccd3935a
+
+  - name: bluez-qt
+    sources:
+      # find specific version
+      - type: git
+        url: https://invent.kde.org/frameworks/bluez-qt.git
+        tag: v5.77.0
+        commit: 760a013c3ff553b23d456c7787ed76981ec5142f
+        x-checker-data:
+          type: git
+          tag-pattern: ^v(\d[\d.]+\d)$
+          versions:
+            ==: "5.90.0"
+
+  - name: easyeffects
+    sources:
+      # filter versions
+      - type: git
+        url: https://github.com/wwmm/easyeffects.git
+        tag: v4.8.4
+        commit: 9bc7dd83bf3958b171ea4b9cc0710ef34c8d50fc
+        x-checker-data:
+          type: git
+          tag-pattern: ^v([\d.]+)$
+          versions:
+            <: '4.8.6'

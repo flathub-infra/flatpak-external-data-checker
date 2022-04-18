@@ -238,6 +238,8 @@ If the project follows [semver](https://semver.org/) specification, you can set
 `version-scheme` property to `semantic` in order to use semantic version scheme for sorting.
 In this case, make sure that `tag-pattern` extracts only valid semver strings.
 
+The [`versions`](#version-constraining) property is supported.
+
 ### JSON checker
 
 The JSON checker allows using [jq](https://stedolan.github.io/jq/) to query
