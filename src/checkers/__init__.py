@@ -6,7 +6,17 @@ from string import Template
 import datetime
 import json
 import re
+import zlib
+import sys
 import typing as t
+
+# pylint: disable=wrong-import-position
+if sys.version_info >= (3, 10):
+    from typing import TypeAlias
+else:
+    from typing_extensions import TypeAlias
+# pylint: enable=wrong-import-position
+
 import importlib
 import pkgutil
 
@@ -14,6 +24,7 @@ import aiohttp
 from yarl import URL
 import jsonschema
 import ruamel.yaml
+import lxml.etree as ElementTree
 
 from ..lib import (
     utils,
@@ -39,6 +50,7 @@ from ..lib.checksums import (
 )
 
 JSONType = t.Union[str, int, float, bool, None, t.Dict[str, t.Any], t.List[t.Any]]
+XMLElement: TypeAlias = ElementTree._Element  # pylint: disable=protected-access
 
 yaml = ruamel.yaml.YAML(typ="safe")
 log = logging.getLogger(__name__)
@@ -127,6 +139,16 @@ class Checker:
                     raise CheckerQueryError("Failed to parse JSON") from err
         except NETWORK_ERRORS as err:
             raise CheckerQueryError from err
+
+    async def _get_xml(self, url: URL) -> XMLElement:
+        parser = ElementTree.XMLPullParser(load_dtd=False, resolve_entities=False)
+        log.debug("Loading XML from %s", url)
+        async with self.session.get(url) as resp:
+            is_gzip = url.name.endswith(".gz")
+            decompressor = zlib.decompressobj(16 + zlib.MAX_WBITS)
+            async for chunk, _ in resp.content.iter_chunks():
+                parser.feed(decompressor.decompress(chunk) if is_gzip else chunk)
+        return parser.close()
 
     @staticmethod
     def _version_parts(version: str) -> t.Dict[str, str]:
