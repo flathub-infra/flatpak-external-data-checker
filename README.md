@@ -296,7 +296,7 @@ To use the **JSONChecker**, specify JSON data URL, version query and url query
 (you can use `$version` variable got from the version query in url query):
 
 ```json
-{
+"x-checker-data": {
     "type": "json",
     "url": "https://api.github.com/repos/stedolan/jq/releases/latest",
     "version-query": ".tag_name | sub(\"^jq-\"; \"\")",
@@ -305,7 +305,7 @@ To use the **JSONChecker**, specify JSON data URL, version query and url query
 ```
 for git type sources, specify tag query and, optionaly, commit and version queries:
 ```json
-{
+"x-checker-data": {
     "type": "json",
     "url": "https://api.github.com/repos/stedolan/jq/releases/latest",
     "tag-query": ".tag_name",
