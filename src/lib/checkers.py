@@ -6,6 +6,7 @@ import typing as t
 import aiohttp
 from yarl import URL
 import jsonschema
+import datetime
 
 from . import (
     utils,
@@ -147,6 +148,7 @@ class Checker:
         latest_version: str,
         latest_url: str,
         follow_redirects: bool = False,
+        timestamp: t.Optional[datetime.datetime] = None,
     ):
         assert latest_version is not None
         assert latest_url is not None
@@ -180,4 +182,6 @@ class Checker:
         new_version = new_version._replace(
             version=latest_version  # pylint: disable=no-member
         )
+        if timestamp is not None:
+            new_version = new_version._replace(timestamp=timestamp)
         external_data.set_new_version(new_version)
