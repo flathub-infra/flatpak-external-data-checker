@@ -10,6 +10,17 @@ modules:
           url: https://api.github.com/repos/stedolan/jq/releases/latest
           version-query: '.tag_name | sub("^jq-"; "")'
           url-query: '.assets[] | select(.name=="jq-" + $version + ".tar.gz") | .browser_download_url'
+
+      - type: archive
+        dest-filename: jq-1.4.tarball.tar.gz
+        url: https://api.github.com/repos/stedolan/jq/tarball/jq-1.4
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+        x-checker-data:
+          type: json
+          url: https://api.github.com/repos/stedolan/jq/releases/13660432
+          version-query: '.tag_name | sub("^jq-"; "")'
+          url-query: '.tarball_url'
+          timestamp-query: '.published_at'
     modules:
 
       - name: oniguruma

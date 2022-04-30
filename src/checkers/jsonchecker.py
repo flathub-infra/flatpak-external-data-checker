@@ -132,13 +132,20 @@ class JSONChecker(Checker):
         checker_data = external_data.checker_data
         results = await self._query_sequence(
             json_data,
-            self._read_q_seq(checker_data, ["tag", "commit", "version", "url"]),
+            self._read_q_seq(
+                checker_data, ["tag", "commit", "version", "url", "timestamp"]
+            ),
         )
         latest_version = results["version"]
         latest_url = results["url"]
+        latest_timestamp = parse_timestamp(results.get("timestamp"))
 
         await self._update_version(
-            external_data, latest_version, latest_url, follow_redirects=False
+            external_data,
+            latest_version,
+            latest_url,
+            follow_redirects=False,
+            timestamp=latest_timestamp,
         )
 
     async def _check_git(self, json_data: bytes, external_data: ExternalGitRepo):

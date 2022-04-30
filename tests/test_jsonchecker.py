@@ -18,7 +18,7 @@ class TestJSONChecker(unittest.IsolatedAsyncioTestCase):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = await checker.check()
 
-        self.assertEqual(len(ext_data), 7)
+        self.assertEqual(len(ext_data), 8)
         for data in ext_data:
             self.assertIsNotNone(data)
             if data.filename == "jq-1.4.tar.gz":
@@ -37,6 +37,11 @@ class TestJSONChecker(unittest.IsolatedAsyncioTestCase):
                     MultiDigest(
                         sha256="0000000000000000000000000000000000000000000000000000000000000000"
                     ),
+                )
+            elif data.filename == "jq-1.4.tarball.tar.gz":
+                self.assertEqual(
+                    data.new_version.timestamp,
+                    datetime.datetime.fromisoformat("2018-11-02T01:54:23+00:00"),
                 )
             elif data.filename == "oniguruma.git":
                 self.assertIsInstance(data.new_version, ExternalGitRef)
