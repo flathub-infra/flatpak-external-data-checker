@@ -91,7 +91,7 @@ class GitChecker(Checker):
     @staticmethod
     async def _check_has_new(external_data: ExternalGitRepo):
         tag_pattern = external_data.checker_data.get(
-            "tag-pattern", r"^(?:[vV])?(\d[\d\w.-]+\d)"
+            "tag-pattern", r"^(?:[vV])?((?:\d+\.)+\d+)$"
         )
         tag_re = re.compile(tag_pattern)
         assert tag_re.groups == 1
