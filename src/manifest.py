@@ -180,6 +180,28 @@ class ManifestChecker:
         elif self.kind in [self.Kind.SOURCE, self.Kind.SOURCES]:
             self._collect_source_data(self._root_manifest_path, self._root_manifest)
 
+        # Establish parent-child relation between sources
+        # FIXME Expensive O(n^2) algorithm; perhaps we can do better?
+        collected_data = self.get_external_data()
+        for data in collected_data:
+            if "parent-id" not in data.checker_data:
+                continue
+            # Assign parent source object
+            assert data.parent is None
+            parent_id = data.checker_data["parent-id"]
+            try:
+                data.parent = next(d for d in collected_data if d.ident == parent_id)
+            except StopIteration as err:
+                raise ManifestLoadError(
+                    f'Source {data}: parent source with ID "{parent_id}" not found'
+                ) from err
+            # Check for inheritance loops
+            parent = data.parent
+            while parent is not None:
+                if parent is data:
+                    raise ManifestLoadError(f"Source {data}: inheritance loop detected")
+                parent = parent.parent
+
     def _collect_module_data(
         self,
         module_path: str,

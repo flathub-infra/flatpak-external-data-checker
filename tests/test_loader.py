@@ -6,6 +6,7 @@ import string
 import tempfile
 
 from src.manifest import ManifestChecker
+from src.lib.errors import ManifestLoadError
 
 
 TEST_MANIFEST_DATA = {
@@ -17,6 +18,10 @@ TEST_MANIFEST_DATA = {
                 {
                     "type": "git",
                     "url": "http://example.com/first-repo.git",
+                    "x-checker-data": {
+                        "type": "dummy",
+                        "parent-id": "my-custom-id",
+                    },
                 },
                 {
                     "type": "file",
@@ -31,6 +36,10 @@ TEST_MANIFEST_DATA = {
                     "type": "file",
                     "url": "http://example.com/first-two.txt",
                     "sha256": "x",
+                    "x-checker-data": {
+                        "type": "dummy",
+                        "parent-id": "my-custom-id",
+                    },
                 },
             ],
         },
@@ -40,6 +49,10 @@ TEST_MANIFEST_DATA = {
                 {
                     "type": "git",
                     "url": "http://example.com/second-repo.git",
+                    "x-checker-data": {
+                        "type": "dummy",
+                        "parent-id": "first-file-1",
+                    },
                 },
             ],
             "modules": [
@@ -64,6 +77,10 @@ TEST_MANIFEST_DATA = {
                                     "type": "archive",
                                     "url": "http://example.com/first-grandchild.tar",
                                     "sha256": "x",
+                                    "x-checker-data": {
+                                        "type": "dummy",
+                                        "parent-id": "first-child-file-0",
+                                    },
                                 },
                             ],
                         },
@@ -92,6 +109,54 @@ TEST_MANIFEST_DATA = {
                     "type": "archive",
                     "url": "http://example.com/third.tar",
                     "sha256": "x",
+                    "x-checker-data": {
+                        "type": "dummy",
+                        "parent-id": "second-git-0",
+                    },
+                },
+            ],
+        },
+    ],
+}
+TEST_MANIFEST_INVALID_NO_ID = {
+    "id": "fedc.test.Loader",
+    "modules": [
+        {
+            "name": "broken",
+            "sources": [
+                {
+                    "type": "git",
+                    "url": "http://example.com/invalid.git",
+                    "x-checker-data": {
+                        "type": "dummy",
+                        "parent-id": "no-such-id",
+                    },
+                },
+            ],
+        },
+    ],
+}
+TEST_MANIFEST_INVALID_LOOP = {
+    "id": "fedc.test.Loader",
+    "modules": [
+        {
+            "name": "broken",
+            "sources": [
+                {
+                    "type": "git",
+                    "url": "http://example.com/first.git",
+                    "x-checker-data": {
+                        "type": "dummy",
+                        "parent-id": "broken-git-1",
+                    },
+                },
+                {
+                    "type": "git",
+                    "url": "http://example.com/second.git",
+                    "x-checker-data": {
+                        "type": "dummy",
+                        "parent-id": "broken-git-0",
+                    },
                 },
             ],
         },
@@ -134,6 +199,9 @@ class TestManifestLoader(unittest.IsolatedAsyncioTestCase):
             [s.ident for s in modules[0].sources],
             ["first-git-0", "my-custom-id", "first-file-1"],
         )
+        self.assertIs(modules[0].sources[0].parent, modules[0].sources[1])
+        self.assertIsNone(modules[0].sources[1].parent)
+        self.assertIs(modules[0].sources[2].parent, modules[0].sources[1])
 
         self.assertEqual(modules[1].name, "second")
         self.assertIsNone(modules[1].parent)
@@ -145,6 +213,7 @@ class TestManifestLoader(unittest.IsolatedAsyncioTestCase):
             [s.ident for s in modules[1].sources],
             ["second-git-0"],
         )
+        self.assertIs(modules[1].sources[0].parent, modules[0].sources[2])
 
         self.assertEqual(modules[2].name, "first-child")
         self.assertIs(modules[2].parent, modules[1])
@@ -167,6 +236,7 @@ class TestManifestLoader(unittest.IsolatedAsyncioTestCase):
             [s.ident for s in modules[3].sources],
             ["first-grandchild-archive-0"],
         )
+        self.assertIs(modules[3].sources[0].parent, modules[2].sources[1])
 
         self.assertEqual(modules[4].name, "second-child")
         self.assertIs(modules[4].parent, modules[1])
@@ -189,4 +259,11 @@ class TestManifestLoader(unittest.IsolatedAsyncioTestCase):
             [s.ident for s in modules[5].sources],
             ["third-archive-0"],
         )
+        self.assertIs(modules[5].sources[0].parent, modules[1].sources[0])
         # fmt: on
+
+    def test_invalid_relations(self):
+        with self.assertRaises(ManifestLoadError):
+            self._load_manifest(TEST_MANIFEST_INVALID_NO_ID)
+        with self.assertRaises(ManifestLoadError):
+            self._load_manifest(TEST_MANIFEST_INVALID_LOOP)
