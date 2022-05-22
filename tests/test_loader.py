@@ -22,6 +22,10 @@ TEST_MANIFEST_DATA = {
                     "type": "file",
                     "url": "http://example.com/first-one.txt",
                     "sha256": "x",
+                    "x-checker-data": {
+                        "type": "dummy",
+                        "source-id": "my-custom-id",
+                    },
                 },
                 {
                     "type": "file",
@@ -126,12 +130,20 @@ class TestManifestLoader(unittest.IsolatedAsyncioTestCase):
             [s.filename for s in modules[0].sources],
             ["first-repo.git", "first-one.txt", "first-two.txt"],
         )
+        self.assertEqual(
+            [s.ident for s in modules[0].sources],
+            ["first-git-0", "my-custom-id", "first-file-1"],
+        )
 
         self.assertEqual(modules[1].name, "second")
         self.assertIsNone(modules[1].parent)
         self.assertEqual(
             [s.filename for s in modules[1].sources],
             ["second-repo.git"],
+        )
+        self.assertEqual(
+            [s.ident for s in modules[1].sources],
+            ["second-git-0"],
         )
 
         self.assertEqual(modules[2].name, "first-child")
@@ -140,12 +152,20 @@ class TestManifestLoader(unittest.IsolatedAsyncioTestCase):
             [s.filename for s in modules[2].sources],
             ["first-child-repo.git", "first-child.txt"],
         )
+        self.assertEqual(
+            [s.ident for s in modules[2].sources],
+            ["first-child-git-0", "first-child-file-0"],
+        )
 
         self.assertEqual(modules[3].name, "first-grandchild")
         self.assertIs(modules[3].parent, modules[2])
         self.assertEqual(
             [s.filename for s in modules[3].sources],
             ["first-grandchild.tar"],
+        )
+        self.assertEqual(
+            [s.ident for s in modules[3].sources],
+            ["first-grandchild-archive-0"],
         )
 
         self.assertEqual(modules[4].name, "second-child")
@@ -154,11 +174,19 @@ class TestManifestLoader(unittest.IsolatedAsyncioTestCase):
             [s.filename for s in modules[4].sources],
             ["second-child.txt"],
         )
+        self.assertEqual(
+            [s.ident for s in modules[4].sources],
+            ["second-child-file-0"],
+        )
 
         self.assertEqual(modules[5].name, "third")
         self.assertIsNone(modules[5].parent)
         self.assertEqual(
             [s.filename for s in modules[5].sources],
             ["third.tar"],
+        )
+        self.assertEqual(
+            [s.ident for s in modules[5].sources],
+            ["third-archive-0"],
         )
         # fmt: on

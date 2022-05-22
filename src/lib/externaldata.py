@@ -50,6 +50,7 @@ CHECKER_DATA_SCHEMA_COMMON = {
             "type": "array",
             "items": {"type": "string"},
         },
+        "source-id": {"type": "string"},
     },
     "required": ["type"],
 }
@@ -166,6 +167,15 @@ class BuilderSource(abc.ABC):
         module: t.Optional[BuilderModule] = None,
     ) -> _BS:
         raise NotImplementedError
+
+    @property
+    def ident(self) -> str:
+        if "source-id" in self.checker_data:
+            return self.checker_data["source-id"]
+        if self.module:
+            index = [s for s in self.module.sources if s.type == self.type].index(self)
+            return f"{self.module.name}-{self.type.value}-{index}"
+        raise SourceLoadError("Can't get source id")
 
     def __str__(self):
         name = self.filename
