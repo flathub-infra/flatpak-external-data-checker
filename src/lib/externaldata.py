@@ -51,6 +51,7 @@ CHECKER_DATA_SCHEMA_COMMON = {
             "items": {"type": "string"},
         },
         "source-id": {"type": "string"},
+        "parent-id": {"type": "string"},
     },
     "required": ["type"],
 }
@@ -123,6 +124,7 @@ class BuilderSource(abc.ABC):
     source_path: str
     checker_data: t.Dict[str, t.Any]
     module: t.Optional[BuilderModule]
+    parent: t.Optional[BuilderSource] = dataclasses.field(init=False, default=None)
 
     def __post_init__(self):
         if self.module:
