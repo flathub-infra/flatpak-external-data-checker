@@ -25,6 +25,7 @@ import datetime
 import typing as t
 import dataclasses
 import logging
+import asyncio
 
 from yarl import URL
 import jsonschema
@@ -125,6 +126,9 @@ class BuilderSource(abc.ABC):
     checker_data: t.Dict[str, t.Any]
     module: t.Optional[BuilderModule]
     parent: t.Optional[BuilderSource] = dataclasses.field(init=False, default=None)
+    # fmt: off
+    checked: asyncio.Event = dataclasses.field(init=False, default_factory=asyncio.Event)
+    # fmt: on
 
     def __post_init__(self):
         if self.module:
