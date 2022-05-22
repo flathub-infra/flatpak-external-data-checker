@@ -303,6 +303,9 @@ class ManifestChecker:
         data: ExternalBase,
     ) -> ExternalBase:
         src_rel_path = os.path.relpath(data.source_path, self._root_manifest_dir)
+        if data.parent:
+            await data.parent.checked.wait()
+        data.checked.clear()
         counter.started += 1
         checkers = [c(http_session) for c in self._checkers if c.should_check(data)]
         if not checkers:
@@ -343,6 +346,7 @@ class ManifestChecker:
                 # TODO: Potentially we can proceed to the next applicable checker here,
                 # but applying checkers in sequence should be carefully tested.
                 # This is a safety switch: leave the data alone on error.
+                data.checked.set()
                 return data
             if data.state != data.State.UNKNOWN:
                 log.debug(
@@ -367,6 +371,7 @@ class ManifestChecker:
             data,
             src_rel_path,
         )
+        data.checked.set()
         return data
 
     async def check(self, filter_type=None) -> t.List[ExternalBase]:
