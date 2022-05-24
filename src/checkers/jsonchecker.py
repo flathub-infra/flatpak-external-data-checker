@@ -75,7 +75,6 @@ class JSONChecker(Checker):
             "timestamp-query": {"type": "string"},
             "timestamp-data-url": {"type": "string"},
         },
-        "required": ["url"],
     }
     SUPPORTED_DATA_CLASSES = [ExternalData, ExternalGitRepo]
 
@@ -110,8 +109,8 @@ class JSONChecker(Checker):
 
     async def _query_sequence(
         self,
-        init_json_data: JSONType,
         queries: t.Iterable[_Query],
+        init_json_data: JSONType = None,
     ) -> t.Dict[str, str]:
         results: t.Dict[str, str] = {}
         for query in queries:
@@ -142,8 +141,8 @@ class JSONChecker(Checker):
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
 
-        json_url = external_data.checker_data["url"]
-        json_data = await self._get_json(json_url)
+        json_url = external_data.checker_data.get("url")
+        json_data = await self._get_json(json_url) if json_url else None
 
         if isinstance(external_data, ExternalGitRepo):
             return await self._check_git(json_data, external_data)
@@ -154,10 +153,10 @@ class JSONChecker(Checker):
     async def _check_data(self, json_data: JSONType, external_data: ExternalData):
         checker_data = external_data.checker_data
         results = await self._query_sequence(
-            json_data,
             self._read_q_seq(
                 checker_data, ["tag", "commit", "version", "url", "timestamp"]
             ),
+            json_data,
         )
         latest_version = results["version"]
         latest_url = results["url"]
@@ -174,8 +173,8 @@ class JSONChecker(Checker):
     async def _check_git(self, json_data: JSONType, external_data: ExternalGitRepo):
         checker_data = external_data.checker_data
         results = await self._query_sequence(
-            json_data,
             self._read_q_seq(checker_data, ["tag", "commit", "version", "timestamp"]),
+            json_data,
         )
         new_version = ExternalGitRef(
             url=external_data.current_version.url,
