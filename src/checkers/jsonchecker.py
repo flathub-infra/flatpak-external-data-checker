@@ -111,16 +111,18 @@ class JSONChecker(Checker):
     async def _query_sequence(
         self,
         queries: t.Iterable[_Query],
+        json_vars: t.Dict[str, JSONType],
         init_json_data: JSONType = None,
     ) -> t.Dict[str, str]:
         results: t.Dict[str, str] = {}
         for query in queries:
+            _vars = json_vars | results
             if query.url_expr:
-                url = await _jq(query.url_expr, init_json_data, results)
+                url = await _jq(query.url_expr, init_json_data, _vars)
                 json_data = await self._get_json(url)
             else:
                 json_data = init_json_data
-            results[query.name] = await _jq(query.value_expr, json_data, results)
+            results[query.name] = await _jq(query.value_expr, json_data, _vars)
         return results
 
     @staticmethod
@@ -145,18 +147,26 @@ class JSONChecker(Checker):
         json_url = external_data.checker_data.get("url")
         json_data = await self._get_json(json_url) if json_url else None
 
+        json_vars: t.Dict[str, JSONType] = {}
+
         if isinstance(external_data, ExternalGitRepo):
-            return await self._check_git(json_data, external_data)
+            return await self._check_git(json_data, json_vars, external_data)
         else:
             assert isinstance(external_data, ExternalData)
-            return await self._check_data(json_data, external_data)
+            return await self._check_data(json_data, json_vars, external_data)
 
-    async def _check_data(self, json_data: JSONType, external_data: ExternalData):
+    async def _check_data(
+        self,
+        json_data: JSONType,
+        json_vars: t.Dict[str, JSONType],
+        external_data: ExternalData,
+    ):
         checker_data = external_data.checker_data
         results = await self._query_sequence(
             self._read_q_seq(
                 checker_data, ["tag", "commit", "version", "url", "timestamp"]
             ),
+            json_vars,
             json_data,
         )
         latest_version = results["version"]
@@ -171,10 +181,16 @@ class JSONChecker(Checker):
             timestamp=latest_timestamp,
         )
 
-    async def _check_git(self, json_data: JSONType, external_data: ExternalGitRepo):
+    async def _check_git(
+        self,
+        json_data: JSONType,
+        json_vars: t.Dict[str, JSONType],
+        external_data: ExternalGitRepo,
+    ):
         checker_data = external_data.checker_data
         results = await self._query_sequence(
             self._read_q_seq(checker_data, ["tag", "commit", "version", "timestamp"]),
+            json_vars,
             json_data,
         )
         new_version = ExternalGitRef(
