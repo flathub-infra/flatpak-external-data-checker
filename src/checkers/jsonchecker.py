@@ -82,8 +82,9 @@ class JSONChecker(Checker):
     def get_json_schema(cls, data_class: t.Type[ExternalBase]):
         schema = super().get_json_schema(data_class).copy()
         if issubclass(data_class, ExternalGitRepo):
-            schema["required"] = schema.get("required", []) + [
-                "tag-query",
+            schema["anyOf"] = schema.get("anyOf", []) + [
+                {"required": ["tag-query"]},
+                {"required": ["commit-query"]},
             ]
         else:
             schema["required"] = schema.get("required", []) + [
@@ -179,7 +180,7 @@ class JSONChecker(Checker):
         new_version = ExternalGitRef(
             url=external_data.current_version.url,
             commit=results.get("commit"),
-            tag=results["tag"],
+            tag=results.get("tag"),
             branch=None,
             version=results.get("version"),
             timestamp=parse_timestamp(results.get("timestamp")),
