@@ -46,6 +46,12 @@ def parse_timestamp(date_string: t.Optional[str]) -> t.Optional[datetime]:
         raise CheckerQueryError("Failed to parse timestamp") from err
 
 
+class _Query(t.NamedTuple):
+    name: str
+    value_expr: str
+    url_expr: t.Optional[str]
+
+
 class JSONChecker(Checker):
     CHECKER_DATA_TYPE = "json"
     CHECKER_DATA_SCHEMA = {
@@ -100,26 +106,33 @@ class JSONChecker(Checker):
     async def _query_sequence(
         self,
         init_json_data: bytes,
-        queries: t.Iterable[t.Tuple[str, str, t.Optional[str]]],
+        queries: t.Iterable[_Query],
     ) -> t.Dict[str, str]:
         results: t.Dict[str, str] = {}
-        for result_key, value_query, url_query in queries:
-            if url_query:
-                url = await query_json(url_query, init_json_data, results)
+        for query in queries:
+            if query.url_expr:
+                url = await query_json(query.url_expr, init_json_data, results)
                 json_data = await self._get_json(url)
             else:
                 json_data = init_json_data
-            results[result_key] = await query_json(value_query, json_data, results)
+            results[query.name] = await query_json(query.value_expr, json_data, results)
         return results
 
     @staticmethod
-    def _read_q_seq(checker_data: t.Mapping, sequence: t.List[str]):
+    def _read_q_seq(
+        checker_data: t.Mapping,
+        sequence: t.List[str],
+    ) -> t.Iterable[_Query]:
         for query_name in sequence:
             q_prop = f"{query_name}-query"
             if q_prop not in checker_data:
                 continue
             url_prop = f"{query_name}-data-url"
-            yield (query_name, checker_data[q_prop], checker_data.get(url_prop))
+            yield _Query(
+                name=query_name,
+                value_expr=checker_data[q_prop],
+                url_expr=checker_data.get(url_prop),
+            )
 
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
