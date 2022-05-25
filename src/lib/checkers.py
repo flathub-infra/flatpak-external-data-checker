@@ -1,12 +1,14 @@
 import logging
 from distutils.version import LooseVersion
 from string import Template
+import datetime
+import re
 import typing as t
 
 import aiohttp
 from yarl import URL
 import jsonschema
-import datetime
+import ruamel.yaml
 
 from . import (
     utils,
@@ -33,6 +35,7 @@ from .checksums import (
 
 JSONType = t.Union[str, int, float, bool, None, t.Dict[str, t.Any], t.List[t.Any]]
 
+yaml = ruamel.yaml.YAML(typ="safe")
 log = logging.getLogger(__name__)
 
 
@@ -92,6 +95,11 @@ class Checker:
             headers = {}
         try:
             async with self.session.get(url, headers=headers) as response:
+                if re.match(r".+\.ya?ml$", response.url.name):
+                    try:
+                        return yaml.load(await response.read())
+                    except ruamel.yaml.error.YAMLError as err:
+                        raise CheckerQueryError("Failed to parse YAML") from err
                 return await response.json()
         except NETWORK_ERRORS as err:
             raise CheckerQueryError from err
