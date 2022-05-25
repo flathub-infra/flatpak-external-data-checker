@@ -21,10 +21,10 @@ from ..lib.checkers import Checker, JSONType
 log = logging.getLogger(__name__)
 
 
-async def _jq(query: str, data: JSONType, variables: t.Dict[str, str]) -> str:
+async def _jq(query: str, data: JSONType, variables: t.Dict[str, JSONType]) -> str:
     var_args = []
     for var_name, var_value in variables.items():
-        var_args += ["--arg", var_name, var_value]
+        var_args += ["--argjson", var_name, json.dumps(var_value)]
 
     jq_cmd = ["jq"] + var_args + ["-e", query]
     try:
