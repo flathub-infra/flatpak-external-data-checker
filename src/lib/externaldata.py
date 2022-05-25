@@ -205,6 +205,12 @@ class ExternalState(abc.ABC):
     def _asdict(self) -> t.Dict[str, t.Any]:
         return dataclasses.asdict(self)
 
+    @property
+    def json(self) -> t.Dict[str, t.Any]:
+        return self._asdict() | {
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+        }
+
     def matches(self: _ES, other: _ES) -> bool:
         raise NotImplementedError
 
@@ -274,6 +280,12 @@ class ExternalBase(BuilderSource):
 class ExternalFile(ExternalState):
     checksum: MultiDigest
     size: t.Optional[int]
+
+    @property
+    def json(self) -> t.Dict[str, t.Any]:
+        return super().json | {
+            "checksum": self.checksum._asdict(),  # pylint: disable=no-member
+        }
 
     def matches(self, other: ExternalFile):
         for i in (self, other):
