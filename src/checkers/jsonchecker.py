@@ -149,6 +149,18 @@ class JSONChecker(Checker):
 
         json_vars: t.Dict[str, JSONType] = {}
 
+        if external_data.parent:
+            assert isinstance(external_data.parent, ExternalBase)
+            # XXX This seemingly redundant extra variable is needed to make Mypy happy
+            parent_data: t.Dict[str, t.Optional[t.Dict[str, JSONType]]]
+            parent_data = {
+                "current": external_data.parent.current_version.json,
+                "new": None,
+            }
+            if external_data.parent.new_version:
+                parent_data["new"] = external_data.parent.new_version.json
+            json_vars["parent"] = parent_data
+
         if isinstance(external_data, ExternalGitRepo):
             return await self._check_git(json_data, json_vars, external_data)
         else:

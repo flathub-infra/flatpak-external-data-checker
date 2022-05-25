@@ -318,6 +318,14 @@ for git type sources, specify tag query and, optionaly, commit and version queri
 
 See the [jq manual](https://stedolan.github.io/jq/manual/) for complete information about writing queries.
 
+#### Inheriting parent source check results
+
+If a parent source is specified, its check results will be accessible in the `$parent` variable.
+The `$parent` object has `current` and `new` properties with objects representing current and new
+parent source data, respectively. The later can be `null` if parent check didn't get a new version.
+JSON schema for these objects can be found [here](data/source-state.schema.json).
+
+
 ### Debian repo checker
 
 For the **DebianRepoChecker**, which deals only with deb packages, it
