@@ -1,0 +1,41 @@
+{
+  "$defs": {
+    "source-state": {
+      "file": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string" },
+          "checksum": {
+            "type": "object",
+            "properties": {
+              "md5": { "type": "string" },
+              "sha1": { "type": "string" },
+              "sha256": { "type": "string" },
+              "sha512": { "type": "string" }
+            }
+          },
+          "version": { "type": "string" },
+          "timestamp": { "type": "string" }
+        },
+        "required": [ "url", "checksum" ]
+      },
+      "git": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string" },
+          "commit": { "type": "string" },
+          "tag": { "type": "string" },
+          "branch": { "type": "string" },
+          "version": { "type": "string" },
+          "timestamp": { "type": "string" }
+        },
+        "required": [ "url" ]
+      }
+    }
+  },
+  "type": "object",
+  "anyOf": [
+    { "$ref": "#/$defs/source-state/file" },
+    { "$ref": "#/$defs/source-state/git" }
+  ]
+}
