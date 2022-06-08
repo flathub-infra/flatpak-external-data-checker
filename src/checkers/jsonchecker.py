@@ -71,9 +71,14 @@ class JSONChecker(Checker):
     def get_json_schema(cls, data_class: t.Type[ExternalBase]):
         schema = super().get_json_schema(data_class).copy()
         if issubclass(data_class, ExternalGitRepo):
-            schema["required"] = ["tag-query"]
+            schema["required"] = schema.get("required", []) + [
+                "tag-query",
+            ]
         else:
-            schema["required"] = ["version-query", "url-query"]
+            schema["required"] = schema.get("required", []) + [
+                "version-query",
+                "url-query",
+            ]
         return schema
 
     async def _get_json(self, url: t.Union[str, URL]) -> bytes:
