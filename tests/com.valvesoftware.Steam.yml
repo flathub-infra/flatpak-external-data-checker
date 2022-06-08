@@ -38,3 +38,21 @@ modules:
           type: pypi
           name: Pillow
           packagetype: bdist_wheel
+
+      - type: file
+        url: http://example.com/allow-prerelease
+        sha256: x
+        x-checker-data:
+          type: pypi
+          name: borgbackup
+          versions: { "<": "1.2" }
+          stable-only: false
+
+      - type: file
+        url: http://example.com/disallow-prerelease
+        sha256: x
+        x-checker-data:
+          type: pypi
+          name: borgbackup
+          versions: { "<": "1.2" }
+          stable-only: true
