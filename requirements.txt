@@ -11,3 +11,4 @@ semver
 jsonschema
 editorconfig
 lxml
+packaging

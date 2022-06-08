@@ -1,6 +1,8 @@
 import os
 import unittest
 
+from packaging.version import Version
+
 from src.manifest import ManifestChecker
 from src.lib.utils import init_logging
 from src.lib.checksums import MultiDigest
@@ -16,7 +18,7 @@ class TestPyPIChecker(unittest.IsolatedAsyncioTestCase):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = await checker.check()
 
-        self.assertEqual(len(ext_data), 4)
+        self.assertEqual(len(ext_data), 6)
         for data in ext_data:
             if data.filename != "Pillow-7.2.0.tar.gz":
                 self.assertIsNotNone(data.new_version)
@@ -46,5 +48,15 @@ class TestPyPIChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(data.new_version.version, "3.2")
             elif data.filename == "Pillow-7.2.0.tar.gz":
                 self.assertIsNone(data.new_version)
+            elif data.filename == "allow-prerelease":
+                # Avoid false-success on the `disallow-prerelease` source assertions
+                # in case there wasn't any prerelease on PyPI
+                self.assertIsNotNone(data.new_version)
+                self.assertIsNotNone(data.new_version.version)
+                self.assertIsNotNone(Version(data.new_version.version).pre)
+            elif data.filename == "disallow-prerelease":
+                self.assertIsNotNone(data.new_version)
+                self.assertIsNotNone(data.new_version.version)
+                self.assertIsNone(Version(data.new_version.version).pre)
             else:
                 self.fail(f"Unknown data {data.filename}")

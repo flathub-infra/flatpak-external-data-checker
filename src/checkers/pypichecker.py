@@ -3,6 +3,8 @@ from datetime import datetime
 import re
 import typing as t
 
+from packaging.version import Version
+
 from ..lib import OPERATORS_SCHEMA
 from ..lib.externaldata import ExternalFile, ExternalBase
 from ..lib.checksums import MultiDigest
@@ -20,6 +22,7 @@ def _filter_downloads(
     pypy_releases: t.Dict[str, t.List[t.Dict]],
     constraints: t.List[t.Tuple[str, str]],
     packagetype: str,
+    stable_only: bool = False,
 ) -> t.Generator[t.Tuple[str, t.Dict, datetime], None, None]:
     releases = filter_versions(
         pypy_releases.items(),
@@ -28,6 +31,8 @@ def _filter_downloads(
         sort=True,
     )
     for pypi_version, pypi_downloads in releases:
+        if stable_only and Version(pypi_version).pre:
+            continue
         for download in pypi_downloads:
             if download["packagetype"] != packagetype:
                 continue
@@ -49,6 +54,7 @@ class PyPIChecker(Checker):
             "name": {"type": "string"},
             "packagetype": {"type": "string", "enum": ["sdist", "bdist_wheel"]},
             "versions": OPERATORS_SCHEMA,
+            "stable-only": {"type": "boolean"},
         },
         "required": ["name"],
     }
@@ -57,6 +63,7 @@ class PyPIChecker(Checker):
         package_name = external_data.checker_data["name"]
         package_type = external_data.checker_data.get("packagetype", "sdist")
         constraints = external_data.checker_data.get("versions", {}).items()
+        stable_only = external_data.checker_data.get("stable-only", False)
 
         async with self.session.get(f"{PYPI_INDEX}/{package_name}/json") as response:
             pypi_data = await response.json()
@@ -66,7 +73,9 @@ class PyPIChecker(Checker):
         else:
             releases = {pypi_data["info"]["version"]: pypi_data["urls"]}
 
-        downloads = list(_filter_downloads(releases, constraints, package_type))
+        downloads = list(
+            _filter_downloads(releases, constraints, package_type, stable_only)
+        )
 
         try:
             pypi_version, pypi_download, pypi_date = downloads[-1]
