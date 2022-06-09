@@ -34,6 +34,8 @@ from src.lib.utils import (
     parse_github_url,
     strip_query,
     filter_versions,
+    filter_versioned_items,
+    FallbackVersion,
     _extract_timestamp,
     get_extra_data_info_from_url,
     Command,
@@ -175,10 +177,10 @@ class TestVersionFilter(unittest.TestCase):
 
     def test_objects(self):
         self.assertEqual(
-            filter_versions(
+            filter_versioned_items(
                 [("c", "1.1"), ("a", "1.3"), ("b", "1.2"), ("d", "1.0")],
-                [("!=", "1.2")],
-                to_string=lambda o: o[1],
+                [("!=", FallbackVersion("1.2"))],
+                to_version=lambda o: FallbackVersion(o[1]),
                 sort=True,
             ),
             [("d", "1.0"), ("c", "1.1"), ("a", "1.3")],
