@@ -33,6 +33,7 @@ from distutils.version import StrictVersion, LooseVersion
 import asyncio
 import shlex
 from pathlib import Path
+import operator
 
 from collections import OrderedDict
 from ruamel.yaml import YAML
@@ -144,40 +145,92 @@ async def get_extra_data_info_from_url(
     return external_file
 
 
-_VersionObj = t.TypeVar("_VersionObj")
+class VersionComparisonError(CheckerQueryError):
+    def __init__(self, left, right):
+        self.left = left
+        self.right = right
+        super().__init__(f"Can't compare {self.left} and {self.right}")
 
 
-def filter_versions(
-    versions: t.Iterable[_VersionObj],
-    constraints: t.List[t.Tuple[str, str]],
-    to_string: t.Callable[[_VersionObj], str] = str,
+class FallbackVersion(t.NamedTuple):
+    s: str
+
+    def __compare(self, oper, other) -> bool:
+        try:
+            return oper(StrictVersion(self.s), StrictVersion(other.s))
+        except ValueError:
+            try:
+                return oper(LooseVersion(self.s), LooseVersion(other.s))
+            except TypeError as err:
+                raise VersionComparisonError(self.s, other.s) from err
+
+    def __lt__(self, other):
+        return self.__compare(operator.lt, other)
+
+    def __le__(self, other):
+        return self.__compare(operator.le, other)
+
+    def __gt__(self, other):
+        return self.__compare(operator.gt, other)
+
+    def __ge__(self, other):
+        return self.__compare(operator.ge, other)
+
+    def __eq__(self, other):
+        return self.__compare(operator.eq, other)
+
+    def __ne__(self, other):
+        return self.__compare(operator.ne, other)
+
+
+class _SupportsComparison(t.Protocol):
+    def __lt__(self, other: t.Any) -> bool:
+        ...
+
+
+_VersionedObj = t.TypeVar("_VersionedObj")
+_ComparableObj = t.TypeVar("_ComparableObj", bound=_SupportsComparison)
+
+
+def filter_versioned_items(
+    items: t.Iterable[_VersionedObj],
+    constraints: t.Iterable[t.Tuple[str, _ComparableObj]],
+    to_version: t.Callable[[_VersionedObj], _ComparableObj],
     sort=False,
-):
-    new_versions = []
-    for version in versions:
-        version_str = to_string(version)
+) -> t.List[_VersionedObj]:
+    constraints = list(constraints)
+    new_items = []
+    for item in items:
+        version = to_version(item)
         matches = []
         for oper_str, version_limit in constraints:
             oper = OPERATORS[oper_str]
             try:
-                match = oper(StrictVersion(version_str), StrictVersion(version_limit))
-            except ValueError:
-                try:
-                    match = oper(LooseVersion(version_str), LooseVersion(version_limit))
-                except TypeError as err:
-                    log.debug(
-                        "Comparison of loose versions failed due to type mismatch: %s",
-                        err,
-                    )
-                    match = False
+                match = oper(version, version_limit)
+            except VersionComparisonError as err:
+                log.debug(err)
+                match = False
             matches.append(match)
         if all(matches):
-            new_versions.append(version)
+            new_items.append(item)
 
     if sort:
-        return sorted(new_versions, key=lambda v: LooseVersion(to_string(v)))
+        return sorted(new_items, key=to_version)
 
-    return new_versions
+    return new_items
+
+
+def filter_versions(
+    versions: t.Iterable[str],
+    constraints: t.Iterable[t.Tuple[str, str]],
+    sort=False,
+) -> t.List[str]:
+    return filter_versioned_items(
+        versions,
+        ((o, FallbackVersion(l)) for o, l in constraints),
+        to_version=FallbackVersion,
+        sort=sort,
+    )
 
 
 def clear_env(environ):

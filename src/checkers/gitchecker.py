@@ -1,13 +1,12 @@
 import logging
 import re
 import typing as t
-from distutils.version import LooseVersion
 
 import semver
 
 from ..lib import OPERATORS_SCHEMA
 from ..lib.externaldata import ExternalBase, ExternalGitRepo, ExternalGitRef
-from ..lib.utils import git_ls_remote, filter_versions
+from ..lib.utils import git_ls_remote, filter_versioned_items, TrialVersion
 from ..lib.errors import CheckerQueryError, CheckerFetchError
 from ..lib.checkers import Checker
 
@@ -23,9 +22,13 @@ class TagWithVersion(t.NamedTuple):
     annotated: bool
     version: str
 
+    @classmethod
+    def parse_version(cls, version: str):
+        return TrialVersion(version)
+
     @property
     def parsed_version(self):
-        return LooseVersion(self.version)
+        return self.parse_version(self.version)
 
     def __lt__(self, other):
         if self.tag == other.tag:
@@ -45,9 +48,9 @@ class TagWithVersion(t.NamedTuple):
 
 
 class TagWithSemver(TagWithVersion):
-    @property
-    def parsed_version(self):
-        return semver.VersionInfo.parse(self.version)
+    @classmethod
+    def parse_version(self, version: str):
+        return semver.VersionInfo.parse(version)
 
 
 TAG_VERSION_SCHEMES = {
@@ -99,7 +102,10 @@ class GitChecker(Checker):
         version_scheme = external_data.checker_data.get("version-scheme", "loose")
         tag_cls = TAG_VERSION_SCHEMES[version_scheme]
         sort_tags = external_data.checker_data.get("sort-tags", True)
-        constraints = external_data.checker_data.get("versions", {}).items()
+        constraints = [
+            (o, tag_cls.parse_version(v))
+            for o, v in external_data.checker_data.get("versions", {}).items()
+        ]
 
         matching_tags = []
         refs = await git_ls_remote(external_data.current_version.url)
@@ -119,10 +125,10 @@ class GitChecker(Checker):
             matching_tags.append(tag_cls(commit, tag, annotated, version))
 
         if constraints:
-            sorted_tags = filter_versions(
+            sorted_tags = filter_versioned_items(
                 matching_tags,
                 constraints=constraints,
-                to_string=lambda t: t.version,
+                to_version=lambda t: t.parsed_version,
                 sort=sort_tags,
             )
         elif sort_tags:

@@ -8,7 +8,7 @@ from packaging.version import Version
 from ..lib import OPERATORS_SCHEMA
 from ..lib.externaldata import ExternalFile, ExternalBase
 from ..lib.checksums import MultiDigest
-from ..lib.utils import filter_versions
+from ..lib.utils import filter_versioned_items
 from ..lib.errors import CheckerQueryError
 from ..lib.checkers import Checker
 
@@ -20,14 +20,14 @@ BDIST_RE = re.compile(r"^(\S+)-(\d[\d\.\w]*\d)-(\S+)-(\S+)-(\S+).whl$")
 
 def _filter_downloads(
     pypy_releases: t.Dict[str, t.List[t.Dict]],
-    constraints: t.List[t.Tuple[str, str]],
+    constraints: t.List[t.Tuple[str, Version]],
     packagetype: str,
     stable_only: bool = False,
 ) -> t.Generator[t.Tuple[str, t.Dict, datetime], None, None]:
-    releases = filter_versions(
+    releases = filter_versioned_items(
         pypy_releases.items(),
         constraints,
-        to_string=lambda r: r[0],
+        to_version=lambda r: Version(r[0]),
         sort=True,
     )
     for pypi_version, pypi_downloads in releases:
@@ -62,7 +62,10 @@ class PyPIChecker(Checker):
     async def check(self, external_data: ExternalBase):
         package_name = external_data.checker_data["name"]
         package_type = external_data.checker_data.get("packagetype", "sdist")
-        constraints = external_data.checker_data.get("versions", {}).items()
+        constraints = [
+            (o, Version(v))
+            for o, v in external_data.checker_data.get("versions", {}).items()
+        ]
         stable_only = external_data.checker_data.get("stable-only", False)
 
         async with self.session.get(f"{PYPI_INDEX}/{package_name}/json") as response:
