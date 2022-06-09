@@ -3,7 +3,7 @@ from datetime import datetime
 import re
 import typing as t
 
-from packaging.version import Version
+from packaging.version import Version as PackagingVersion
 
 from ..lib import OPERATORS_SCHEMA
 from ..lib.externaldata import ExternalFile, ExternalBase
@@ -18,20 +18,27 @@ PYPI_INDEX = "https://pypi.org/pypi"
 BDIST_RE = re.compile(r"^(\S+)-(\d[\d\.\w]*\d)-(\S+)-(\S+)-(\S+).whl$")
 
 
+# We want to keep the original version string on parsed version object
+class Version(PackagingVersion):
+    def __init__(self, version: str):
+        super().__init__(version)
+        self.orig_str = version
+
+
 def _filter_downloads(
     pypy_releases: t.Dict[str, t.List[t.Dict]],
     constraints: t.List[t.Tuple[str, Version]],
     packagetype: str,
     stable_only: bool = False,
-) -> t.Generator[t.Tuple[str, t.Dict, datetime], None, None]:
+) -> t.Generator[t.Tuple[Version, t.Dict, datetime], None, None]:
     releases = filter_versioned_items(
-        pypy_releases.items(),
+        ((Version(v), d) for v, d in pypy_releases.items()),
         constraints,
-        to_version=lambda r: Version(r[0]),
+        to_version=lambda r: r[0],
         sort=True,
     )
     for pypi_version, pypi_downloads in releases:
-        if stable_only and Version(pypi_version).pre:
+        if stable_only and pypi_version.pre:
             continue
         for download in pypi_downloads:
             if download["packagetype"] != packagetype:
@@ -93,7 +100,7 @@ class PyPIChecker(Checker):
             url=pypi_download["url"],
             checksum=checksum,
             size=pypi_download["size"],
-            version=pypi_version,
+            version=pypi_version.orig_str,
             timestamp=pypi_date,
         )
         external_data.set_new_version(new_version)

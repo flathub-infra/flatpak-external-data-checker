@@ -6,7 +6,7 @@ import semver
 
 from ..lib import OPERATORS_SCHEMA
 from ..lib.externaldata import ExternalBase, ExternalGitRepo, ExternalGitRef
-from ..lib.utils import git_ls_remote, filter_versioned_items, TrialVersion
+from ..lib.utils import git_ls_remote, filter_versioned_items, FallbackVersion
 from ..lib.errors import CheckerQueryError, CheckerFetchError
 from ..lib.checkers import Checker
 
@@ -24,7 +24,7 @@ class TagWithVersion(t.NamedTuple):
 
     @classmethod
     def parse_version(cls, version: str):
-        return TrialVersion(version)
+        return FallbackVersion(version)
 
     @property
     def parsed_version(self):
