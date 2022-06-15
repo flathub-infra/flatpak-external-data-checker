@@ -2,38 +2,12 @@ FROM debian:bullseye
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+ADD dependencies.apt.txt ./
+
 RUN apt-get update && \
-    apt-get install --no-install-recommends -y \
-      bubblewrap \
-      git \
-      gir1.2-glib-2.0 \
-      gir1.2-json-1.0 \
-      python3-apt \
-      python3-defusedxml \
-      python3-aiohttp \
-      python3-chardet \
-      python3-aiodns \
-      python3-brotli \
-      python3-gi \
-      python3-cairo \
-      python3-requests \
-      python3-github \
-      python3-pip \
-      python3-ruamel.yaml \
-      python3-setuptools \
-      python3-toml \
-      python3-pyelftools \
-      python3-semver \
-      python3-jsonschema \
-      python3-editorconfig \
-      python3-lxml \
-      python3-packaging \
-      squashfs-tools \
-      ssh-client \
-      jq \
-    && \
-  apt-get clean && \
-  rmdir /var/cache/apt/archives/partial
+    xargs apt-get install --no-install-recommends -y < dependencies.apt.txt && \
+    apt-get clean && \
+    rmdir /var/cache/apt/archives/partial
 
 ADD requirements.txt ./
 
