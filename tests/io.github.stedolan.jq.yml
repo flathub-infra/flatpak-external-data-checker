@@ -67,11 +67,20 @@ modules:
         commit: 740ffb3c6426d62ac1a54e68d5a13f91479baf9a
         x-checker-data:
           type: json
-          url: https://api.github.com/repos/telegramdesktop/tdesktop/releases/latest
+          url: https://api.github.com/repos/telegramdesktop/tdesktop/releases/tags/v3.7.3
           tag-query: '.tag_name'
           version-query: '.tag_name | sub("^[vV]"; "")'
-          # This one should result in parse error
-          timestamp-query: '.target_commitish'
+
+  - name: tg_owt
+    sources:
+      - type: git
+        url: https://github.com/desktop-app/tg_owt.git
+        x-checker-data:
+          type: json
+          parent-id: tdesktop-git-0
+          commit-data-url: >-
+            "https://github.com/telegramdesktop/tdesktop/raw/\($parent.new.tag)/snap/snapcraft.yaml"
+          commit-query: .parts.webrtc."source-commit"
 
   - name: lib_webrtc
     sources:
