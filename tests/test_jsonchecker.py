@@ -18,7 +18,7 @@ class TestJSONChecker(unittest.IsolatedAsyncioTestCase):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = await checker.check()
 
-        self.assertEqual(len(ext_data), 8)
+        self.assertEqual(len(ext_data), 9)
         for data in ext_data:
             self.assertIsNotNone(data)
             if data.filename == "jq-1.4.tar.gz":
@@ -73,7 +73,13 @@ class TestJSONChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNotNone(data.new_version.timestamp)
                 self.assertIsInstance(data.new_version.timestamp, datetime.datetime)
             elif data.filename == "tdesktop.git":
-                self.assertIsNone(data.new_version)
+                self.assertIsNotNone(data.new_version)
+                self.assertEqual(data.new_version.tag, "v3.7.3")
+            elif data.filename == "tg_owt.git":
+                self.assertIsNotNone(data.new_version)
+                self.assertEqual(
+                    data.new_version.commit, "63a934db1ed212ebf8aaaa20f0010dd7b0d7b396"
+                )
             elif data.filename == "lib_webrtc.git":
                 self.assertIsNone(data.new_version)
             elif data.filename == "tg_angle.git":
