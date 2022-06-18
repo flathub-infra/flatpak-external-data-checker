@@ -138,7 +138,24 @@ class HTMLChecker(Checker):
         assert self.should_check(external_data)
         assert isinstance(external_data, ExternalData)
 
-        url = external_data.checker_data["url"]
+        url_tmpl = external_data.checker_data["url"]
+
+        if external_data.parent:
+            assert isinstance(external_data.parent, ExternalBase)
+            parent_state = (
+                external_data.parent.new_version or external_data.parent.current_version
+            )
+            parent_json = parent_state.json
+            if parent_state.version:
+                parent_json |= self._version_parts(parent_state.version)
+        else:
+            parent_json = {}
+
+        url = self._substitute_template(
+            url_tmpl,
+            {f"parent_{k}": v for k, v in parent_json.items() if v is not None},
+        )
+
         combo_pattern = _get_pattern(external_data.checker_data, "pattern", 2)
         version_pattern = _get_pattern(external_data.checker_data, "version-pattern", 1)
         url_template = external_data.checker_data.get("url-template")
