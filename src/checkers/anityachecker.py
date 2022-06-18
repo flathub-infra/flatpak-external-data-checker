@@ -79,7 +79,9 @@ class AnityaChecker(Checker):
 
     async def _check_data(self, external_data: ExternalData, latest_version):
         url_template = external_data.checker_data["url-template"]
-        latest_url = self._substitute_placeholders(url_template, latest_version)
+        latest_url = self._substitute_template(
+            url_template, self._version_parts(latest_version)
+        )
 
         await self._update_version(
             external_data, latest_version, latest_url, follow_redirects=False
@@ -87,7 +89,9 @@ class AnityaChecker(Checker):
 
     async def _check_git(self, external_data: ExternalGitRepo, latest_version):
         tag_template = external_data.checker_data["tag-template"]
-        latest_tag = self._substitute_placeholders(tag_template, latest_version)
+        latest_tag = self._substitute_template(
+            tag_template, self._version_parts(latest_version)
+        )
 
         new_version = await ExternalGitRef(
             url=external_data.current_version.url,

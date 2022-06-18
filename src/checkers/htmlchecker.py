@@ -183,7 +183,9 @@ class HTMLChecker(Checker):
         else:
             assert version_pattern and url_template
             latest_version = _get_latest(version_pattern, 1).group(1)
-            latest_url = self._substitute_placeholders(url_template, latest_version)
+            latest_url = self._substitute_template(
+                url_template, self._version_parts(latest_version)
+            )
 
         abs_url = urllib.parse.urljoin(base=url, url=latest_url)
 

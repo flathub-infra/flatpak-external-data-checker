@@ -105,9 +105,11 @@ class Checker:
             raise CheckerQueryError from err
 
     @staticmethod
-    def _substitute_placeholders(template_string: str, version: str) -> str:
+    def _version_parts(version: str) -> t.Dict[str, str]:
+        """
+        Parse version string and return a dict of named components.
+        """
         version_list = LooseVersion(version).version
-        tmpl = Template(template_string)
         tmpl_vars: t.Dict[str, t.Union[str, int]]
         tmpl_vars = {"version": version}
         for i, version_part in enumerate(version_list):
@@ -118,8 +120,17 @@ class Checker:
                 tmpl_vars["minor"] = version_part
             elif i == 2:
                 tmpl_vars["patch"] = version_part
+        return {k: str(v) for k, v in tmpl_vars.items()}
+
+    @classmethod
+    def _substitute_template(
+        cls,
+        template_string: str,
+        variables: t.Dict[str, t.Any],
+    ) -> str:
+        tmpl = Template(template_string)
         try:
-            return tmpl.substitute(**tmpl_vars)
+            return tmpl.substitute(**variables)
         except (KeyError, ValueError) as err:
             raise CheckerMetadataError("Error substituting template") from err
 
