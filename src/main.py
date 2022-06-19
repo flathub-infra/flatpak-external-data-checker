@@ -396,7 +396,11 @@ async def run_with_args(args: argparse.Namespace) -> t.Tuple[int, int, bool]:
     should_update = args.update or args.commit_only or args.edit_only
     did_update = False
 
-    manifest_checker = manifest.ManifestChecker(args.manifest, args.unsafe)
+    options = manifest.CheckerOptions(
+        allow_unsafe=args.unsafe,
+    )
+
+    manifest_checker = manifest.ManifestChecker(args.manifest, options)
 
     await manifest_checker.check(args.filter_type)
 

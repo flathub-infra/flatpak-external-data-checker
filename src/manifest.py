@@ -20,6 +20,7 @@
 
 from collections import OrderedDict
 import datetime
+import dataclasses
 import typing as t
 import asyncio
 from dataclasses import dataclass
@@ -85,6 +86,11 @@ def _external_source_filter(manifest_path: str, source: str) -> bool:
     return True
 
 
+@dataclasses.dataclass(frozen=True)
+class CheckerOptions:
+    allow_unsafe: bool = False
+
+
 class ManifestChecker:
     class Kind(IntEnum):
         UNKNOWN = 0
@@ -100,12 +106,12 @@ class ManifestChecker:
         failed: int = 0
         total: int = 0
 
-    def __init__(self, manifest: str, unsafe_enabled: bool = False):
+    def __init__(self, manifest: str, options: CheckerOptions = None):
         self.kind = self.Kind.UNKNOWN
         self.app_id: t.Optional[str]
         self.app_id = None
 
-        self.unsafe_enabled = unsafe_enabled
+        self.opts = options or CheckerOptions()
 
         self._root_manifest_path = manifest
         self._root_manifest_dir = os.path.dirname(self._root_manifest_path)
