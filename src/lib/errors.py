@@ -22,6 +22,10 @@ class ManifestLoadError(ManifestError):
     """Error loading flatpak-builder manifest"""
 
 
+class ManifestFileTooLarge(ManifestLoadError):
+    """Manifest file size is too big"""
+
+
 class ManifestUpdateError(ManifestError):
     """Error updating flatpak-builder manifest"""
 
