@@ -130,11 +130,6 @@ class BuilderSource(abc.ABC):
     checked: asyncio.Event = dataclasses.field(init=False, default_factory=asyncio.Event)
     # fmt: on
 
-    def __post_init__(self):
-        if self.module:
-            if self not in self.module.sources:
-                self.module.sources.append(self)
-
     @classmethod
     def data_classes(cls: t.Type[_BS]) -> t.Dict[Type, t.Type[_BS]]:
         classes = {}
