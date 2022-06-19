@@ -386,6 +386,12 @@ def parse_cli_args(cli_args=None):
         help="Enable unsafe features; use only with manifests from trusted sources",
         action="store_true",
     )
+    parser.add_argument(
+        "--max-manifest-size",
+        help="Maximum manifest file size allowed to load",
+        type=int,
+        default=manifest.MAX_MANIFEST_SIZE,
+    )
 
     return parser.parse_args(cli_args)
 
@@ -398,6 +404,7 @@ async def run_with_args(args: argparse.Namespace) -> t.Tuple[int, int, bool]:
 
     options = manifest.CheckerOptions(
         allow_unsafe=args.unsafe,
+        max_manifest_size=args.max_manifest_size,
     )
 
     manifest_checker = manifest.ManifestChecker(args.manifest, options)
