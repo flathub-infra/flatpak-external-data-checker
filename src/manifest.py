@@ -295,6 +295,8 @@ class ManifestChecker:
             log.error(err)
         else:
             manifest_datas.append(data)
+            if module:
+                module.sources.append(data)
 
     async def _check_data(
         self,
