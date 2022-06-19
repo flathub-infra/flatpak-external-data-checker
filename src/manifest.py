@@ -46,6 +46,7 @@ from .lib.errors import (
     AppdataNotFound,
     AppdataLoadError,
     ManifestLoadError,
+    ManifestFileTooLarge,
     SourceLoadError,
     SourceUnsupported,
 )
@@ -72,23 +73,10 @@ def find_appdata_file(directory, appid):
     return None
 
 
-def _external_source_filter(manifest_path: str, source: str) -> bool:
-    source_path = os.path.join(os.path.dirname(manifest_path), source)
-    source_size = os.stat(source_path).st_size
-    if source_size > MAX_MANIFEST_SIZE:
-        log.info(
-            "External source file size %i KiB is over %i KiB, skipping: %s",
-            source_size / 1024,
-            MAX_MANIFEST_SIZE / 1024,
-            source,
-        )
-        return False
-    return True
-
-
 @dataclasses.dataclass(frozen=True)
 class CheckerOptions:
     allow_unsafe: bool = False
+    max_manifest_size: int = MAX_MANIFEST_SIZE
 
 
 class ManifestChecker:
@@ -165,6 +153,12 @@ class ManifestChecker:
     def _read_manifest(self, manifest_path: str) -> t.Union[t.List, t.Dict]:
         if manifest_path in self._manifest_contents:
             return self._manifest_contents[manifest_path]
+        manifest_size = os.stat(manifest_path).st_size
+        if manifest_size > self.opts.max_manifest_size:
+            raise ManifestFileTooLarge(
+                f"Manifest file size {manifest_size / 1024:.1f} KiB exceeds "
+                f"{self.opts.max_manifest_size / 1024:.1f} KiB: {manifest_path}"
+            )
         contents = read_manifest(manifest_path)
         self._manifest_contents[manifest_path] = contents
         return contents
@@ -263,13 +257,16 @@ class ManifestChecker:
                     "Nested external source manifests not allowed: "
                     f"{source} referenced from {source_path}"
                 )
-            if _external_source_filter(source_path, source):
-                ext_source_path = os.path.join(os.path.dirname(source_path), source)
-                log.info(
-                    "Loading sources from %s",
-                    os.path.relpath(ext_source_path, self._root_manifest_dir),
-                )
+            ext_source_path = os.path.join(os.path.dirname(source_path), source)
+            log.info(
+                "Loading sources from %s",
+                os.path.relpath(ext_source_path, self._root_manifest_dir),
+            )
+            try:
                 ext_source = self._read_manifest(ext_source_path)
+            except ManifestFileTooLarge as err:
+                log.warning(err)
+            else:
                 self._collect_source_data(
                     ext_source_path, ext_source, module, is_external=True
                 )
