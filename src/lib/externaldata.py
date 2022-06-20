@@ -86,8 +86,18 @@ class BuilderModule:
         return self.name
 
 
+class BuilderSourceMeta(abc.ABCMeta):
+    """flatpak-builder source metaclass"""
+
+    def __init__(cls, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        validator_cls = jsonschema.validators.validator_for(cls.SOURCE_SCHEMA)
+        validator_cls.check_schema(cls.SOURCE_SCHEMA)
+        cls.source_validator = validator_cls(cls.SOURCE_SCHEMA)
+
+
 @dataclasses.dataclass
-class BuilderSource(abc.ABC):
+class BuilderSource(abc.ABC, metaclass=BuilderSourceMeta):
     """flatpak-builder source item"""
 
     SOURCE_SCHEMA = {
@@ -147,7 +157,7 @@ class BuilderSource(abc.ABC):
         module: t.Optional[BuilderModule] = None,
     ) -> _BS:
         try:
-            jsonschema.validate(source, cls.SOURCE_SCHEMA)
+            cls.source_validator.validate(source, cls.SOURCE_SCHEMA)
         except jsonschema.ValidationError as err:
             raise SourceLoadError("Error reading source") from err
 
