@@ -47,6 +47,7 @@ from .lib.errors import (
     AppdataLoadError,
     ManifestLoadError,
     ManifestFileTooLarge,
+    ManifestFileOpenError,
     SourceLoadError,
     SourceUnsupported,
 )
@@ -153,13 +154,16 @@ class ManifestChecker:
     def _read_manifest(self, manifest_path: str) -> t.Union[t.List, t.Dict]:
         if manifest_path in self._manifest_contents:
             return self._manifest_contents[manifest_path]
-        manifest_size = os.stat(manifest_path).st_size
-        if manifest_size > self.opts.max_manifest_size:
-            raise ManifestFileTooLarge(
-                f"Manifest file size {manifest_size / 1024:.1f} KiB exceeds "
-                f"{self.opts.max_manifest_size / 1024:.1f} KiB: {manifest_path}"
-            )
-        contents = read_manifest(manifest_path)
+        try:
+            manifest_size = os.stat(manifest_path).st_size
+            if manifest_size > self.opts.max_manifest_size:
+                raise ManifestFileTooLarge(
+                    f"Manifest file size {manifest_size / 1024:.1f} KiB exceeds "
+                    f"{self.opts.max_manifest_size / 1024:.1f} KiB: {manifest_path}"
+                )
+            contents = read_manifest(manifest_path)
+        except FileNotFoundError as err:
+            raise ManifestFileOpenError from err
         self._manifest_contents[manifest_path] = contents
         return contents
 
@@ -217,8 +221,8 @@ class ManifestChecker:
 
             try:
                 ext_module = self._read_manifest(ext_module_path)
-            except FileNotFoundError as err:
-                log.warning("Referenced file not found: %s", err)
+            except ManifestFileOpenError as err:
+                log.warning(err)
                 return
 
             assert isinstance(ext_module, dict), ext_module_path
