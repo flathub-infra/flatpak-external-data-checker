@@ -5,7 +5,6 @@ from datetime import datetime
 import logging
 from distutils.version import LooseVersion
 from xml.etree.ElementTree import Element
-import typing as t
 
 from defusedxml import ElementTree
 
