@@ -23,7 +23,6 @@ import datetime
 import dataclasses
 import typing as t
 import asyncio
-from dataclasses import dataclass
 from enum import IntEnum
 import logging
 import os
@@ -36,8 +35,6 @@ from .lib.appdata import add_release_to_file
 from .lib.externaldata import (
     BuilderModule,
     ExternalBase,
-    ExternalFile,
-    ExternalGitRef,
 )
 from .lib.utils import read_manifest, dump_manifest
 from .lib.errors import (
@@ -90,7 +87,7 @@ class ManifestChecker:
         SOURCE = 4
         SOURCES = 8
 
-    @dataclass
+    @dataclasses.dataclass
     class TasksCounter:
         started: int = 0
         finished: int = 0
