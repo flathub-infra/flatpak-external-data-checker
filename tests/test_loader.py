@@ -6,6 +6,7 @@ import string
 import tempfile
 
 from src.manifest import ManifestChecker
+from src.lib.externaldata import ExternalGitRef
 from src.lib.errors import ManifestLoadError
 
 
@@ -181,6 +182,56 @@ class TestManifestLoader(unittest.IsolatedAsyncioTestCase):
             json.dump(manifest_data, mf)
 
         return ManifestChecker(mf_path)
+
+    def test_same_version(self):
+        def assertSame(data1, data2):
+            self.assertTrue(data1.is_same_version(data2))
+            self.assertTrue(data2.is_same_version(data1))
+
+        def assertDiff(data1, data2):
+            self.assertFalse(data1.is_same_version(data2))
+            self.assertFalse(data2.is_same_version(data1))
+
+        assertSame(
+            ExternalGitRef("http://example.com", None, None, "a", "v1.0", None),
+            ExternalGitRef("http://example.com", None, None, "b", "v1.0", None),
+        )
+        assertDiff(
+            ExternalGitRef("http://example.com", None, None, "a", "v1.0", None),
+            ExternalGitRef("http://example.com", None, None, "b", "v1.1", None),
+        )
+        assertDiff(
+            ExternalGitRef("http://example.com", None, None, "a", "v1.0", None),
+            ExternalGitRef("http://example.com", None, None, "a", "v1.1", None),
+        )
+        assertDiff(
+            ExternalGitRef("http://example.com", None, None, "a", "v1.0", "same"),
+            ExternalGitRef("http://example.com", None, None, "a", "v1.1", "same"),
+        )
+        assertDiff(
+            ExternalGitRef("http://example.com", None, None, "a", "v1.0", "one"),
+            ExternalGitRef("http://example.com", None, None, "a", "v1.0", "two"),
+        )
+        # No tag, same branch
+        assertSame(
+            ExternalGitRef("http://example.com", None, None, "a", None, "same"),
+            ExternalGitRef("http://example.com", None, None, "b", None, "same"),
+        )
+        # No tag, different branches
+        assertDiff(
+            ExternalGitRef("http://example.com", None, None, "a", None, "one"),
+            ExternalGitRef("http://example.com", None, None, "b", None, "two"),
+        )
+        # No tag or branch, same commit
+        assertSame(
+            ExternalGitRef("http://example.com", None, None, "a", None, None),
+            ExternalGitRef("http://example.com", None, None, "a", None, None),
+        )
+        # No tag or branch, different commits
+        assertDiff(
+            ExternalGitRef("http://example.com", None, None, "a", None, None),
+            ExternalGitRef("http://example.com", None, None, "b", None, None),
+        )
 
     def test_load(self):
         manifest = self._load_manifest(TEST_MANIFEST_DATA)
