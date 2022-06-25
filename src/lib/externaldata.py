@@ -472,6 +472,10 @@ class ExternalGitRef(ExternalState):
 
     def is_same_version(self, other: ExternalGitRef):
         assert isinstance(other, type(self))
+        # If only commit is set on both sides, compare it as a version indicator
+        if all(p is None for p in [self.tag, self.branch, other.tag, other.branch]):
+            return self.url == other.url and self.commit == other.commit
+        # otherwise, compare tag an branch
         return (
             self.url == other.url
             and self.tag == other.tag
