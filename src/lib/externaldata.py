@@ -279,7 +279,12 @@ class ExternalBase(BuilderSource):
     @property
     def has_version_changed(self) -> bool:
         """Detect if some external data had a version change"""
-        raise NotImplementedError
+        if self.new_version is None:
+            return False
+        return (
+            self.new_version.version is not None
+            and not self.current_version.is_same_version(self.new_version)
+        )
 
     def update(self):
         """If self.new_version is not None, writes back the necessary changes to the
@@ -380,18 +385,15 @@ class ExternalData(ExternalBase):
 
     @property
     def has_version_changed(self) -> bool:
-        update = self.new_version
-        return (
-            update is not None
-            and update.version is not None
-            and isinstance(update, ExternalFile)
-            and (
-                update.url != self.current_version.url
-                # TODO We can't reliably tell if the appimage version stayed the same
-                # without downloading it, so just assume it changed
-                or update.url.endswith(".AppImage")
-            )
-        )
+        # TODO We can't reliably tell if the appimage version stayed the same
+        # without downloading it, so just assume it changed
+        if (
+            self.new_version is not None
+            and self.new_version.version is not None
+            and self.new_version.url.endswith(".AppImage")
+        ):
+            return True
+        return super().has_version_changed
 
 
 @dataclasses.dataclass
@@ -526,16 +528,6 @@ class ExternalGitRepo(ExternalBase):
             None,
         )
         return obj
-
-    @property
-    def has_version_changed(self) -> bool:
-        update = self.new_version
-        return (
-            update is not None
-            and update.version is not None
-            and isinstance(update, ExternalGitRef)
-            and update.tag != self.current_version.tag
-        )
 
     def update(self):
         if self.new_version is not None:
