@@ -235,6 +235,8 @@ set single pattern containing two nested match groups for both url and version:
 
 To disable sorting and get first matched version/url, set `sort-matches` to `false`.
 
+The [`versions`](#version-constraining) property is supported.
+
 #### URL templates
 
 The HTML checker also supports building the download URL using

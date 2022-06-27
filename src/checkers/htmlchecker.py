@@ -21,37 +21,21 @@
 import logging
 import re
 import urllib.parse
-from distutils.version import LooseVersion
 import io
 import codecs
 import typing as t
 
 import aiohttp
 from yarl import URL
+import semver
 
-from ..lib import NETWORK_ERRORS
+from ..lib import NETWORK_ERRORS, OPERATORS_SCHEMA
 from ..lib.externaldata import ExternalBase, ExternalData
 from ..lib.errors import CheckerMetadataError, CheckerQueryError, CheckerFetchError
 from ..lib.checkers import Checker
+from ..lib.utils import filter_versioned_items, FallbackVersion
 
 log = logging.getLogger(__name__)
-
-
-def _get_latest(
-    html: str,
-    pattern: re.Pattern,
-    sort_key: t.Optional[t.Callable[[re.Match], t.Any]] = None,
-) -> re.Match:
-    matches = list(pattern.finditer(html))
-    if not matches:
-        raise CheckerQueryError(f"Pattern '{pattern.pattern}' didn't match anything")
-    if sort_key is None or len(matches) == 1:
-        result = matches[0]
-    else:
-        log.debug("%s matched multiple times, selected latest", pattern.pattern)
-        result = max(matches, key=sort_key)
-    log.debug("%s matched %s", pattern.pattern, result)
-    return result
 
 
 def _get_pattern(
@@ -73,6 +57,19 @@ def _get_pattern(
     return pattern
 
 
+def _semantic_version(version: str) -> semver.VersionInfo:
+    try:
+        return semver.VersionInfo.parse(version)
+    except ValueError as err:
+        raise CheckerQueryError("Can't parse version") from err
+
+
+_VERSION_SCHEMES = {
+    "loose": FallbackVersion,
+    "semantic": _semantic_version,
+}
+
+
 class HTMLChecker(Checker):
     CHECKER_DATA_TYPE = "html"
     CHECKER_DATA_SCHEMA = {
@@ -83,6 +80,11 @@ class HTMLChecker(Checker):
             "version-pattern": {"type": "string", "format": "regex"},
             "url-template": {"type": "string", "format": "regex"},
             "sort-matches": {"type": "boolean"},
+            "versions": OPERATORS_SCHEMA,
+            "version-scheme": {
+                "type": "string",
+                "enum": list(_VERSION_SCHEMES),
+            },
         },
         "allOf": [
             {"required": ["url"]},
@@ -141,23 +143,46 @@ class HTMLChecker(Checker):
         version_pattern = _get_pattern(external_data.checker_data, "version-pattern", 1)
         url_template = external_data.checker_data.get("url-template")
         sort_matches = external_data.checker_data.get("sort-matches", True)
+        version_cls = _VERSION_SCHEMES[
+            external_data.checker_data.get("version-scheme", "loose")
+        ]
+        constraints = [
+            (o, version_cls(v))
+            for o, v in external_data.checker_data.get("versions", {}).items()
+        ]
         assert combo_pattern or (version_pattern and url_template)
 
         html = await self._get_text(url)
 
+        def _get_latest(pattern: re.Pattern, ver_group: int) -> re.Match:
+            matches = filter_versioned_items(
+                items=pattern.finditer(html),
+                constraints=constraints,
+                to_version=lambda m: version_cls(m.group(ver_group)),
+                sort=sort_matches,
+            )
+            if not matches:
+                raise CheckerQueryError(
+                    f"Pattern '{pattern.pattern}' didn't match anything"
+                )
+
+            try:
+                # NOTE Returning last match when sort is requested and first match otherwise
+                # doesn't seem sensible, but we need to retain backward compatibility
+                result = matches[-1 if sort_matches else 0]
+            except IndexError as err:
+                raise CheckerQueryError(
+                    f"Pattern '{pattern.pattern}' didn't match anything"
+                ) from err
+
+            log.debug("%s matched %s", pattern.pattern, result)
+            return result
+
         if combo_pattern:
-            latest_url, latest_version = _get_latest(
-                html,
-                combo_pattern,
-                (lambda m: LooseVersion(m.group(2))) if sort_matches else None,
-            ).group(1, 2)
+            latest_url, latest_version = _get_latest(combo_pattern, 2).group(1, 2)
         else:
             assert version_pattern and url_template
-            latest_version = _get_latest(
-                html,
-                version_pattern,
-                (lambda m: LooseVersion(m.group(1))) if sort_matches else None,
-            ).group(1)
+            latest_version = _get_latest(version_pattern, 1).group(1)
             latest_url = self._substitute_placeholders(url_template, latest_version)
 
         abs_url = urllib.parse.urljoin(base=url, url=latest_url)
