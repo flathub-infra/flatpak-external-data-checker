@@ -77,9 +77,6 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
     async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = await checker.check()
-        self._test_separate_patterns(
-            self._find_by_filename(ext_data, "xeyes-1.1.0.tar.bz2")
-        )
         self._test_check_with_url_template(
             self._find_by_filename(ext_data, "ico-1.0.4.tar.bz2")
         )
@@ -91,30 +88,6 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         )
         self._test_no_match(self._find_by_filename(ext_data, "libFS-1.0.7.tar.bz2"))
         self._test_invalid_url(self._find_by_filename(ext_data, "libdoesntexist.tar"))
-
-    def _test_separate_patterns(self, data):
-        self.assertIsNotNone(data)
-        self.assertRegex(data.filename, r"xeyes-[\d\.-]+.tar.bz2")
-        self.assertIsNotNone(data.new_version)
-        self.assertRegex(
-            data.new_version.url,
-            r"^https?://www.x.org/releases/individual/app/xeyes-[\d\.-]+.tar.bz2",  # noqa: E501
-        )
-        self.assertNotEqual(data.new_version.url, data.current_version.url)
-        self.assertIsNotNone(data.new_version.version)
-        self.assertLessEqual(
-            LooseVersion("1.1.0"), LooseVersion(data.new_version.version)
-        )
-        self.assertIsInstance(data.new_version.size, int)
-        self.assertGreater(data.new_version.size, 0)
-        self.assertIsNotNone(data.new_version.checksum)
-        self.assertIsInstance(data.new_version.checksum, MultiDigest)
-        self.assertNotEqual(
-            data.new_version.checksum,
-            MultiDigest(
-                sha256="0000000000000000000000000000000000000000000000000000000000000000"
-            ),
-        )
 
     def _test_check_with_url_template(self, data):
         self.assertIsNotNone(data)
