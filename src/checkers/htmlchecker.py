@@ -81,19 +81,15 @@ class HTMLChecker(Checker):
             "url": {"type": "string", "format": "uri"},
             "pattern": {"type": "string", "format": "regex"},
             "version-pattern": {"type": "string", "format": "regex"},
-            "url-pattern": {"type": "string", "format": "regex"},
             "url-template": {"type": "string", "format": "regex"},
             "sort-matches": {"type": "boolean"},
         },
-        "required": ["url"],
-        "anyOf": [
-            {"required": ["pattern"]},
+        "allOf": [
+            {"required": ["url"]},
             {
-                "required": ["version-pattern"],
-                "anyOf": [
-                    {"required": ["url-pattern"]},
-                    {"required": ["url-template"]},
-                ],
+                "if": {"required": ["version-pattern"]},
+                "then": {"required": ["url-template"]},
+                "else": {"required": ["pattern"]},
             },
         ],
     }
@@ -143,10 +139,9 @@ class HTMLChecker(Checker):
         url = external_data.checker_data["url"]
         combo_pattern = _get_pattern(external_data.checker_data, "pattern", 2)
         version_pattern = _get_pattern(external_data.checker_data, "version-pattern", 1)
-        url_pattern = _get_pattern(external_data.checker_data, "url-pattern", 1)
         url_template = external_data.checker_data.get("url-template")
         sort_matches = external_data.checker_data.get("sort-matches", True)
-        assert combo_pattern or (version_pattern and (url_pattern or url_template))
+        assert combo_pattern or (version_pattern and url_template)
 
         html = await self._get_text(url)
 
@@ -157,21 +152,13 @@ class HTMLChecker(Checker):
                 (lambda m: LooseVersion(m.group(2))) if sort_matches else None,
             ).group(1, 2)
         else:
-            assert version_pattern
+            assert version_pattern and url_template
             latest_version = _get_latest(
                 html,
                 version_pattern,
                 (lambda m: LooseVersion(m.group(1))) if sort_matches else None,
             ).group(1)
-            if url_template:
-                latest_url = self._substitute_placeholders(url_template, latest_version)
-            else:
-                assert url_pattern
-                latest_url = _get_latest(
-                    html,
-                    url_pattern,
-                    (lambda m: LooseVersion(m.group(1))) if sort_matches else None,
-                ).group(1)
+            latest_url = self._substitute_placeholders(url_template, latest_version)
 
         abs_url = urllib.parse.urljoin(base=url, url=latest_url)
 
