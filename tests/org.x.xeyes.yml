@@ -32,6 +32,34 @@ modules:
           pattern: <link>(https://sourceforge.net/.+/qrupdate-([\d\.]+\d)\.tar\.gz)/download</link>
           sort-matches: false
 
+  - name: libX11
+    sources:
+      - type: archive
+        url: http://some-incorrect.url/libX11.tar.gz
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+        x-checker-data:
+          type: html
+          url: https://www.x.org/releases/individual/lib/
+          version-pattern: libX11-([\d\.]+).tar.gz
+          url-template: libX11-$version.tar.gz
+          versions:
+            ==: 1.7.5
+
+  - name: semver
+    sources:
+      - type: file
+        url: http://example.com/semver.txt
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+        x-checker-data:
+          type: html
+          # printf '%s\n' v1.0.0 v1.0.0+patch1 v2.0.0-rc1 v2.0.0 | base64
+          url: http://httpbingo.org/base64/djEuMC4wCnYxLjAuMCtwYXRjaDEKdjIuMC4wLXJjMQp2Mi4wLjAK
+          version-pattern: v(\d.*)
+          url-template: http://httpbingo.org/base64/encode/$version
+          versions:
+            <: 2.0.0-alpha
+          version-scheme: semantic
+
   - name: libFS
     sources:
       - type: archive

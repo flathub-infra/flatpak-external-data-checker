@@ -86,6 +86,8 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         self._test_combo_pattern_nosort(
             self._find_by_filename(ext_data, "qrupdate-1.1.0.tar.gz")
         )
+        self._test_version_filter(self._find_by_filename(ext_data, "libX11.tar.gz"))
+        self._test_semver_filter(self._find_by_filename(ext_data, "semver.txt"))
         self._test_no_match(self._find_by_filename(ext_data, "libFS-1.0.7.tar.bz2"))
         self._test_invalid_url(self._find_by_filename(ext_data, "libdoesntexist.tar"))
 
@@ -143,6 +145,17 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
                 sha256="0000000000000000000000000000000000000000000000000000000000000000"
             ),
         )
+
+    def _test_version_filter(self, data):
+        self.assertIsNotNone(data)
+        self.assertIsNotNone(data.new_version)
+        self.assertEqual(data.new_version.version, "1.7.5")
+
+    def _test_semver_filter(self, data):
+        self.assertIsNotNone(data)
+        self.assertIsNotNone(data.new_version)
+        self.assertIsNotNone(data.new_version.version)
+        self.assertEqual(data.new_version.version, "1.0.0+patch1")
 
     def _test_no_match(self, data):
         self.assertIsNotNone(data)
