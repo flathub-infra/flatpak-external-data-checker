@@ -390,7 +390,7 @@ def parse_cli_args(cli_args=None):
         "--max-manifest-size",
         help="Maximum manifest file size allowed to load",
         type=int,
-        default=manifest.MAX_MANIFEST_SIZE,
+        default=manifest.CheckerOptions.max_manifest_size,
     )
     parser.add_argument(
         "--require-important-update",

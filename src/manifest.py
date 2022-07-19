@@ -54,7 +54,6 @@ from .checkers import ALL_CHECKERS
 
 MAIN_SRC_PROP = "is-main-source"
 IMPORTANT_SRC_PROP = "is-important"
-MAX_MANIFEST_SIZE = 1024 * 100
 
 
 log = logging.getLogger(__name__)
@@ -75,7 +74,7 @@ def find_appdata_file(directory, appid):
 @dataclasses.dataclass(frozen=True)
 class CheckerOptions:
     allow_unsafe: bool = False
-    max_manifest_size: int = MAX_MANIFEST_SIZE
+    max_manifest_size: int = 1024 * 100
     require_important_update: bool = False
 
 
