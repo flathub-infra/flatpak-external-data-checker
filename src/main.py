@@ -399,6 +399,18 @@ def parse_cli_args(cli_args=None):
         "This is useful to avoid PRs generated to update a singular unimportant source.",
         action="store_true",
     )
+    parser.add_argument(
+        "--max-connections",
+        help="""Maximum number of simultaneous connections""",
+        type=int,
+        default=manifest.CheckerOptions.conn_limit,
+    )
+    parser.add_argument(
+        "--max-connections-per-host",
+        help="""Maximum number of simultaneous connections per host""",
+        type=int,
+        default=manifest.CheckerOptions.conn_limit_per_host,
+    )
 
     return parser.parse_args(cli_args)
 
@@ -413,6 +425,8 @@ async def run_with_args(args: argparse.Namespace) -> t.Tuple[int, int, bool]:
         allow_unsafe=args.unsafe,
         max_manifest_size=args.max_manifest_size,
         require_important_update=args.require_important_update,
+        conn_limit=args.max_connections,
+        conn_limit_per_host=args.max_connections_per_host,
     )
 
     manifest_checker = manifest.ManifestChecker(args.manifest, options)

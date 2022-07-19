@@ -76,6 +76,8 @@ class CheckerOptions:
     allow_unsafe: bool = False
     max_manifest_size: int = 1024 * 100
     require_important_update: bool = False
+    conn_limit_per_host: int = 5
+    conn_limit: int = 50
 
 
 class ManifestChecker:
@@ -397,6 +399,10 @@ class ManifestChecker:
             raise_for_status=True,
             headers=HTTP_CLIENT_HEADERS,
             timeout=aiohttp.ClientTimeout(connect=TIMEOUT_CONNECT, total=TIMEOUT_TOTAL),
+            connector=aiohttp.TCPConnector(
+                limit=self.opts.conn_limit,
+                limit_per_host=self.opts.conn_limit_per_host,
+            ),
         ) as http_session:
             check_tasks = []
             for data in external_data:
