@@ -77,11 +77,15 @@ Note Flathub's hosted tool only checks the default branch.
 
 To stop Flathub's tool from checking your repo, add `"disable-external-data-checker": true` to `flathub.json` in the default branch.
 
-### Custom workflow
+### Custom workflows
 
 Alternatively, you can use own workflow. This can be useful if e.g. wanting to update non-default branches.
 
-Put this yaml file under `.github/workflows`, e.g. put it in `.github/workflows/update.yaml`. Ensure to put the correct path to the manifest in the last line.
+There are two workflows examples, with the only difference being which repository is pushed to for changes.
+The first workflow has f-e-d-c push changes to a branch in the same repository where the workflow is run. 
+The second instead pushes to a branch in a fork of the repository.
+
+Put either yaml file under `.github/workflows`, e.g. put it in the file `.github/workflows/update.yaml`. Ensure to put the correct path to the manifest in the last line.
 
 ```yaml
 name: Check for updates
@@ -111,9 +115,55 @@ jobs:
           GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
           GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
           EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # gives permission to push changes to the repository
         with:
           args: --update --never-fork $PATH_TO_MANIFEST # e.g. com.organization.myapp.json
+```
+
+This second workflow has the tool push updates to a fork of your repository. This may be preferred if you do not want the tool to have direct push access to the canonical repsoitory.
+You will need to provide a token of a GitHub user to fork the repository and make PRs. 
+It is recommended to not use your main account as the updater/bot user, since any collaborators of the repository will have access to the GitHub Secret containing the user's token.
+
+In addition to adding this workflow file to your repository, [create a PAT for the user which will fork and create PRs](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-token) that has repo:public_repos access. Note if you have a private repo you will need to provide full repo permission.
+
+Then, [create a GitHub Secret](https://docs.github.com/en/actions/security-guides/encrypted-secrets#creating-encrypted-secrets-for-a-repository) in the repository the workflow is being added to, with the name matching the workflow's GITHUB_TOKEN value. The Secret's value should be the PAT itself.
+
+```yaml
+name: Check for updates
+on:
+  schedule: # for scheduling to work this file must be in the default branch
+  - cron: "0 * * * *" # run every hour
+  workflow_dispatch: # can be manually dispatched under GitHub's "Actions" tab 
+
+jobs:
+  flatpak-external-data-checker:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        branch: [ master, beta ] # list all branches to check
+    
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ matrix.branch }}
+          # we can't push changes to a fork via a shallow update, we need to fetch the full repo
+          fetch-depth: 0
+          # by default the local git config will use the workflow provided GITHUB_TOKEN/credentials to push changes
+          # this will fail to push to a fork since that config only provides access to the repository where the workflow is running
+          persist-credentials: false
+
+      - uses: docker://ghcr.io/flathub/flatpak-external-data-checker:latest
+        env:
+          GIT_AUTHOR_NAME: Flatpak External Data Checker
+          GIT_COMMITTER_NAME: Flatpak External Data Checker
+          # email sets "github-actions[bot]" as commit author, see https://github.community/t/github-actions-bot-email-address/17204/6
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GITHUB_TOKEN: ${{ secrets.BOT_USER_SECRET }} # replace this with the name of the GitHub Secret where you store the PAT of the user you wish to fork the repo and create PRs 
+        with:
+          args: --update --always-fork $PATH_TO_MANIFEST # e.g. com.organization.myapp.json
 ```
 
 ### Automatically submitting PRs
