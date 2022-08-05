@@ -96,7 +96,7 @@ jobs:
 
     strategy:
       matrix:
-        branch: [ master ] # list all branches to check
+        branch: [ master, beta ] # list all branches to check
     
     steps:
       - uses: actions/checkout@v3
