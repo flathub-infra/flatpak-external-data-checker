@@ -368,7 +368,8 @@ and add a template for source download URL.
     "url-template": "https://github.com/flatpak/flatpak/releases/download/$version/flatpak-$version.tar.xz"
 }
 ```
-Set `stable-only` to `true` to retrieve latest stable version (as recognized by Anitya).
+
+Set `stable-only` to `false` to include unstable releases (as recognized by Anitya).
 
 The [`versions`](#version-constraining) property is supported.
 

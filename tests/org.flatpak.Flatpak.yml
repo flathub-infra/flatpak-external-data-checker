@@ -20,6 +20,7 @@ modules:
         x-checker-data:
           type: anitya
           project-id: 6377
+          stable-only: false
           versions:
             ==: "1.10.1"
           url-template: https://github.com/flatpak/flatpak/releases/download/$version/flatpak-$version.tar.xz
@@ -43,6 +44,7 @@ modules:
         x-checker-data:
           type: anitya
           project-id: 1157
+          # Leaving stable-only unset to at least exercise the default path
           url-template: https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs$version0$version1$version2/ghostscript-$version.tar.xz
 
   - name: gnuradio-iqbal
