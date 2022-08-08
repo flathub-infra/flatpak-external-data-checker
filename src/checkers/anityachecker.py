@@ -48,7 +48,7 @@ class AnityaChecker(Checker):
             "baseurl", "https://release-monitoring.org"
         )
         versions_url = URL(instance_url) / "api/v2/versions/"
-        stable_only = external_data.checker_data.get("stable-only", False)
+        stable_only = external_data.checker_data.get("stable-only", True)
         constraints = external_data.checker_data.get("versions", {}).items()
 
         query = {"project_id": external_data.checker_data["project-id"]}

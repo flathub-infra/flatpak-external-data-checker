@@ -73,7 +73,7 @@ class PyPIChecker(Checker):
             (o, Version(v))
             for o, v in external_data.checker_data.get("versions", {}).items()
         ]
-        stable_only = external_data.checker_data.get("stable-only", False)
+        stable_only = external_data.checker_data.get("stable-only", True)
 
         async with self.session.get(f"{PYPI_INDEX}/{package_name}/json") as response:
             pypi_data = await response.json()
