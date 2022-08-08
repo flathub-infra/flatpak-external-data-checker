@@ -51,7 +51,7 @@ flatpak install --from https://dl.flathub.org/repo/appstream/org.flathub.flatpak
 And run with
 
 ```bash
-flatpak run org.flathub.flatpak-external-data-checker MANIFEST_FILE
+flatpak run --filesystem=MANIFEST_DIR org.flathub.flatpak-external-data-checker MANIFEST_DIR/MANIFEST_FILE
 ```
 
 #### Running in a container
