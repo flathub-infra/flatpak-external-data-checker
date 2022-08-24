@@ -90,6 +90,10 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         self._test_semver_filter(self._find_by_filename(ext_data, "semver.txt"))
         self._test_no_match(self._find_by_filename(ext_data, "libFS-1.0.7.tar.bz2"))
         self._test_invalid_url(self._find_by_filename(ext_data, "libdoesntexist.tar"))
+        self._test_parent_child(
+            self._find_by_filename(ext_data, "parent.txt"),
+            self._find_by_filename(ext_data, "child.txt"),
+        )
 
     def _test_check_with_url_template(self, data):
         self.assertIsNotNone(data)
@@ -164,6 +168,19 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
     def _test_invalid_url(self, data):
         self.assertIsNotNone(data)
         self.assertIsNone(data.new_version)
+
+    def _test_parent_child(self, parent, child):
+        self.assertIs(child.parent, parent)
+        self.assertIsNotNone(parent.new_version)
+        self.assertIsNotNone(child.new_version)
+        self.assertEqual(
+            child.new_version.checksum,
+            # curl https://httpbingo.org/response-headers?version=1.0.0 | sha256sum
+            MultiDigest(
+                sha256="da69554c4483e69a2c4e918e252c68e7e17eb2f6b70b6cdb33746a415fc0e687"
+            ),
+        )
+        self.assertEqual(parent.new_version.checksum, child.new_version.checksum)
 
     def _find_by_filename(self, ext_data, filename):
         for data in ext_data:
