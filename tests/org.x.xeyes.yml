@@ -82,3 +82,26 @@ modules:
           url: https://httpbingo.org/base64/MS4wLjAK
           version-pattern: (\d[\d\.]+\d)
           url-template: https://httpbingo.org/status/404
+
+  - name: parent-child
+    sources:
+      - type: file
+        url: http://example.com/parent.txt
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+        x-checker-data:
+          type: html
+          # echo 'Version: 1.0.0' | base64 -w 0
+          url: http://httpbingo.org/base64/VmVyc2lvbjogMS4wLjAK
+          version-pattern: Version:\s+([\d\.]+)
+          url-template: https://httpbingo.org/response-headers?version=$version
+          source-id: html-parent
+
+      - type: file
+        url: http://example.com/child.txt
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+        x-checker-data:
+          type: html
+          url: https://httpbingo.org/response-headers?version=$parent_version
+          version-pattern: \["([\d\.]+)"\]
+          url-template: https://httpbingo.org/response-headers?version=$version
+          parent-id: html-parent
