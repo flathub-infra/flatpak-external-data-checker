@@ -568,7 +568,7 @@ class TestImportantGitExternalDataChecker(_TestWithInlineManifest):
         """With two sources, while one source is updated it is not the important one,
         so no manifest update should be made."""
         filename = "importantsource.com.virustotal.Uploader.yml"
-        contents = """
+        contents = r"""
 id: importantsource.com.virustotal.Uploader
 modules:
   - name: extra-cmake-modules
@@ -595,7 +595,7 @@ modules:
           # since this is marked as the only important source, 
           # but isn't getting updated, manifest should not be updated
 """.lstrip()
-        expected_new_contents = f"""
+        expected_new_contents = rf"""
 id: importantsource.com.virustotal.Uploader
 modules:
   - name: extra-cmake-modules
@@ -635,7 +635,7 @@ modules:
     async def test_update_one_important_source_updated(self):
         """With two sources, one of them being important and updated, so a manifest update should be made."""
         filename = "importantsource.com.virustotal.Uploader.yml"
-        contents = f"""
+        contents = rf"""
 id: importantsource.com.virustotal.Uploader
 modules:
   - name: extra-cmake-modules
@@ -662,7 +662,7 @@ modules:
           tag-pattern: ^(0.5.4)$
           sort-tags: false
 """.lstrip()
-        expected_new_contents = f"""
+        expected_new_contents = rf"""
 id: importantsource.com.virustotal.Uploader
 modules:
   - name: extra-cmake-modules
@@ -704,7 +704,7 @@ modules:
         so a manifest update should be made.
         Tests for correct looping (i.e. once it finds a singular important source that's updated it should update the manifest)."""
         filename = "importantsource.com.virustotal.Uploader.yml"
-        contents = """
+        contents = r"""
 id: importantsource.com.virustotal.Uploader
 modules:
   - name: extra-cmake-modules
@@ -734,7 +734,7 @@ modules:
           # this is marked as important and not being updated, 
           # yet the manifest should still be updated since the previous source is important and getting an update.
 """.lstrip()
-        expected_new_contents = f"""
+        expected_new_contents = rf"""
 id: importantsource.com.virustotal.Uploader
 modules:
   - name: extra-cmake-modules
@@ -782,7 +782,7 @@ modules:
         so a manifest update should be made.
         Tests for correct looping (i.e. once it finds a singular important source that's updated it should update the manifest)."""
         filename = "importantsource.com.virustotal.Uploader.yml"
-        contents = f"""
+        contents = rf"""
 id: importantsource.com.virustotal.Uploader
 modules:
   - name: vt-py
@@ -812,7 +812,7 @@ modules:
           # since this is marked as a important source, 
           # and is getting updated, manifest should be updated
 """.lstrip()
-        expected_new_contents = f"""
+        expected_new_contents = rf"""
 id: importantsource.com.virustotal.Uploader
 modules:
   - name: vt-py
@@ -856,7 +856,7 @@ modules:
         """With two sources, while one source is updated it is not the main one,
         so no manifest update should be made."""
         filename = "importantsource.com.virustotal.Uploader.yml"
-        contents = """
+        contents = r"""
 id: importantsource.com.virustotal.Uploader
 modules:
   - name: extra-cmake-modules
@@ -883,7 +883,7 @@ modules:
           # since this is marked as the only important/main source,
           # but isn't getting updated, manifest should not be updated
 """.lstrip()
-        expected_new_contents = f"""
+        expected_new_contents = rf"""
 id: importantsource.com.virustotal.Uploader
 modules:
   - name: extra-cmake-modules
@@ -924,7 +924,7 @@ modules:
         """With two sources, one of them being the main source and updated,
         so a manifest update should be made."""
         filename = "importantsource.com.virustotal.Uploader.yml"
-        contents = f"""
+        contents = rf"""
 id: importantsource.com.virustotal.Uploader
 modules:
   - name: extra-cmake-modules
@@ -951,7 +951,7 @@ modules:
           tag-pattern: ^(0.5.4)$
           sort-tags: false
 """.lstrip()
-        expected_new_contents = f"""
+        expected_new_contents = rf"""
 id: importantsource.com.virustotal.Uploader
 modules:
   - name: extra-cmake-modules
@@ -992,7 +992,7 @@ modules:
         """With two sources, one being important, but with require_important_source=false, so normal behaviour should occur.
         Should disregard the fact that there is a singular important source not being updated"""
         filename = "importantsource.com.virustotal.Uploader.yml"
-        contents = """
+        contents = r"""
 id: importantsource.com.virustotal.Uploader
 modules:
   - name: extra-cmake-modules
@@ -1018,7 +1018,7 @@ modules:
           is-important: true
           # manifest should still be updated since the require_important source is disabled
 """.lstrip()
-        expected_new_contents = f"""
+        expected_new_contents = rf"""
 id: importantsource.com.virustotal.Uploader
 modules:
   - name: extra-cmake-modules
@@ -1060,7 +1060,7 @@ modules:
     async def test_main_source_not_important(self):
         """Normally the main source is considered important, however this can be overridden by setting is-important: false"""
         filename = "importantsource.com.virustotal.Uploader.yml"
-        contents = f"""
+        contents = rf"""
 id: importantsource.com.virustotal.Uploader
 modules:
   - name: vt-py
@@ -1089,7 +1089,7 @@ modules:
           is-important: false
           # since this is marked as the main source but is not important, it should not be updated
 """.lstrip()
-        expected_new_contents = f"""
+        expected_new_contents = rf"""
 id: importantsource.com.virustotal.Uploader
 modules:
   - name: vt-py
