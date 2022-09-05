@@ -70,18 +70,21 @@ class GNOMEChecker(Checker):
         if constraints:
             filtered_versions = filter_versions(filtered_versions, constraints)
 
-        if stable_only:
-            try:
-                latest_version = list(filter(_is_stable, filtered_versions))[-1]
-            except IndexError:
+        try:
+            if stable_only:
+                try:
+                    latest_version = list(filter(_is_stable, filtered_versions))[-1]
+                except IndexError:
+                    latest_version = filtered_versions[-1]
+                    log.warning(
+                        "Couldn't find any stable version for %s, selecting latest %s",
+                        project_name,
+                        latest_version,
+                    )
+            else:
                 latest_version = filtered_versions[-1]
-                log.warning(
-                    "Couldn't find any stable version for %s, selecting latest %s",
-                    project_name,
-                    latest_version,
-                )
-        else:
-            latest_version = filtered_versions[-1]
+        except IndexError as e:
+            raise CheckerQueryError("No matching versions") from e
 
         proj_files = downloads[project_name][latest_version]
 
