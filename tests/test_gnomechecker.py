@@ -52,6 +52,10 @@ class TestGNOMEChecker(unittest.IsolatedAsyncioTestCase):
         ext_data = await checker.check()
 
         for data in ext_data:
+            if data.filename == "cairo-1.17.6.tar.gz":
+                self.assertIsNone(data.new_version)
+                continue
+
             self.assertIsNotNone(data.new_version)
             self.assertIsNotNone(data.new_version.checksum)
             self.assertIsInstance(data.new_version.checksum, MultiDigest)

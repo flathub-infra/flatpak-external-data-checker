@@ -64,6 +64,23 @@
                     }
                 }
             ]
+        },
+        {
+            "name" : "cairo-static",
+            "sources" : [
+                {
+                    "type": "archive",
+                    "url": "https://gitlab.freedesktop.org/cairo/cairo/-/archive/1.17.6/cairo-1.17.6.tar.gz",
+                    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "x-checker-data": {
+                        "type": "gnome",
+                        "name": "cairo",
+                        "versions": {
+                            ">": "9999.0.0"
+                        }
+                    }
+                }
+            ]
         }
     ]
 }
