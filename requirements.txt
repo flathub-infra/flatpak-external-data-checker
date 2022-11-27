@@ -11,3 +11,4 @@ jsonschema
 editorconfig
 lxml
 packaging
+python-magic

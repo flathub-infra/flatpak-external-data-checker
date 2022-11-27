@@ -40,6 +40,7 @@ from ruamel.yaml import YAML
 from elftools.elf.elffile import ELFFile
 import aiohttp
 import editorconfig
+import magic
 
 from . import externaldata, TIMEOUT_CONNECT, HTTP_CHUNK_SIZE, OPERATORS
 from .errors import CheckerRemoteError, CheckerQueryError, CheckerFetchError
@@ -116,19 +117,26 @@ async def get_extra_data_info_from_url(
         real_url = str(response.url)
         info = response.headers
 
-        content_type = info.get(aiohttp.hdrs.CONTENT_TYPE)
-        if (
-            content_type is not None
-            and content_type_deny is not None
-            and any(r.match(content_type) for r in content_type_deny)
-        ):
-            raise CheckerFetchError(
-                f"Wrong content type '{content_type}' received from '{url}'"
+        def content_type_rejected(content_type: t.Optional[str]) -> bool:
+            return (
+                content_type is not None
+                and content_type_deny is not None
+                and any(r.match(content_type) for r in content_type_deny)
             )
 
         checksum = MultiHash()
+        first_chunk = True
         size = 0
         async for chunk in response.content.iter_chunked(HTTP_CHUNK_SIZE):
+            if first_chunk:
+                first_chunk = False
+                # determine content type from magic number since http header may be wrong
+                actual_content_type = magic.from_buffer(chunk, mime=True)
+                if content_type_rejected(actual_content_type):
+                    raise CheckerFetchError(
+                        f"Wrong content type '{actual_content_type}' received from '{url}'"
+                    )
+
             checksum.update(chunk)
             size += len(chunk)
             if dest_io is not None:

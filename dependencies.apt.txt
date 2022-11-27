@@ -21,6 +21,7 @@ python3-jsonschema
 python3-editorconfig
 python3-lxml
 python3-packaging
+python3-magic
 squashfs-tools
 ssh-client
 jq

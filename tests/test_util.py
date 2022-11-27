@@ -29,7 +29,7 @@ from tempfile import TemporaryDirectory
 
 import aiohttp
 
-from src.lib.errors import CheckerError
+from src.lib.errors import CheckerFetchError
 from src.lib.utils import (
     parse_github_url,
     strip_query,
@@ -222,12 +222,34 @@ class TestDownload(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         await self.http.close()
 
+    async def test_correct_content_type(self):
+        await get_extra_data_info_from_url(
+            url=f"https://ftp.gnu.org/gnu/gzip/gzip-1.12.tar.gz",
+            session=self.http,
+            content_type_deny=[re.compile(r"^application/x-fedc-test$")],
+        )
+
     async def test_wrong_content_type(self):
-        with self.assertRaises(CheckerError):
+        # Because so many web servers serve source code archives with an incorrect
+        # Content-Type, we ignore the Content-Type header and instead use
+        # (lib)magic to sniff the content type from the response data.
+        #
+        # However, we also have to deal with the problem that SourceForge
+        # sometimes returns a 200 OK response with an HTML error page rather
+        # than the source code archive we requested. So
+        # get_extra_data_info_from_url() allows the caller to provide a
+        # denylist.
+        #
+        # This test case is testing 2 things. The server returns a JSON body
+        # but with application/gzip as the Content-Type. We test that:
+        #
+        # 1. The content type is sniffed from the data as application/json
+        # 2. As a result it is rejected
+        with self.assertRaises(CheckerFetchError):
             await get_extra_data_info_from_url(
-                url=f"https://httpbin.org/response-headers?Content-Type={self._CONTENT_TYPE}",
+                url=f"https://httpbingo.org/response-headers?Content-Type=application/gzip",
                 session=self.http,
-                content_type_deny=[re.compile(f"^{self._CONTENT_TYPE}$")],
+                content_type_deny=[re.compile(r"^application/json$")],
             )
 
 
