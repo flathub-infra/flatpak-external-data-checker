@@ -208,7 +208,7 @@ AUTOMERGE_DUE_TO_BROKEN_URLS = (
 
 def open_pr(
     change: CommittedChanges,
-    manifest_checker: manifest.ManifestChecker = None,
+    manifest_checker: t.Optional[manifest.ManifestChecker] = None,
     fork: t.Optional[bool] = None,
 ):
     try:
