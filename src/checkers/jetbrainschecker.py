@@ -16,8 +16,13 @@ class JetBrainsChecker(Checker):
             "code": {"type": "string"},
             # TODO: add enum here
             "release-type": {"type": "string"},
+            "arch": {"type": "string"},
         },
         "required": ["code"],
+    }
+    DOWNLOAD_NODE_SUFFIX = {
+        "x86_64": "",
+        "aarch64": "ARM64",
     }
 
     async def check(self, external_data: ExternalBase):
@@ -33,7 +38,9 @@ class JetBrainsChecker(Checker):
             result = await response.json()
             data = result[code][0]
 
-        release = data["downloads"]["linux"]
+        arch = external_data.checker_data["arch"] if "arch" in external_data.checker_data else "x86_64"
+        download_node = f"linux{DOWNLOAD_NODE_SUFFIX[arch]}"
+        release = data["downloads"][download_node]
 
         async with self.session.get(release["checksumLink"]) as response:
             result = await response.text()
