@@ -94,7 +94,7 @@ class ManifestChecker:
         failed: int = 0
         total: int = 0
 
-    def __init__(self, manifest: str, options: CheckerOptions = None):
+    def __init__(self, manifest: str, options: t.Optional[CheckerOptions] = None):
         self.kind = self.Kind.UNKNOWN
         self.app_id: t.Optional[str]
         self.app_id = None
