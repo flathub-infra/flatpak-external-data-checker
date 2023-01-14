@@ -16,7 +16,6 @@ class JetBrainsChecker(Checker):
             "code": {"type": "string"},
             # TODO: add enum here
             "release-type": {"type": "string"},
-            "arch": {"type": "string"},
         },
         "required": ["code"],
     }
@@ -34,12 +33,9 @@ class JetBrainsChecker(Checker):
             result = await response.json()
             data = result[code][0]
 
-        arch = (
-            external_data.checker_data["arch"]
-            if "arch" in external_data.checker_data
-            else "x86_64"
-        )
-        release = data["downloads"][self._get_download_node_name(arch)]
+        release = data["downloads"][
+            self._get_download_node_name(external_data.arches[0])
+        ]
 
         async with self.session.get(release["checksumLink"]) as response:
             result = await response.text()
