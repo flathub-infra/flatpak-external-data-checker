@@ -20,10 +20,6 @@ class JetBrainsChecker(Checker):
         },
         "required": ["code"],
     }
-    DOWNLOAD_NODE_SUFFIX = {
-        "x86_64": "",
-        "aarch64": "ARM64",
-    }
 
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
@@ -43,8 +39,7 @@ class JetBrainsChecker(Checker):
             if "arch" in external_data.checker_data
             else "x86_64"
         )
-        download_node = f"linux{DOWNLOAD_NODE_SUFFIX[arch]}"
-        release = data["downloads"][download_node]
+        release = data["downloads"][self._get_download_node_name(arch)]
 
         async with self.session.get(release["checksumLink"]) as response:
             result = await response.text()
@@ -59,3 +54,11 @@ class JetBrainsChecker(Checker):
         )
 
         external_data.set_new_version(new_version)
+
+    @staticmethod
+    def _get_download_node_name(arch: str) -> str:
+        mapping = {
+            "x86_64": "",
+            "aarch64": "ARM64",
+        }
+        return f"linux{mapping[arch]}"
