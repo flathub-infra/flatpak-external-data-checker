@@ -87,7 +87,7 @@ class Checker:
     async def _get_json(
         self,
         url: t.Union[str, URL],
-        headers: t.Dict[str, str] = None,
+        headers: t.Optional[t.Dict[str, str]] = None,
     ) -> JSONType:
         url = URL(url)
         log.debug("Loading JSON from %s", url)

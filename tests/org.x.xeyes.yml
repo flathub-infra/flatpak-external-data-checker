@@ -102,6 +102,6 @@ modules:
         x-checker-data:
           type: html
           url: https://httpbingo.org/response-headers?version=$parent_version
-          version-pattern: \["([\d\.]+)"\]
+          version-pattern: (\d\.\d\.\d)
           url-template: https://httpbingo.org/response-headers?version=$version
           parent-id: html-parent
