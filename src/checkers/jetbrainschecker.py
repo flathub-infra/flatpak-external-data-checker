@@ -38,7 +38,11 @@ class JetBrainsChecker(Checker):
             result = await response.json()
             data = result[code][0]
 
-        arch = external_data.checker_data["arch"] if "arch" in external_data.checker_data else "x86_64"
+        arch = (
+            external_data.checker_data["arch"]
+            if "arch" in external_data.checker_data
+            else "x86_64"
+        )
         download_node = f"linux{DOWNLOAD_NODE_SUFFIX[arch]}"
         release = data["downloads"][download_node]
 
