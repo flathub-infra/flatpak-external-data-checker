@@ -7,6 +7,11 @@ from ..lib.checkers import Checker
 
 log = logging.getLogger(__name__)
 
+DOWNLOAD_NODE_SUFFIX = {
+    "x86_64": "",
+    "aarch64": "ARM64",
+}
+
 
 class JetBrainsChecker(Checker):
     CHECKER_DATA_TYPE = "jetbrains"
@@ -33,9 +38,8 @@ class JetBrainsChecker(Checker):
             result = await response.json()
             data = result[code][0]
 
-        release = data["downloads"][
-            self._get_download_node_name(external_data.arches[0])
-        ]
+        arch = external_data.arches[0]
+        release = data["downloads"][f"linux{DOWNLOAD_NODE_SUFFIX[arch]}"]
 
         async with self.session.get(release["checksumLink"]) as response:
             result = await response.text()
@@ -50,11 +54,3 @@ class JetBrainsChecker(Checker):
         )
 
         external_data.set_new_version(new_version)
-
-    @staticmethod
-    def _get_download_node_name(arch: str) -> str:
-        mapping = {
-            "x86_64": "",
-            "aarch64": "ARM64",
-        }
-        return f"linux{mapping[arch]}"
