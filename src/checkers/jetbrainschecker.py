@@ -7,9 +7,9 @@ from ..lib.checkers import Checker
 
 log = logging.getLogger(__name__)
 
-DOWNLOAD_NODE_SUFFIX = {
-    "x86_64": "",
-    "aarch64": "ARM64",
+_JB_ARCH_MAP = {
+    "x86_64": "linux",
+    "aarch64": "linuxARM64",
 }
 
 
