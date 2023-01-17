@@ -38,8 +38,7 @@ class JetBrainsChecker(Checker):
             result = await response.json()
             data = result[code][0]
 
-        arch = external_data.arches[0]
-        release = data["downloads"][f"linux{DOWNLOAD_NODE_SUFFIX[arch]}"]
+        release = data["downloads"][_JB_ARCH_MAP[external_data.arches[0]]]
 
         async with self.session.get(release["checksumLink"]) as response:
             result = await response.text()
