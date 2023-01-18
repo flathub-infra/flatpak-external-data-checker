@@ -7,6 +7,11 @@ from ..lib.checkers import Checker
 
 log = logging.getLogger(__name__)
 
+_JB_ARCH_MAP = {
+    "x86_64": "linux",
+    "aarch64": "linuxARM64",
+}
+
 
 class JetBrainsChecker(Checker):
     CHECKER_DATA_TYPE = "jetbrains"
@@ -33,7 +38,7 @@ class JetBrainsChecker(Checker):
             result = await response.json()
             data = result[code][0]
 
-        release = data["downloads"]["linux"]
+        release = data["downloads"][_JB_ARCH_MAP[external_data.arches[0]]]
 
         async with self.session.get(release["checksumLink"]) as response:
             result = await response.text()
