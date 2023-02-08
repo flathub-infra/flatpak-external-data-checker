@@ -55,7 +55,7 @@ NUM_OUTDATED_DATA = NUM_ALL_EXT_DATA - (NUM_UP_TO_DATE_DATA + NUM_SKIPPED_DATA)
 NUM_NEW_VERSIONS = 2
 
 
-class DummyChecker(Checker):
+class DummyChecker(Checker, register=False):
     def get_json_schema(self, external_data):
         return None
 
@@ -70,7 +70,7 @@ class DummyChecker(Checker):
         )
 
 
-class UpdateEverythingChecker(DummyChecker):
+class UpdateEverythingChecker(DummyChecker, register=False):
     SIZE = 0
     # echo -n | sha256sum
     CHECKSUM = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -524,7 +524,7 @@ class TestCheckerHelpers(unittest.IsolatedAsyncioTestCase):
             )
 
 
-class GitDummyChecker(GitChecker):
+class GitDummyChecker(GitChecker, register=False):
     def get_json_schema(self, external_data):
         return None
 
@@ -539,7 +539,7 @@ class GitDummyChecker(GitChecker):
         )
 
 
-class GitUpdateEverythingChecker(GitDummyChecker):
+class GitUpdateEverythingChecker(GitDummyChecker, register=False):
     # SIZE = 0
     # echo -n | sha256sum
     COMMIT = "abcdeadbeef00000000000000000000000000000"

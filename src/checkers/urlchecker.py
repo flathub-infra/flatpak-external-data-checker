@@ -62,6 +62,7 @@ def extract_version(checker_data, url):
 
 
 class URLChecker(Checker):
+    PRIORITY = 99
     CHECKER_DATA_TYPE = "rotating-url"
     CHECKER_DATA_SCHEMA = {
         "type": "object",

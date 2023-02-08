@@ -60,6 +60,7 @@ TAG_VERSION_SCHEMES = {
 
 
 class GitChecker(Checker):
+    PRIORITY = 95
     CHECKER_DATA_TYPE = "git"
     CHECKER_DATA_SCHEMA = {
         "type": "object",

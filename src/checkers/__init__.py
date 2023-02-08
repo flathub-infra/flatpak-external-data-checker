@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import logging
 from distutils.version import LooseVersion
 from string import Template
 import datetime
 import re
 import typing as t
+import importlib
+import pkgutil
 
 import aiohttp
 from yarl import URL
@@ -38,12 +42,28 @@ JSONType = t.Union[str, int, float, bool, None, t.Dict[str, t.Any], t.List[t.Any
 yaml = ruamel.yaml.YAML(typ="safe")
 log = logging.getLogger(__name__)
 
+ALL_CHECKERS: t.List[t.Type[Checker]] = []
+
 
 class Checker:
+    """
+    Base class for implementing checkers
+
+    :cvar PRIORITY: Alter the checker priority (lower is used first)
+    """
+
+    PRIORITY: t.ClassVar[int] = 0
     CHECKER_DATA_TYPE: t.Optional[str] = None
     CHECKER_DATA_SCHEMA: t.Dict[str, t.Any]
     SUPPORTED_DATA_CLASSES: t.List[t.Type[ExternalBase]] = [ExternalData]
     session: aiohttp.ClientSession
+
+    @classmethod
+    def __init_subclass__(cls, *args, register: bool = True, **kwargs):
+        super().__init_subclass__(*args, **kwargs)
+        if register and cls not in ALL_CHECKERS:
+            ALL_CHECKERS.append(cls)
+            ALL_CHECKERS.sort(key=lambda c: c.PRIORITY)
 
     def __init__(self, session: aiohttp.ClientSession):
         self.session = session
@@ -224,37 +244,13 @@ class Checker:
         external_data.set_new_version(new_version)
 
 
-from .debianrepochecker import DebianRepoChecker
-from .rpmrepochecker import RPMRepoChecker
-from .jsonchecker import JSONChecker
-from .urlchecker import URLChecker
-from .htmlchecker import HTMLChecker
-from .jetbrainschecker import JetBrainsChecker
-from .snapcraftchecker import SnapcraftChecker
-from .anityachecker import AnityaChecker
-from .rustchecker import RustChecker
-from .gitchecker import GitChecker
-from .pypichecker import PyPIChecker
-from .gnomechecker import GNOMEChecker
-from .chromiumchecker import ChromiumChecker
-from .electronchecker import ElectronChecker
+def load_checkers():
+    for plugin_info in pkgutil.iter_modules(__path__):
+        try:
+            importlib.import_module(f".{plugin_info.name}", package=__name__)
+        except ImportError as err:
+            log.error("Can't load %s: %s", plugin_info.name, err)
+            continue
 
 
-# For each ExternalData, checkers are run in the order listed here, stopping once data.state is
-# set to something other than UNKNOWN.
-ALL_CHECKERS = [
-    DebianRepoChecker,
-    RPMRepoChecker,
-    HTMLChecker,
-    JetBrainsChecker,
-    SnapcraftChecker,
-    AnityaChecker,
-    RustChecker,
-    JSONChecker,
-    PyPIChecker,
-    GNOMEChecker,
-    ChromiumChecker,
-    ElectronChecker,
-    GitChecker,  # leave this last but one
-    URLChecker,  # leave this last
-]
+load_checkers()
