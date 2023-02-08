@@ -700,9 +700,11 @@ modules:
         )
 
     async def test_update_two_important_sources_first_updated(self):
-        """With two important sources, the first getting updated,
+        """
+        With two important sources, the first getting updated,
         so a manifest update should be made.
-        Tests for correct looping (i.e. once it finds a singular important source that's updated it should update the manifest)."""
+        Tests for correct looping (i.e. once it finds a singular important source that's updated it should update the manifest).
+        """
         filename = "importantsource.com.virustotal.Uploader.yml"
         contents = r"""
 id: importantsource.com.virustotal.Uploader
@@ -780,7 +782,8 @@ modules:
     async def test_update_two_important_sources_second_updated(self):
         """With two important sources, the second getting updated,
         so a manifest update should be made.
-        Tests for correct looping (i.e. once it finds a singular important source that's updated it should update the manifest)."""
+        Tests for correct looping (i.e. once it finds a singular important source that's updated it should update the manifest).
+        """
         filename = "importantsource.com.virustotal.Uploader.yml"
         contents = rf"""
 id: importantsource.com.virustotal.Uploader
@@ -990,7 +993,8 @@ modules:
 
     async def test_require_important_source_disabled_no_important_source_updated(self):
         """With two sources, one being important, but with require_important_source=false, so normal behaviour should occur.
-        Should disregard the fact that there is a singular important source not being updated"""
+        Should disregard the fact that there is a singular important source not being updated
+        """
         filename = "importantsource.com.virustotal.Uploader.yml"
         contents = r"""
 id: importantsource.com.virustotal.Uploader
