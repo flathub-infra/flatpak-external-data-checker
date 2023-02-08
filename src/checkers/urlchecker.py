@@ -39,7 +39,7 @@ import tempfile
 from ..lib.externaldata import ExternalBase, ExternalData
 from ..lib import utils, NETWORK_ERRORS, HTTP_CLIENT_HEADERS
 from ..lib.errors import CheckerFetchError
-from ..lib.checkers import Checker
+from . import Checker
 
 log = logging.getLogger(__name__)
 

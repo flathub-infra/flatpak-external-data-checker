@@ -8,7 +8,7 @@ from ..lib import OPERATORS_SCHEMA
 from ..lib.externaldata import ExternalBase, ExternalGitRepo, ExternalGitRef
 from ..lib.utils import git_ls_remote, filter_versioned_items, FallbackVersion
 from ..lib.errors import CheckerQueryError, CheckerFetchError
-from ..lib.checkers import Checker
+from . import Checker
 
 log = logging.getLogger(__name__)
 

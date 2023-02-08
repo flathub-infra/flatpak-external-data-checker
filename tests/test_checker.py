@@ -32,7 +32,7 @@ import aiohttp
 
 from src.lib.utils import init_logging
 from src.lib.externaldata import ExternalData
-from src.lib.checkers import Checker
+from src.checkers import Checker
 from src.checkers.gitchecker import GitChecker
 from src.lib.externaldata import ExternalGitRepo
 from src.lib.checksums import MultiDigest

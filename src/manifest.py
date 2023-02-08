@@ -48,8 +48,7 @@ from .lib.errors import (
     SourceLoadError,
     SourceUnsupported,
 )
-from .lib.checkers import Checker
-from .checkers import ALL_CHECKERS
+from .checkers import Checker, ALL_CHECKERS
 
 
 MAIN_SRC_PROP = "is-main-source"
