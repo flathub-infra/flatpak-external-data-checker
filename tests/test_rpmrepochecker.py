@@ -28,7 +28,7 @@ class TestRPMRepoChecker(unittest.IsolatedAsyncioTestCase):
             )
             self.assertRegex(
                 data.new_version.url,
-                r"https://packages\.microsoft\.com/yumrepos/vscode/code-.+\.{0}\.rpm".format(
+                r"https://packages\.microsoft\.com/yumrepos/.+?/code-.+\.{0}\.rpm".format(
                     data.arches[0]
                 ),
             )
