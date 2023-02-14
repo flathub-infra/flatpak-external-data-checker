@@ -30,7 +30,7 @@ import aiohttp
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
 from src.lib.checksums import MultiDigest
-from src.checkers import HTMLChecker
+from src.checkers.htmlchecker import HTMLChecker
 from src.lib.errors import CheckerError
 
 

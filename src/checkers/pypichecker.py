@@ -10,7 +10,7 @@ from ..lib.externaldata import ExternalFile, ExternalBase
 from ..lib.checksums import MultiDigest
 from ..lib.utils import filter_versioned_items
 from ..lib.errors import CheckerQueryError
-from ..lib.checkers import Checker
+from . import Checker
 
 log = logging.getLogger(__name__)
 

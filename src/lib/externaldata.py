@@ -87,18 +87,8 @@ class BuilderModule:
         return self.name
 
 
-class BuilderSourceMeta(abc.ABCMeta):
-    """flatpak-builder source metaclass"""
-
-    def __init__(cls, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        validator_cls = jsonschema.validators.validator_for(cls.SOURCE_SCHEMA)
-        validator_cls.check_schema(cls.SOURCE_SCHEMA)
-        cls.source_validator = validator_cls(cls.SOURCE_SCHEMA)
-
-
 @dataclasses.dataclass
-class BuilderSource(abc.ABC, metaclass=BuilderSourceMeta):
+class BuilderSource(abc.ABC):
     """flatpak-builder source item"""
 
     SOURCE_SCHEMA = {
@@ -129,6 +119,8 @@ class BuilderSource(abc.ABC, metaclass=BuilderSourceMeta):
         OUTDATED = 1 << 4
 
     type: t.ClassVar[Type]
+    source_validator: t.ClassVar[jsonschema.Validator]
+
     state: State
     filename: str
     arches: t.List[str]
@@ -140,6 +132,13 @@ class BuilderSource(abc.ABC, metaclass=BuilderSourceMeta):
     # fmt: off
     checked: asyncio.Event = dataclasses.field(init=False, default_factory=asyncio.Event)
     # fmt: on
+
+    @classmethod
+    def __init_subclass__(cls, *args, **kwargs):
+        super().__init_subclass__(*args, **kwargs)
+        validator_cls = jsonschema.validators.validator_for(cls.SOURCE_SCHEMA)
+        validator_cls.check_schema(cls.SOURCE_SCHEMA)
+        cls.source_validator = validator_cls(cls.SOURCE_SCHEMA)
 
     @classmethod
     def data_classes(cls: t.Type[_BS]) -> t.Dict[Type, t.Type[_BS]]:
@@ -158,7 +157,7 @@ class BuilderSource(abc.ABC, metaclass=BuilderSourceMeta):
         module: t.Optional[BuilderModule] = None,
     ) -> _BS:
         try:
-            cls.source_validator.validate(source, cls.SOURCE_SCHEMA)
+            cls.source_validator.validate(source)
         except jsonschema.ValidationError as err:
             raise SourceLoadError("Error reading source") from err
 

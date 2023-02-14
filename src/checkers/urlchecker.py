@@ -39,7 +39,7 @@ import tempfile
 from ..lib.externaldata import ExternalBase, ExternalData
 from ..lib import utils, NETWORK_ERRORS, HTTP_CLIENT_HEADERS
 from ..lib.errors import CheckerFetchError
-from ..lib.checkers import Checker
+from . import Checker
 
 log = logging.getLogger(__name__)
 
@@ -62,6 +62,7 @@ def extract_version(checker_data, url):
 
 
 class URLChecker(Checker):
+    PRIORITY = 99
     CHECKER_DATA_TYPE = "rotating-url"
     CHECKER_DATA_SCHEMA = {
         "type": "object",

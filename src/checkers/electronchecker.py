@@ -14,7 +14,7 @@ from ..lib.externaldata import (
 )
 from ..lib.errors import CheckerQueryError
 from ..lib.checksums import MultiDigest
-from ..lib.checkers import Checker
+from . import Checker
 from .jsonchecker import parse_timestamp
 
 yaml = ruamel.yaml.YAML(typ="safe")

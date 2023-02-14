@@ -44,7 +44,7 @@ import apt_pkg
 from ..lib.externaldata import ExternalFile, ExternalBase
 from ..lib.checksums import MultiDigest
 from ..lib.utils import get_timestamp_from_url
-from ..lib.checkers import Checker
+from . import Checker
 
 apt_pkg.init()
 

@@ -12,7 +12,7 @@ from ..lib.externaldata import (
 )
 from ..lib.utils import filter_versions
 from ..lib.errors import CheckerQueryError
-from ..lib.checkers import Checker
+from . import Checker
 
 log = logging.getLogger(__name__)
 

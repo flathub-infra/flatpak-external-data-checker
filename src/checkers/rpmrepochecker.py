@@ -10,7 +10,7 @@ from defusedxml import ElementTree
 
 from ..lib.externaldata import ExternalBase, ExternalFile
 from ..lib.checksums import MultiDigest
-from ..lib.checkers import Checker
+from . import Checker
 
 
 log = logging.getLogger(__name__)

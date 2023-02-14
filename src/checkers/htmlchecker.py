@@ -32,7 +32,7 @@ import semver
 from ..lib import NETWORK_ERRORS, OPERATORS_SCHEMA
 from ..lib.externaldata import ExternalBase, ExternalData
 from ..lib.errors import CheckerMetadataError, CheckerQueryError, CheckerFetchError
-from ..lib.checkers import Checker
+from . import Checker
 from ..lib.utils import filter_versioned_items, FallbackVersion
 
 log = logging.getLogger(__name__)

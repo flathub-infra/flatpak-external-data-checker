@@ -14,7 +14,7 @@ from ..lib.externaldata import (
 )
 from ..lib.utils import get_extra_data_info_from_url
 from ..lib.errors import CheckerMetadataError, CheckerFetchError
-from ..lib.checkers import Checker
+from . import Checker
 
 log = logging.getLogger(__name__)
 

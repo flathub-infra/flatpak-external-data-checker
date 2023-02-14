@@ -16,7 +16,7 @@ from ..lib.externaldata import (
     ExternalGitRef,
 )
 from ..lib.errors import CheckerQueryError
-from ..lib.checkers import Checker, JSONType
+from . import Checker, JSONType
 
 log = logging.getLogger(__name__)
 
