@@ -58,7 +58,7 @@ modules:
           type: anitya
           project-id: 14456
           stable-only: true
-          # Version filter that can't match any verion
+          # Version filter that can't match any version
           versions:
             '>': '0.38.2'
             '<': '0.38.1'

@@ -56,7 +56,7 @@ flatpak run --filesystem=MANIFEST_DIR org.flathub.flatpak-external-data-checker 
 
 #### Running in a container
 
-**flatpak-external-data-checker** is also avaiable as an
+**flatpak-external-data-checker** is also available as an
 [OCI image](https://github.com/orgs/flathub/packages/container/package/flatpak-external-data-checker)
 from GitHub Container Registry.
 
@@ -311,7 +311,7 @@ To use the **JSONChecker**, specify JSON data URL, version query and url query
     "url-query": ".assets[] | select(.name==\"jq-\" + $version + \".tar.gz\") | .browser_download_url"
 }
 ```
-for git type sources, specify tag query and, optionaly, commit and version queries:
+for git type sources, specify tag query and, optionally, commit and version queries:
 ```json
 "x-checker-data": {
     "type": "json",
