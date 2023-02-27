@@ -426,7 +426,7 @@ class ManifestChecker:
         self,
         only_type: t.Optional[t.Type[Exception]] = None,
     ) -> t.List[Exception]:
-        """Return a list of errors occured while checking/updating the manifest"""
+        """Return a list of errors occurred while checking/updating the manifest"""
 
         return [
             e for e in self._errors if only_type is None or isinstance(e, only_type)
