@@ -19,6 +19,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import datetime as dt
+import json
 import logging
 import os
 import unittest
@@ -36,7 +37,7 @@ from src.checkers import Checker
 from src.checkers.gitchecker import GitChecker
 from src.lib.externaldata import ExternalGitRepo
 from src.lib.checksums import MultiDigest
-from src.lib.errors import CheckerFetchError
+from src.lib.errors import CheckerFetchError, CheckerQueryError
 from src import manifest
 
 TEST_MANIFEST = os.path.join(
@@ -522,6 +523,22 @@ class TestCheckerHelpers(unittest.IsolatedAsyncioTestCase):
             await checker._complete_digests(
                 "https://httpbin.org/base64/status/404", MultiDigest(sha512=sha512)
             )
+
+    async def test_get_json(self):
+        # note that the json of this dict must encode to a base64 string without
+        # padding, or httpbingo.org will return extra \0's at the end.
+        expected = {"key": 123}
+        urlpart = base64.urlsafe_b64encode(json.dumps(expected).encode()).decode()
+
+        checker = DummyChecker(self.http)
+
+        response = await checker._get_json(
+            f"https://httpbingo.org/base64/decode/{urlpart}"
+        )
+        self.assertEqual(response, expected)
+
+        with self.assertRaises(CheckerQueryError):
+            await checker._get_json("https://httpbingo.org/bytes/10")
 
 
 class GitDummyChecker(GitChecker, register=False):

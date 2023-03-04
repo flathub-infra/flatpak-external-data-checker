@@ -4,6 +4,7 @@ import logging
 from distutils.version import LooseVersion
 from string import Template
 import datetime
+import json
 import re
 import typing as t
 import importlib
@@ -120,7 +121,10 @@ class Checker:
                         return yaml.load(await response.read())
                     except ruamel.yaml.error.YAMLError as err:
                         raise CheckerQueryError("Failed to parse YAML") from err
-                return await response.json()
+                try:
+                    return await response.json(content_type=None)
+                except json.JSONDecodeError as err:
+                    raise CheckerQueryError("Failed to parse JSON") from err
         except NETWORK_ERRORS as err:
             raise CheckerQueryError from err
 
