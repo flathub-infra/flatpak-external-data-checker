@@ -59,7 +59,9 @@ jobs:
           apt-get install -y \
             $(xargs < dependencies.apt.txt) \
             python3-setuptools
-          python3 -m pip install mypy
+          python3 -m pip install \
+            mypy \
+            lxml-stubs
 
       - name: Prime mypy cache
         uses: actions/cache@v2
