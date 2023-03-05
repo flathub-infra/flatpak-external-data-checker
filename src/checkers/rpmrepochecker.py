@@ -62,16 +62,21 @@ class RPMRepoChecker(Checker):
         repomd_xml = await self._get_xml(repomd_xml_url)
 
         primary_location_el = repomd_xml.find(
-            'repo:data[@type="primary"]/repo:location', self._XMLNS
+            'repo:data[@type="primary"]/repo:location',
+            namespaces=self._XMLNS,
         )
+        assert primary_location_el is not None
+        primary_location_href = primary_location_el.get("href")
+        assert primary_location_href is not None
 
-        primary_xml_url = repo_root.join(URL(primary_location_el.get("href")))
+        primary_xml_url = repo_root.join(URL(primary_location_href))
         primary_xml = await self._get_xml(primary_xml_url)
 
         log.debug("Looking up package %s arch %s", package_name, package_arch)
         external_files = []
         for package_el in primary_xml.findall(
-            f'package[name="{package_name}"][arch="{package_arch}"]', self._XMLNS
+            f'package[name="{package_name}"][arch="{package_arch}"]',
+            namespaces=self._XMLNS,
         ):
             external_files.append(self._file_from_xml(package_el, repo_root))
 
