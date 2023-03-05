@@ -1,11 +1,11 @@
 from datetime import datetime
 import logging
-from distutils.version import LooseVersion
 
 from yarl import URL
 
 from ..lib.externaldata import ExternalBase, ExternalFile
 from ..lib.checksums import MultiDigest
+from ..lib.utils import FallbackVersion
 from . import Checker, XMLElement
 
 
@@ -75,6 +75,6 @@ class RPMRepoChecker(Checker):
         ):
             external_files.append(self._file_from_xml(package_el, repo_root))
 
-        new_version = max(external_files, key=lambda e: LooseVersion(e.version))
+        new_version = max(external_files, key=lambda e: FallbackVersion(e.version))
 
         external_data.set_new_version(new_version)
