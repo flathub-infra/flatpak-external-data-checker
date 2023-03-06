@@ -123,7 +123,7 @@ class Checker:
                         raise CheckerQueryError("Failed to parse YAML") from err
                 try:
                     return await response.json(content_type=None)
-                except json.JSONDecodeError as err:
+                except (UnicodeDecodeError, json.JSONDecodeError) as err:
                     raise CheckerQueryError("Failed to parse JSON") from err
         except NETWORK_ERRORS as err:
             raise CheckerQueryError from err
