@@ -27,6 +27,7 @@ import contextlib
 import json
 import logging
 import os
+from pathlib import Path
 import subprocess
 import sys
 import asyncio
@@ -125,6 +126,30 @@ def print_errors(manifest_checker: manifest.ManifestChecker) -> int:
 def check_call(args):
     log.debug("$ %s", " ".join(args))
     subprocess.check_call(args)
+
+
+def ensure_git_safe_directory(checkout: t.Union[Path, str]):
+    uid = os.getuid()
+    checkout_uid = os.stat(checkout).st_uid
+    if uid == checkout_uid:
+        return
+
+    try:
+        safe_dirs_output = subprocess.check_output(
+            ["git", "config", "--get-all", "safe.directory"]
+        )
+    except subprocess.CalledProcessError:
+        # Assume git is too old to enforce safe.directory. The oldest
+        # version to have it is 2.30.3, I believe.
+        return
+
+    safe_dirs = safe_dirs_output.decode("utf-8").split()
+    if checkout in safe_dirs:
+        return
+
+    log.info("Adding %s git safe directory", checkout)
+    location = "--system" if uid == 0 else "--global"
+    check_call(["git", "config", location, "--add", "safe.directory", str(checkout)])
 
 
 class CommittedChanges(t.NamedTuple):
@@ -424,7 +449,9 @@ async def run_with_args(args: argparse.Namespace) -> t.Tuple[int, int, bool]:
     if should_update and outdated_num > 0:
         changes = manifest_checker.update_manifests()
         if changes and not args.edit_only:
-            with indir(os.path.dirname(args.manifest)):
+            git_checkout = os.path.dirname(args.manifest)
+            ensure_git_safe_directory(git_checkout)
+            with indir(git_checkout):
                 committed_changes = commit_changes(changes)
                 if not args.commit_only:
                     open_pr(
