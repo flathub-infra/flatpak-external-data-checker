@@ -138,10 +138,12 @@ def ensure_git_safe_directory(checkout: t.Union[Path, str]):
         safe_dirs_output = subprocess.check_output(
             ["git", "config", "--get-all", "safe.directory"]
         )
-    except subprocess.CalledProcessError:
-        # Assume git is too old to enforce safe.directory. The oldest
-        # version to have it is 2.30.3, I believe.
-        return
+    except subprocess.CalledProcessError as err:
+        # git config --get-all will return 1 if the key doesn't exist.
+        # Re-raise the error for anything else.
+        if err.returncode != 1:
+            raise
+        safe_dirs_output = b""
 
     safe_dirs = safe_dirs_output.decode("utf-8").split()
     if checkout in safe_dirs:
