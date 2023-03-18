@@ -49,10 +49,7 @@ class TestHTMLTools(unittest.IsolatedAsyncioTestCase):
         await self.session.close()
 
     def _encoded_url(self, data: bytes):
-        return (
-            "https://httpbin.org/base64/"
-            + base64.b64encode(data, altchars=b"-_").decode()
-        )
+        return "https://httpbingo.org/base64/decode/" + base64.b64encode(data).decode()
 
     async def test_get_text(self):
         checker = HTMLChecker(self.session)
@@ -64,7 +61,7 @@ class TestHTMLTools(unittest.IsolatedAsyncioTestCase):
             )
 
         with self.assertRaises(CheckerError):
-            await checker._get_text("https://httpbin.org/image/jpeg")
+            await checker._get_text("https://httpbingo.org/image/jpeg")
 
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.x.xeyes.yml")
