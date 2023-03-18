@@ -497,44 +497,50 @@ class TestCheckerHelpers(unittest.IsolatedAsyncioTestCase):
         await self.http.close()
 
     @staticmethod
-    def _get_url(data):
-        return "https://httpbin.org/base64/" + base64.b64encode(data).decode("ascii")
+    def _b64_pad(data: bytes) -> bytes:
+        # XXX httpbingo.org will return extra \0's at the end of data
+        # if the data sent requred padding, causing mismatch.
+        # this helpers adds trailing null bytes in advance.
+        return data + b"\0" * ((3 - len(data) % 3) % 3)
+
+    @staticmethod
+    def _get_b64_url(data: bytes):
+        return (
+            "https://httpbingo.org/base64/decode/"
+            + base64.urlsafe_b64encode(data).decode()
+        )
 
     async def test_complete_digests(self):
-        CORRECT = "Correct".encode()
-        WRONG = "Wrong".encode()
+        CORRECT = self._b64_pad("Correct".encode())
+        WRONG = self._b64_pad("Wrong".encode())
 
         checker = DummyChecker(self.http)
         sha256 = hashlib.sha256(CORRECT).hexdigest()
         sha512 = hashlib.sha512(CORRECT).hexdigest()
 
         checksum = await checker._complete_digests(
-            self._get_url(CORRECT), MultiDigest(sha512=sha512)
+            self._get_b64_url(CORRECT), MultiDigest(sha512=sha512)
         )
         self.assertEqual(checksum.sha256, sha256)
         self.assertEqual(checksum.sha512, sha512)
 
         with self.assertRaises(CheckerFetchError):
             await checker._complete_digests(
-                self._get_url(WRONG), MultiDigest(sha512=sha512)
+                self._get_b64_url(WRONG), MultiDigest(sha512=sha512)
             )
 
         with self.assertRaises(CheckerFetchError):
             await checker._complete_digests(
-                "https://httpbin.org/base64/status/404", MultiDigest(sha512=sha512)
+                "https://httpbingo.org/status/404", MultiDigest(sha512=sha512)
             )
 
     async def test_get_json(self):
-        # note that the json of this dict must encode to a base64 string without
-        # padding, or httpbingo.org will return extra \0's at the end.
         expected = {"key": 123}
-        urlpart = base64.urlsafe_b64encode(json.dumps(expected).encode()).decode()
+        url = self._get_b64_url(json.dumps(expected).encode())
 
         checker = DummyChecker(self.http)
 
-        response = await checker._get_json(
-            f"https://httpbingo.org/base64/decode/{urlpart}"
-        )
+        response = await checker._get_json(url)
         self.assertEqual(response, expected)
 
         with self.assertRaises(CheckerQueryError):
