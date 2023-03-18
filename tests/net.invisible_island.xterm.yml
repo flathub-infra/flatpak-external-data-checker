@@ -20,7 +20,7 @@ modules:
             x-checker-data:
               type: anitya
               project-id: 1766
-              url-template: https://xorg.freedesktop.org/releases/individual/lib/libXaw-$version.tar.bz2
+              url-template: https://xorg.freedesktop.org/releases/individual/lib/libXaw-$version.tar.gz
 
       - name: libXaw-32bit
         sources: *libXaw-sources
