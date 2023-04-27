@@ -36,16 +36,16 @@ modules:
           stable-only: true
           url-template: https://boostorg.jfrog.io/artifactory/main/release/$version/source/boost_${major}_${minor}_$patch.tar.bz2
 
-  - name: ghostscript
+  - name: glib-networking
     sources:
       - type: archive
-        url: https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs926/ghostscript-9.26.tar.xz
-        sha256: 90ed475f37584f646e9ef829932b2525d5c6fc2e0147e8d611bc50aa0e718598
+        url: https://download.gnome.org/sources/glib-networking/2.74/glib-networking-2.74.0.tar.xz
+        sha256: 1f185aaef094123f8e25d8fa55661b3fd71020163a0174adb35a37685cda613b
         x-checker-data:
           type: anitya
-          project-id: 1157
+          project-id: 21353
           # Leaving stable-only unset to at least exercise the default path
-          url-template: https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs$version0$version1$version2/ghostscript-$version.tar.xz
+          url-template: https://download.gnome.org/sources/glib-networking/$version0.$version1/glib-networking-$version.tar.xz
 
   - name: gnuradio-iqbal
     buildsystem: cmake

@@ -20,16 +20,16 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(ext_data), 5)
         for data in ext_data:
-            if data.filename == "ghostscript-9.26.tar.xz":
+            if data.filename == "glib-networking-2.74.0.tar.xz":
                 self.assertIsNotNone(data.new_version)
                 self.assertIsInstance(data.new_version, ExternalFile)
                 self.assertRegex(
                     data.new_version.url,
-                    r"^https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs[\d]+/ghostscript-[\d.]+.tar.xz$",
+                    r"^https://download.gnome.org/sources/glib-networking/\d+.\d+/glib-networking-[\d.]+.tar.xz$",
                 )
                 self.assertIsNotNone(data.new_version.version)
                 self.assertGreater(
-                    LooseVersion(data.new_version.version), LooseVersion("9.26")
+                    LooseVersion(data.new_version.version), LooseVersion("2.76")
                 )
                 self.assertIsInstance(data.new_version.size, int)
                 self.assertGreater(data.new_version.size, 0)
@@ -38,7 +38,7 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertNotEqual(
                     data.new_version.checksum,
                     MultiDigest(
-                        sha256="90ed475f37584f646e9ef829932b2525d5c6fc2e0147e8d611bc50aa0e718598"
+                        sha256="1f185aaef094123f8e25d8fa55661b3fd71020163a0174adb35a37685cda613b",
                     ),
                 )
             elif data.filename == "boost_1_74_0.tar.bz2":
