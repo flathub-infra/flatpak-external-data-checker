@@ -19,6 +19,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import datetime as dt
+import zoneinfo
 import json
 import logging
 import os
@@ -56,19 +57,39 @@ log = logging.getLogger(__name__)
 
 def _extract_timestamp(info):
     date_str = info.get("Last-Modified") or info.get("Date")
+    list_zones = list(zoneinfo.available_timezones())
+    invalid_zones = [e for e in list_zones if e not in ("GMT", "UTC")]
+    if any((match_tz := tz) in date_str for tz in invalid_zones):
+        date_str_notz = date_str.replace(match_tz, "").strip()
+        for date_fmt in [
+            "%a, %d %b %Y %H:%M:%S",
+            "%a, %d-%b-%Y %H:%M:%S",
+        ]:
+            try:
+                dt_obj = dt.datetime.strptime(date_str_notz, date_fmt)
+                local_dt = dt.datetime.fromisoformat(str(dt_obj)).replace(
+                    tzinfo=zoneinfo.ZoneInfo(match_tz)
+                )
+                utc_dt = local_dt.astimezone(zoneinfo.ZoneInfo("UTC"))
+                return utc_dt.replace(tzinfo=None)
+            except ValueError:
+                continue
+            raise CheckerRemoteError(f"Cannot parse date/time: {date_str}")
+    else:
+        for date_fmt in [
+            "%a, %d %b %Y %H:%M:%S %Z",
+            "%a, %d %b %Y %H:%M:%S %z",
+            "%a, %d-%b-%Y %H:%M:%S %Z",
+            "%a, %d-%b-%Y %H:%M:%S %z",
+        ]:
+            try:
+                return dt.datetime.strptime(date_str, date_fmt)
+            except ValueError:
+                continue
+            raise CheckerRemoteError(f"Cannot parse date/time: {date_str}")
+
     if not date_str:
         return dt.datetime.now()  # what else can we do?
-    for date_fmt in [
-        "%a, %d %b %Y %H:%M:%S %Z",
-        "%a, %d %b %Y %H:%M:%S %z",
-        "%a, %d-%b-%Y %H:%M:%S %Z",
-        "%a, %d-%b-%Y %H:%M:%S %z",
-    ]:
-        try:
-            return dt.datetime.strptime(date_str, date_fmt)
-        except ValueError:
-            continue
-    raise CheckerRemoteError(f"Cannot parse date/time: {date_str}")
 
 
 def _check_newline(fp):
