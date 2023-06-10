@@ -83,6 +83,12 @@ def add_release(
     releases.insert(0, release)
     _fill_padding(release)
 
+    description = ElementTree.Element("description")
+    description.text = ''
+
+    release.append(description)
+    _fill_padding(description)
+
     tree.write(
         dst,
         # XXX: lxml uses single quotes for doctype line if generated with

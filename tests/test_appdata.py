@@ -46,7 +46,9 @@ class TestAddRelease(unittest.TestCase):
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop">
   <releases>
-    <release version="4.5.6" date="2020-02-02"/>
+    <release version="4.5.6" date="2020-02-02">
+      <description></description>
+    </release>
     <release version="1.2.3" date="2019-01-01"/>
   </releases>
 </component>
@@ -70,7 +72,9 @@ class TestAddRelease(unittest.TestCase):
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop">
    <releases>
-      <release version="4.5.6" date="2020-02-02"/>
+      <release version="4.5.6" date="2020-02-02">
+        <description></description>
+      </release>
       <release version="1.2.3" date="2019-01-01"/>
        <release version="1.2.3" date="2019-01-01"/>
    </releases>
@@ -119,7 +123,9 @@ class TestAddRelease(unittest.TestCase):
 <component type="desktop">
   <!-- I am the walrus -->
   <releases>
-    <release version="4.5.6" date="2020-02-02"/>
+    <release version="4.5.6" date="2020-02-02">
+      <description></description>
+    </release>
     <release version="1.2.3" date="2019-01-01"/>
   </releases>
 </component>
@@ -137,14 +143,16 @@ class TestAddRelease(unittest.TestCase):
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop">
   <releases>
-    <release version="4.5.6" date="2020-02-02"/>
+    <release version="4.5.6" date="2020-02-02">
+      <description></description>
+    </release>
   </releases>
 </component>
             """.strip(),
         )
 
     def test_empty_releases(self):
-        """No whitespace is generated between <release /> and </releases>."""
+        """No whitespace is generated between </release> and </releases>."""
         self._do_test(
             """
 <?xml version="1.0" encoding="UTF-8"?>
@@ -156,7 +164,9 @@ class TestAddRelease(unittest.TestCase):
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop">
   <releases>
-    <release version="4.5.6" date="2020-02-02"/>
+    <release version="4.5.6" date="2020-02-02">
+      <description></description>
+    </release>
   </releases>
 </component>
             """.strip(),
@@ -186,7 +196,9 @@ SentUpstream: 2014-05-22
 -->
   <name>First element needed</name>
   <releases>
-    <release version="4.5.6" date="2020-02-02"/>
+    <release version="4.5.6" date="2020-02-02">
+      <description></description>
+    </release>
   </releases>
 </application>
             """.strip(),
@@ -219,7 +231,9 @@ SentUpstream: 2014-05-22
 -->
 <application>
   <releases>
-    <release version="4.5.6" date="2020-02-02"/>
+    <release version="4.5.6" date="2020-02-02">
+      <description></description>
+    </release>
   </releases>
 </application>
             """.strip(),
@@ -238,7 +252,9 @@ SentUpstream: 2014-05-22
 <component type="desktop">
   <name>🍦 &amp; 🎂</name>
   <releases>
-    <release version="4.5.6" date="2020-02-02"/>
+    <release version="4.5.6" date="2020-02-02">
+      <description></description>
+    </release>
   </releases>
 </component>
             """.strip(),
@@ -259,7 +275,9 @@ SentUpstream: 2014-05-22
 <component type="desktop">
   <name>🦝 &#38; 🍒</name>
   <releases>
-    <release version="4.5.6" date="2020-02-02"/>
+    <release version="4.5.6" date="2020-02-02">
+      <description></description>
+    </release>
   </releases>
 </component>
             """.strip(),
