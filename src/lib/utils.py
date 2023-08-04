@@ -165,9 +165,13 @@ async def get_extra_data_info_from_url(
                 # wrong
                 actual_content_type = magic.from_buffer(chunk, mime=True)
                 if content_type_rejected(actual_content_type):
+                    if real_url != url:
+                        suffix = f" (redirected from '{url}')"
+                    else:
+                        suffix = ""
                     raise CheckerFetchError(
                         f"Wrong content type '{actual_content_type}' received "
-                        f"from '{url}'"
+                        f"from '{real_url}'{suffix}"
                     )
 
             checksum.update(chunk)
