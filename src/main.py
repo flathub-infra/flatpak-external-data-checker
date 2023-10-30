@@ -128,6 +128,15 @@ def check_call(args):
     subprocess.check_call(args)
 
 
+def get_manifest_git_checkout(manifest: t.Union[Path, str]) -> str:
+    manifest_dir = os.path.dirname(manifest)
+    output = subprocess.check_output(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=manifest_dir,
+    )
+    return output.decode("utf-8").strip()
+
+
 def ensure_git_safe_directory(checkout: t.Union[Path, str]):
     uid = os.getuid()
     checkout_uid = os.stat(checkout).st_uid
@@ -451,7 +460,7 @@ async def run_with_args(args: argparse.Namespace) -> t.Tuple[int, int, bool]:
     if should_update and outdated_num > 0:
         changes = manifest_checker.update_manifests()
         if changes and not args.edit_only:
-            git_checkout = os.path.dirname(args.manifest)
+            git_checkout = get_manifest_git_checkout(args.manifest)
             ensure_git_safe_directory(git_checkout)
             with indir(git_checkout):
                 committed_changes = commit_changes(changes)
