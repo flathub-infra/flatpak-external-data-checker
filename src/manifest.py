@@ -26,6 +26,8 @@ import asyncio
 from enum import IntEnum
 import logging
 import os
+import errno
+import sys
 
 import aiohttp
 from lxml.etree import XMLSyntaxError
@@ -445,25 +447,38 @@ class ManifestChecker:
         ]
 
     def _update_manifest(self, path, datas, changes):
-        path_has_changes = False
-        for data in datas:
-            if data.new_version is None:
-                continue
+        try:
+            path_has_changes = False
+            for data in datas:
+                if data.new_version is None:
+                    continue
 
-            data.update()
-            if data.new_version.version is not None:
-                message = "Update {} to {}".format(
-                    data.filename, data.new_version.version
-                )
+                data.update()
+                if data.new_version.version is not None:
+                    message = "Update {} to {}".format(
+                        data.filename, data.new_version.version
+                    )
+                else:
+                    message = "Update {}".format(data.filename)
+
+                changes[message] = None
+                path_has_changes = True
+
+            if path_has_changes:
+                log.info("Updating %s", path)
+                self._dump_manifest(path)
+        except OSError as e:
+            if e.errno in (errno.EPERM, errno.EACCES):
+                log.error("Permission denied writing to file")
+            elif e.errno == errno.EROFS:
+                log.error("The file is read-only")
+                if os.path.exists("/.flatpak-info"):
+                    log.info(
+                        "Running inside flatpak. Please give it filesystem access using --filesystem"
+                    )
             else:
-                message = "Update {}".format(data.filename)
-
-            changes[message] = None
-            path_has_changes = True
-
-        if path_has_changes:
-            log.info("Updating %s", path)
-            self._dump_manifest(path)
+                log.error(e)
+            sys.exit(1)
 
     def _update_appdata(self):
         if not self.app_id:
