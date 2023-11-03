@@ -1,4 +1,4 @@
-python-apt
+python-apt @ http://deb.debian.org/debian/pool/main/p/python-apt/python-apt_2.6.0.tar.xz
 PyGObject
 requests
 PyGithub
