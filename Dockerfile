@@ -4,8 +4,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 ADD dependencies.apt.txt ./
 
+RUN printf "deb-src http://deb.debian.org/debian bullseye main\ndeb-src http://deb.debian.org/debian-security/ bullseye-security main\ndeb-src http://deb.debian.org/debian bullseye-updates main" >> /etc/apt/sources.list
+
 RUN apt-get update && \
     xargs apt-get install --no-install-recommends -y < dependencies.apt.txt && \
+    apt-get --no-install-recommends -y build-dep python3-apt && \
     apt-get clean && \
     rmdir /var/cache/apt/archives/partial
 
