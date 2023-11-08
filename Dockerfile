@@ -1,20 +1,21 @@
-FROM debian:bullseye
+FROM debian:bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 ADD dependencies.apt.txt ./
 
-RUN printf "deb-src http://deb.debian.org/debian bullseye main\ndeb-src http://deb.debian.org/debian-security/ bullseye-security main\ndeb-src http://deb.debian.org/debian bullseye-updates main" >> /etc/apt/sources.list
-
-RUN apt-get update && \
+RUN sed -i "s/Types: deb/Types: deb deb-src/" /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && \
     xargs apt-get install --no-install-recommends -y < dependencies.apt.txt && \
     apt-get --no-install-recommends -y build-dep python3-apt && \
     apt-get clean && \
     rmdir /var/cache/apt/archives/partial
 
+# All requirements should be satisfied by dependencies.apt.txt – but feed it to
+# pip to keep us honest
 ADD requirements.txt ./
-
-RUN python3 -m pip install -r requirements.txt && \
+RUN sed -i 's/python-apt @ .*/python-apt/' requirements.txt && \
+    pip install --break-system-packages -r requirements.txt && \
     rm -rf $HOME/.cache/pip
 
 # Creating the user is required because jenkins runs he container
