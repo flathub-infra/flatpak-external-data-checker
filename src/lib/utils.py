@@ -122,8 +122,13 @@ async def get_extra_data_info_from_url(
             and content_type_deny is not None
             and any(r.match(content_type) for r in content_type_deny)
         ):
+            if real_url != url:
+                suffix = f" (redirected from '{url}')"
+            else:
+                suffix = ""
+
             raise CheckerFetchError(
-                f"Wrong content type '{content_type}' received from '{url}'"
+                f"Wrong content type '{content_type}' received from '{real_url}'{suffix}"
             )
 
         checksum = MultiHash()
