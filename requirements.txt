@@ -1,14 +1,14 @@
-python-apt @ http://deb.debian.org/debian/pool/main/p/python-apt/python-apt_2.6.0.tar.xz
 PyGObject
-requests
 PyGithub
-ruamel.yaml
-toml
-pyelftools
 aiohttp
-semver
-jsonschema
 editorconfig
+jsonschema
 lxml
 packaging
+pyelftools
+python-apt @ http://deb.debian.org/debian/pool/main/p/python-apt/python-apt_2.6.0.tar.xz
 python-magic
+requests
+ruamel.yaml
+semver
+toml
