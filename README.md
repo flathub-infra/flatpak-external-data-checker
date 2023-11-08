@@ -64,7 +64,7 @@ You can use the `run-in-container.sh` helper script to set up needed CLI
 options for you and run the image using `podman`:
 
 ```bash
-~/src/endlessm/flatpak-external-data-checker/run-in-container.sh \
+./run-in-container.sh \
     [ARGS …] \
     ~/src/flathub/com.example.App/com.example.App.json
 ```
