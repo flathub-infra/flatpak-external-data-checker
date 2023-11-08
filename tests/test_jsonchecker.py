@@ -26,7 +26,7 @@ class TestJSONChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertNotEqual(data.current_version.url, data.new_version.url)
                 self.assertRegex(
                     data.new_version.url,
-                    r"^https://github.com/stedolan/jq/releases/download/jq-[0-9\.\w]+/jq-[0-9\.\w]+\.tar.gz$",
+                    r"^https://github.com/jqlang/jq/releases/download/jq-[0-9\.\w]+/jq-[0-9\.\w]+\.tar.gz$",
                 )
                 self.assertIsInstance(data.new_version.size, int)
                 self.assertGreater(data.new_version.size, 0)
