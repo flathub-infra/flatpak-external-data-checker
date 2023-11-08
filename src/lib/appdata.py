@@ -84,10 +84,20 @@ def add_release(
     _fill_padding(release)
 
     description = ElementTree.Element("description")
-    description.text = ''
 
+    # Give <description> a closing </description> rather than it being
+    # self-closing
+    description.text = ""
+
+    # Indent the opening <description> tag one level
+    # deeper than the <release> tag.
+    release.text = "\n" + ((releases.text[1::2]) * 3)
+
+    # Indent the closing </release> tag by the same amount as the opening
+    # <release> tag (which we know to be the first child of <releases> since
+    # we just prepended it above)
+    description.tail = releases.text
     release.append(description)
-    _fill_padding(description)
 
     tree.write(
         dst,

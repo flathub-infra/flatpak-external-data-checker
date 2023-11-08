@@ -73,7 +73,7 @@ class TestAddRelease(unittest.TestCase):
 <component type="desktop">
    <releases>
       <release version="4.5.6" date="2020-02-02">
-        <description></description>
+         <description></description>
       </release>
       <release version="1.2.3" date="2019-01-01"/>
        <release version="1.2.3" date="2019-01-01"/>
