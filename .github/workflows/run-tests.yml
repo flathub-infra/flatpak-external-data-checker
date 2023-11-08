@@ -103,7 +103,7 @@ jobs:
       - name: Run tests in container
         run: |
           docker run -v $PWD:$PWD -w $PWD --entrypoint bash ${{ env.DOCKER_IMAGE }}:build -c \
-          "pip3 install coverage && python3 -m coverage run -m unittest discover --verbose --buffer"
+          "apt-get install python3-coverage && python3 -m coverage run -m unittest discover --verbose --buffer"
 
       - name: Submit code coverage to Coveralls.io
         env:
