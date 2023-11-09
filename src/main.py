@@ -45,7 +45,7 @@ log = logging.getLogger(__name__)
 
 
 @contextlib.contextmanager
-def indir(path):
+def indir(path: Path):
     """
     >>> with indir(path):
     ...    # code executes with 'path' as working directory
@@ -128,35 +128,38 @@ def check_call(args):
     subprocess.check_call(args)
 
 
-def get_manifest_git_checkout(manifest: t.Union[Path, str]) -> str:
+def get_manifest_git_checkout(manifest: t.Union[Path, str]) -> Path:
     # Can't use git rev-parse --show-toplevel because of a chicken-and-egg problem: we
     # need to find the checkout directory so that we can mark it as safe so that we can
     # use git against it.
     for directory in Path(manifest).parents:
         if os.path.exists(directory / ".git"):
-            return str(directory)
+            return directory
 
     raise FileNotFoundError(f"Cannot find git checkout for {manifest}")
 
 
-def ensure_git_safe_directory(checkout: t.Union[Path, str]):
+def ensure_git_safe_directory(checkout: Path):
     uid = os.getuid()
     checkout_uid = os.stat(checkout).st_uid
     if uid == checkout_uid:
         return
 
     try:
-        safe_dirs_output = subprocess.check_output(
-            ["git", "config", "--get-all", "safe.directory"]
+        result = subprocess.run(
+            ["git", "config", "--get-all", "safe.directory"],
+            check=True,
+            capture_output=True,
+            encoding="utf-8",
         )
+        safe_dirs = [Path(x) for x in result.stdout.splitlines()]
     except subprocess.CalledProcessError as err:
         # git config --get-all will return 1 if the key doesn't exist.
         # Re-raise the error for anything else.
         if err.returncode != 1:
             raise
-        safe_dirs_output = b""
+        safe_dirs = []
 
-    safe_dirs = safe_dirs_output.decode("utf-8").split()
     if checkout in safe_dirs:
         return
 
