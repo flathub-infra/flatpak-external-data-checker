@@ -42,13 +42,19 @@ it should display messages about any broken or outdated external data.
 
 ### Installation
 
-This tool itself is available in flatpak format from Flathub. Install with
+This tool itself is available in Flatpak format from Flathub. Install with
 
 ```bash
 flatpak install --from https://dl.flathub.org/repo/appstream/org.flathub.flatpak-external-data-checker.flatpakref
 ```
 
 And run with
+
+```bash
+flatpak run org.flathub.flatpak-external-data-checker MANIFEST_DIR/MANIFEST_FILE
+```
+
+If the manifest is not in your home directory, you need to punch a sandbox hole for it:
 
 ```bash
 flatpak run --filesystem=MANIFEST_DIR org.flathub.flatpak-external-data-checker MANIFEST_DIR/MANIFEST_FILE
