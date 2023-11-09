@@ -65,10 +65,11 @@ def parse_date_header(date_str):
 
     In addition to standard(ish) formats, non-standard formats where the
     timezone is a named zone rather than an offset are detected and handled."""
-    list_zones = list(zoneinfo.available_timezones())
-    invalid_zones = [e for e in list_zones if e not in ("GMT", "UTC")]
-    if any((match_tz := tz) in date_str for tz in invalid_zones):
-        date_str_notz = date_str.replace(match_tz, "").strip()
+    for tz in zoneinfo.available_timezones():
+        if tz in ("UTC", "GMT") or not date_str.endswith(tz):
+            continue
+
+        date_str_notz = date_str[: -(len(tz) + 1)]
         for date_fmt in [
             "%a, %d %b %Y %H:%M:%S",
             "%a, %d-%b-%Y %H:%M:%S",
@@ -76,25 +77,25 @@ def parse_date_header(date_str):
             try:
                 dt_obj = dt.datetime.strptime(date_str_notz, date_fmt)
                 local_dt = dt.datetime.fromisoformat(str(dt_obj)).replace(
-                    tzinfo=zoneinfo.ZoneInfo(match_tz)
+                    tzinfo=zoneinfo.ZoneInfo(tz)
                 )
                 utc_dt = local_dt.astimezone(zoneinfo.ZoneInfo("UTC"))
                 return utc_dt.replace(tzinfo=None)
             except ValueError:
                 continue
             raise CheckerRemoteError(f"Cannot parse date/time: {date_str}")
-    else:
-        for date_fmt in [
-            "%a, %d %b %Y %H:%M:%S %Z",
-            "%a, %d %b %Y %H:%M:%S %z",
-            "%a, %d-%b-%Y %H:%M:%S %Z",
-            "%a, %d-%b-%Y %H:%M:%S %z",
-        ]:
-            try:
-                return dt.datetime.strptime(date_str, date_fmt)
-            except ValueError:
-                continue
-            raise CheckerRemoteError(f"Cannot parse date/time: {date_str}")
+
+    for date_fmt in [
+        "%a, %d %b %Y %H:%M:%S %Z",
+        "%a, %d %b %Y %H:%M:%S %z",
+        "%a, %d-%b-%Y %H:%M:%S %Z",
+        "%a, %d-%b-%Y %H:%M:%S %z",
+    ]:
+        try:
+            return dt.datetime.strptime(date_str, date_fmt)
+        except ValueError:
+            continue
+        raise CheckerRemoteError(f"Cannot parse date/time: {date_str}")
 
     if not date_str:
         return dt.datetime.now()  # what else can we do?
