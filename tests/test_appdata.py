@@ -55,6 +55,81 @@ class TestAddRelease(unittest.TestCase):
             """.strip(),
         )
 
+    @unittest.expectedFailure
+    def test_four_space_no_releases_element(self):
+        # FIXME: This ends up indenting <releases> correctly, but
+        # <release> and <description> incorrectly get the default 2-space
+        # indent.
+        self._do_test(
+            """
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop">
+    <id>com.example.Workaround</id>
+    <name>My history is a mystery</name>
+</component>
+            """.strip(),
+            """
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop">
+    <id>com.example.Workaround</id>
+    <name>My history is a mystery</name>
+    <releases>
+        <release version="4.5.6" date="2020-02-02">
+            <description></description>
+        </release>
+    </releases>
+</component>
+            """.strip(),
+        )
+
+    def test_four_space_one_prior_release(self):
+        self._do_test(
+            """
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop">
+    <releases>
+        <release version="1.2.3" date="2019-01-01"/>
+    </releases>
+</component>
+            """.strip(),
+            """
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop">
+    <releases>
+        <release version="4.5.6" date="2020-02-02">
+            <description></description>
+        </release>
+        <release version="1.2.3" date="2019-01-01"/>
+    </releases>
+</component>
+            """.strip(),
+        )
+
+    def test_four_space_many_prior_releases(self):
+        self._do_test(
+            """
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop">
+    <releases>
+        <release version="1.2.3" date="2019-01-01"/>
+        <release version="1.1.2" date="2018-01-01"/>
+    </releases>
+</component>
+            """.strip(),
+            """
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop">
+    <releases>
+        <release version="4.5.6" date="2020-02-02">
+            <description></description>
+        </release>
+        <release version="1.2.3" date="2019-01-01"/>
+        <release version="1.1.2" date="2018-01-01"/>
+    </releases>
+</component>
+            """.strip(),
+        )
+
     def test_mixed_indentation(self):
         """This input uses 3-space indentation for one existing <release> and 4-space
         for another. Match the top one."""
