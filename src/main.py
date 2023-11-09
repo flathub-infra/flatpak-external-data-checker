@@ -129,12 +129,14 @@ def check_call(args):
 
 
 def get_manifest_git_checkout(manifest: t.Union[Path, str]) -> str:
-    manifest_dir = os.path.dirname(manifest)
-    output = subprocess.check_output(
-        ["git", "rev-parse", "--show-toplevel"],
-        cwd=manifest_dir,
-    )
-    return output.decode("utf-8").strip()
+    # Can't use git rev-parse --show-toplevel because of a chicken-and-egg problem: we
+    # need to find the checkout directory so that we can mark it as safe so that we can
+    # use git against it.
+    for directory in Path(manifest).parents:
+        if os.path.exists(directory / ".git"):
+            return str(directory)
+
+    raise FileNotFoundError(f"Cannot find git checkout for {manifest}")
 
 
 def ensure_git_safe_directory(checkout: t.Union[Path, str]):
