@@ -36,7 +36,7 @@ from src.lib.utils import (
     filter_versions,
     filter_versioned_items,
     FallbackVersion,
-    _extract_timestamp,
+    parse_date_header,
     get_extra_data_info_from_url,
     Command,
     dump_manifest,
@@ -192,10 +192,15 @@ class TestParseHTTPDate(unittest.TestCase):
         for date_str in [
             "Wed, 20 Jan 2021 15:25:15 UTC",
             "Wed, 20-Jan-2021 15:25:15 UTC",
+            "Wed, 20-Jan-2021 15:25:15 GMT",
             "Wed, 20 Jan 2021 15:25:15 +0000",
             "Wed, 20 Jan 2021 18:25:15 +0300",
+            "Wed, 20 Jan 2021 07:25:15 -0800",
+            # https://github.com/flathub/flatpak-external-data-checker/issues/370
+            "Wed, 20 Jan 2021 23:25:15 +0800",
+            "Wed, 20 Jan 2021 23:25:15 Asia/Shanghai",
         ]:
-            parsed = _extract_timestamp({"Date": date_str})
+            parsed = parse_date_header(date_str)
             self.assertEqual(
                 parsed,
                 datetime(
@@ -208,7 +213,7 @@ class TestParseHTTPDate(unittest.TestCase):
 
     @unittest.expectedFailure
     def test_parse_invalid(self):
-        self.assertIsNotNone(_extract_timestamp({"Date": "some broken string"}))
+        self.assertIsNotNone(parse_date_header("some broken string"))
 
 
 class TestDownload(unittest.IsolatedAsyncioTestCase):

@@ -19,6 +19,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import datetime as dt
+import zoneinfo
 import json
 import logging
 import os
@@ -56,8 +57,34 @@ log = logging.getLogger(__name__)
 
 def _extract_timestamp(info):
     date_str = info.get("Last-Modified") or info.get("Date")
-    if not date_str:
-        return dt.datetime.now()  # what else can we do?
+    return parse_date_header(date_str)
+
+
+def parse_date_header(date_str):
+    """Parse a stringified date, from a Last-Modified or Date header.
+
+    In addition to standard(ish) formats, non-standard formats where the
+    timezone is a named zone rather than an offset are detected and handled."""
+    for tz in zoneinfo.available_timezones():
+        if tz in ("UTC", "GMT") or not date_str.endswith(tz):
+            continue
+
+        date_str_notz = date_str[: -(len(tz) + 1)]
+        for date_fmt in [
+            "%a, %d %b %Y %H:%M:%S",
+            "%a, %d-%b-%Y %H:%M:%S",
+        ]:
+            try:
+                dt_obj = dt.datetime.strptime(date_str_notz, date_fmt)
+                local_dt = dt.datetime.fromisoformat(str(dt_obj)).replace(
+                    tzinfo=zoneinfo.ZoneInfo(tz)
+                )
+                utc_dt = local_dt.astimezone(zoneinfo.ZoneInfo("UTC"))
+                return utc_dt.replace(tzinfo=None)
+            except ValueError:
+                continue
+            raise CheckerRemoteError(f"Cannot parse date/time: {date_str}")
+
     for date_fmt in [
         "%a, %d %b %Y %H:%M:%S %Z",
         "%a, %d %b %Y %H:%M:%S %z",
@@ -68,7 +95,10 @@ def _extract_timestamp(info):
             return dt.datetime.strptime(date_str, date_fmt)
         except ValueError:
             continue
-    raise CheckerRemoteError(f"Cannot parse date/time: {date_str}")
+        raise CheckerRemoteError(f"Cannot parse date/time: {date_str}")
+
+    if not date_str:
+        return dt.datetime.now()  # what else can we do?
 
 
 def _check_newline(fp):
