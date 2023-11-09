@@ -57,6 +57,14 @@ log = logging.getLogger(__name__)
 
 def _extract_timestamp(info):
     date_str = info.get("Last-Modified") or info.get("Date")
+    return parse_date_header(date_str)
+
+
+def parse_date_header(date_str):
+    """Parse a stringified date, from a Last-Modified or Date header.
+
+    In addition to standard(ish) formats, non-standard formats where the
+    timezone is a named zone rather than an offset are detected and handled."""
     list_zones = list(zoneinfo.available_timezones())
     invalid_zones = [e for e in list_zones if e not in ("GMT", "UTC")]
     if any((match_tz := tz) in date_str for tz in invalid_zones):
