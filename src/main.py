@@ -251,6 +251,7 @@ def open_pr(
     change: CommittedChanges,
     manifest_checker: t.Optional[manifest.ManifestChecker] = None,
     fork: t.Optional[bool] = None,
+    branch_title: t.Optional[bool] = None,
 ):
     try:
         github_token = os.environ["GITHUB_TOKEN"]
@@ -288,6 +289,11 @@ def open_pr(
 
     head = "{}:{}".format(repo.owner.login, change.branch)
     pr_message = ((change.body or "") + "\n\n" + DISCLAIMER).strip()
+    
+    if branch_title:
+        pr_subject = f"[{base}]{change.subject}"
+    else:
+        pr_subject = change.subject
 
     try:
         with open("flathub.json") as f:
@@ -350,7 +356,7 @@ def open_pr(
         base,
     )
     pr = origin_repo.create_pull(
-        change.subject,
+        pr_subject,
         pr_message,
         base,
         head,
@@ -423,6 +429,11 @@ def parse_cli_args(cli_args=None):
         ),
     )
     parser.add_argument(
+        "--show-branch-in-title",
+        help="Include the branch in the PR title",
+        action="store_true",
+    )
+    parser.add_argument(
         "--unsafe",
         help="Enable unsafe features; use only with manifests from trusted sources",
         action="store_true",
@@ -474,6 +485,7 @@ async def run_with_args(args: argparse.Namespace) -> t.Tuple[int, int, bool]:
                         committed_changes,
                         manifest_checker=manifest_checker,
                         fork=args.fork,
+                        branch_title=args.show_branch_in_title,
                     )
         did_update = True
 
