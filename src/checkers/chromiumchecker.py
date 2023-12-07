@@ -162,8 +162,8 @@ class ChromiumChecker(Checker):
         "required": ["component"],
     }
 
-    _CHROMIUM_VERSIONS_URL = "https://omahaproxy.appspot.com/all.json"
-    _CHROMIUM_VERSIONS_PARAMS = {"os": "linux", "channel": "stable"}
+    _CHROMIUM_VERSIONS_URL = "https://chromiumdash.appspot.com/fetch_releases"
+    _CHROMIUM_VERSIONS_PARAMS = {"platform": "Linux", "channel": "Stable", "num": "1"}
 
     async def _get_latest_chromium(self) -> str:
         async with self.session.get(
@@ -172,8 +172,7 @@ class ChromiumChecker(Checker):
             result = await response.json()
 
         assert len(result) == 1, result
-        assert len(result[0]["versions"]) == 1, result
-        return result[0]["versions"][0]["current_version"]
+        return result[0]["version"]
 
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
