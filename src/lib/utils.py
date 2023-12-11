@@ -548,6 +548,7 @@ def dump_manifest(contents: t.Dict, manifest_path: t.Union[Path, str]):
         indent = 4
 
     # Determine max line length preference
+    max_line_length: t.Optional[int]
     if "max_line_length" in conf:
         try:
             max_line_length = int(conf.get("max_line_length"))
