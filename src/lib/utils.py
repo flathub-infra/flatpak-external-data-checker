@@ -547,6 +547,14 @@ def dump_manifest(contents: t.Dict, manifest_path: t.Union[Path, str]):
     else:
         indent = 4
 
+    # Determine max line length preference
+    if "max_line_length" in conf:
+        try:
+            max_line_length = int(conf.get("max_line_length"))
+            _yaml.width = max_line_length
+        except ValueError:
+            log.error("max_line_length EditorConfig variable is not valid")
+
     # Determine trailing newline preference
     newline: t.Optional[bool]
     if "insert_final_newline" in conf:
