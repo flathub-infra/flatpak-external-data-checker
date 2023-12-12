@@ -548,13 +548,11 @@ def dump_manifest(contents: t.Dict, manifest_path: t.Union[Path, str]):
         indent = 4
 
     # Determine max line length preference
-    max_line_length: t.Optional[int]
-    if "max_line_length" in conf:
+    if max_line_length := conf.get("max_line_length"):
         try:
-            max_line_length = int(conf.get("max_line_length"))
-            _yaml.width = max_line_length  # type: ignore # See https://sourceforge.net/p/ruamel-yaml/tickets/322/
+            _yaml.width = int(max_line_length)  # type: ignore # See https://sourceforge.net/p/ruamel-yaml/tickets/322/
         except ValueError:
-            log.error("max_line_length EditorConfig variable is not valid")
+            log.warning("Ignoring invalid max_line_length %r", max_line_length)
 
     # Determine trailing newline preference
     newline: t.Optional[bool]
