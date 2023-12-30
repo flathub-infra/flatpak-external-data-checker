@@ -231,7 +231,7 @@ DISCLAIMER = (
     "[flathub/flatpak-external-data-checker]"
     "(https://github.com/flathub/flatpak-external-data-checker). "
     "Please [open an issue]"
-    "(https://github.com/flathub/flatpak-external-data-checker/issues/new) "
+    "(https://github.com/flathub-infra/flatpak-external-data-checker/issues/new) "
     "if you have any questions or complaints. 🤖"
 )
 
