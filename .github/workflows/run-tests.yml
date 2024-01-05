@@ -134,3 +134,20 @@ jobs:
           file: ./Dockerfile
           tags: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:latest
           push: true
+
+      - name: Login to ghcr.io using Flathub credentials
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.FLATHUB_ORG_USER }}
+          password: ${{ secrets.FLATHUB_ORG_TOKEN }}
+
+      - name: Push image to the old location
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          tags: ghcr.io/flathub/flatpak-external-data-checker:latest
+          push: true
