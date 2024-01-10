@@ -196,7 +196,7 @@ class TestParseHTTPDate(unittest.TestCase):
             "Wed, 20 Jan 2021 15:25:15 +0000",
             "Wed, 20 Jan 2021 18:25:15 +0300",
             "Wed, 20 Jan 2021 07:25:15 -0800",
-            # https://github.com/flathub/flatpak-external-data-checker/issues/370
+            # https://github.com/flathub-infra/flatpak-external-data-checker/issues/370
             "Wed, 20 Jan 2021 23:25:15 +0800",
             "Wed, 20 Jan 2021 23:25:15 Asia/Shanghai",
         ]:

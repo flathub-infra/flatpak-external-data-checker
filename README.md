@@ -1,10 +1,8 @@
 # Flatpak External Data Checker
 
-![Tests](https://github.com/flathub/flatpak-external-data-checker/workflows/Tests/badge.svg)
+![Tests](https://github.com/flathub-infra/flatpak-external-data-checker/workflows/Tests/badge.svg)
 [![Coverage Status](https://coveralls.io/repos/github/flathub/flatpak-external-data-checker/badge.svg)](https://coveralls.io/github/flathub/flatpak-external-data-checker)
-[![Total alerts](https://img.shields.io/lgtm/alerts/g/flathub/flatpak-external-data-checker.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/flathub/flatpak-external-data-checker/alerts/)
-[![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/flathub/flatpak-external-data-checker.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/flathub/flatpak-external-data-checker/context:python)
-[![CodeFactor](https://www.codefactor.io/repository/github/flathub/flatpak-external-data-checker/badge)](https://www.codefactor.io/repository/github/flathub/flatpak-external-data-checker)
+[![CodeFactor](https://www.codefactor.io/repository/github/flathub-infra/flatpak-external-data-checker/badge)](https://www.codefactor.io/repository/github/flathub-infra/flatpak-external-data-checker)
 
 This is a tool for checking for outdated or broken links of external
 data in Flatpak manifests.
@@ -109,7 +107,7 @@ jobs:
         with:
           ref: ${{ matrix.branch }}
 
-      - uses: docker://ghcr.io/flathub/flatpak-external-data-checker:latest
+      - uses: docker://ghcr.io/flathub-infra/flatpak-external-data-checker:latest
         env:
           GIT_AUTHOR_NAME: Flatpak External Data Checker
           GIT_COMMITTER_NAME: Flatpak External Data Checker

@@ -10,7 +10,7 @@ TIMEOUT_TOTAL = 60 * 10
 # With the default urllib User-Agent, dl.discordapp.net returns 403
 USER_AGENT = (
     "flatpak-external-data-checker/1.0 "
-    "(+https://github.com/flathub/flatpak-external-data-checker)"
+    "(+https://github.com/flathub-infra/flatpak-external-data-checker)"
 )
 
 HTTP_CLIENT_HEADERS = {"User-Agent": USER_AGENT}
