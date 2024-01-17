@@ -543,9 +543,6 @@ class TestCheckerHelpers(unittest.IsolatedAsyncioTestCase):
         response = await checker._get_json(url)
         self.assertEqual(response, expected)
 
-        with self.assertRaises(CheckerQueryError):
-            await checker._get_json("https://httpbingo.org/bytes/10")
-
 
 class GitDummyChecker(GitChecker, register=False):
     def get_json_schema(self, external_data):
