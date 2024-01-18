@@ -117,7 +117,9 @@ class HTMLChecker(Checker):
             encoding = "utf-8"
         return encoding
 
-    async def _get_text(self, url: t.Union[URL, str], encoding_error:str="strict") -> str:
+    async def _get_text(
+        self, url: t.Union[URL, str], encoding_error: str = "strict"
+    ) -> str:
         try:
             async with self.session.get(url) as response:
                 encoding = await self._get_encoding(response)
