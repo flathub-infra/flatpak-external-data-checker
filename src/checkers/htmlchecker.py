@@ -80,6 +80,7 @@ class HTMLChecker(Checker):
             "version-pattern": {"type": "string", "format": "regex"},
             "url-template": {"type": "string", "format": "regex"},
             "sort-matches": {"type": "boolean"},
+            "encoding-error": {"type": "string"},
             "versions": OPERATORS_SCHEMA,
             "version-scheme": {
                 "type": "string",
@@ -116,14 +117,14 @@ class HTMLChecker(Checker):
             encoding = "utf-8"
         return encoding
 
-    async def _get_text(self, url: t.Union[URL, str]) -> str:
+    async def _get_text(self, url: t.Union[URL, str], encoding_error:str="strict") -> str:
         try:
             async with self.session.get(url) as response:
                 encoding = await self._get_encoding(response)
                 # We use streaming decoding in order to get decode error and abort the check
                 # as early as possible, without preloading the whole raw contents into memory
                 decoder_cls = codecs.getincrementaldecoder(encoding)
-                decoder = decoder_cls(errors="strict")
+                decoder = decoder_cls(errors=encoding_error)
                 with io.StringIO() as buf:
                     async for chunk, _ in response.content.iter_chunks():
                         try:
@@ -156,6 +157,7 @@ class HTMLChecker(Checker):
             {f"parent_{k}": v for k, v in parent_json.items() if v is not None},
         )
 
+        encoding_error = external_data.checker_data.get("encoding-error", "strict")
         combo_pattern = _get_pattern(external_data.checker_data, "pattern", 2)
         version_pattern = _get_pattern(external_data.checker_data, "version-pattern", 1)
         url_template = external_data.checker_data.get("url-template")
@@ -169,7 +171,7 @@ class HTMLChecker(Checker):
         ]
         assert combo_pattern or (version_pattern and url_template)
 
-        html = await self._get_text(url)
+        html = await self._get_text(url, encoding_error)
 
         def _get_latest(pattern: re.Pattern, ver_group: int) -> re.Match:
             matches = filter_versioned_items(
