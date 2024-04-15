@@ -3,6 +3,7 @@ import subprocess
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from src import main
 
@@ -15,8 +16,10 @@ TEST_APPDATA = os.path.join(
 )
 
 
+@patch.dict(os.environ)
 class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self._clear_environment()
         self.test_dir = tempfile.TemporaryDirectory()
         self.manifest_filename = os.path.basename(TEST_MANIFEST)
         self.appdata_filename = os.path.basename(TEST_APPDATA)
@@ -33,6 +36,17 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
 
     def tearDown(self):
         self.test_dir.cleanup()
+
+    def _clear_environment(self):
+        unwanted_vars = [
+            "EMAIL",
+            "GIT_AUTHOR_NAME",
+            "GIT_AUTHOR_EMAIL",
+            "GIT_COMMITTER_NAME",
+            "GIT_COMMITTER_EMAIL",
+        ]
+        for var in unwanted_vars:
+            os.environ.pop(var, None)
 
     def _run_cmd(self, cmd):
         return subprocess.run(cmd, cwd=self.test_dir.name, check=True)
