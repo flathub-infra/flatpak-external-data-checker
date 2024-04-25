@@ -29,7 +29,7 @@ class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
             self.assertIsNotNone(data.new_version)
             self.assertIsNotNone(data.new_version.version)
             self.assertGreater(
-                LooseVersion(data.new_version.version), LooseVersion("90.0.4430.212")
+                LooseVersion(data.new_version.version), LooseVersion("100.0.4845.0")
             )
 
             if isinstance(data, ExternalData):
@@ -44,7 +44,7 @@ class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
                     self.assertNotEqual(
                         data.new_version.checksum,
                         MultiDigest(
-                            sha256="abe11d0cb1ff21278aad2eec1a1e279d59176b15331804d7df1807446786d59e"
+                            sha256="a68d31f77a6b7700a5161d82f5932c2822f85f7ae68ad51be3d3cf689a3fe2b0"
                         ),
                     )
                 elif data.filename.startswith("clang-"):
@@ -55,7 +55,7 @@ class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
                     self.assertNotEqual(
                         data.new_version.checksum,
                         MultiDigest(
-                            sha256="676448e180fb060d3983f24476a2136eac83c6011c600117686035634a2bbe26"
+                            sha256="cf6b516a4e410d79439a150927fc8b450b325e2a6349395ae153c9d2dd6c6ed2"
                         ),
                     )
                 else:
