@@ -37,6 +37,10 @@ jobs:
         run: |
           python3 -m black --check --diff .
 
+      - name: Run flake8
+        run: |
+          python3 -m flake8
+
   check-typing:
     name: Static type check
     runs-on: ubuntu-latest

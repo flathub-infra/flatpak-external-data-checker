@@ -10,6 +10,7 @@ python3-brotli
 python3-cairo
 python3-chardet
 python3-editorconfig
+python3-flake8
 python3-gi
 python3-github
 python3-jsonschema
