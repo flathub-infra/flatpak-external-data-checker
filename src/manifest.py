@@ -510,10 +510,10 @@ class ManifestChecker:
             log.debug("Version didn't change, not adding release")
 
     def update_manifests(self) -> t.List[str]:
-        """
-        Updates references to external data in manifests.
-        If require_important_update is True, only update the manifest
-        if at least one source with IMPORTANT_SRC_PROP or MAIN_SRC_PROP received an update.
+        """Updates references to external data in manifests.
+
+        If require_important_update is True, only update the manifest if at least one
+        source with IMPORTANT_SRC_PROP or MAIN_SRC_PROP received an update.
         """
         # We want a list, without duplicates; Python provides an
         # insertion-order-preserving dictionary so we use that.
@@ -526,7 +526,7 @@ class ManifestChecker:
             for data in self.get_external_data():
                 important = data.checker_data.get(IMPORTANT_SRC_PROP)
                 main = data.checker_data.get(MAIN_SRC_PROP)
-                if important or (main and important != False):
+                if important or (main and important is not False):
                     log.debug("Found an important source: %s", data)
 
                     found_important_update = data.has_version_changed

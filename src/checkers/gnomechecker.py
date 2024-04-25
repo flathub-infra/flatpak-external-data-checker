@@ -60,7 +60,8 @@ class GNOMEChecker(Checker):
         proj_url = GNOME_MIRROR / "sources" / project_name
         try:
             async with self.session.get(proj_url / "cache.json") as cache_resp:
-                # Some mirrors may sand invalid content-type; don't require it to be application/json
+                # Some mirrors may sand invalid content-type; don't require it to be
+                # application/json
                 cache_json = await cache_resp.json(content_type=None)
         except NETWORK_ERRORS as err:
             raise CheckerQueryError from err

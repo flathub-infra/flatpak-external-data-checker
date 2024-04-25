@@ -28,7 +28,7 @@ class TestRPMRepoChecker(unittest.IsolatedAsyncioTestCase):
             )
             self.assertRegex(
                 data.new_version.url,
-                r"https://packages\.microsoft\.com/yumrepos/.+?/code-.+\.{0}\.rpm".format(
+                r"https://packages\.microsoft\.com/yumrepos/.+?/code-.+\.{0}\.rpm".format(  # noqa: E501
                     data.arches[0]
                 ),
             )

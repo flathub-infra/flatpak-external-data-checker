@@ -26,6 +26,7 @@ from contextlib import contextmanager
 import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from textwrap import dedent
 
 import aiohttp
 
@@ -64,7 +65,7 @@ class TestParseGitHubUrl(unittest.TestCase):
 class TestStripQuery(unittest.TestCase):
     def test_strip_query(self):
         url = "https://d11yldzmag5yn.cloudfront.net/prod/3.5.372466.0322/zoom_x86_64.tar.xz?_x_zm_rtaid=muDd1uOqSZ-xUScZF698QQ.1585134521724.21e5ab14908b2121f5ed53882df91cb9&_x_zm_rhtaid=732"  # noqa: E501
-        expected = "https://d11yldzmag5yn.cloudfront.net/prod/3.5.372466.0322/zoom_x86_64.tar.xz"
+        expected = "https://d11yldzmag5yn.cloudfront.net/prod/3.5.372466.0322/zoom_x86_64.tar.xz"  # noqa: E501
         self.assertEqual(strip_query(url), expected)
 
     def test_preserve_nice_query(self):
@@ -229,7 +230,7 @@ class TestDownload(unittest.IsolatedAsyncioTestCase):
 
     async def test_correct_content_type(self):
         await get_extra_data_info_from_url(
-            url=f"https://ftp.gnu.org/gnu/gzip/gzip-1.12.tar.gz",
+            url="https://ftp.gnu.org/gnu/gzip/gzip-1.12.tar.gz",
             session=self.http,
             content_type_deny=[re.compile(r"^application/x-fedc-test$")],
         )
@@ -252,57 +253,74 @@ class TestDownload(unittest.IsolatedAsyncioTestCase):
         # 2. As a result it is rejected
         with self.assertRaises(CheckerFetchError):
             await get_extra_data_info_from_url(
-                url=f"https://httpbingo.org/response-headers?Content-Type=application/gzip",
+                url="https://httpbingo.org/response-headers?Content-Type=application/gzip",  # noqa: E501
                 session=self.http,
                 content_type_deny=[re.compile(r"^application/json$")],
             )
 
 
 EDITORCONFIG_SAMPLE_DATA = {"first": 1, "second": [2, 3]}
-# fmt: off
 EDITORCONFIG_STYLES = [
-# 2-space with newline
-("""
-[*.json]
-indent_style = space
-indent_size = 2
-insert_final_newline = true
-""",
-# ---
-"""{
-  "first": 1,
-  "second": [
-    2,
-    3
-  ]
-}
-"""),
-# Tab without newline
-("""
-[*.json]
-indent_style = tab
-insert_final_newline = false
-""",
-# ---
-"""{
-	"first": 1,
-	"second": [
-		2,
-		3
-	]
-}"""),
-# No preference, default to 4-space without newline
-(None,
-# ---
-"""{
-    "first": 1,
-    "second": [
-        2,
-        3
-    ]
-}"""),
+    # 2-space with newline
+    (
+        dedent(
+            """\
+            [*.json]
+            indent_style = space
+            indent_size = 2
+            insert_final_newline = true
+            """
+        ),
+        # ---
+        dedent(
+            """\
+            {
+              "first": 1,
+              "second": [
+                2,
+                3
+              ]
+            }
+            """
+        ),
+    ),
+    # Tab without newline
+    (
+        dedent(
+            """\
+            [*.json]
+            indent_style = tab
+            insert_final_newline = false
+            """
+        ),
+        # ---
+        dedent(
+            """\
+            {
+            \t"first": 1,
+            \t"second": [
+            \t\t2,
+            \t\t3
+            \t]
+            }"""
+        ),
+    ),
+    # No preference, default to 4-space without newline
+    (
+        None,
+        # ---
+        dedent(
+            """\
+            {
+                "first": 1,
+                "second": [
+                    2,
+                    3
+                ]
+            }"""
+        ),
+    ),
 ]
-# fmt: on
 
 
 class TestDumpManifest(unittest.TestCase):

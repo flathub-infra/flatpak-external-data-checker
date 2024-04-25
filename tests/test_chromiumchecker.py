@@ -39,23 +39,23 @@ class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
                 if data.filename.startswith("chromium-"):
                     self.assertRegex(
                         data.new_version.url,
-                        r"^https://commondatastorage.googleapis.com/chromium-browser-official/chromium-[\d.]+\.tar\.xz$",
+                        r"^https://commondatastorage.googleapis.com/chromium-browser-official/chromium-[\d.]+\.tar\.xz$",  # noqa: E501
                     )
                     self.assertNotEqual(
                         data.new_version.checksum,
                         MultiDigest(
-                            sha256="a68d31f77a6b7700a5161d82f5932c2822f85f7ae68ad51be3d3cf689a3fe2b0"
+                            sha256="a68d31f77a6b7700a5161d82f5932c2822f85f7ae68ad51be3d3cf689a3fe2b0"  # noqa: E501
                         ),
                     )
                 elif data.filename.startswith("clang-"):
                     self.assertRegex(
                         data.new_version.url,
-                        r"^https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-.*\.tgz$",
+                        r"^https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-.*\.tgz$",  # noqa: E501
                     )
                     self.assertNotEqual(
                         data.new_version.checksum,
                         MultiDigest(
-                            sha256="cf6b516a4e410d79439a150927fc8b450b325e2a6349395ae153c9d2dd6c6ed2"
+                            sha256="cf6b516a4e410d79439a150927fc8b450b325e2a6349395ae153c9d2dd6c6ed2"  # noqa: E501
                         ),
                     )
                 else:

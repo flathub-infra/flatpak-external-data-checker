@@ -163,9 +163,10 @@ class DebianRepoChecker(Checker):
 
                 new_version = ExternalFile(
                     url=candidate.uri,
-                    # FIXME: apt.package.Version.{md5,sha1,sha256} can raise an exception
-                    # if given hash isn't set, while sha512 isn't accessible at all.
-                    # Raw hashes are handy, but accessible only through protected property.
+                    # FIXME: apt.package.Version.{md5,sha1,sha256} can raise an
+                    # exception if given hash isn't set, while sha512 isn't accessible
+                    # at all. Raw hashes are handy, but accessible only through
+                    # protected property.
                     checksum=read_deb_hashes(candidate._records.hashes),
                     size=candidate.size,
                     version=candidate.version,
@@ -180,10 +181,10 @@ class DebianRepoChecker(Checker):
         return arches.get(arch, arch)
 
     async def _get_timestamp_for_candidate(self, candidate: apt.Version):
-        # TODO: fetch package, parse changelog, get the date from there.
-        # python-apt can fetch changelogs from Debian and Ubuntu's changelog
-        # server, but most packages this checker will be used for are not from these repos.
-        # We'd have to open-code it.
+        # TODO: fetch package, parse changelog, get the date from there. python-apt can
+        # fetch changelogs from Debian and Ubuntu's changelog server, but most packages
+        # this checker will be used for are not from these repos. We'd have to open-code
+        # it.
         # https://salsa.debian.org/apt-team/python-apt/blob/master/apt/package.py#L1245-1417
         assert candidate.uri
         return await get_timestamp_from_url(candidate.uri, self.session)
