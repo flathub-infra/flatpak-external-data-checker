@@ -3,3 +3,7 @@
 # <https://github.com/python/black#line-length>, defaults to 88, based on some
 # empirical research on reducing annoying line wrapping on real source code.
 max-line-length = 88
+
+# Black disagrees with some rules.
+# E203 - Whitespace before ':'
+extend-ignore = E203
