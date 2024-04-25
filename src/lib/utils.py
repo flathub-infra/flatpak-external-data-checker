@@ -222,8 +222,7 @@ class FallbackVersion(t.NamedTuple):
 
 
 class _SupportsComparison(t.Protocol):
-    def __lt__(self, other: t.Any) -> bool:
-        ...
+    def __lt__(self, other: t.Any) -> bool: ...
 
 
 _VersionedObj = t.TypeVar("_VersionedObj")
