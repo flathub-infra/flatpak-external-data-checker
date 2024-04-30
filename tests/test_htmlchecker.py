@@ -37,7 +37,8 @@ from src.lib.errors import CheckerError
 class TestHTMLTools(unittest.IsolatedAsyncioTestCase):
     SAMPLES = {
         "utf-8": "🙋, 🌍!\n…"
-        # TODO we want to test other encodings, but httbin(go)/base64/ supports only utf-8
+        # TODO we want to test other encodings, but httbin(go)/base64/ supports only
+        # utf-8
     }
 
     async def asyncSetUp(self):
@@ -107,7 +108,7 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             data.new_version.checksum,
             MultiDigest(
-                sha256="d73b62f29eb98d850f16b76d759395180b860b613fbe1686b18eee99a6e3773f"
+                sha256="d73b62f29eb98d850f16b76d759395180b860b613fbe1686b18eee99a6e3773f"  # noqa: E501
             ),
         )
 
@@ -125,7 +126,7 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(
             data.new_version.checksum,
             MultiDigest(
-                sha256="0000000000000000000000000000000000000000000000000000000000000000"
+                sha256="0000000000000000000000000000000000000000000000000000000000000000"  # noqa: E501
             ),
         )
 
@@ -143,7 +144,7 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(
             data.new_version.checksum,
             MultiDigest(
-                sha256="0000000000000000000000000000000000000000000000000000000000000000"
+                sha256="0000000000000000000000000000000000000000000000000000000000000000"  # noqa: E501
             ),
         )
 
@@ -174,7 +175,7 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
             child.new_version.checksum,
             # curl https://httpbingo.org/response-headers?version=1.0.0 | sha256sum
             MultiDigest(
-                sha256="b7160b96668c66cdee4ec5b0115bc5a7a8d58cd86b3ff49473e1611947babda3"
+                sha256="b7160b96668c66cdee4ec5b0115bc5a7a8d58cd86b3ff49473e1611947babda3"  # noqa: E501
             ),
         )
         self.assertEqual(parent.new_version.checksum, child.new_version.checksum)

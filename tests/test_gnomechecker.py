@@ -62,7 +62,7 @@ class TestGNOMEChecker(unittest.IsolatedAsyncioTestCase):
             self.assertNotEqual(
                 data.new_version.checksum,
                 MultiDigest(
-                    sha256="0000000000000000000000000000000000000000000000000000000000000000"
+                    sha256="0000000000000000000000000000000000000000000000000000000000000000"  # noqa: E501
                 ),
             )
             self.assertIsNotNone(data.new_version.version)

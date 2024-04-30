@@ -141,7 +141,8 @@ class GitChecker(Checker):
             latest_tag = sorted_tags[-1]
         except IndexError as err:
             raise CheckerQueryError(
-                f"{external_data.current_version.url} has no tags matching '{tag_pattern}'"
+                f"{external_data.current_version.url} has no tags matching "
+                f"'{tag_pattern}'"
             ) from err
 
         new_version = ExternalGitRef(

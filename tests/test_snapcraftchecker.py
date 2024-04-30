@@ -22,7 +22,7 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(data.new_version)
         self.assertRegex(
             data.new_version.url,
-            r"^https://api\.snapcraft\.io/api/v1/snaps/download/[A-Za-z0-9]{32}_[0-9]+.snap$",
+            r"^https://api\.snapcraft\.io/api/v1/snaps/download/[A-Za-z0-9]{32}_[0-9]+.snap$",  # noqa: E501
         )
         self.assertIsInstance(data.new_version.size, int)
         self.assertGreater(data.new_version.size, 0)
@@ -31,7 +31,7 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(
             data.new_version.checksum,
             MultiDigest(
-                sha256="0000000000000000000000000000000000000000000000000000000000000000"
+                sha256="0000000000000000000000000000000000000000000000000000000000000000"  # noqa: E501
             ),
         )
 

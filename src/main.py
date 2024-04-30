@@ -435,9 +435,13 @@ def parse_cli_args(cli_args=None):
     )
     parser.add_argument(
         "--require-important-update",
-        help="Require an update to at least one source with is-important or is-main-source to save changes to the manifest. "
-        "If no instances of is-important or is-main-source are found, assume normal behaviour and always save changes to the manifest. "
-        "This is useful to avoid PRs generated to update a singular unimportant source.",
+        help=(
+            "Require an update to at least one source with is-important or "
+            "is-main-source to save changes to the manifest. If no instances of "
+            "is-important or is-main-source are found, assume normal behaviour and "
+            "always save changes to the manifest. This is useful to avoid PRs "
+            "generated to update a singular unimportant source."
+        ),
         action="store_true",
     )
 

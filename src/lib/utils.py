@@ -160,11 +160,13 @@ async def get_extra_data_info_from_url(
         async for chunk in response.content.iter_chunked(HTTP_CHUNK_SIZE):
             if first_chunk:
                 first_chunk = False
-                # determine content type from magic number since http header may be wrong
+                # determine content type from magic number since http header may be
+                # wrong
                 actual_content_type = magic.from_buffer(chunk, mime=True)
                 if content_type_rejected(actual_content_type):
                     raise CheckerFetchError(
-                        f"Wrong content type '{actual_content_type}' received from '{url}'"
+                        f"Wrong content type '{actual_content_type}' received "
+                        f"from '{url}'"
                     )
 
             checksum.update(chunk)
@@ -222,8 +224,7 @@ class FallbackVersion(t.NamedTuple):
 
 
 class _SupportsComparison(t.Protocol):
-    def __lt__(self, other: t.Any) -> bool:
-        ...
+    def __lt__(self, other: t.Any) -> bool: ...
 
 
 _VersionedObj = t.TypeVar("_VersionedObj")
@@ -430,7 +431,7 @@ async def git_ls_remote(url: str) -> t.Dict[str, str]:
         raise CheckerQueryError("Listing Git remote failed") from err
     git_stdout = git_stdout_raw.decode()
 
-    return {r: c for c, r in (l.split() for l in git_stdout.splitlines())}
+    return {r: c for c, r in (line.split() for line in git_stdout.splitlines())}
 
 
 async def extract_appimage_version(appimg_io: t.IO):
@@ -550,7 +551,8 @@ def dump_manifest(contents: t.Dict, manifest_path: t.Union[Path, str]):
     # Determine max line length preference
     if max_line_length := conf.get("max_line_length"):
         try:
-            _yaml.width = int(max_line_length)  # type: ignore # See https://sourceforge.net/p/ruamel-yaml/tickets/322/
+            # See https://sourceforge.net/p/ruamel-yaml/tickets/322/
+            _yaml.width = int(max_line_length)  # type: ignore
         except ValueError:
             log.warning("Ignoring invalid max_line_length %r", max_line_length)
 

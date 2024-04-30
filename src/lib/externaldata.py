@@ -129,9 +129,10 @@ class BuilderSource(abc.ABC):
     checker_data: t.Dict[str, t.Any]
     module: t.Optional[BuilderModule]
     parent: t.Optional[BuilderSource] = dataclasses.field(init=False, default=None)
-    # fmt: off
-    checked: asyncio.Event = dataclasses.field(init=False, default_factory=asyncio.Event)
-    # fmt: on
+    checked: asyncio.Event = dataclasses.field(
+        init=False,
+        default_factory=asyncio.Event,
+    )
 
     @classmethod
     def __init_subclass__(cls, *args, **kwargs):

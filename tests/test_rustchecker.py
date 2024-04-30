@@ -23,7 +23,7 @@ class TestRustChecker(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(data.new_version)
         self.assertRegex(
             data.new_version.url,
-            r"^https://static.rust-lang.org/dist/[\-\d]+/rust-nightly-x86_64-unknown-linux-gnu.tar.xz$",
+            r"^https://static.rust-lang.org/dist/[\-\d]+/rust-nightly-x86_64-unknown-linux-gnu.tar.xz$",  # noqa: E501
         )
         self.assertIsNone(data.new_version.size)
         self.assertIsNotNone(data.new_version.checksum)
@@ -31,7 +31,7 @@ class TestRustChecker(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(
             data.new_version.checksum,
             MultiDigest(
-                sha256="24b4681187654778817652273a68a4d55f5090604cd14b1f1c3ff8785ad24b99"
+                sha256="24b4681187654778817652273a68a4d55f5090604cd14b1f1c3ff8785ad24b99"  # noqa: E501
             ),
         )
 

@@ -120,8 +120,9 @@ class HTMLChecker(Checker):
         try:
             async with self.session.get(url) as response:
                 encoding = await self._get_encoding(response)
-                # We use streaming decoding in order to get decode error and abort the check
-                # as early as possible, without preloading the whole raw contents into memory
+                # We use streaming decoding in order to get decode error and abort the
+                # check as early as possible, without preloading the whole raw contents
+                # into memory
                 decoder_cls = codecs.getincrementaldecoder(encoding)
                 decoder = decoder_cls(errors="strict")
                 with io.StringIO() as buf:
@@ -184,8 +185,9 @@ class HTMLChecker(Checker):
                 )
 
             try:
-                # NOTE Returning last match when sort is requested and first match otherwise
-                # doesn't seem sensible, but we need to retain backward compatibility
+                # NOTE Returning last match when sort is requested and first match
+                # otherwise doesn't seem sensible, but we need to retain backward
+                # compatibility
                 result = matches[-1 if sort_matches else 0]
             except IndexError as err:
                 raise CheckerQueryError(

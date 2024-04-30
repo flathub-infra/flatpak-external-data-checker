@@ -37,12 +37,12 @@ class TestDebianRepoChecker(unittest.IsolatedAsyncioTestCase):
             if data.filename == "python-apt-source.tar.xz":
                 self.assertRegex(
                     data.new_version.url,
-                    r"http://deb.debian.org/debian/pool/main/p/python-apt/python-apt_(\d[\d\.-]+\d).tar.xz",
+                    r"http://deb.debian.org/debian/pool/main/p/python-apt/python-apt_(\d[\d\.-]+\d).tar.xz",  # noqa: E501
                 )
             elif data.filename == "apt-aarch64.deb":
                 self.assertRegex(
                     data.new_version.url,
-                    r"http://deb.debian.org/debian/pool/main/a/apt/apt_(\d[\d\.-]+\d)_arm64.deb",
+                    r"http://deb.debian.org/debian/pool/main/a/apt/apt_(\d[\d\.-]+\d)_arm64.deb",  # noqa: E501
                 )
             else:
                 self.fail(f"Unknown data {data.filename}")
