@@ -3,6 +3,7 @@ import subprocess
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from src import main
 
@@ -15,8 +16,10 @@ TEST_APPDATA = os.path.join(
 )
 
 
+@patch.dict(os.environ)
 class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self._clear_environment()
         self.test_dir = tempfile.TemporaryDirectory()
         self.manifest_filename = os.path.basename(TEST_MANIFEST)
         self.appdata_filename = os.path.basename(TEST_APPDATA)
@@ -34,14 +37,69 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
     def tearDown(self):
         self.test_dir.cleanup()
 
-    def _run_cmd(self, cmd):
-        return subprocess.run(cmd, cwd=self.test_dir.name, check=True)
+    def _clear_environment(self):
+        unwanted_vars = [
+            "EMAIL",
+            "GIT_AUTHOR_NAME",
+            "GIT_AUTHOR_EMAIL",
+            "GIT_COMMITTER_NAME",
+            "GIT_COMMITTER_EMAIL",
+        ]
+        for var in unwanted_vars:
+            os.environ.pop(var, None)
+
+    def _run_cmd(self, cmd, **kwargs):
+        return subprocess.run(cmd, cwd=self.test_dir.name, check=True, **kwargs)
+
+    def _get_commit_data(self, rev="HEAD"):
+        data = {}
+        for name, fmt in [
+            ("commit", "%H"),
+            ("subject", "%s"),
+            ("body", "%b"),
+            ("author_name", "%an"),
+            ("author_email", "%ae"),
+            ("committer_name", "%cn"),
+            ("committer_email", "%ce"),
+        ]:
+            cmd = ["git", "show", "--no-patch", f"--pretty=format:{fmt}", rev]
+            proc = self._run_cmd(cmd, stdout=subprocess.PIPE)
+            output = proc.stdout.decode("utf-8")
+            data[name] = output
+
+        return data
 
     async def test_full_run(self):
         args1 = main.parse_cli_args(["--update", "--commit-only", self.manifest_path])
         self.assertEqual(await main.run_with_args(args1), (2, 0, True))
+
+        commit_data = self._get_commit_data()
+        self.assertEqual(commit_data["subject"], "Update 2 modules")
+        self.assertEqual(commit_data["author_name"], "Test Runner")
+        self.assertEqual(commit_data["author_email"], "test@localhost")
+        self.assertEqual(commit_data["committer_name"], "Test Runner")
+        self.assertEqual(commit_data["committer_email"], "test@localhost")
+
+        body_lines = commit_data["body"].splitlines()
+        self.assertEqual(len(body_lines), 2)
+        self.assertRegex(body_lines[0], r"^Update libXaw-1.0.12.tar.bz2 to ")
+        self.assertRegex(body_lines[1], r"^Update xterm-snapshots.git to ")
+
         args2 = main.parse_cli_args([self.manifest_path])
         self.assertEqual(await main.run_with_args(args2), (0, 0, False))
+
+    async def test_git_envvars(self):
+        os.environ["GIT_AUTHOR_NAME"] = "Some Guy"
+        os.environ["GIT_AUTHOR_EMAIL"] = "someguy@localhost"
+        args1 = main.parse_cli_args(["--update", "--commit-only", self.manifest_path])
+        self.assertEqual(await main.run_with_args(args1), (2, 0, True))
+
+        commit_data = self._get_commit_data()
+        self.assertEqual(commit_data["subject"], "Update 2 modules")
+        self.assertEqual(commit_data["author_name"], "Some Guy")
+        self.assertEqual(commit_data["author_email"], "someguy@localhost")
+        self.assertEqual(commit_data["committer_name"], "Test Runner")
+        self.assertEqual(commit_data["committer_email"], "test@localhost")
 
 
 class TestForceForkTristate(unittest.TestCase):

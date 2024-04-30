@@ -28,7 +28,6 @@ import subprocess
 import tempfile
 import urllib.request
 import urllib.parse
-import copy
 import typing as t
 from distutils.version import StrictVersion, LooseVersion
 import asyncio
@@ -272,15 +271,6 @@ def filter_versions(
     )
 
 
-def clear_env(environ):
-    new_env = copy.deepcopy(environ)
-    for varname in new_env.keys():
-        if any(i in varname.lower() for i in ["pass", "token", "secret", "auth"]):
-            log.debug("Removing env %s", varname)
-            new_env.pop(varname)
-    return new_env
-
-
 def wrap_in_bwrap(cmdline, bwrap_args=None):
     bwrap_cmd = ["bwrap", "--unshare-all", "--dev", "/dev"]
     for path in ("/usr", "/lib", "/lib64", "/bin", "/proc"):
@@ -370,7 +360,6 @@ class Command:
             stdin=self.stdin,
             stdout=self.stdout,
             stderr=self.stderr,
-            env=clear_env(os.environ),
         )
         try:
             stdout, stderr = await asyncio.wait_for(
@@ -404,7 +393,6 @@ class Command:
             stdout=self.stdout,
             stderr=self.stderr,
             timeout=self.timeout,
-            env=clear_env(os.environ),
             check=False,
         )
         proc.check_returncode()

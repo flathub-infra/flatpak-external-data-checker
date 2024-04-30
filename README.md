@@ -114,7 +114,6 @@ jobs:
           # email sets "github-actions[bot]" as commit author, see https://github.community/t/github-actions-bot-email-address/17204/6
           GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
           GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
-          EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: --update --never-fork $PATH_TO_MANIFEST # e.g. com.organization.myapp.json
