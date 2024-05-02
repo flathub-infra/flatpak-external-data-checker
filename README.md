@@ -107,7 +107,7 @@ jobs:
         with:
           ref: ${{ matrix.branch }}
 
-      - uses: docker://ghcr.io/flathub-infra/flatpak-external-data-checker:latest
+      - uses: docker://ghcr.io/flathub/flatpak-external-data-checker:latest
         env:
           GIT_AUTHOR_NAME: Flatpak External Data Checker
           GIT_COMMITTER_NAME: Flatpak External Data Checker
