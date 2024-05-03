@@ -92,13 +92,11 @@ class GitChecker(Checker):
             return await self._check_has_new(external_data)
         return await self._check_still_valid(external_data)
 
-    @staticmethod
-    async def _check_has_new(external_data: ExternalGitRepo):
-        tag_pattern = external_data.checker_data.get(
-            "tag-pattern", r"^(?:[vV])?((?:\d+\.)+\d+)$"
-        )
-        tag_re = re.compile(tag_pattern)
-        assert tag_re.groups == 1
+    @classmethod
+    async def _check_has_new(cls, external_data: ExternalGitRepo):
+        tag_re = cls._get_pattern(external_data.checker_data, "tag-pattern", 1)
+        if tag_re is None:
+            tag_re = re.compile(r"^(?:[vV])?((?:\d+\.)+\d+)$")
 
         version_scheme = external_data.checker_data.get("version-scheme", "loose")
         tag_cls = TAG_VERSION_SCHEMES[version_scheme]
@@ -142,7 +140,7 @@ class GitChecker(Checker):
         except IndexError as err:
             raise CheckerQueryError(
                 f"{external_data.current_version.url} has no tags matching "
-                f"'{tag_pattern}'"
+                f"'{tag_re.pattern}'"
             ) from err
 
         new_version = ExternalGitRef(

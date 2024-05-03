@@ -180,6 +180,29 @@ class Checker:
         except (KeyError, ValueError) as err:
             raise CheckerMetadataError("Error substituting template") from err
 
+    @classmethod
+    def _get_pattern(
+        cls,
+        checker_data: t.Dict,
+        pattern_name: str,
+        expected_groups: int = 1,
+    ) -> t.Optional[re.Pattern]:
+        try:
+            pattern_str = checker_data[pattern_name]
+        except KeyError:
+            return None
+
+        try:
+            pattern = re.compile(pattern_str)
+        except re.error as err:
+            raise CheckerMetadataError(f"Invalid regex '{pattern_str}'") from err
+        if pattern.groups != expected_groups:
+            raise CheckerMetadataError(
+                f"Pattern '{pattern.pattern}' contains {pattern.groups} group(s) "
+                f"instead of {expected_groups}"
+            )
+        return pattern
+
     async def _complete_digests(
         self, url: t.Union[str, URL], digests: MultiDigest
     ) -> MultiDigest:
