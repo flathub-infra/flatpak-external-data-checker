@@ -31,30 +31,11 @@ import semver
 
 from ..lib import NETWORK_ERRORS, OPERATORS_SCHEMA
 from ..lib.externaldata import ExternalBase, ExternalData
-from ..lib.errors import CheckerMetadataError, CheckerQueryError, CheckerFetchError
+from ..lib.errors import CheckerQueryError, CheckerFetchError
 from . import Checker
 from ..lib.utils import filter_versioned_items, FallbackVersion
 
 log = logging.getLogger(__name__)
-
-
-def _get_pattern(
-    checker_data: t.Dict, pattern_name: str, expected_groups: int = 1
-) -> t.Optional[re.Pattern]:
-    try:
-        pattern_str = checker_data[pattern_name]
-    except KeyError:
-        return None
-    try:
-        pattern = re.compile(pattern_str)
-    except re.error as err:
-        raise CheckerMetadataError(f"Invalid regex '{pattern_str}'") from err
-    if pattern.groups != expected_groups:
-        raise CheckerMetadataError(
-            f"Pattern '{pattern.pattern}' contains {pattern.groups} group(s) "
-            f"instead of {expected_groups}"
-        )
-    return pattern
 
 
 def _semantic_version(version: str) -> semver.VersionInfo:
@@ -157,8 +138,10 @@ class HTMLChecker(Checker):
             {f"parent_{k}": v for k, v in parent_json.items() if v is not None},
         )
 
-        combo_pattern = _get_pattern(external_data.checker_data, "pattern", 2)
-        version_pattern = _get_pattern(external_data.checker_data, "version-pattern", 1)
+        combo_pattern = self._get_pattern(external_data.checker_data, "pattern", 2)
+        version_pattern = self._get_pattern(
+            external_data.checker_data, "version-pattern", 1
+        )
         url_template = external_data.checker_data.get("url-template")
         sort_matches = external_data.checker_data.get("sort-matches", True)
         version_cls = _VERSION_SCHEMES[
