@@ -248,6 +248,19 @@ class ExternalBase(BuilderSource):
         if not source.get("url"):
             raise SourceUnsupported('Data is not external: no "url" property')
 
+        if (
+            source.get("type") == ExternalBase.Type.EXTRA_DATA
+            and "sha256" not in source
+        ):
+            raise SourceLoadError("Extra data is missing SHA256 checksum")
+
+        if source.get("type") in (
+            ExternalBase.Type.FILE,
+            ExternalBase.Type.ARCHIVE,
+        ):
+            if not (source.keys() & {"md5", "sha1", "sha256", "sha512"}):
+                raise SourceLoadError("Data is missing checksum")
+
         # FIXME: https://github.com/python/mypy/issues/9282
         return super().from_source(source_path, source, module)  # type: ignore
 
