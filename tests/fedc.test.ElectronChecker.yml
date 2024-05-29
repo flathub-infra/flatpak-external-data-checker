@@ -7,7 +7,7 @@ modules:
         sha512: 360142fb3e6a0b67f17f2cd1bf90e8c9663a5e4658bae9ed754081315fa8034d68cddffa6419ae4bde5eb60a9ccfed8c8236c9a939cd5b1f9131e28bdf3924c2
         x-checker-data:
           type: electron-updater
-          url: https://github.com/balena-io/etcher/releases/latest/download/latest-linux.yml
+          url: https://github.com/balena-io/etcher/releases/download/v1.18.11/latest-linux.yml
   
   - name: Lunar-Client
     sources:
