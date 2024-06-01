@@ -197,7 +197,8 @@ def commit_changes(changes: t.List[str]) -> CommittedChanges:
         base_branch = None
 
     # Moved to detached HEAD
-    check_call(["git", "checkout", "HEAD@{0}"])
+    log.info("Switching to detached HEAD")
+    check_call(["git", "-c", "advice.detachedHead=false", "checkout", "HEAD@{0}"])
     check_call(["git", "commit", "-am", message])
 
     # Find a stable identifier for the contents of the tree, to avoid
