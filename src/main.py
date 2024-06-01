@@ -24,6 +24,7 @@
 
 import argparse
 import contextlib
+import getpass
 import json
 import logging
 import os
@@ -199,7 +200,22 @@ def commit_changes(changes: t.List[str]) -> CommittedChanges:
     # Moved to detached HEAD
     log.info("Switching to detached HEAD")
     check_call(["git", "-c", "advice.detachedHead=false", "checkout", "HEAD@{0}"])
-    check_call(["git", "commit", "-am", message])
+
+    try:
+        git_email = subprocess.check_output(
+            ["git", "config", "user.email"], encoding="utf-8"
+        ).strip()
+    except subprocess.CalledProcessError:
+        git_email = None
+        pass
+
+    if git_email is None:
+        git_email = getpass.getuser() + "@" + os.uname()[1]
+        assert git_email is not None
+        log.warning("No email configured for git. Falling back to default")
+        check_call(["git", "-c", f"user.email={git_email}", "commit", "-am", message])
+    else:
+        check_call(["git", "commit", "-am", message])
 
     # Find a stable identifier for the contents of the tree, to avoid
     # sending the same PR twice.
