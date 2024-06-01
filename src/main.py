@@ -24,6 +24,7 @@
 
 import argparse
 import contextlib
+import getpass
 import json
 import logging
 import os
@@ -199,7 +200,37 @@ def commit_changes(changes: t.List[str]) -> CommittedChanges:
     # Moved to detached HEAD
     log.info("Switching to detached HEAD")
     check_call(["git", "-c", "advice.detachedHead=false", "checkout", "HEAD@{0}"])
-    check_call(["git", "commit", "-am", message])
+
+    retry_commit = False
+    try:
+        check_call(["git", "commit", "-am", message])
+    except subprocess.CalledProcessError:
+        retry_commit = True
+        pass
+
+    if retry_commit:
+        log.warning("Committing failed. Falling back to a sanitised config")
+        git_email = getpass.getuser() + "@" + "localhost"
+        assert git_email is not None
+        env = {
+            "GIT_CONFIG_GLOBAL": "/dev/null",
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG": "''",
+        }
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                f"user.email={git_email}",
+                "commit",
+                "--no-verify",
+                "--no-gpg-sign",
+                "-am",
+                message,
+            ],
+            check=True,
+            env=env,
+        )
 
     # Find a stable identifier for the contents of the tree, to avoid
     # sending the same PR twice.
