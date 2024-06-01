@@ -452,11 +452,11 @@ class ManifestChecker:
 
             data.update()
             if data.new_version.version is not None:
-                message = "Update {} to {}".format(
-                    data.filename, data.new_version.version
+                message = "{}: Update {} to {}".format(
+                    data.module, data.filename, data.new_version.version
                 )
             else:
-                message = "Update {}".format(data.filename)
+                message = "{}: Update {}".format(data.module, data.filename)
 
             changes[message] = None
             path_has_changes = True

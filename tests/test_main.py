@@ -82,8 +82,8 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
 
         body_lines = commit_data["body"].splitlines()
         self.assertEqual(len(body_lines), 2)
-        self.assertRegex(body_lines[0], r"^Update libXaw-1.0.12.tar.bz2 to ")
-        self.assertRegex(body_lines[1], r"^Update xterm-snapshots.git to ")
+        self.assertRegex(body_lines[0], r"^libXaw: Update libXaw-1.0.12.tar.bz2 to ")
+        self.assertRegex(body_lines[1], r"^xterm: Update xterm-snapshots.git to ")
 
         args2 = main.parse_cli_args([self.manifest_path])
         self.assertEqual(await main.run_with_args(args2), (0, 0, False))

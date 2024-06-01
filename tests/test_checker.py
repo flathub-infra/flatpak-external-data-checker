@@ -217,7 +217,7 @@ class TestExternalDataChecker(_TestWithInlineManifest):
             filename,
             contents,
             expected_new_contents,
-            ["Update UnityHubSetup.AppImage to 1.2.3.4"],
+            ["foo: Update UnityHubSetup.AppImage to 1.2.3.4"],
         )
 
     async def test_update_yaml(self):
@@ -288,7 +288,7 @@ modules:
             filename,
             contents,
             expected_new_contents,
-            ["Update UnityHubSetup.AppImage to 1.2.3.4"],
+            ["foo: Update UnityHubSetup.AppImage to 1.2.3.4"],
             expected_data_count=2,
         )
 
@@ -320,7 +320,7 @@ modules:
             filename,
             contents,
             expected_new_contents,
-            ["Update some-deb.deb to 1.2.3.4"],
+            ["foo: Update some-deb.deb to 1.2.3.4"],
             new_release=False,
         )
 
@@ -348,7 +348,7 @@ sources:
             filename,
             contents,
             expected_new_contents,
-            ["Update some-deb.deb to 1.2.3.4"],
+            ["foo: Update some-deb.deb to 1.2.3.4"],
             new_release=False,
         )
 
@@ -372,7 +372,7 @@ size: {UpdateEverythingChecker.SIZE}
             filename,
             contents,
             expected_new_contents,
-            ["Update some-deb.deb to 1.2.3.4"],
+            ["None: Update some-deb.deb to 1.2.3.4"],
             new_release=False,
         )
 
@@ -418,7 +418,7 @@ size: {UpdateEverythingChecker.SIZE}
             filename,
             contents,
             expected_new_contents,
-            ["Update some-deb.deb to 1.2.3.4"],
+            ["None: Update some-deb.deb to 1.2.3.4"],
             expected_data_count=2,
             new_release=False,
         )
@@ -717,7 +717,9 @@ modules:
             filename=filename,
             contents=contents,
             expected_new_contents=expected_new_contents,
-            expected_updates=["Update extra-cmake-modules to 1.2.3.4"],
+            expected_updates=[
+                "extra-cmake-modules: Update extra-cmake-modules to 1.2.3.4"
+            ],
             expected_data_count=2,
             new_release=False,
             require_important_update=True,
@@ -796,8 +798,8 @@ modules:
             contents=contents,
             expected_new_contents=expected_new_contents,
             expected_updates=[
-                "Update extra-cmake-modules to 1.2.3.4",
-                "Update vt-py.git to 1.2.3.4",
+                "extra-cmake-modules: Update extra-cmake-modules to 1.2.3.4",
+                "vt-py: Update vt-py.git to 1.2.3.4",
             ],
             expected_data_count=2,
             new_release=False,
@@ -876,7 +878,9 @@ modules:
             filename=filename,
             contents=contents,
             expected_new_contents=expected_new_contents,
-            expected_updates=["Update extra-cmake-modules to 1.2.3.4"],
+            expected_updates=[
+                "extra-cmake-modules: Update extra-cmake-modules to 1.2.3.4"
+            ],
             expected_data_count=2,
             new_release=True,
             require_important_update=True,
@@ -1012,7 +1016,9 @@ modules:
             filename=filename,
             contents=contents,
             expected_new_contents=expected_new_contents,
-            expected_updates=["Update extra-cmake-modules to 1.2.3.4"],
+            expected_updates=[
+                "extra-cmake-modules: Update extra-cmake-modules to 1.2.3.4"
+            ],
             expected_data_count=2,
             new_release=True,
             require_important_update=True,
@@ -1083,8 +1089,8 @@ modules:
             contents=contents,
             expected_new_contents=expected_new_contents,
             expected_updates=[
-                "Update extra-cmake-modules to 1.2.3.4",
-                "Update vt-py.git to 1.2.3.4",
+                "extra-cmake-modules: Update extra-cmake-modules to 1.2.3.4",
+                "vt-py: Update vt-py.git to 1.2.3.4",
             ],
             expected_data_count=2,
             new_release=True,
