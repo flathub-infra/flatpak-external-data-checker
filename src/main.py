@@ -177,15 +177,39 @@ class CommittedChanges(t.NamedTuple):
     base_branch: t.Optional[str]
 
 
+def commit_message(changes: t.List[str]) -> str:
+    assert len(changes) >= 1
+
+    if len(changes) == 1:
+        return changes[0]
+
+    module_names = list(dict.fromkeys(list(i.split(":", 1)[0] for i in changes)))
+    for i in reversed(range(2, len(module_names) + 1)):
+        xs = module_names[: i - 1]
+        y = module_names[i - 1]
+        zs = module_names[i:]
+
+        if zs:
+            tail = f" and {len(zs)} more modules"
+            xs.append(y)
+        else:
+            tail = f" and {y} modules"
+
+        subject = "Update " + ", ".join(xs) + tail
+        if len(subject) <= 70:
+            return subject
+
+    return f"Update {len(module_names)} modules"
+
+
 def commit_changes(changes: t.List[str]) -> CommittedChanges:
     log.info("Committing updates")
     body: t.Optional[str]
+    subject = commit_message(changes)
     if len(changes) > 1:
-        subject = "Update {} modules".format(len(changes))
         body = "\n".join(changes)
         message = subject + "\n\n" + body
     else:
-        subject = changes[0]
         body = None
         message = subject
 

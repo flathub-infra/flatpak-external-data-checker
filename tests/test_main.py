@@ -74,7 +74,7 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await main.run_with_args(args1), (2, 0, True))
 
         commit_data = self._get_commit_data()
-        self.assertEqual(commit_data["subject"], "Update 2 modules")
+        self.assertEqual(commit_data["subject"], "Update libXaw and xterm modules")
         self.assertEqual(commit_data["author_name"], "Test Runner")
         self.assertEqual(commit_data["author_email"], "test@localhost")
         self.assertEqual(commit_data["committer_name"], "Test Runner")
@@ -95,7 +95,7 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await main.run_with_args(args1), (2, 0, True))
 
         commit_data = self._get_commit_data()
-        self.assertEqual(commit_data["subject"], "Update 2 modules")
+        self.assertEqual(commit_data["subject"], "Update libXaw and xterm modules")
         self.assertEqual(commit_data["author_name"], "Some Guy")
         self.assertEqual(commit_data["author_email"], "someguy@localhost")
         self.assertEqual(commit_data["committer_name"], "Test Runner")
