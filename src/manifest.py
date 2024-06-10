@@ -486,10 +486,19 @@ class ManifestChecker:
             elif data.source_path == self._root_manifest_path:
                 selected_data = data
         else:
-            # Guess that the last external source in the root manifest is the one
-            # corresponding to the main application bundle.
-            assert selected_data is not None
-            log.warning("Guessed upstream source: %s", selected_data)
+            if selected_data is not None:
+                # Guess that the last external source in the root manifest is the one
+                # corresponding to the main application bundle.
+                log.warning("Guessed last source as main source: %s", selected_data)
+            else:
+                log.error(
+                    (
+                        "No main source configured and no external source in "
+                        "%s. Not updating appdata"
+                    ),
+                    self._root_manifest_path,
+                )
+                return
 
         last_update = selected_data.new_version
 
