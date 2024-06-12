@@ -184,6 +184,10 @@ def commit_message(changes: t.List[str]) -> str:
         return changes[0]
 
     module_names = list(dict.fromkeys(list(i.split(":", 1)[0] for i in changes)))
+
+    if len(module_names) == 1:
+        return f"Update {module_names[0]} module"
+
     for i in reversed(range(2, len(module_names) + 1)):
         xs = module_names[: i - 1]
         y = module_names[i - 1]
