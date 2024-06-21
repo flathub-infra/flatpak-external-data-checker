@@ -138,10 +138,10 @@ The tool will also automatically merge previously opened pull request for
 unavailable (`BROKEN`) sources if the change has successfully passed CI checks
 and the token has sufficient privileges.
 
-Automatically merging all submitted PRs, not just unavailable sources,
+Under limited circumstances, automatically merging all submitted PRs, not just unavailable sources,
 from the tool can be forcefully enabled by setting
 `automerge-flathubbot-prs` to `true` in `flathub.json`,
-or it can be completely disabled by setting `automerge-flathubbot-prs` to `false`.
+or it can be completely disabled by setting `automerge-flathubbot-prs` to `false`. Use of this option without requesting an exception will cause the build to fail in the linting stage; see the [FlatHub docs](https://docs.flathub.org/blog/linter-restricting-automatic-merge/) for more info.
 
 ### Formatting manifests
 
