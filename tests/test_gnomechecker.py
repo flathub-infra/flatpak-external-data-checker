@@ -25,7 +25,7 @@ from distutils.version import LooseVersion
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
 from src.lib.checksums import MultiDigest
-from src.checkers.gnomechecker import _is_stable
+from src.checkers.gnomechecker import _is_stable, VersionScheme
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.gnome.baobab.json")
 
@@ -35,19 +35,43 @@ class TestGNOMEChecker(unittest.IsolatedAsyncioTestCase):
         init_logging()
 
     def test_is_stable(self):
-        self.assertFalse(_is_stable("1.9.0"))
         self.assertTrue(_is_stable("3.28.0"))
-        self.assertFalse(_is_stable("3.29.0"))
         self.assertTrue(_is_stable("41"))
         self.assertTrue(_is_stable("41.1"))
         self.assertTrue(_is_stable("41.2"))
         self.assertTrue(_is_stable("4.1"))
         self.assertTrue(_is_stable("4.2"))
+        self.assertTrue(_is_stable("1.7"))
+        self.assertTrue(_is_stable("1.2"))
+        self.assertTrue(_is_stable("2.7"))
+        self.assertTrue(_is_stable("2.2"))
+
         self.assertFalse(_is_stable("4.rc"))
         self.assertFalse(_is_stable("4.2.beta"))
         self.assertFalse(_is_stable("4.alpha.0"))
         self.assertFalse(_is_stable("48.0.alpha2"))
         self.assertFalse(_is_stable("48.alpha2"))
+
+    def test_minor_scheme_is_stable(self):
+        scheme = VersionScheme.ODD_MINOR_IS_UNSTABLE
+        self.assertTrue(_is_stable("1", scheme))
+        self.assertTrue(_is_stable("2", scheme))
+
+        self.assertTrue(_is_stable("1.2", scheme))
+        self.assertTrue(_is_stable("1.2.0", scheme))
+        self.assertTrue(_is_stable("2.2", scheme))
+        self.assertTrue(_is_stable("2.2.1", scheme))
+        self.assertTrue(_is_stable("2.2.2", scheme))
+        self.assertTrue(_is_stable("1.2.2", scheme))
+        self.assertTrue(_is_stable("1.2.1", scheme))
+
+        self.assertFalse(_is_stable("1.1", scheme))
+        self.assertFalse(_is_stable("1.1.0", scheme))
+        self.assertFalse(_is_stable("2.3", scheme))
+        self.assertFalse(_is_stable("2.1.1", scheme))
+        self.assertFalse(_is_stable("2.3.2", scheme))
+        self.assertFalse(_is_stable("1.1.2", scheme))
+        self.assertFalse(_is_stable("1.3.1", scheme))
 
     async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
@@ -79,6 +103,8 @@ class TestGNOMEChecker(unittest.IsolatedAsyncioTestCase):
                 )
             elif data.filename == "alleyoop-0.9.8.tar.xz":
                 self._test_non_standard_version(data)
+            elif data.filename == "tracker-3.4.2.tar.xz":
+                self.assertIsNotNone(data.new_version)
 
     def _test_stable_only(self, data):
         self.assertEqual(data.filename, "baobab-3.34.0.tar.xz")

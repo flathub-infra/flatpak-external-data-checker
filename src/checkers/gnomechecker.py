@@ -2,6 +2,7 @@ import logging
 import re
 import typing as t
 
+from enum import StrEnum
 from yarl import URL
 
 from ..lib import OPERATORS_SCHEMA, NETWORK_ERRORS
@@ -14,6 +15,11 @@ from . import Checker
 log = logging.getLogger(__name__)
 
 GNOME_MIRROR = URL("https://download.gnome.org/")
+
+
+class VersionScheme(StrEnum):
+    DEFAULT = "default"
+    ODD_MINOR_IS_UNSTABLE = "odd-minor-is-unstable"
 
 
 def _parse_checksums(text: str) -> t.Dict[str, str]:
@@ -30,16 +36,22 @@ def _contains_keyword(version: str) -> bool:
     return any(kw in version for kw in ["alpha", "beta", "rc"])
 
 
-def _is_stable(version: str) -> bool:
+def _is_stable(
+    version: str,
+    scheme: VersionScheme = VersionScheme.DEFAULT,
+) -> bool:
     ver_list = version.split(".")
     if len(ver_list) < 2:
         # Single number, e.g. "41"
         return True
     major, minor = ver_list[:2]
-    if any(_contains_keyword(x) for x in ver_list[1:]):
-        return False
-    if int(major) > 0 and int(major) < 40 and len(ver_list) > 2:
-        return (int(minor) % 2) == 0
+    if scheme == VersionScheme.DEFAULT:
+        if any(_contains_keyword(x) for x in ver_list[1:]):
+            return False
+    elif scheme == VersionScheme.ODD_MINOR_IS_UNSTABLE:
+        if int(major) > 0 and len(ver_list) >= 2:
+            return (int(minor) % 2) == 0
+
     # XXX If we didn't see any indication that the version is a prerelease,
     # assume it's a normal (stable) release
     return True
@@ -52,6 +64,13 @@ class GNOMEChecker(Checker):
         "properties": {
             "name": {"type": "string"},
             "stable-only": {"type": "boolean"},
+            "version-scheme": {
+                "type": "string",
+                "enum": [
+                    VersionScheme.DEFAULT,
+                    VersionScheme.ODD_MINOR_IS_UNSTABLE,
+                ],
+            },
             "versions": OPERATORS_SCHEMA,
         },
         "required": ["name"],
@@ -61,6 +80,9 @@ class GNOMEChecker(Checker):
         project_name = external_data.checker_data["name"]
         stable_only = external_data.checker_data.get("stable-only", True)
         constraints = external_data.checker_data.get("versions", {}).items()
+        version_scheme = external_data.checker_data.get(
+            "version-scheme", VersionScheme.DEFAULT
+        )
         assert isinstance(project_name, str)
 
         proj_url = GNOME_MIRROR / "sources" / project_name
@@ -77,10 +99,15 @@ class GNOMEChecker(Checker):
         if constraints:
             filtered_versions = filter_versions(filtered_versions, constraints)
 
+        def _is_stable_wrapper(version):
+            return _is_stable(version, version_scheme)
+
         try:
             if stable_only:
                 try:
-                    latest_version = list(filter(_is_stable, filtered_versions))[-1]
+                    latest_version = list(
+                        filter(_is_stable_wrapper, filtered_versions)
+                    )[-1]
                 except IndexError:
                     latest_version = filtered_versions[-1]
                     log.warning(

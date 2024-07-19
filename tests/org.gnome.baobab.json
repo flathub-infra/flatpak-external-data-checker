@@ -30,6 +30,7 @@
                         "type": "gnome",
                         "name": "pygobject",
                         "stable-only": false,
+                        "version-scheme": "odd-minor-is-unstable",
                         "versions": {
                             "<": "3.38"
                         }
@@ -66,6 +67,21 @@
             ]
         },
         {
+            "name" : "tracker",
+            "sources" : [
+                {
+                    "type": "archive",
+                    "url": "https://download.gnome.org/sources/tracker/3.4/tracker-3.4.2.tar.xz",
+                    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "x-checker-data": {
+                        "type": "gnome",
+                        "name": "tracker",
+                        "version-scheme": "odd-minor-is-unstable"
+                    }
+                }
+            ]
+        },
+        {
             "name" : "cairo-static",
             "sources" : [
                 {
@@ -75,6 +91,7 @@
                     "x-checker-data": {
                         "type": "gnome",
                         "name": "cairo",
+                        "version-scheme": "odd-minor-is-unstable",
                         "versions": {
                             ">": "9999.0.0"
                         }
