@@ -32,8 +32,6 @@ def _is_stable(version: str) -> bool:
     major, minor = ver_list[:2]
     if set(ver_list[1:]) & {"alpha", "beta", "rc"}:
         return False
-    if int(major) > 0 and int(major) < 40 and len(ver_list) > 2:
-        return (int(minor) % 2) == 0
     # XXX If we didn't see any indication that the version is a prerelease,
     # assume it's a normal (stable) release
     return True
