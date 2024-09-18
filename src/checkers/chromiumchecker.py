@@ -129,7 +129,7 @@ class LLVMPrebuiltComponent(LLVMComponent):
 
     _PREBUILT_URL_FORMAT = (
         "https://commondatastorage.googleapis.com"
-        "/chromium-browser-clang/Linux_x64/clang-{revision}-{sub_revision}.tgz"
+        "/chromium-browser-clang/Linux_x64/clang-{revision}-{sub_revision}.tar.xz"
     )
 
     async def check(self) -> None:
