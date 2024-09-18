@@ -320,8 +320,7 @@ class ExternalFile(ExternalState):
         for i in (self, other):
             assert i.checksum is None or isinstance(i.checksum, MultiDigest), i.checksum
         return (
-            self.url == other.url
-            and self.checksum == other.checksum
+            self.checksum == other.checksum
             and (self.size is None or other.size is None or self.size == other.size)
         )
 
