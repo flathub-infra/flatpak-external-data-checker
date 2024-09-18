@@ -205,6 +205,17 @@ The version number for the latest version can be detected in two ways:
   URL for the latest version, and the first match group is taken to be the
   version. (This follows the convention used by
   [`debian/watch`](https://wiki.debian.org/debian/watch) files.)
+* If downloads come from load-balanced URLs, the `"pattern"` regex must
+  match all URL variants otherwise identical versions may be treated as
+  updates. Eg.
+
+```json
+"x-checker-data": {
+  "type": "rotating-url",
+  "url": "http://example.com/last-version",
+  "pattern": "https://(?:dl|stable.dl\\d).example.com/foo-v([0-9.]+).tar.gz"
+}
+```
 
 Some upstream vendors may add unwanted GET query parameters to
 the download URL, such as identifiers for counting unique downloads.
