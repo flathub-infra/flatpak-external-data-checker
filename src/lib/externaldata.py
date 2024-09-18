@@ -319,9 +319,8 @@ class ExternalFile(ExternalState):
     def matches(self, other: ExternalFile):
         for i in (self, other):
             assert i.checksum is None or isinstance(i.checksum, MultiDigest), i.checksum
-        return (
-            self.checksum == other.checksum
-            and (self.size is None or other.size is None or self.size == other.size)
+        return self.checksum == other.checksum and (
+            self.size is None or other.size is None or self.size == other.size
         )
 
     def is_same_version(self, other: ExternalFile):
