@@ -50,7 +50,7 @@ class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
                 elif data.filename.startswith("clang-"):
                     self.assertRegex(
                         data.new_version.url,
-                        r"^https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-.*\.tgz$",  # noqa: E501
+                        r"^https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-.*\.tar\.xz$",  # noqa: E501
                     )
                     self.assertNotEqual(
                         data.new_version.checksum,
