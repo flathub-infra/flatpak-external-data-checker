@@ -39,7 +39,7 @@ class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
                 if data.filename.startswith("chromium-"):
                     self.assertRegex(
                         data.new_version.url,
-                        r"^https://commondatastorage.googleapis.com/chromium-browser-official/chromium-[\d.]+\.tar\.xz$",  # noqa: E501
+                        r"^https://(commondatastorage.googleapis.com/chromium-browser-official|chromium-tarballs.distfiles.gentoo.org)/chromium-[\d.]+\.tar\.xz$",  # noqa: E501
                     )
                     self.assertNotEqual(
                         data.new_version.checksum,
