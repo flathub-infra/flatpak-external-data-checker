@@ -60,12 +60,30 @@ class ChromiumComponent(Component):
         "https://commondatastorage.googleapis.com"
         "/chromium-browser-official/chromium-{version}.tar.xz"
     )
+    # https://groups.google.com/a/chromium.org/g/chromium-packagers/c/wjv9UKg2u4w/m/SwSvLazmCAAJ
+    _GENTOO_URL_FORMAT = (
+        "https://chromium-tarballs.distfiles.gentoo.org/chromium-{version}.tar.xz"
+    )
 
     async def check(self) -> None:
         assert isinstance(self.external_data, ExternalData)
 
-        latest_url = self._URL_FORMAT.format(version=self.latest_version)
-        await self.update_external_source_version(latest_url)
+        try:
+            latest_url = self._URL_FORMAT.format(version=self.latest_version)
+            await self.update_external_source_version(latest_url)
+        except CheckerFetchError as err:
+            if (
+                isinstance(err.__cause__, aiohttp.ClientResponseError)
+                and err.__cause__.status == 404
+            ):
+                log.error(
+                    "Chromium tarball is missing (falling back to alternate URL): %s",
+                    err,
+                )
+                latest_url = self._GENTOO_URL_FORMAT.format(version=self.latest_version)
+                await self.update_external_source_version(latest_url)
+            else:
+                raise
 
 
 class LLVMComponent(Component):
