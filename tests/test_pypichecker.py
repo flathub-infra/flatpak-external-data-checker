@@ -38,7 +38,7 @@ class TestPyPIChecker(unittest.IsolatedAsyncioTestCase):
             elif data.filename == "PyYAML-5.3.1.tar.gz":
                 self.assertRegex(
                     data.new_version.url,
-                    r"https://files.pythonhosted.org/packages/[a-f0-9/]+/PyYAML-[\d\.]+.(tar.(gz|xz|bz2)|zip)",  # noqa: E501
+                    r"https://files.pythonhosted.org/packages/[a-f0-9/]+/(?i:PyYAML-)[\d\.]+.(tar.(gz|xz|bz2)|zip)",  # noqa: E501
                 )
             elif data.filename == "vdf-3.1-py2.py3-none-any.whl":
                 self.assertRegex(
