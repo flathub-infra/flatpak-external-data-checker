@@ -205,6 +205,22 @@ The version number for the latest version can be detected in two ways:
   URL for the latest version, and the first match group is taken to be the
   version. (This follows the convention used by
   [`debian/watch`](https://wiki.debian.org/debian/watch) files.)
+  * If the application download is behind load-balanced URL that changes regularly
+    (e.g. `https://stable.dl2.example.com` and `dl.example.com`),
+    the regex needs to be adjusted to extract the version number in all cases.
+    Otherwise this project assumes a new version was published.
+  * You can use a non-capturing group for this use-case. For the use case above, use
+    the pattern below to allow downloads from:
+    * `https://dl.example.com/foo-v1.9.tar.gz`
+    * `https://stable.dl1.example.com/foo-v1.9.tar.gz`
+    * ...
+```json
+"x-checker-data": {
+    "type": "rotating-url",
+    "url": "http://example.com/last-version",
+    "pattern": "https://(?:dl|stable.dl\\d).example.com/foo-v([0-9.]+).tar.gz"
+}
+```
 
 Some upstream vendors may add unwanted GET query parameters to
 the download URL, such as identifiers for counting unique downloads.
