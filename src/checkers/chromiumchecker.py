@@ -62,7 +62,7 @@ class ChromiumComponent(Component):
     )
     # https://groups.google.com/a/chromium.org/g/chromium-packagers/c/wjv9UKg2u4w/m/SwSvLazmCAAJ
     _GENTOO_URL_FORMAT = (
-        "https://chromium-tarballs.distfiles.gentoo.org/chromium-{version}.tar.xz"
+        "https://chromium-tarballs.distfiles.gentoo.org/chromium-{version}-linux.tar.xz"
     )
 
     async def check(self) -> None:
