@@ -292,6 +292,9 @@ exactly one match group (the pattern will be used to extract version from tag):
 By default tags are sorted based on version number extracted from tag.
 To disable sorting and keep order from `git ls-remote`, set `sort-tags` to `false`.
 
+If the tags are just the version without anything else e.g. `1.0`, you don't need to
+specify a `tag-pattern`.
+
 If the project follows [semver](https://semver.org/) specification, you can set
 `version-scheme` property to `semantic` in order to use semantic version scheme for sorting.
 In this case, make sure that `tag-pattern` extracts only valid semver strings.
