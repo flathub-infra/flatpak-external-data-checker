@@ -1,0 +1,9 @@
+app-id: com.tencent.WeChat
+modules:
+  - name: wechat
+    sources:
+      - type: extra-data
+        filename: wechat.deb
+        url: https://dldir1v6.qq.com/weixin/Universal/Linux/WeChatLinux_x86_64.deb
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+        size: 0
