@@ -18,6 +18,8 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import apt_inst
+import apt_pkg
 import datetime as dt
 import zoneinfo
 import json
@@ -447,6 +449,12 @@ async def extract_appimage_version(appimg_io: t.IO):
             kf = GLib.KeyFile()
             kf.load_from_file(str(desktop), GLib.KeyFileFlags.NONE)
             return kf.get_string(GLib.KEY_FILE_DESKTOP_GROUP, "X-AppImage-Version")
+
+
+def extract_deb_version(deb_io: t.IO):
+    assert deb_io.name
+    control = apt_inst.DebFile(deb_io.name).control.extractdata("control")
+    return apt_pkg.TagSection(control).get("Version")
 
 
 _GITHUB_URL_PATTERN = re.compile(
