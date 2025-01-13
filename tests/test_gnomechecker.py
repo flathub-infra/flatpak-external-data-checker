@@ -46,6 +46,8 @@ class TestGNOMEChecker(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(_is_stable("4.rc"))
         self.assertFalse(_is_stable("4.2.beta"))
         self.assertFalse(_is_stable("4.alpha.0"))
+        self.assertFalse(_is_stable("48.0.alpha2"))
+        self.assertFalse(_is_stable("48.alpha2"))
 
     async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
