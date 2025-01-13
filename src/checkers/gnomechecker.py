@@ -24,13 +24,19 @@ def _parse_checksums(text: str) -> t.Dict[str, str]:
     return result
 
 
+# Checkes whether any component of the version contains either alpha, beta or
+# rc.
+def _contains_keyword(version: str) -> bool:
+    return any(kw in version for kw in ["alpha", "beta", "rc"])
+
+
 def _is_stable(version: str) -> bool:
     ver_list = version.split(".")
     if len(ver_list) < 2:
         # Single number, e.g. "41"
         return True
     major, minor = ver_list[:2]
-    if set(ver_list[1:]) & {"alpha", "beta", "rc"}:
+    if any(_contains_keyword(x) for x in ver_list[1:]):
         return False
     if int(major) > 0 and int(major) < 40 and len(ver_list) > 2:
         return (int(minor) % 2) == 0
