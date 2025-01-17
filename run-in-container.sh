@@ -10,6 +10,7 @@ podman run --rm --privileged \
     -v $HOME:$HOME:rslave \
     -v $CWD:$CWD:rslave \
     -w $CWD \
+    --entrypoint= \
     -e GIT_AUTHOR_NAME="$GIT_USER_NAME" \
     -e GIT_COMMITTER_NAME="$GIT_USER_NAME" \
     -e GIT_AUTHOR_EMAIL="$GIT_USER_EMAIL" \
