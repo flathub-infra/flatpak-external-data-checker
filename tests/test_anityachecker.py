@@ -46,7 +46,7 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertIsInstance(data.new_version, ExternalFile)
                 self.assertRegex(
                     data.new_version.url,
-                    r"^https://boostorg\.jfrog\.io/artifactory/main/release/[\d.]+/source/boost_[\d]+_[\d]+_[\d]+.tar.bz2$",  # noqa: E501
+                    r"^https://archives\.boost\.io/release/[\d.]+/source/boost_[\d]+_[\d]+_[\d]+.tar.bz2$",  # noqa: E501
                 )
                 self.assertIsNotNone(data.new_version.version)
                 self.assertGreater(
