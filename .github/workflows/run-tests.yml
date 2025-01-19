@@ -16,7 +16,7 @@ jobs:
   check-formatting:
     name: Check formatting
     runs-on: ubuntu-latest
-    container: debian:bullseye
+    container: debian:bookworm
     permissions:
       contents: read
 
@@ -43,7 +43,7 @@ jobs:
   check-typing:
     name: Static type check
     runs-on: ubuntu-latest
-    container: debian:bullseye
+    container: debian:bookworm
     permissions:
       contents: read
     steps:
