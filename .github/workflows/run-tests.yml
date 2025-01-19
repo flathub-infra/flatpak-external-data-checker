@@ -29,7 +29,7 @@ jobs:
           apt-get install -y \
             $(xargs < dependencies.apt.txt) \
             python3-setuptools
-          python3 -m pip install \
+          python3 -m pip install --break-system-packages \
             black
 
       - name: Run black
@@ -64,7 +64,7 @@ jobs:
           apt-get install -y \
             $(xargs < dependencies.apt.txt) \
             python3-setuptools
-          python3 -m pip install \
+          python3 -m pip install --break-system-packages \
             mypy \
             lxml-stubs
 
