@@ -44,6 +44,8 @@ jobs:
     name: Static type check
     runs-on: ubuntu-latest
     container: debian:bullseye
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
