@@ -175,6 +175,9 @@ async def get_extra_data_info_from_url(
             if dest_io is not None:
                 dest_io.write(chunk)
 
+        if dest_io is not None:
+            dest_io.flush()
+
     external_file = externaldata.ExternalFile(
         url=strip_query(real_url if follow_redirects else url),
         checksum=checksum.hexdigest(),
