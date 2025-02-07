@@ -393,7 +393,11 @@ Check for latest source tarball for a GNOME project.
 }
 ```
 
-Set `stable-only` to `false` to check for pre-releases, too.
+Set `stable-only` to `false` to check for pre-releases, too. By default, any
+version that contains the string `alpha`, `beta` or `rc` is considered a
+pre-release, following the dominant convention since GNOME 40. To override this,
+set `version-scheme` to `odd-minor-is-unstable` to consider any version with an
+odd second component to be a pre-release.
 
 The [`versions`](#version-constraining) property is supported.
 
