@@ -262,8 +262,7 @@ class ExternalBase(BuilderSource):
             if not (source.keys() & {"md5", "sha1", "sha256", "sha512"}):
                 raise SourceLoadError("Data is missing checksum")
 
-        # FIXME: https://github.com/python/mypy/issues/9282
-        return super().from_source(source_path, source, module)  # type: ignore
+        return super().from_source(source_path, source, module)
 
     def set_new_version(self, new_version: ExternalState, is_update: bool = True):
         assert isinstance(new_version, type(self.current_version))
