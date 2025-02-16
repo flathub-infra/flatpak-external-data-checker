@@ -65,51 +65,47 @@ def print_outdated_external_data(manifest_checker: manifest.ManifestChecker):
     ext_data = manifest_checker.get_outdated_external_data()
     for data in ext_data:
         state_txt = data.state.name or str(data.state)
-        message_tmpl = ""
+        message_tmpl = [
+            "{data_state}: {data_name}",
+            " Has a new version:",
+            "  URL:       {url}",
+        ]
         message_args = {}
         if data.new_version:
             if data.type == data.Type.GIT:
                 assert data.new_version
-                message_tmpl = (
-                    "{data_state}: {data_name}\n"
-                    " Has a new version:\n"
-                    "  URL:       {url}\n"
-                    "  Commit:    {commit}\n"
-                    "  Tag:       {tag}\n"
-                    "  Branch:    {branch}\n"
-                    "  Version:   {version}\n"
-                    "  Timestamp: {timestamp}\n"
-                )
+                message_tmpl += [
+                    "  Commit:    {commit}",
+                    "  Tag:       {tag}",
+                    "  Branch:    {branch}",
+                ]
                 message_args = data.new_version._asdict()
             else:
                 assert isinstance(data, ExternalData)
                 assert data.new_version
-                message_tmpl = (
-                    "{data_state}: {data_name}\n"
-                    " Has a new version:\n"
-                    "  URL:       {url}\n"
-                    "  MD5:       {md5}\n"
-                    "  SHA1:      {sha1}\n"
-                    "  SHA256:    {sha256}\n"
-                    "  SHA512:    {sha512}\n"
-                    "  Size:      {size}\n"
-                    "  Version:   {version}\n"
-                    "  Timestamp: {timestamp}\n"
-                )
+                message_tmpl += [
+                    "  MD5:       {md5}",
+                    "  SHA1:      {sha1}",
+                    "  SHA256:    {sha256}",
+                    "  SHA512:    {sha512}",
+                    "  Size:      {size}",
+                ]
                 message_args = {
                     **data.new_version._asdict(),
                     **data.new_version.checksum._asdict(),
                 }
+            message_tmpl += [
+                "  Version:   {version}",
+                "  Timestamp: {timestamp}",
+            ]
         elif data.State.BROKEN in data.state:
-            message_tmpl = (
-                # fmt: off
-                "{data_state}: {data_name}\n"
-                " Couldn't get new version for {url}\n"
-                # fmt: on
-            )
+            message_tmpl = [
+                "{data_state}: {data_name}",
+                " Couldn't get new version for {url}",
+            ]
             message_args = data.current_version._asdict()
 
-        message = message_tmpl.format(
+        message = "\n".join(message_tmpl).format(
             data_state=state_txt,
             data_name=data.filename,
             **message_args,
