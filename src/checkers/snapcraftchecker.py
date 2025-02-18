@@ -70,6 +70,7 @@ class SnapcraftChecker(Checker):
                     timestamp=datetime.datetime.strptime(
                         data["channel"]["released-at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                     ),
+                    changelog_url=None,
                 )
 
                 external_data.set_new_version(new_version)

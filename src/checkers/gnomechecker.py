@@ -116,6 +116,7 @@ class GNOMEChecker(Checker):
             size=None,
             version=latest_version,
             timestamp=None,
+            changelog_url=None,
         )
 
         external_data.set_new_version(new_version)

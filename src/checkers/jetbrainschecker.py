@@ -50,6 +50,7 @@ class JetBrainsChecker(Checker):
             size=release["size"],
             version=data["version"],
             timestamp=datetime.datetime.strptime(data["date"], "%Y-%m-%d"),
+            changelog_url=None,
         )
 
         external_data.set_new_version(new_version)
