@@ -175,7 +175,7 @@ class CommittedChanges(t.NamedTuple):
     base_branch: t.Optional[str]
 
 
-def commit_message(changes: t.List[str]) -> str:
+def commit_subject(changes: t.List[str]) -> str:
     assert len(changes) >= 1
 
     if len(changes) == 1:
@@ -206,13 +206,22 @@ def commit_message(changes: t.List[str]) -> str:
 
 def commit_changes(changes: t.List[str]) -> CommittedChanges:
     log.info("Committing updates")
+    log.debug("For changes %s", repr(changes))
+    subject = commit_subject(changes)
     body: t.Optional[str]
-    subject = commit_message(changes)
+    # message will be the git-style combination of subject and message
+    # we'll still need the parts for PR creation later
+
     if len(changes) > 1:
         body = "\n".join(changes)
-        message = subject + "\n\n" + body
     else:
         body = None
+        # move the changelog url from subject to body
+        if "\n" in subject:
+            subject, body = subject.split("\n", maxsplit=1)
+    if body:
+        message = subject + "\n\n" + body
+    else:
         message = subject
 
     # Remember the base branch
@@ -275,6 +284,7 @@ def commit_changes(changes: t.List[str]) -> CommittedChanges:
     except subprocess.CalledProcessError:
         # If not, create it
         check_call(["git", "checkout", "-b", branch])
+    log.debug("Commited with subject='%s', message='%s', body='%s'", subject, repr(message), repr(body))
     return CommittedChanges(
         subject=subject,
         body=body,
