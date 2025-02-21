@@ -450,7 +450,10 @@ class ManifestChecker:
             if data.new_version is None:
                 continue
 
-            changelog = "\nChangelog: " + data.new_version.changelog_url if data.new_version.changelog_url else ""
+            if data.new_version.changelog_url:
+                changelog = "\nChangelog: " + data.new_version.changelog_url
+            else:
+                changelog = ""
 
             data.update()
             if data.new_version.version is not None:
@@ -458,7 +461,9 @@ class ManifestChecker:
                     data.module, data.filename, data.new_version.version, changelog
                 )
             else:
-                message = "{}: Update {}{}".format(data.module, data.filename, changelog)
+                message = "{}: Update {}{}".format(
+                    data.module, data.filename, changelog
+                )
 
             changes[message] = None
             path_has_changes = True

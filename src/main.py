@@ -284,7 +284,12 @@ def commit_changes(changes: t.List[str]) -> CommittedChanges:
     except subprocess.CalledProcessError:
         # If not, create it
         check_call(["git", "checkout", "-b", branch])
-    log.debug("Commited with subject='%s', message='%s', body='%s'", subject, repr(message), repr(body))
+    log.debug(
+        "committed with subject='%s', message='%s', body='%s'",
+        subject,
+        repr(message),
+        repr(body),
+    )
     return CommittedChanges(
         subject=subject,
         body=body,
