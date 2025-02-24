@@ -121,6 +121,8 @@ class ManifestChecker:
         self._manifest_contents: t.Dict[str, t.Union[t.List, t.Dict]]
         self._manifest_contents = {}
 
+        self._manifest_headers: t.Dict[str, bool] = {}
+
         # Top-level manifest contents
         self._root_manifest = self._read_manifest(self._root_manifest_path)
         self._load_root_manifest()
@@ -159,17 +161,23 @@ class ManifestChecker:
                     f"Manifest file size {manifest_size / 1024:.1f} KiB exceeds "
                     f"{self.opts.max_manifest_size / 1024:.1f} KiB: {manifest_path}"
                 )
-            contents = read_manifest(manifest_path)
+            ret = read_manifest(manifest_path)
+            if isinstance(ret, tuple):
+                contents, has_yaml_header = ret
+            else:
+                contents, has_yaml_header = ret, False
         except FileNotFoundError as err:
             raise ManifestFileOpenError from err
         self._manifest_contents[manifest_path] = contents
+        self._manifest_headers[manifest_path] = has_yaml_header
         return contents
 
     def _dump_manifest(self, path):
         """Writes back the cached contents of 'path', which may have been
         modified."""
         contents = self._manifest_contents[path]
-        dump_manifest(contents, path)
+        has_yaml_header = self._manifest_headers.get(path, False)
+        dump_manifest(contents, path, has_yaml_header)
 
     def _collect_external_data(self):
         if self.kind == self.Kind.APP:

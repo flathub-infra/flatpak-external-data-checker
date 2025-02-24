@@ -512,7 +512,10 @@ _yaml.indent(mapping=2, sequence=4, offset=2)
 def read_yaml_manifest(manifest_path: Path):
     """Read a YAML manifest from 'manifest_path'."""
     with manifest_path.open("r") as f:
-        return _yaml.load(f)
+        has_yaml_header = (_ := f.read(3)) == "---"
+        f.seek(0)
+        data = _yaml.load(f)
+    return data, has_yaml_header
 
 
 def read_manifest(manifest_path: t.Union[Path, str]):
@@ -524,7 +527,9 @@ def read_manifest(manifest_path: t.Union[Path, str]):
         return read_json_manifest(manifest_path)
 
 
-def dump_manifest(contents: t.Dict, manifest_path: t.Union[Path, str]):
+def dump_manifest(
+    contents: t.Dict, manifest_path: t.Union[Path, str], has_yaml_header: bool = False
+):
     """Writes back 'contents' to 'manifest_path'.
 
     For YAML, we make a best-effort attempt to preserve
@@ -562,6 +567,7 @@ def dump_manifest(contents: t.Dict, manifest_path: t.Union[Path, str]):
 
     with manifest_path.open("w", encoding="utf-8") as fp:
         if manifest_path.suffix in (".yaml", ".yml"):
+            _yaml.explicit_start = has_yaml_header  # type: ignore[assignment]
             _yaml.dump(contents, fp)
         else:
             json.dump(obj=contents, fp=fp, indent=indent)
