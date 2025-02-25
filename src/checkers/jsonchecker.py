@@ -212,6 +212,7 @@ class JSONChecker(Checker):
             branch=None,
             version=results.get("version"),
             timestamp=parse_timestamp(results.get("timestamp")),
+            changelog_url=None,
         )
 
         if new_version.commit is None:
