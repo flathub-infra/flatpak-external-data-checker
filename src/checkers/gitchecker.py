@@ -150,6 +150,7 @@ class GitChecker(Checker):
             branch=None,
             version=latest_tag.version,
             timestamp=None,
+            changelog_url=None,
         )
         external_data.set_new_version(new_version)
 

@@ -54,6 +54,7 @@ CHECKER_DATA_SCHEMA_COMMON = {
         },
         "source-id": {"type": "string"},
         "parent-id": {"type": "string"},
+        "changelog-url-template": {"type": "string"},
     },
     "required": ["type"],
 }
@@ -204,6 +205,7 @@ class ExternalState(abc.ABC):
     url: str
     version: t.Optional[str]
     timestamp: t.Optional[datetime.datetime]
+    changelog_url: t.Optional[str]
 
     def _replace(self: _ES, **kwargs) -> _ES:
         return dataclasses.replace(self, **kwargs)
@@ -286,6 +288,11 @@ class ExternalBase(BuilderSource):
                 )
                 self.state |= self.State.OUTDATED
 
+                assert new_version.changelog_url is None
+                new_version = new_version._replace(
+                    changelog_url=self.current_version.changelog_url
+                )
+
             self.new_version = new_version
 
     @property
@@ -358,6 +365,7 @@ class ExternalData(ExternalBase):
         checksum = MultiDigest.from_source(source)
         size = source.get("size")
         checker_data = source.get("x-checker-data", {})
+        changelog_url = checker_data.get("changelog-url-template", None)
         arches = checker_data.get("arches") or source.get("only-arches") or ["x86_64"]
 
         obj = cls(
@@ -374,6 +382,7 @@ class ExternalData(ExternalBase):
                 size=size,
                 version=None,
                 timestamp=None,
+                changelog_url=changelog_url,
             ),
             None,
         )
@@ -519,6 +528,7 @@ class ExternalGitRepo(ExternalBase):
         tag = source.get("tag")
         branch = source.get("branch")
         checker_data = source.get("x-checker-data", {})
+        changelog_url = checker_data.get("changelog-url-template", None)
         arches = checker_data.get("arches") or source.get("only-arches") or ["x86_64"]
 
         obj = cls(
@@ -536,6 +546,7 @@ class ExternalGitRepo(ExternalBase):
                 branch=branch,
                 version=None,
                 timestamp=None,
+                changelog_url=changelog_url,
             ),
             None,
         )
