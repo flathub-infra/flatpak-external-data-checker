@@ -411,6 +411,14 @@ def open_pr(
         head,
         base,
     )
+
+    gh_run_id = os.environ.get("GITHUB_RUN_ID")
+    gh_repo_name = os.environ.get("GITHUB_REPOSITORY")
+    if gh_run_id and gh_repo_name:
+        log.info("Appending GitHub actions log URL to PR message")
+        log_url = f"https://github.com/{gh_repo_name}/actions/runs/{gh_run_id}"
+        pr_message += f"\n\n[📋 View External data checker logs]({log_url})"
+
     pr = origin_repo.create_pull(
         change.subject,
         pr_message,
