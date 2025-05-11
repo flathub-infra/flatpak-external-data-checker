@@ -68,7 +68,7 @@ modules:
         x-checker-data:
           type: html
           url: https://www.x.org/releases/individual/lib/
-          url-pattern: (http://some-incorrect.url/libFS-[\d\.]+.tar.bz2)
+          url-template: http://some-incorrect.url/libFS-$version.tar.bz2
           version-pattern: http://some-incorrect.url/libFS-([\d\.]+).tar.bz2
 
   - name: libdoesntexist
