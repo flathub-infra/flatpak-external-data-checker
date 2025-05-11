@@ -311,7 +311,9 @@ def open_pr(
     change: CommittedChanges,
     manifest_checker: t.Optional[manifest.ManifestChecker] = None,
     fork: t.Optional[bool] = None,
+    pr_labels: t.Optional[t.List[str]] = None,
 ):
+
     try:
         github_token = os.environ["GITHUB_TOKEN"]
     except KeyError:
@@ -417,6 +419,9 @@ def open_pr(
         maintainer_can_modify=True,
     )
     log.info("Opened pull request %s", pr.html_url)
+    if pr_labels:
+        log.info("Adding labels to PR: %s", ", ".join(pr_labels))
+        pr.set_labels(*pr_labels)
 
 
 def parse_cli_args(cli_args=None):
@@ -504,8 +509,19 @@ def parse_cli_args(cli_args=None):
         ),
         action="store_true",
     )
+    parser.add_argument(
+        "--pr-labels",
+        type=str,
+        default="",
+        help="Comma-separated GitHub labels to add to the pull request",
+    )
 
-    return parser.parse_args(cli_args)
+    args = parser.parse_args(cli_args)
+    args.pr_labels = [
+        label.strip() for label in args.pr_labels.split(",") if label.strip()
+    ]
+
+    return args
 
 
 async def run_with_args(args: argparse.Namespace) -> t.Tuple[int, int, bool]:
@@ -538,6 +554,7 @@ async def run_with_args(args: argparse.Namespace) -> t.Tuple[int, int, bool]:
                         committed_changes,
                         manifest_checker=manifest_checker,
                         fork=args.fork,
+                        pr_labels=args.pr_labels,
                     )
         did_update = True
 
