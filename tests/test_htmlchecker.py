@@ -175,7 +175,7 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
             child.new_version.checksum,
             # curl https://httpbingo.org/response-headers?version=1.0.0 | sha256sum
             MultiDigest(
-                sha256="b7160b96668c66cdee4ec5b0115bc5a7a8d58cd86b3ff49473e1611947babda3"  # noqa: E501
+                sha256="81f3779437618c7f9ff38b53ce6f5ed99e626ba82a7c31107400a2ef97592882"  # noqa: E501
             ),
         )
         self.assertEqual(parent.new_version.checksum, child.new_version.checksum)

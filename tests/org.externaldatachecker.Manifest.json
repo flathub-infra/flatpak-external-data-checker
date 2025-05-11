@@ -83,9 +83,9 @@
                     "type": "extra-data",
                     "filename": "strip-query.txt",
                     "url": "https://httpbingo.org/response-headers",
-                    "//": "This is sha256 of '{}' string, returned by the url above (without GET params)",
-                    "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
-                    "size": 3,
+                    "//": "curl -s https://httpbingo.org/response-headers|sha256sum",
+                    "sha256": "93a8f337fa182b33b88e66aecb41dde58f49bfec2e059fe9e17ed227786750a0",
+                    "size": 66,
                     "x-checker-data": {
                         "type": "rotating-url",
                         "url": "https://httpbingo.org/redirect-to?url=/response-headers?This-Should-Be=Removed",
