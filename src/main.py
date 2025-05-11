@@ -265,7 +265,10 @@ def commit_changes(changes: t.List[str]) -> CommittedChanges:
     tree = subprocess.check_output(
         ["git", "rev-parse", "HEAD^{tree}"], text=True
     ).strip()
-    branch = f"update-{tree[:7]}"
+    if base_branch:
+        branch = f"update-{base_branch}-{tree[:7]}"
+    else:
+        branch = f"update-{tree[:7]}"
 
     try:
         # Check if the branch already exists
