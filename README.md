@@ -221,7 +221,7 @@ HTML page which contains this information:
     "type": "html",
     "url": "https://www.example.com/download.html",
     "version-pattern": "The latest version is ([\\d\\.-]+)",
-    "url-pattern": "(https://www.example.com/pub/foo/v([\\d\\.-]+)/foo.tar.gz)"
+    "url-template": "https://www.example.com/pub/foo-v$version.tar.gz)"
 }
 ```
 
