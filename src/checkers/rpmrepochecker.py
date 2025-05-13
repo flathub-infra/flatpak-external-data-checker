@@ -49,6 +49,7 @@ class RPMRepoChecker(Checker):
             size=int(child_prop("size", "archive")),
             version=child_prop("version", "ver"),
             timestamp=datetime.utcfromtimestamp(int(child_prop("time", "file"))),
+            changelog_url=None,
         )
 
     async def check(self, external_data: ExternalBase):

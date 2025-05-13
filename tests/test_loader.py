@@ -194,44 +194,44 @@ class TestManifestLoader(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(data2.is_same_version(data1))
 
         assertSame(
-            ExternalGitRef("http://example.com", None, None, "a", "v1.0", None),
-            ExternalGitRef("http://example.com", None, None, "b", "v1.0", None),
+            ExternalGitRef("http://example.com", None, None, None, "a", "v1.0", None),
+            ExternalGitRef("http://example.com", None, None, None, "b", "v1.0", None),
         )
         assertDiff(
-            ExternalGitRef("http://example.com", None, None, "a", "v1.0", None),
-            ExternalGitRef("http://example.com", None, None, "b", "v1.1", None),
+            ExternalGitRef("http://example.com", None, None, None, "a", "v1.0", None),
+            ExternalGitRef("http://example.com", None, None, None, "b", "v1.1", None),
         )
         assertDiff(
-            ExternalGitRef("http://example.com", None, None, "a", "v1.0", None),
-            ExternalGitRef("http://example.com", None, None, "a", "v1.1", None),
+            ExternalGitRef("http://example.com", None, None, None, "a", "v1.0", None),
+            ExternalGitRef("http://example.com", None, None, None, "a", "v1.1", None),
         )
         assertDiff(
-            ExternalGitRef("http://example.com", None, None, "a", "v1.0", "same"),
-            ExternalGitRef("http://example.com", None, None, "a", "v1.1", "same"),
+            ExternalGitRef("http://example.com", None, None, None, "a", "v1.0", "same"),
+            ExternalGitRef("http://example.com", None, None, None, "a", "v1.1", "same"),
         )
         assertDiff(
-            ExternalGitRef("http://example.com", None, None, "a", "v1.0", "one"),
-            ExternalGitRef("http://example.com", None, None, "a", "v1.0", "two"),
+            ExternalGitRef("http://example.com", None, None, None, "a", "v1.0", "one"),
+            ExternalGitRef("http://example.com", None, None, None, "a", "v1.0", "two"),
         )
         # No tag, same branch
         assertSame(
-            ExternalGitRef("http://example.com", None, None, "a", None, "same"),
-            ExternalGitRef("http://example.com", None, None, "b", None, "same"),
+            ExternalGitRef("http://example.com", None, None, None, "a", None, "same"),
+            ExternalGitRef("http://example.com", None, None, None, "b", None, "same"),
         )
         # No tag, different branches
         assertDiff(
-            ExternalGitRef("http://example.com", None, None, "a", None, "one"),
-            ExternalGitRef("http://example.com", None, None, "b", None, "two"),
+            ExternalGitRef("http://example.com", None, None, None, "a", None, "one"),
+            ExternalGitRef("http://example.com", None, None, None, "b", None, "two"),
         )
         # No tag or branch, same commit
         assertSame(
-            ExternalGitRef("http://example.com", None, None, "a", None, None),
-            ExternalGitRef("http://example.com", None, None, "a", None, None),
+            ExternalGitRef("http://example.com", None, None, None, "a", None, None),
+            ExternalGitRef("http://example.com", None, None, None, "a", None, None),
         )
         # No tag or branch, different commits
         assertDiff(
-            ExternalGitRef("http://example.com", None, None, "a", None, None),
-            ExternalGitRef("http://example.com", None, None, "b", None, None),
+            ExternalGitRef("http://example.com", None, None, None, "a", None, None),
+            ExternalGitRef("http://example.com", None, None, None, "b", None, None),
         )
 
     def test_load(self):
