@@ -64,6 +64,7 @@ class TestGNOMEChecker(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(_is_stable("2.2.2", scheme))
         self.assertTrue(_is_stable("1.2.2", scheme))
         self.assertTrue(_is_stable("1.2.1", scheme))
+        self.assertTrue(_is_stable("0.10.0", scheme))
 
         self.assertFalse(_is_stable("1.1", scheme))
         self.assertFalse(_is_stable("1.1.0", scheme))
@@ -72,6 +73,7 @@ class TestGNOMEChecker(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(_is_stable("2.3.2", scheme))
         self.assertFalse(_is_stable("1.1.2", scheme))
         self.assertFalse(_is_stable("1.3.1", scheme))
+        self.assertFalse(_is_stable("0.11.0", scheme))
 
     async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)

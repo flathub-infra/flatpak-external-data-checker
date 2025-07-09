@@ -49,7 +49,7 @@ def _is_stable(
         if any(_contains_keyword(x) for x in ver_list[1:]):
             return False
     elif scheme == VersionScheme.ODD_MINOR_IS_UNSTABLE:
-        if int(major) > 0 and len(ver_list) >= 2:
+        if len(ver_list) >= 2:
             return (int(minor) % 2) == 0
 
     # XXX If we didn't see any indication that the version is a prerelease,
