@@ -8,7 +8,7 @@ modules:
             x-checker-data:
               type: debian-repo
               root: http://deb.debian.org/debian/
-              dist: buster
+              dist: bookworm
               component: main
               package-name: python-apt
               source: true
@@ -23,6 +23,6 @@ modules:
                 x-checker-data:
                   type: debian-repo
                   root: http://deb.debian.org/debian
-                  dist: buster
+                  dist: bookworm
                   component: main
                   package-name: apt
