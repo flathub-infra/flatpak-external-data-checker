@@ -75,7 +75,7 @@ options for you and run the image using `podman`:
 
 ### On Flathub
 
-Flathub runs this tool hourly for all Flatpak repos under [github.com/flathub](https://github.com/flathub). 
+Flathub [runs this tool periodically](https://github.com/flathub/flathub/blob/master/.github/workflows/external-data-checker.yml) for all Flatpak repos under [github.com/flathub](https://github.com/flathub). 
 So, for those repos to receive update PRs, add `x-checker-data` [as needed to sources](#changes-to-flatpak-manifests). 
 Note Flathub's hosted tool only checks the default branch.
 
