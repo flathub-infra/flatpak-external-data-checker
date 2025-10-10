@@ -199,7 +199,7 @@ class TestDownload(unittest.IsolatedAsyncioTestCase):
 
     async def test_correct_content_type(self):
         await get_extra_data_info_from_url(
-            url="https://ftp.gnu.org/gnu/gzip/gzip-1.12.tar.gz",
+            url="https://ftpmirror.gnu.org/gnu/gzip/gzip-1.12.tar.gz",
             session=self.http,
             content_type_deny=[re.compile(r"^application/x-fedc-test$")],
         )
