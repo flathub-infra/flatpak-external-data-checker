@@ -53,7 +53,7 @@ from .checkers import Checker, ALL_CHECKERS
 
 MAIN_SRC_PROP = "is-main-source"
 IMPORTANT_SRC_PROP = "is-important"
-MAX_MANIFEST_SIZE = 1024 * 100
+MAX_MANIFEST_SIZE = 1024 * 1024
 
 
 log = logging.getLogger(__name__)
