@@ -48,6 +48,7 @@ CHECKER_DATA_SCHEMA_COMMON = {
         "type": {"type": "string"},
         "is-main-source": {"type": "boolean"},
         "is-important": {"type": "boolean"},
+        "release-url-template": {"type": "string"},
         "arches": {
             "type": "array",
             "items": {"type": "string"},

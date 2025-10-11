@@ -67,6 +67,7 @@ def add_release(
     dst: t.Union[t.IO, str],
     version: str,
     date: str,
+    release_url_template: t.Optional[str],
 ):
     parser = ElementTree.XMLParser(load_dtd=False, resolve_entities=False)
     tree = ElementTree.parse(src, parser=parser)
@@ -83,16 +84,21 @@ def add_release(
     releases.insert(0, release)
     _fill_padding(release)
 
+    # Indent the opening <description> tag one level
+    # deeper than the <release> tag.
+    if releases.text:
+        release.text = "\n" + ((releases.text[1::2]) * 3)
+
+    if release_url_template:
+        rel_url_elem = ElementTree.SubElement(release, "url", type="details")
+        rel_url_elem.text = release_url_template.replace("$version", version)
+        rel_url_elem.tail = release.text
+
     description = ElementTree.Element("description")
 
     # Give <description> a closing </description> rather than it being
     # self-closing
     description.text = ""
-
-    # Indent the opening <description> tag one level
-    # deeper than the <release> tag.
-    if releases.text:
-        release.text = "\n" + ((releases.text[1::2]) * 3)
 
     # Indent the closing </release> tag by the same amount as the opening
     # <release> tag (which we know to be the first child of <releases> since
@@ -110,9 +116,11 @@ def add_release(
     )
 
 
-def add_release_to_file(appdata_path: str, version: str, date: str):
+def add_release_to_file(
+    appdata_path: str, version: str, date: str, release_url_template: t.Optional[str]
+):
     with io.BytesIO() as buf:
-        add_release(appdata_path, buf, version, date)
+        add_release(appdata_path, buf, version, date, release_url_template)
 
         with open(appdata_path, "wb") as f:
             f.write(buf.getvalue())
