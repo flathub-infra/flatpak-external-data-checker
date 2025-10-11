@@ -75,8 +75,8 @@ options for you and run the image using `podman`:
 
 ### On Flathub
 
-Flathub [runs this tool periodically](https://github.com/flathub/flathub/blob/master/.github/workflows/external-data-checker.yml) for all Flatpak repos under [github.com/flathub](https://github.com/flathub). 
-So, for those repos to receive update PRs, add `x-checker-data` [as needed to sources](#changes-to-flatpak-manifests). 
+Flathub [runs this tool periodically](https://github.com/flathub/flathub/blob/master/.github/workflows/external-data-checker.yml) for all Flatpak repos under [github.com/flathub](https://github.com/flathub).
+So, for those repos to receive update PRs, add `x-checker-data` [as needed to sources](#changes-to-flatpak-manifests).
 Note Flathub's hosted tool only checks the default branch.
 
 To stop Flathub's tool from checking your repo, add `"disable-external-data-checker": true` to `flathub.json` in the default branch.
@@ -92,7 +92,7 @@ name: Check for updates
 on:
   schedule: # for scheduling to work this file must be in the default branch
   - cron: "0 * * * *" # run every hour
-  workflow_dispatch: # can be manually dispatched under GitHub's "Actions" tab 
+  workflow_dispatch: # can be manually dispatched under GitHub's "Actions" tab
 
 jobs:
   flatpak-external-data-checker:
@@ -101,7 +101,7 @@ jobs:
     strategy:
       matrix:
         branch: [ master ] # list all branches to check
-    
+
     steps:
       - uses: actions/checkout@v3
         with:
@@ -279,7 +279,7 @@ If the placeholder is immediately followed by an underscore, you need to add bra
 ### Git checker
 
 To check for latest git tag in corresponding git source repo, add checker
-metadata with type `git` and set `tag-pattern` to a regular expression with 
+metadata with type `git` and set `tag-pattern` to a regular expression with
 exactly one match group (the pattern will be used to extract version from tag):
 
 ```json
@@ -355,8 +355,8 @@ to, e.g. where "type": "extra-data" is declared):
 
 ### Anitya (release-monitoring) checker
 
-[Anitya](https://github.com/fedora-infra/anitya) is an upstream release monitoring 
-project by Fedora. It supports multiple backends for retrieving version information 
+[Anitya](https://github.com/fedora-infra/anitya) is an upstream release monitoring
+project by Fedora. It supports multiple backends for retrieving version information
 from different services, including GitHub, GitLab, Sourceforge, etc.
 To use the **AnityaChecker**, specify numeric project ID on release-monitoring.org
 and add a template for source download URL.
@@ -429,7 +429,7 @@ x-checker-data:
   url: https://example.com/download/latest-linux.yml
 ```
 
-The `url`, if set, must link to a Electron Auto Update metadata file (usually `latest-linux.yml`).  
+The `url`, if set, must link to a Electron Auto Update metadata file (usually `latest-linux.yml`).
 If `url` is omitted, the checker will try to guess it based on the current source url.
 
 Make sure to use `sha512` checksum for the source, unless it's an `extra-data` (which supports `sha256` only).
@@ -496,6 +496,25 @@ The following components are supported:
   sources.
 - `llvm-git`: updates a `type: git` source for its commit to point to the LLVM
   sources for the toolchain used by the latest Chromium version.
+
+### Release URL template
+
+When updating the metainfo file with the release information of the main
+source if a `release-url-template` is provided in the `x-checker-data`
+like below a `<url type="details"></url>` tag will also be added.
+
+The `$version` in `release-url-template` will be replaced by the release
+version.
+
+```yaml
+x-checker-data:
+    type: json
+    url: https://api.github.com/repos/example/foobar/releases
+    version-query: map(select(.prerelease)) | first | .tag_name
+    url-query: map(select(.prerelease)) | first | .assets[] | select(.name=="foobar-x86_64.tar.gz")| .browser_download_url
+    release-url-template: https://github.com/example/foobar/releases/tag/$version
+    is-main-source: true
+```
 
 ## License and Copyright
 

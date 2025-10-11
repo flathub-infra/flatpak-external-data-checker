@@ -53,6 +53,7 @@ from .checkers import Checker, ALL_CHECKERS
 
 MAIN_SRC_PROP = "is-main-source"
 IMPORTANT_SRC_PROP = "is-important"
+RELEASE_URL_TEMPLATE_PROP = "release-url-template"
 MAX_MANIFEST_SIZE = 1024 * 1024
 
 
@@ -508,6 +509,7 @@ class ManifestChecker:
                 )
                 return
 
+        release_url_template = selected_data.checker_data.get(RELEASE_URL_TEMPLATE_PROP)
         last_update = selected_data.new_version
 
         if selected_data.has_version_changed:
@@ -519,7 +521,10 @@ class ManifestChecker:
                 timestamp = last_update.timestamp
             try:
                 add_release_to_file(
-                    appdata, last_update.version, timestamp.strftime("%F")
+                    appdata,
+                    last_update.version,
+                    timestamp.strftime("%F"),
+                    release_url_template,
                 )
             except XMLSyntaxError as err:
                 raise AppdataLoadError from err

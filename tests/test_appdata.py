@@ -28,7 +28,7 @@ class TestAddRelease(unittest.TestCase):
     def _do_test(self, before, expected):
         in_ = BytesIO(before.encode())
         out = BytesIO()
-        add_release(in_, out, "4.5.6", "2020-02-02")
+        add_release(in_, out, "4.5.6", "2020-02-02", None)
         # FIXME lxml pretty print always adds trailing newline
         self.assertMultiLineEqual(expected + "\n", out.getvalue().decode())
 
@@ -357,6 +357,37 @@ SentUpstream: 2014-05-22
 </component>
             """.strip(),
         )
+
+    def test_release_url_template(self):
+        before = """
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop">
+  <releases></releases>
+</component>
+        """.strip()
+
+        expected = """
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop">
+  <releases>
+    <release version="4.5.6" date="2020-02-02">
+      <url type="details">https://example.org/changelog.html#version_4.5.6</url>
+      <description></description>
+    </release>
+  </releases>
+</component>
+        """.strip()
+
+        in_ = BytesIO(before.encode())
+        out = BytesIO()
+        add_release(
+            in_,
+            out,
+            "4.5.6",
+            "2020-02-02",
+            "https://example.org/changelog.html#version_$version",
+        )
+        self.assertMultiLineEqual(expected + "\n", out.getvalue().decode())
 
 
 if __name__ == "__main__":
