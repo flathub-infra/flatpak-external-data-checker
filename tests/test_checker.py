@@ -45,13 +45,17 @@ TEST_MANIFEST = os.path.join(
     "org.externaldatachecker.Manifest.json",
 )
 NUM_ARCHIVE_IN_MANIFEST = 1
-NUM_FILE_IN_MANIFEST = 1
+NUM_FILE_IN_MANIFEST = 382
 NUM_EXTRA_DATA_IN_MANIFEST = 11
+NUM_GIT_IN_MANIFEST = 5
 NUM_ALL_EXT_DATA = (
-    NUM_ARCHIVE_IN_MANIFEST + NUM_FILE_IN_MANIFEST + NUM_EXTRA_DATA_IN_MANIFEST
+    NUM_ARCHIVE_IN_MANIFEST
+    + NUM_FILE_IN_MANIFEST
+    + NUM_EXTRA_DATA_IN_MANIFEST
+    + NUM_GIT_IN_MANIFEST
 )
 NUM_UP_TO_DATE_DATA = 2
-NUM_SKIPPED_DATA = 2
+NUM_SKIPPED_DATA = 388
 NUM_OUTDATED_DATA = NUM_ALL_EXT_DATA - (NUM_UP_TO_DATE_DATA + NUM_SKIPPED_DATA)
 NUM_NEW_VERSIONS = 2
 
@@ -62,7 +66,9 @@ class DummyChecker(Checker, register=False):
 
     @classmethod
     def should_check(cls, external_data):
-        return True
+        if getattr(external_data, "type", None) == external_data.Type.EXTRA_DATA:
+            return True
+        return bool(getattr(external_data, "checker_data", None))
 
     async def check(self, external_data):
         logging.debug(
