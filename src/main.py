@@ -238,7 +238,8 @@ def commit_changes(changes: t.List[str]) -> CommittedChanges:
 
     if retry_commit:
         log.warning("Committing failed. Falling back to a sanitised config")
-        git_email = getpass.getuser() + "@" + "localhost"
+        git_name = getpass.getuser()
+        git_email = git_name + "@" + "localhost"
         assert git_email is not None
         env = {
             "GIT_CONFIG_GLOBAL": "/dev/null",
@@ -248,6 +249,8 @@ def commit_changes(changes: t.List[str]) -> CommittedChanges:
         subprocess.run(
             [
                 "git",
+                "-c",
+                f"user.name={git_name}",
                 "-c",
                 f"user.email={git_email}",
                 "commit",
