@@ -172,7 +172,7 @@ def ensure_git_safe_directory(checkout: Path):
 class CommittedChanges(t.NamedTuple):
     subject: str
     body: t.Optional[str]
-    commit: str
+    commit: t.Optional[str]
     branch: str
     base_branch: t.Optional[str]
 
@@ -206,7 +206,21 @@ def commit_message(changes: t.List[str]) -> str:
     return f"Update {len(module_names)} modules"
 
 
-def commit_changes(changes: t.List[str]) -> CommittedChanges:
+def branch_exists(branch: str) -> bool:
+    try:
+        subprocess.run(
+            ["git", "rev-parse", "--verify", branch],
+            capture_output=True,
+            check=True,
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def commit_changes(
+    changes: t.List[str], commit_to_base: bool = False
+) -> t.Optional[CommittedChanges]:
     log.info("Committing updates")
     body: t.Optional[str]
     subject = commit_message(changes)
@@ -225,9 +239,25 @@ def commit_changes(changes: t.List[str]) -> CommittedChanges:
     if not base_branch:
         base_branch = None
 
-    # Moved to detached HEAD
-    log.info("Switching to detached HEAD")
-    check_call(["git", "-c", "advice.detachedHead=false", "checkout", "HEAD@{0}"])
+    if commit_to_base:
+        if not base_branch:
+            log.error("Failed to determine the base branch: cannot commit to it")
+            return None
+        else:
+            branch = base_branch
+            tree = None
+    else:
+        # Moved to detached HEAD
+        log.info("Switching to detached HEAD")
+        check_call(["git", "-c", "advice.detachedHead=false", "checkout", "HEAD@{0}"])
+        # Find a stable identifier for the contents of the tree, to avoid
+        # sending the same PR twice.
+        tree = subprocess.check_output(
+            ["git", "rev-parse", "HEAD^{tree}"], text=True
+        ).strip()
+        branch = (
+            f"update-{base_branch}-{tree[:7]}" if base_branch else f"update-{tree[:7]}"
+        )
 
     retry_commit = False
     try:
@@ -263,25 +293,7 @@ def commit_changes(changes: t.List[str]) -> CommittedChanges:
             env=env,
         )
 
-    # Find a stable identifier for the contents of the tree, to avoid
-    # sending the same PR twice.
-    tree = subprocess.check_output(
-        ["git", "rev-parse", "HEAD^{tree}"], text=True
-    ).strip()
-    if base_branch:
-        branch = f"update-{base_branch}-{tree[:7]}"
-    else:
-        branch = f"update-{tree[:7]}"
-
-    try:
-        # Check if the branch already exists
-        subprocess.run(
-            ["git", "rev-parse", "--verify", branch],
-            capture_output=True,
-            check=True,
-        )
-    except subprocess.CalledProcessError:
-        # If not, create it
+    if not (commit_to_base or branch_exists(branch)):
         check_call(["git", "checkout", "-b", branch])
     return CommittedChanges(
         subject=subject,
@@ -529,6 +541,14 @@ def parse_cli_args(cli_args=None):
         default="",
         help="Comma-separated GitHub labels to add to the pull request",
     )
+    parser.add_argument(
+        "--commit-to-current-branch",
+        action="store_true",
+        help=(
+            "Commit changes directly to the currently checked out branch"
+            " instead of creating a new branch"
+        ),
+    )
 
     args = parser.parse_args(cli_args)
     args.pr_labels = [
@@ -562,8 +582,12 @@ async def run_with_args(args: argparse.Namespace) -> t.Tuple[int, int, bool]:
             git_checkout = get_manifest_git_checkout(args.manifest)
             ensure_git_safe_directory(git_checkout)
             with indir(git_checkout):
-                committed_changes = commit_changes(changes)
-                if not args.commit_only:
+                committed_changes = commit_changes(
+                    changes, commit_to_base=args.commit_to_current_branch
+                )
+                if not committed_changes:
+                    return (-1, -1, False)
+                if not (args.commit_only or args.commit_to_current_branch):
                     open_pr(
                         committed_changes,
                         manifest_checker=manifest_checker,
@@ -593,7 +617,7 @@ def main():
     res = ResultCode.SUCCESS
     args = parse_cli_args()
     outdated_num, errors_num, updated = asyncio.run(run_with_args(args))
-    if errors_num:
+    if (outdated_num, errors_num, updated) == (-1, -1, False) or errors_num:
         res |= ResultCode.ERROR
     if args.check_outdated and not updated and outdated_num > 0:
         res |= ResultCode.OUTDATED
