@@ -101,6 +101,61 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(commit_data["committer_name"], "Test Runner")
         self.assertEqual(commit_data["committer_email"], "test@localhost")
 
+    async def test_branch_exists(self):
+        current_branch = subprocess.check_output(
+            ["git", "branch", "--show-current"], cwd=self.test_dir.name, text=True
+        ).strip()
+        with main.indir(self.test_dir.name):
+            self.assertTrue(main.branch_exists(current_branch))
+            self.assertFalse(main.branch_exists("nonexistent-branch"))
+
+    async def test_commit_to_base_branch(self):
+        base_branch = subprocess.check_output(
+            ["git", "branch", "--show-current"], cwd=self.test_dir.name, text=True
+        ).strip()
+
+        args = main.parse_cli_args(
+            [
+                "--update",
+                "--commit-only",
+                "--commit-to-current-branch",
+                self.manifest_path,
+            ]
+        )
+
+        with patch("src.main.open_pr") as mock_open_pr:
+            result = await main.run_with_args(args)
+            self.assertEqual(result, (2, 0, True))
+            mock_open_pr.assert_not_called()
+
+        branch_name = self._run_cmd(
+            ["git", "branch", "--show-current"], stdout=subprocess.PIPE
+        )
+        self.assertEqual(branch_name.stdout.decode().strip(), base_branch)
+
+        commit_msg_proc = self._run_cmd(
+            ["git", "log", "-1", "--pretty=%s"], stdout=subprocess.PIPE
+        )
+        commit_msg = commit_msg_proc.stdout.decode().strip()
+        self.assertEqual(commit_msg, "Update libXaw and xterm modules")
+
+    async def test_commit_to_base_no_base_branch(self):
+        self._run_cmd(["git", "checkout", "--detach"])
+
+        args = main.parse_cli_args(
+            [
+                "--update",
+                "--commit-only",
+                "--commit-to-current-branch",
+                self.manifest_path,
+            ]
+        )
+
+        with patch("src.main.open_pr") as mock_open_pr:
+            result = await main.run_with_args(args)
+            self.assertEqual(result, (-1, -1, False))
+            mock_open_pr.assert_not_called()
+
 
 class TestCommitFallback(unittest.TestCase):
     def setUp(self):
