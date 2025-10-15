@@ -1,11 +1,13 @@
 import copy
 import os
 import unittest
+import aiohttp
+from unittest import mock
 
 from src.manifest import ManifestChecker
 from src.lib.externaldata import ExternalGitRepo, ExternalGitRef
 from src.lib.utils import init_logging
-from src.checkers.gitchecker import TagWithVersion, TagWithSemver
+from src.checkers.gitchecker import TagWithVersion, TagWithSemver, GitChecker
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.virustotal.Uploader.yml")
 
@@ -122,6 +124,45 @@ class TestGitChecker(unittest.IsolatedAsyncioTestCase):
             self.assertIn("commit", data.source)
             self.assertNotEqual(data.source["commit"], orig_source["commit"])
             self.assertNotEqual(data.source["tag"], orig_source["tag"])
+
+    async def test_version_scheme_validation(self):
+        mock_refs = {
+            "refs/tags/v1.0.0": "commit1",
+            "refs/tags/v2.1.0": "commit2",
+            "refs/tags/v21.0": "commit3",  # Invalid semver
+            "refs/tags/v21.1": "commit4",  # Invalid semver
+            "refs/tags/v3.0.0": "commit5",
+            "refs/tags/v2.6.1rc1": "commit6",  # Should not match pattern
+        }
+
+        external_data = ExternalGitRepo.from_source_impl(
+            source_path="test.git",
+            source={
+                "type": "git",
+                "url": "https://example.com/test.git",
+                "tag": "v1.0.0",
+                "commit": "commit1",
+                "x-checker-data": {
+                    "type": "git",
+                    "tag-pattern": r"^v([\d.]+)$",
+                    "version-scheme": "semantic",
+                },
+            },
+        )
+
+        with mock.patch(
+            "src.checkers.gitchecker.git_ls_remote",
+            new_callable=mock.AsyncMock,
+            return_value=mock_refs,
+        ):
+            async with aiohttp.ClientSession() as session:
+                checker = GitChecker(session)
+                await checker.check(external_data)
+
+        self.assertIsNotNone(external_data.new_version)
+        self.assertEqual(external_data.new_version.tag, "v3.0.0")
+        self.assertEqual(external_data.new_version.version, "3.0.0")
+        self.assertEqual(external_data.new_version.commit, "commit5")
 
 
 if __name__ == "__main__":
