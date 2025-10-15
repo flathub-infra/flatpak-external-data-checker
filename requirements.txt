@@ -12,3 +12,4 @@ requests
 ruamel.yaml
 semver
 toml
+packaging
