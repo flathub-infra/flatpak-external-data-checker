@@ -31,7 +31,7 @@ import tempfile
 import urllib.request
 import urllib.parse
 import typing as t
-from distutils.version import StrictVersion, LooseVersion
+from distutils.version import StrictVersion
 import asyncio
 import shlex
 from pathlib import Path
@@ -47,6 +47,7 @@ import magic
 from . import externaldata, TIMEOUT_CONNECT, HTTP_CHUNK_SIZE, OPERATORS
 from .errors import CheckerRemoteError, CheckerQueryError, CheckerFetchError
 from .checksums import MultiHash
+from .version import LooseVersion
 
 import gi
 

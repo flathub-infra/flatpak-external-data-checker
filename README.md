@@ -243,9 +243,10 @@ The [`versions`](#version-constraining) property is supported.
 #### URL templates
 
 The HTML checker also supports building the download URL using
-the retrieved version string, its components according to the Python
-[LooseVersion](http://epydoc.sourceforge.net/stdlib/distutils.version.LooseVersion-class.html)
-class and semantic versioning fields:
+the retrieved version string, its components according to our
+LooseVersion implementation (see `src/lib/version.py` based on
+distutils' implementation before it was removed from Python stdlib in
+3.12) and semantic versioning fields:
 
 ```json
 "x-checker-data": {

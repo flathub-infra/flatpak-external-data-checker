@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from distutils.version import LooseVersion
 from string import Template
 import datetime
 import json
@@ -25,6 +24,8 @@ from yarl import URL
 import jsonschema
 import ruamel.yaml
 import lxml.etree as ElementTree
+
+from ..lib.version import LooseVersion
 
 from ..lib import (
     utils,

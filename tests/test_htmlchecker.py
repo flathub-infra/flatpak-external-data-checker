@@ -23,7 +23,6 @@
 import os
 import base64
 import unittest
-from distutils.version import LooseVersion
 
 import aiohttp
 
@@ -32,6 +31,7 @@ from src.manifest import ManifestChecker
 from src.lib.checksums import MultiDigest
 from src.checkers.htmlchecker import HTMLChecker
 from src.lib.errors import CheckerError
+from src.lib.version import LooseVersion
 
 
 class TestHTMLTools(unittest.IsolatedAsyncioTestCase):
