@@ -20,12 +20,13 @@
 
 import os
 import unittest
-from distutils.version import LooseVersion
 
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
 from src.lib.checksums import MultiDigest
+from src.lib.version import LooseVersion
 from src.checkers.gnomechecker import _is_stable, VersionScheme
+
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.gnome.baobab.json")
 
