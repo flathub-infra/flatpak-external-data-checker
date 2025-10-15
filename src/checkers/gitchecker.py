@@ -121,6 +121,20 @@ class GitChecker(Checker):
             if not tag_match:
                 continue
             version = tag_match.group(1)
+
+            try:
+                tag_cls.parse_version(version)
+            except (ValueError, TypeError):
+                log.error(
+                    "Tag '%s' matched pattern '%s' but version '%s' is invalid for "
+                    "the chosen version-scheme '%s'.",
+                    tag,
+                    tag_re.pattern,
+                    version,
+                    version_scheme,
+                )
+                continue
+
             matching_tags.append(tag_cls(commit, tag, annotated, version))
 
         if constraints:
