@@ -31,7 +31,7 @@ import tempfile
 import urllib.request
 import urllib.parse
 import typing as t
-from distutils.version import StrictVersion
+from packaging.version import Version
 import asyncio
 import shlex
 from pathlib import Path
@@ -206,7 +206,7 @@ class FallbackVersion(t.NamedTuple):
 
     def __compare(self, oper, other) -> bool:
         try:
-            return oper(StrictVersion(self.s), StrictVersion(other.s))
+            return oper(Version(self.s), Version(other.s))
         except ValueError:
             try:
                 return oper(LooseVersion(self.s), LooseVersion(other.s))
