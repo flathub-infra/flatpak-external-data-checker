@@ -245,19 +245,10 @@ def commit_changes(
             return None
         else:
             branch = base_branch
-            tree = None
     else:
         # Moved to detached HEAD
         log.info("Switching to detached HEAD")
         check_call(["git", "-c", "advice.detachedHead=false", "checkout", "HEAD@{0}"])
-        # Find a stable identifier for the contents of the tree, to avoid
-        # sending the same PR twice.
-        tree = subprocess.check_output(
-            ["git", "rev-parse", "HEAD^{tree}"], text=True
-        ).strip()
-        branch = (
-            f"update-{base_branch}-{tree[:7]}" if base_branch else f"update-{tree[:7]}"
-        )
 
     retry_commit = False
     try:
@@ -291,6 +282,17 @@ def commit_changes(
             ],
             check=True,
             env=env,
+        )
+
+    # Find a stable identifier for the contents of the tree, to avoid
+    # sending the same PR twice.
+    tree = subprocess.check_output(
+        ["git", "rev-parse", "HEAD^{tree}"], text=True
+    ).strip()
+
+    if not commit_to_base:
+        branch = (
+            f"update-{base_branch}-{tree[:7]}" if base_branch else f"update-{tree[:7]}"
         )
 
     if not (commit_to_base or branch_exists(branch)):
