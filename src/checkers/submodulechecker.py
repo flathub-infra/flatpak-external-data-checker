@@ -352,6 +352,17 @@ class SubmoduleChecker:
             [
                 "git",
                 "-C",
+                str(self.working_git_top_level_dir / submodule.path),
+                "reset",
+                "--hard",
+                "HEAD",
+            ],
+        )
+        await asyncio.to_thread(
+            self._run_cmd,
+            [
+                "git",
+                "-C",
                 str(self.working_git_top_level_dir),
                 "submodule",
                 "update",
