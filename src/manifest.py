@@ -50,6 +50,7 @@ from .lib.errors import (
 )
 from .checkers import Checker, ALL_CHECKERS
 
+from src.checkers.submodulechecker import SubmoduleChecker
 
 MAIN_SRC_PROP = "is-main-source"
 IMPORTANT_SRC_PROP = "is-important"
@@ -111,10 +112,14 @@ class ManifestChecker:
         self._errors: t.List[Exception]
         self._errors = []
 
+        self._relative_module_paths: t.List[str] = []
+
         # Initialize checkers
         self._checkers: t.List[t.Type[Checker]]
         self._checkers = [checker_cls for checker_cls in ALL_CHECKERS]
         assert self._checkers
+
+        self._submodule_checker = SubmoduleChecker()
 
         # Map from filename to parsed contents of that file. Sources may be
         # specified as references to external files, which is why there can be
@@ -221,10 +226,11 @@ class ManifestChecker:
     ):
         if isinstance(module, str):
             ext_module_path = os.path.join(os.path.dirname(module_path), module)
-            log.info(
-                "Loading module from %s",
-                os.path.relpath(ext_module_path, self._root_manifest_dir),
+            relative_module_path = os.path.relpath(
+                ext_module_path, self._root_manifest_dir
             )
+            self._relative_module_paths.append(relative_module_path)
+            log.info("Loading module from %s", relative_module_path)
 
             try:
                 ext_module = self._read_manifest(ext_module_path)
@@ -416,6 +422,14 @@ class ManifestChecker:
             log.info("Checking %s external data items", counter.total)
             ext_data_checked = await asyncio.gather(*check_tasks)
 
+        if self._relative_module_paths:
+            log.info(
+                "Checking %d modules in submodules", len(self._relative_module_paths)
+            )
+            await self._submodule_checker.check(
+                self._relative_module_paths, self._root_manifest_path
+            )
+
         return ext_data_checked
 
     def get_external_data(self, only_type=None) -> t.List[ExternalBase]:
@@ -436,10 +450,15 @@ class ManifestChecker:
         only_type: t.Optional[t.Type[Exception]] = None,
     ) -> t.List[Exception]:
         """Return a list of errors occurred while checking/updating the manifest"""
-
-        return [
+        errors = [
             e for e in self._errors if only_type is None or isinstance(e, only_type)
         ]
+        submodule_errors = self._submodule_checker.get_errors()
+        if only_type is None:
+            errors.extend(submodule_errors)
+        else:
+            errors.extend(e for e in submodule_errors if isinstance(e, only_type))
+        return errors
 
     def get_outdated_external_data(self) -> t.List[ExternalBase]:
         """Returns a list of the outdated external data
@@ -531,8 +550,8 @@ class ManifestChecker:
         else:
             log.debug("Version didn't change, not adding release")
 
-    def update_manifests(self) -> t.List[str]:
-        """Updates references to external data in manifests.
+    async def update_manifests(self) -> t.List[str]:
+        """Updates references to external data in manifests and submodules.
 
         If require_important_update is True, only update the manifest if at least one
         source with IMPORTANT_SRC_PROP or MAIN_SRC_PROP received an update.
@@ -563,6 +582,11 @@ class ManifestChecker:
         if found_important_update or found_important_update is None:
             for path, datas in self._external_data.items():
                 self._update_manifest(path, datas, changes)
+
+            submodule_changes = await self._submodule_checker.update()
+            for change in submodule_changes:
+                changes[change] = None
+
             if changes:
                 try:
                     self._update_appdata()

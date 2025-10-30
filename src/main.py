@@ -41,6 +41,7 @@ from .lib.utils import parse_github_url, init_logging
 from .lib.externaldata import ExternalData
 from . import manifest
 
+from src.checkers.submodulechecker import HashIndex
 
 log = logging.getLogger(__name__)
 
@@ -61,8 +62,10 @@ def indir(path: Path):
         os.chdir(old)
 
 
-def print_outdated_external_data(manifest_checker: manifest.ManifestChecker):
+def print_outdated_data(manifest_checker: manifest.ManifestChecker):
     ext_data = manifest_checker.get_outdated_external_data()
+    outdated_count = len(ext_data)
+
     for data in ext_data:
         state_txt = data.state.name or str(data.state)
         message_tmpl = ""
@@ -115,7 +118,49 @@ def print_outdated_external_data(manifest_checker: manifest.ManifestChecker):
             **message_args,
         )
         print(message, flush=True)
-    return len(ext_data)
+
+    submodule_data = manifest_checker._submodule_checker.get_outdated_submodules()
+    outdated_count += len(submodule_data)
+
+    for submodule in submodule_data:
+        for module in submodule.modules:
+            current_hash = submodule.get_module_hash(module, HashIndex.CURRENT)
+            updated_hash = submodule.get_module_hash(module, HashIndex.UPDATED)
+
+            if current_hash and updated_hash:
+                message_tmpl = (
+                    "OUTDATED: {module}\n"
+                    " Has a new version:\n"
+                    "  Current SHA256: {sha256_current}\n"
+                    "  Updated SHA256: {sha256_new}\n"
+                    "  Submodule: {path}\n"
+                    "  Commit:    {commit}\n"
+                )
+
+                message = message_tmpl.format(
+                    module=module,
+                    commit=submodule.commit,
+                    path=submodule.relative_path,
+                    sha256_current=current_hash,
+                    sha256_new=updated_hash,
+                )
+                print(message, flush=True)
+            else:
+                message_tmpl = (
+                    "NOT FOUND: {module}\n"
+                    " Couldn't find in latest submodule:\n"
+                    "  Submodule: {path}\n"
+                    "  Commit:    {commit}\n"
+                )
+
+                message = message_tmpl.format(
+                    module=module,
+                    path=submodule.relative_path,
+                    commit=submodule.commit,
+                )
+                print(message, flush=True)
+
+    return outdated_count
 
 
 def print_errors(manifest_checker: manifest.ManifestChecker) -> int:
@@ -576,10 +621,11 @@ async def run_with_args(args: argparse.Namespace) -> t.Tuple[int, int, bool]:
 
     await manifest_checker.check(args.filter_type)
 
-    outdated_num = print_outdated_external_data(manifest_checker)
+    outdated_num = print_outdated_data(manifest_checker)
 
     if should_update and outdated_num > 0:
-        changes = manifest_checker.update_manifests()
+        changes = await manifest_checker.update_manifests()
+
         if changes and not args.edit_only:
             git_checkout = get_manifest_git_checkout(args.manifest)
             ensure_git_safe_directory(git_checkout)

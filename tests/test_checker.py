@@ -131,7 +131,7 @@ class _TestWithInlineManifest(unittest.IsolatedAsyncioTestCase):
             )
             checker._checkers = [self._DUMMY_CHECKER_CLS]
             await checker.check()
-            updates = checker.update_manifests()
+            updates = await checker.update_manifests()
 
             with open(manifest_path, "r") as f:
                 new_contents = f.read()
