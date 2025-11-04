@@ -2,13 +2,25 @@
 <component type="console-application">
   <id>org.flathub.flatpak-external-data-checker</id>
   <name>Flatpak External Data Checker</name>
-  <summary>A tool for checking if the external data used in Flatpak manifests is still up to date</summary>
+  <summary>Check updates to external data in Flatpak manifests</summary>
   <url type="homepage">https://github.com/flathub-infra/flatpak-external-data-checker</url>
   <url type="bugtracker">https://github.com/flathub-infra/flatpak-external-data-checker/issues</url>
   <description>
-    <p>This is a tool for checking for outdated or broken links of external data in Flatpak manifests.</p>
+    <p>This is a tool to check for updates to external data sources in Flatpak manifests.</p>
+    <p>The package is continuously updated and deployed from the master branch of the repository.
+       Please refer to the manifest to check the latest versions of the included components.
+    </p>
   </description>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-2.0</project_license>
+  <developer id="org.flathub">
+   <name>Flatpak and Flathub contributors</name>
+  </developer>
+  <provides>
+   <binary>flatpak-external-data-checker</binary>
+  </provides>
   <content_rating type="oars-1.1"/>
+   <releases>
+    <release version="v0-Flathub" date="2025-11-02" />
+   </releases>
 </component>
