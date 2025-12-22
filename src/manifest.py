@@ -26,7 +26,7 @@ import asyncio
 from enum import IntEnum
 import logging
 import os
-
+import shutil
 import aiohttp
 from lxml.etree import XMLSyntaxError
 
@@ -36,12 +36,13 @@ from .lib.externaldata import (
     BuilderModule,
     ExternalBase,
 )
-from .lib.utils import read_manifest, dump_manifest
+from .lib.utils import read_manifest, dump_manifest, validate_metainfo_file
 from .lib.errors import (
     CheckerError,
     AppdataError,
     AppdataNotFound,
     AppdataLoadError,
+    AppdataUpdateError,
     ManifestLoadError,
     ManifestFileTooLarge,
     ManifestFileOpenError,
@@ -519,6 +520,11 @@ class ManifestChecker:
                 timestamp = datetime.datetime.now()
             else:
                 timestamp = last_update.timestamp
+
+            backup_path = appdata + ".backup"
+
+            shutil.copy2(appdata, backup_path)
+            is_valid_before, _ = validate_metainfo_file(appdata)
             try:
                 add_release_to_file(
                     appdata,
@@ -526,8 +532,19 @@ class ManifestChecker:
                     timestamp.strftime("%F"),
                     release_url_template,
                 )
+                is_valid_now, errs = validate_metainfo_file(appdata)
+                if is_valid_before and not is_valid_now:
+                    log.error(
+                        "Appdata validation failed after adding new release: %s", errs
+                    )
+                    shutil.copy2(backup_path, appdata)
+                    raise AppdataUpdateError("Appdata validation failed")
             except XMLSyntaxError as err:
+                shutil.copy2(backup_path, appdata)
                 raise AppdataLoadError from err
+            finally:
+                if os.path.exists(backup_path):
+                    os.unlink(backup_path)
         else:
             log.debug("Version didn't change, not adding release")
 
@@ -571,7 +588,6 @@ class ManifestChecker:
                 except AppdataError as err:
                     self._errors.append(err)
                     log.error(err)
-
         else:
             log.info("No important source had an update, not updating manifest")
 

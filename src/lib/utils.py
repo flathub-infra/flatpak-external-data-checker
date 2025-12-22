@@ -51,8 +51,10 @@ from .version import LooseVersion
 
 import gi
 
+gi.require_version("AppStream", "1.0")
+gi.require_version("Gio", "2.0")
 gi.require_version("Json", "1.0")
-from gi.repository import GLib, Json  # noqa: E402
+from gi.repository import AppStream, Gio, GLib, Json  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -587,3 +589,29 @@ def init_logging(level=logging.DEBUG):
     logging.basicConfig(level=level, format="%(levelname)-7s %(name)s: %(message)s")
     if level == logging.DEBUG:
         logging.getLogger("github.Requester").setLevel(logging.INFO)
+
+
+def validate_metainfo_file(path: str) -> tuple[bool, list[str]]:
+    if not os.path.isfile(path):
+        return (False, [])
+
+    validator = AppStream.Validator()
+    gfile = Gio.File.new_for_path(path)
+
+    result = validator.validate_file(gfile)
+    validation_errs: list[str] = []
+
+    if result:
+        return (True, validation_errs)
+    else:
+        issues = validator.get_issues()
+        for issue in issues:
+            severity = issue.get_severity()
+            if severity in (
+                AppStream.IssueSeverity.ERROR,
+                AppStream.IssueSeverity.WARNING,
+            ):
+                message = issue.get_explanation()
+                if message:
+                    validation_errs.append(message.strip())
+    return (False, validation_errs)
