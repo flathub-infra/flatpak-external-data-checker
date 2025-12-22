@@ -189,6 +189,7 @@ async def get_extra_data_info_from_url(
         size=size,
         version=None,
         timestamp=_extract_timestamp(info),
+        changelog_url=None,
     )
 
     return external_file

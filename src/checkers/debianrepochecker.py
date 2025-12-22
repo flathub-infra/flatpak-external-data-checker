@@ -154,6 +154,7 @@ class DebianRepoChecker(Checker):
                     # Strip epoch if present
                     version=re.sub(r"^\d+:", "", source_version),
                     timestamp=await get_timestamp_from_url(src_url, self.session),
+                    changelog_url=None,
                 )
             else:
                 package = cache[package_name]
@@ -171,6 +172,7 @@ class DebianRepoChecker(Checker):
                     size=candidate.size,
                     version=candidate.version,
                     timestamp=await self._get_timestamp_for_candidate(candidate),
+                    changelog_url=None,
                 )
 
             external_data.set_new_version(new_version)

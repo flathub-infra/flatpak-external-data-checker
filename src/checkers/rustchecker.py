@@ -57,5 +57,6 @@ class RustChecker(Checker):
                 size=None,
                 version=appstream_version,
                 timestamp=release_date,
+                changelog_url=None,
             )
             external_data.set_new_version(new_version)
