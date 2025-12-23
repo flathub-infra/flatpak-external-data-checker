@@ -61,6 +61,26 @@ def extract_version(checker_data, url):
     return m.group(1)
 
 
+def is_same_version(checker_data, current_url, new_version):
+    """
+    Check if the new application version is the same with the current one. If the
+    version number could be extracted, those strings are compared with each other
+    to be resilient against load-balanced urls pointing to the same file.
+    """
+    if new_version.version is None:
+        # No pattern given or failed parsing the new version, so check only
+        # if the url is different
+        return current_url == new_version.url
+
+    current_version_string = extract_version(checker_data, current_url)
+    if current_version_string is None:
+        # If the pattern failed to apply to the old/current version,
+        # check again only the url. Otherwise we would compare None values
+        return current_url == new_version.url
+
+    return current_version_string == new_version.version
+
+
 class URLChecker(Checker):
     PRIORITY = 99
     CHECKER_DATA_TYPE = "rotating-url"
@@ -146,9 +166,10 @@ class URLChecker(Checker):
         if not is_rotating:
             new_version = new_version._replace(url=url)  # pylint: disable=no-member
 
+        same_version = is_same_version(
+            external_data.checker_data, external_data.current_version.url, new_version
+        )
         external_data.set_new_version(
             new_version,
-            is_update=(
-                is_rotating and external_data.current_version.url != new_version.url
-            ),
+            is_update=is_rotating and not same_version,
         )
