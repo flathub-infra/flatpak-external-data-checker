@@ -420,6 +420,7 @@ async def git_ls_remote(url: str) -> t.Dict[str, str]:
         allow_paths=[
             Command.SandboxPath("/etc/ssl", True, True),
             Command.SandboxPath("/etc/pki", True, True),
+            Command.SandboxPath("/var/lib/ca-certificates", True, True),
             Command.SandboxPath("/etc/resolv.conf", True, False),
         ],
     )
