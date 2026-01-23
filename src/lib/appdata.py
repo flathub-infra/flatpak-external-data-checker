@@ -36,7 +36,6 @@ else:
 
 import lxml.etree as ElementTree
 
-
 XMLElement: TypeAlias = ElementTree._Element  # pylint: disable=protected-access
 
 DEFAULT_INDENT = "  "

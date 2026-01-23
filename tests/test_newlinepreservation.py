@@ -28,7 +28,6 @@ from src.lib.utils import (
     read_manifest,
 )
 
-
 MANIFEST_WITH_NEWLINE = """{
     "ends in newline": true
 }

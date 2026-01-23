@@ -9,7 +9,6 @@ from src.manifest import ManifestChecker
 from src.lib.externaldata import ExternalGitRef
 from src.lib.errors import ManifestLoadError
 
-
 TEST_MANIFEST_DATA = {
     "id": "fedc.test.Loader",
     "modules": [

@@ -50,7 +50,6 @@ from .lib.errors import (
 )
 from .checkers import Checker, ALL_CHECKERS
 
-
 MAIN_SRC_PROP = "is-main-source"
 IMPORTANT_SRC_PROP = "is-important"
 RELEASE_URL_TEMPLATE_PROP = "release-url-template"

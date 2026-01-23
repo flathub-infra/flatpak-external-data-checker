@@ -232,17 +232,14 @@ EDITORCONFIG_SAMPLE_DATA = {"first": 1, "second": [2, 3]}
 EDITORCONFIG_STYLES = [
     # 2-space with newline
     (
-        dedent(
-            """\
+        dedent("""\
             [*.json]
             indent_style = space
             indent_size = 2
             insert_final_newline = true
-            """
-        ),
+            """),
         # ---
-        dedent(
-            """\
+        dedent("""\
             {
               "first": 1,
               "second": [
@@ -250,44 +247,37 @@ EDITORCONFIG_STYLES = [
                 3
               ]
             }
-            """
-        ),
+            """),
     ),
     # Tab without newline
     (
-        dedent(
-            """\
+        dedent("""\
             [*.json]
             indent_style = tab
             insert_final_newline = false
-            """
-        ),
+            """),
         # ---
-        dedent(
-            """\
+        dedent("""\
             {
             \t"first": 1,
             \t"second": [
             \t\t2,
             \t\t3
             \t]
-            }"""
-        ),
+            }"""),
     ),
     # No preference, default to 4-space without newline
     (
         None,
         # ---
-        dedent(
-            """\
+        dedent("""\
             {
                 "first": 1,
                 "second": [
                     2,
                     3
                 ]
-            }"""
-        ),
+            }"""),
     ),
 ]
 

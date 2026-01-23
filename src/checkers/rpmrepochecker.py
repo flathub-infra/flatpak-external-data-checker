@@ -8,7 +8,6 @@ from ..lib.checksums import MultiDigest
 from ..lib.utils import FallbackVersion
 from . import Checker, XMLElement
 
-
 log = logging.getLogger(__name__)
 
 

@@ -3,7 +3,6 @@ import operator
 
 import aiohttp
 
-
 TIMEOUT_CONNECT = 10
 TIMEOUT_TOTAL = 60 * 10
 

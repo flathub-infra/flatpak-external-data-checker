@@ -7,7 +7,6 @@ from unittest.mock import patch
 
 from src import main
 
-
 TEST_MANIFEST = os.path.join(
     os.path.dirname(__file__), "net.invisible_island.xterm.yml"
 )

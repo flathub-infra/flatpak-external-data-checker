@@ -6,7 +6,6 @@ import typing as t
 
 from .errors import SourceUpdateError
 
-
 log = logging.getLogger(__name__)
 
 
