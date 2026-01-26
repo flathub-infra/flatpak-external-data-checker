@@ -405,6 +405,7 @@ class ManifestChecker:
             raise_for_status=True,
             headers=HTTP_CLIENT_HEADERS,
             timeout=aiohttp.ClientTimeout(connect=TIMEOUT_CONNECT, total=TIMEOUT_TOTAL),
+            trust_env=True,
         ) as http_session:
             check_tasks = []
             for data in external_data:
