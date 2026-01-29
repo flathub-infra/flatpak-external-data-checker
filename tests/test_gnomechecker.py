@@ -75,6 +75,9 @@ class TestGNOMEChecker(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(_is_stable("1.3.1", scheme))
         self.assertFalse(_is_stable("0.11.0", scheme))
 
+        # This should at least not crash
+        self.assertFalse(_is_stable("40.alpha", scheme))
+
     async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = await checker.check()

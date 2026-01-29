@@ -49,6 +49,14 @@ def _is_stable(
         if any(_contains_keyword(x) for x in ver_list[1:]):
             return False
     elif scheme == VersionScheme.ODD_MINOR_IS_UNSTABLE:
+        # This is preferable over crashing if minor is not an int
+        if not minor.isdigit():
+            log.warning(
+                "odd-minor-is-unstable is used but minor in version %s is not numeric",
+                version,
+            )
+            return False
+
         if len(ver_list) >= 2:
             return (int(minor) % 2) == 0
 
