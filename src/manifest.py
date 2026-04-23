@@ -18,7 +18,6 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import asyncio
 import dataclasses
 import datetime
 import logging
@@ -48,7 +47,7 @@ from .lib.externaldata import (
     BuilderModule,
     ExternalBase,
 )
-from .lib.utils import dump_manifest, read_manifest
+from .lib.utils import asyncio_gather_failfast, dump_manifest, read_manifest
 
 MAIN_SRC_PROP = "is-main-source"
 IMPORTANT_SRC_PROP = "is-important"
@@ -417,7 +416,7 @@ class ManifestChecker:
                 check_tasks.append(self._check_data(counter, http_session, data))
 
             log.info("Checking %s external data items", counter.total)
-            ext_data_checked = await asyncio.gather(*check_tasks)
+            ext_data_checked = await asyncio_gather_failfast(check_tasks)
 
         return ext_data_checked
 

@@ -57,6 +57,8 @@ from gi.repository import (  # type: ignore[attr-defined] # noqa: E402 # noqa: I
     Json,
 )
 
+T = t.TypeVar("T")
+
 log = logging.getLogger(__name__)
 
 
@@ -628,3 +630,29 @@ def init_logging(level=logging.DEBUG):
     logging.basicConfig(level=level, format="%(levelname)-7s %(name)s: %(message)s")
     if level == logging.DEBUG:
         logging.getLogger("github.Requester").setLevel(logging.INFO)
+
+
+async def asyncio_gather_failfast(
+    awaitables: t.Iterable[t.Awaitable[T]],
+) -> list[T]:
+    tasks: list[asyncio.Task[T]] = [asyncio.ensure_future(a) for a in awaitables]
+    if not tasks:
+        return []
+    done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+    exc: BaseException | None = None
+    for task in done:
+        if task.cancelled():
+            continue
+        try:
+            e = task.exception()
+        except asyncio.CancelledError:
+            continue
+        if e is not None:
+            exc = e
+            break
+    if exc:
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+        raise exc
+    return [task.result() for task in tasks]
