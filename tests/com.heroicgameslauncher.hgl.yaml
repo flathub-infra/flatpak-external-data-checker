@@ -1,0 +1,9 @@
+app-id: com.heroicgameslauncher.hgl
+modules:
+  - name: heroic
+    sources:
+      - type: extra-data
+        filename: Heroic-2.21.0-linux-x86_64.AppImage
+        url: https://github.com/Heroic-Games-Launcher/HeroicGamesLauncher/releases/download/v2.21.0/Heroic-2.21.0-linux-x86_64.AppImage
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+        size: 0
