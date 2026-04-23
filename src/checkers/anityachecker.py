@@ -10,7 +10,7 @@ from ..lib.externaldata import (
     ExternalGitRef,
     ExternalGitRepo,
 )
-from ..lib.utils import filter_versions
+from ..lib.utils import expand_version_constraints, filter_versions
 from . import Checker
 
 log = logging.getLogger(__name__)
@@ -48,7 +48,9 @@ class AnityaChecker(Checker):
         )
         versions_url = URL(instance_url) / "api/v2/versions/"
         stable_only = external_data.checker_data.get("stable-only", True)
-        constraints = external_data.checker_data.get("versions", {}).items()
+        constraints = expand_version_constraints(
+            external_data.checker_data.get("versions", {})
+        )
 
         query = {"project_id": external_data.checker_data["project-id"]}
         try:

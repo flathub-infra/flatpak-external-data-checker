@@ -9,7 +9,7 @@ from ..lib import OPERATORS_SCHEMA
 from ..lib.checksums import MultiDigest
 from ..lib.errors import CheckerQueryError
 from ..lib.externaldata import ExternalBase, ExternalFile
-from ..lib.utils import filter_versioned_items
+from ..lib.utils import expand_version_constraints, filter_versioned_items
 from . import Checker
 
 log = logging.getLogger(__name__)
@@ -71,7 +71,9 @@ class PyPIChecker(Checker):
         package_type = external_data.checker_data.get("packagetype", "sdist")
         constraints = [
             (o, Version(v))
-            for o, v in external_data.checker_data.get("versions", {}).items()
+            for o, v in expand_version_constraints(
+                external_data.checker_data.get("versions", {})
+            )
         ]
         stable_only = external_data.checker_data.get("stable-only", True)
 

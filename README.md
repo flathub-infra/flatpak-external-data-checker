@@ -177,10 +177,13 @@ checker metadata for that source.
 The checkers can support version constraining, making it possible to e.g. limit
 version checking to a certain major version. The property is `versions`. It
 should contain key-value pairs where the key is the comparison operator (one of
-`<`, `>`, `<=`, `>=`, `==`, `!=`), and the value is the version to compare with
+`<`, `>`, `<=`, `>=`, `==`, `!=`), and the value is the version to compare with.
 So, `{"<": "3.38.0", "!=": "3.37.1"}` means *"any version less than 3.38.0
 except 3.37.1"*. All constraints must match simultaneously, i.e. if one doesn't
 match -> version is rejected.
+
+The `!=` operator accepts either a single version string or a list of
+versions to exclude.
 
 ### URL checker
 

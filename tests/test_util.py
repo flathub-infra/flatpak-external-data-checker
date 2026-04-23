@@ -37,6 +37,7 @@ from src.lib.utils import (
     _detect_json_flatpak_manifest_indent,
     asyncio_gather_failfast,
     dump_manifest,
+    expand_version_constraints,
     filter_versioned_items,
     filter_versions,
     get_extra_data_info_from_url,
@@ -102,6 +103,40 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
                 await cmd.run()
 
 
+class TestExpandVersionConstraints(unittest.TestCase):
+    def test_string_values_unchanged(self):
+        self.assertEqual(
+            expand_version_constraints(
+                {"!=": "1.2", ">=": "1.0", "<": "2.0", "<=": "3.0"}
+            ),
+            [
+                ("!=", "1.2"),
+                (">=", "1.0"),
+                ("<", "2.0"),
+                ("<=", "3.0"),
+            ],
+        )
+
+    def test_exclude_array_expanded(self):
+        self.assertEqual(
+            expand_version_constraints({"!=": ["1.2", "1.3"]}),
+            [("!=", "1.2"), ("!=", "1.3")],
+        )
+
+    def test_array_and_strings(self):
+        self.assertEqual(
+            expand_version_constraints({"!=": ["1.2", "1.3"], "<": "2.0"}),
+            [("!=", "1.2"), ("!=", "1.3"), ("<", "2.0")],
+        )
+
+    def test_empty(self):
+        self.assertEqual(expand_version_constraints({}), [])
+
+    def test_non_exclude_array_raises(self):
+        with self.assertRaises(ValueError):
+            expand_version_constraints({"<": ["1.0", "2.0"]})
+
+
 class TestVersionFilter(unittest.TestCase):
     def test_filter(self):
         self.assertEqual(filter_versions(["1.1"], []), ["1.1"])
@@ -146,6 +181,15 @@ class TestVersionFilter(unittest.TestCase):
         self.assertEqual(
             filter_versions(["1.c", "1.a", "1.b"], [], sort=True),
             ["1.a", "1.b", "1.c"],
+        )
+
+    def test_multiple_exclude_constraints(self):
+        self.assertEqual(
+            filter_versions(
+                ["1.1", "1.2", "1.3", "1.4"],
+                [("!=", "1.2"), ("!=", "1.3")],
+            ),
+            ["1.1", "1.4"],
         )
 
     def test_objects(self):

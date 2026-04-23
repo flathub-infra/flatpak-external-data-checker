@@ -63,3 +63,19 @@ modules:
             '>': '0.38.2'
             '<': '0.38.1'
           tag-template: v$version
+
+  - name: yt-dlp
+    buildsystem: simple
+    build-commands: []
+    sources:
+      - type: archive
+        url: https://github.com/yt-dlp/yt-dlp/releases/download/2024.07.02/yt-dlp.tar.gz
+        sha256: 1094af3a5827a6a31269b97bd701456269af18595427c9905f3ffbe1a11582a0
+        x-checker-data:
+          type: anitya
+          project-id: 143399
+          stable-only: true
+          url-template: https://github.com/yt-dlp/yt-dlp/releases/download/$version/yt-dlp.tar.gz
+          versions:
+            '<': '2024.08.06'
+            '!=': ['2024.08.01', '2024.07.25']
