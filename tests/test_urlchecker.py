@@ -12,13 +12,15 @@ class TestURLChecker(unittest.IsolatedAsyncioTestCase):
 
     async def test_check_appimage(self):
         checker = ManifestChecker(
-            os.path.join(os.path.dirname(__file__), "com.unity.UnityHub.yaml")
+            os.path.join(os.path.dirname(__file__), "com.heroicgameslauncher.hgl.yaml")
         )
         ext_data = await checker.check()
 
-        data = self._find_by_filename(ext_data, "UnityHubSetup.AppImage")
+        filename = "Heroic-2.21.0-linux-x86_64.AppImage"
+        data = self._find_by_filename(ext_data, filename)
+
         self.assertIsNotNone(data)
-        self.assertEqual(data.filename, "UnityHubSetup.AppImage")
+        self.assertEqual(data.filename, filename)
         self.assertIsNotNone(data.new_version)
         self.assertIsInstance(data.new_version.size, int)
         self.assertGreater(data.new_version.size, 0)
