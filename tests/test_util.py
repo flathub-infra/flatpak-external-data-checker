@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+import asyncio
 import re
 import subprocess
 import unittest
@@ -34,6 +35,7 @@ from src.lib.utils import (
     Command,
     FallbackVersion,
     _detect_json_flatpak_manifest_indent,
+    asyncio_gather_failfast,
     dump_manifest,
     filter_versioned_items,
     filter_versions,
@@ -509,6 +511,81 @@ class TestDumpManifest(unittest.TestCase):
             path.write_text(original)
             dump_manifest(EDITORCONFIG_SAMPLE_DATA, path)
             self.assertEqual(path.read_text(), expected_data)
+
+
+class TestGatherFailfast(unittest.IsolatedAsyncioTestCase):
+    async def test_all_succeed(self):
+        async def succeed(val):
+            return val
+
+        result = await asyncio_gather_failfast([succeed(1), succeed(2), succeed(3)])
+        self.assertEqual(result, [1, 2, 3])
+
+    async def test_empty(self):
+        result = await asyncio_gather_failfast([])
+        self.assertEqual(result, [])
+
+    async def test_exception_cancels_pending(self):
+        cancelled = False
+
+        async def hang():
+            nonlocal cancelled
+            try:
+                await asyncio.sleep(999)
+            except asyncio.CancelledError:
+                cancelled = True
+                raise
+
+        async def fail():
+            raise AssertionError("test error")
+
+        with self.assertRaises(AssertionError):
+            await asyncio_gather_failfast([hang(), fail()])
+
+        self.assertTrue(cancelled)
+
+    async def test_exception_propagates(self):
+        async def fail():
+            raise ValueError("test error")
+
+        with self.assertRaises(ValueError, msg="test error"):
+            await asyncio_gather_failfast([fail()])
+
+    async def test_parent_child_hang(self):
+        event = asyncio.Event()
+        child_cancelled = False
+
+        async def parent():
+            raise AssertionError("test error")
+
+        async def child():
+            nonlocal child_cancelled
+            try:
+                await event.wait()
+            except asyncio.CancelledError:
+                child_cancelled = True
+                raise
+
+        with self.assertRaises(AssertionError):
+            await asyncio_gather_failfast([parent(), child()])
+
+        self.assertTrue(child_cancelled)
+
+    async def test_sibling_cancelled_on_exception(self):
+        async def raises_assert():
+            raise AssertionError("test error")
+
+        async def slow():
+            await asyncio.sleep(999)
+
+        with self.assertRaises((AssertionError, asyncio.TimeoutError)):
+            await asyncio.wait_for(
+                asyncio.gather(raises_assert(), slow()),
+                timeout=2.0,
+            )
+
+        with self.assertRaises(AssertionError):
+            await asyncio_gather_failfast([raises_assert(), slow()])
 
 
 if __name__ == "__main__":

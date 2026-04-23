@@ -92,6 +92,22 @@ class UpdateEverythingChecker(DummyChecker, register=False):
         )
 
 
+class RaisesAssertionChecker(DummyChecker, register=False):
+    async def check(self, external_data):
+        raise AssertionError("test error")
+
+
+class TestFailFast(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        init_logging()
+
+    async def test_unexpected_exception_propagates(self):
+        checker = manifest.ManifestChecker(TEST_MANIFEST)
+        checker._checkers = [RaisesAssertionChecker]
+        with self.assertRaises(AssertionError):
+            await checker.check()
+
+
 class _TestWithInlineManifest(unittest.IsolatedAsyncioTestCase):
     _DUMMY_CHECKER_CLS: type[Checker]
     maxDiff = None
