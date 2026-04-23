@@ -7,7 +7,12 @@ import semver
 from ..lib import OPERATORS_SCHEMA
 from ..lib.errors import CheckerFetchError, CheckerQueryError
 from ..lib.externaldata import ExternalBase, ExternalGitRef, ExternalGitRepo
-from ..lib.utils import FallbackVersion, filter_versioned_items, git_ls_remote
+from ..lib.utils import (
+    FallbackVersion,
+    expand_version_constraints,
+    filter_versioned_items,
+    git_ls_remote,
+)
 from . import Checker
 
 log = logging.getLogger(__name__)
@@ -101,9 +106,12 @@ class GitChecker(Checker):
         version_scheme = external_data.checker_data.get("version-scheme", "loose")
         tag_cls = TAG_VERSION_SCHEMES[version_scheme]
         sort_tags = external_data.checker_data.get("sort-tags", True)
+
         constraints = [
             (o, tag_cls.parse_version(v))
-            for o, v in external_data.checker_data.get("versions", {}).items()
+            for o, v in expand_version_constraints(
+                external_data.checker_data.get("versions", {})
+            )
         ]
 
         matching_tags = []

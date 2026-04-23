@@ -43,7 +43,15 @@ OPERATORS = {
 }
 OPERATORS_SCHEMA = {
     "type": "object",
-    "properties": {o: {"type": "string"} for o in list(OPERATORS)},
+    "properties": {
+        **{o: {"type": "string"} for o in list(OPERATORS) if o != "!="},
+        "!=": {
+            "oneOf": [
+                {"type": "string"},
+                {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            ]
+        },
+    },
     "additionalProperties": False,
     "minProperties": 1,
 }

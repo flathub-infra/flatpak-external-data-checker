@@ -18,7 +18,7 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = await checker.check()
 
-        self.assertEqual(len(ext_data), 5)
+        self.assertEqual(len(ext_data), 6)
         for data in ext_data:
             if data.filename == "glib-networking-2.74.0.tar.xz":
                 self.assertIsNotNone(data.new_version)
@@ -101,6 +101,24 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                 )
             elif data.filename == "gr-iqbal.git":
                 self.assertIsNone(data.new_version)
+            elif data.filename == "yt-dlp.tar.gz":
+                self.assertIsNotNone(data.new_version)
+                self.assertIsInstance(data.new_version, ExternalFile)
+
+                self.assertEqual(data.new_version.version, "2024.07.16")
+
+                self.assertRegex(
+                    data.new_version.url,
+                    (
+                        r"^https://github\.com/yt-dlp/yt-dlp/releases/download/"
+                        r"2024\.07\.16/yt-dlp\.tar\.gz$"
+                    ),
+                )
+
+                self.assertIsInstance(data.new_version.size, int)
+                self.assertGreater(data.new_version.size, 0)
+                self.assertIsNotNone(data.new_version.checksum)
+                self.assertIsInstance(data.new_version.checksum, MultiDigest)
             else:
                 self.fail(f"Unknown data {data.filename}")
 

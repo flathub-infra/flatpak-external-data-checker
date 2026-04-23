@@ -316,6 +316,22 @@ def filter_versioned_items(
     return new_items
 
 
+def expand_version_constraints(
+    versions_dict: dict[str, str | list[str]],
+) -> list[tuple[str, str]]:
+    result: list[tuple[str, str]] = []
+
+    for op, val in versions_dict.items():
+        if isinstance(val, list):
+            if op != "!=":
+                raise ValueError(f"Only '!=' supports multiple values (got '{op}')")
+            result.extend((op, v) for v in val)
+        else:
+            result.append((op, val))
+
+    return result
+
+
 def filter_versions(
     versions: t.Iterable[str],
     constraints: t.Iterable[tuple[str, str]],

@@ -164,6 +164,63 @@ class TestGitChecker(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(external_data.new_version.version, "3.0.0")
         self.assertEqual(external_data.new_version.commit, "commit5")
 
+        async def test_exclude_versions(self):
+            cases = [
+                {
+                    "name": "single_exclude",
+                    "mock_refs": {
+                        "refs/tags/v1.0.0": "commit1",
+                        "refs/tags/v2.0.0": "commit2",
+                        "refs/tags/v3.0.0": "commit3",
+                    },
+                    "versions": {"!=": "3.0.0"},
+                    "expected": ("v2.0.0", "2.0.0", "commit2"),
+                },
+                {
+                    "name": "multi_exclude",
+                    "mock_refs": {
+                        "refs/tags/v1.0.0": "commit1",
+                        "refs/tags/v2.0.0": "commit2",
+                        "refs/tags/v2.1.0": "commit3",
+                        "refs/tags/v3.0.0": "commit4",
+                    },
+                    "versions": {"!=": ["2.0.0", "2.1.0"]},
+                    "expected": ("v3.0.0", "3.0.0", "commit4"),
+                },
+            ]
+
+            for case in cases:
+                with self.subTest(case=case["name"]):
+                    external_data = ExternalGitRepo.from_source_impl(
+                        source_path="test.git",
+                        source={
+                            "type": "git",
+                            "url": "https://example.com/test.git",
+                            "tag": "v1.0.0",
+                            "commit": "commit1",
+                            "x-checker-data": {
+                                "type": "git",
+                                "tag-pattern": r"^v([\d.]+)$",
+                                "versions": case["versions"],
+                            },
+                        },
+                    )
+
+                    with mock.patch(
+                        "src.checkers.gitchecker.git_ls_remote",
+                        new_callable=mock.AsyncMock,
+                        return_value=case["mock_refs"],
+                    ):
+                        async with aiohttp.ClientSession() as session:
+                            checker = GitChecker(session)
+                            await checker.check(external_data)
+
+                    self.assertIsNotNone(external_data.new_version)
+                    tag, version, commit = case["expected"]
+                    self.assertEqual(external_data.new_version.tag, tag)
+                    self.assertEqual(external_data.new_version.version, version)
+                    self.assertEqual(external_data.new_version.commit, commit)
+
 
 if __name__ == "__main__":
     unittest.main()

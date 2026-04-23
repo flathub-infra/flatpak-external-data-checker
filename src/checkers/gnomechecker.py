@@ -8,7 +8,7 @@ from ..lib import NETWORK_ERRORS, OPERATORS_SCHEMA
 from ..lib.checksums import MultiDigest
 from ..lib.errors import CheckerQueryError
 from ..lib.externaldata import ExternalBase, ExternalFile
-from ..lib.utils import filter_versions
+from ..lib.utils import expand_version_constraints, filter_versions
 from . import Checker
 
 log = logging.getLogger(__name__)
@@ -86,7 +86,9 @@ class GNOMEChecker(Checker):
     async def check(self, external_data: ExternalBase):
         project_name = external_data.checker_data["name"]
         stable_only = external_data.checker_data.get("stable-only", True)
-        constraints = external_data.checker_data.get("versions", {}).items()
+        constraints = expand_version_constraints(
+            external_data.checker_data.get("versions", {})
+        )
         version_scheme = external_data.checker_data.get(
             "version-scheme", VersionScheme.DEFAULT
         )

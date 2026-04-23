@@ -32,7 +32,11 @@ from yarl import URL
 from ..lib import NETWORK_ERRORS, OPERATORS_SCHEMA
 from ..lib.errors import CheckerFetchError, CheckerQueryError
 from ..lib.externaldata import ExternalBase, ExternalData
-from ..lib.utils import FallbackVersion, filter_versioned_items
+from ..lib.utils import (
+    FallbackVersion,
+    expand_version_constraints,
+    filter_versioned_items,
+)
 from . import Checker
 
 log = logging.getLogger(__name__)
@@ -151,7 +155,9 @@ class HTMLChecker(Checker):
         ]
         constraints = [
             (o, version_cls(v))
-            for o, v in external_data.checker_data.get("versions", {}).items()
+            for o, v in expand_version_constraints(
+                external_data.checker_data.get("versions", {})
+            )
         ]
         assert combo_pattern or (version_pattern and url_template)
 
