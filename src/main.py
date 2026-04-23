@@ -552,6 +552,11 @@ def parse_cli_args(cli_args=None):
             " instead of creating a new branch"
         ),
     )
+    parser.add_argument(
+        "--enable-robots-txt",
+        action="store_true",
+        help="Enable respecting robots.txt rules (default: False)",
+    )
 
     args = parser.parse_args(cli_args)
     args.pr_labels = [
@@ -571,6 +576,7 @@ async def run_with_args(args: argparse.Namespace) -> tuple[int, int, bool]:
         allow_unsafe=args.unsafe,
         max_manifest_size=args.max_manifest_size,
         require_important_update=args.require_important_update,
+        enable_robots_txt=args.enable_robots_txt,
     )
 
     manifest_checker = manifest.ManifestChecker(args.manifest, options)

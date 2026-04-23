@@ -153,7 +153,11 @@ class DebianRepoChecker(Checker):
                     size=source_file.size,
                     # Strip epoch if present
                     version=re.sub(r"^\d+:", "", source_version),
-                    timestamp=await get_timestamp_from_url(src_url, self.session),
+                    timestamp=await get_timestamp_from_url(
+                        src_url,
+                        self.session,
+                        robots_cache=self.robots_cache,
+                    ),
                 )
             else:
                 package = cache[package_name]
@@ -187,7 +191,11 @@ class DebianRepoChecker(Checker):
         # it.
         # https://salsa.debian.org/apt-team/python-apt/blob/master/apt/package.py#L1245-1417
         assert candidate.uri
-        return await get_timestamp_from_url(candidate.uri, self.session)
+        return await get_timestamp_from_url(
+            candidate.uri,
+            self.session,
+            robots_cache=self.robots_cache,
+        )
 
     @contextlib.contextmanager
     def _load_repo(

@@ -534,6 +534,20 @@ x-checker-data:
     is-main-source: true
 ```
 
+## robots.txt
+
+robots.txt is respected when the `--enable-robots-txt` commandline
+argument is passed, or when enabled in a source's checker metadata
+using `enable-robots-txt: true`. The CLI argument overrides the
+per-source metadata.
+
+When enabled, the robots.txt files are cached upto 24 hours in
+`$XDG_CACHE_HOME/fedc/robots`.
+
+The Chromium, PyPI, Rust and SnapCraft checkers disables robots.txt
+handling entirely as the checkers itself rely on some paths being
+accesible.
+
 ## License and Copyright
 
 License: GPLv2

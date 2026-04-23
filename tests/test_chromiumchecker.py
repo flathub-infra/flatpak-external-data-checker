@@ -2,6 +2,7 @@ import base64
 import logging
 import os
 import unittest
+from unittest import mock
 from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
@@ -24,6 +25,11 @@ TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.chromium.Chromium.y
 class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         init_logging(logging.INFO)
+        self.robots_patcher = mock.patch(
+            "src.lib.robots.RobotsCache.ensure_allowed", new_callable=mock.AsyncMock
+        )
+        self.robots_patcher.start()
+        self.addCleanup(self.robots_patcher.stop)
 
     async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)

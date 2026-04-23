@@ -49,6 +49,7 @@ from ruamel.yaml import YAML
 from . import HTTP_CHUNK_SIZE, OPERATORS, TIMEOUT_CONNECT, externaldata
 from .checksums import MultiHash
 from .errors import CheckerFetchError, CheckerQueryError, CheckerRemoteError
+from .robots import RobotsCache
 from .version import LooseVersion
 
 gi.require_version("Json", "1.0")
@@ -178,8 +179,20 @@ def strip_query(url):
     return stripped
 
 
-async def get_timestamp_from_url(url: str, session: aiohttp.ClientSession):
+async def get_timestamp_from_url(
+    url: str,
+    session: aiohttp.ClientSession,
+    robots_cache: RobotsCache | None = None,
+):
+    if robots_cache:
+        await robots_cache.ensure_allowed(url)
+
     async with session.head(url, allow_redirects=True) as response:
+        real_url = str(response.url)
+
+        if robots_cache and real_url != url:
+            await robots_cache.ensure_allowed(real_url)
+
         return _extract_timestamp(response.headers)
 
 
@@ -189,12 +202,20 @@ async def get_extra_data_info_from_url(
     follow_redirects: bool = True,
     dest_io: t.IO | None = None,
     content_type_deny: t.Iterable[re.Pattern] | None = None,
+    robots_cache: RobotsCache | None = None,
 ):
+    if robots_cache:
+        await robots_cache.ensure_allowed(url)
+
     async with session.get(
         url,
         skip_auto_headers=[aiohttp.hdrs.ACCEPT_ENCODING],
     ) as response:
         real_url = str(response.url)
+
+        if robots_cache and real_url != url:
+            await robots_cache.ensure_allowed(real_url)
+
         info = response.headers
 
         def content_type_rejected(content_type: str | None) -> bool:

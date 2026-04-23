@@ -53,8 +53,14 @@ class AnityaChecker(Checker):
         )
 
         query = {"project_id": external_data.checker_data["project-id"]}
+
+        query_url = versions_url % query
+
+        if self.robots_cache:
+            await self.robots_cache.ensure_allowed(query_url)
+
         try:
-            async with self.session.get(versions_url % query) as response:
+            async with self.session.get(query_url) as response:
                 result = await response.json()
         except NETWORK_ERRORS as err:
             raise CheckerQueryError from err

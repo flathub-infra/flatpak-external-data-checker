@@ -34,11 +34,17 @@ class JetBrainsChecker(Checker):
         url = "https://data.services.jetbrains.com/products/releases"
         query = {"code": code, "latest": "true", "type": release_type}
 
+        if self.robots_cache:
+            await self.robots_cache.ensure_allowed(url)
+
         async with self.session.get(url, params=query) as response:
             result = await response.json()
             data = result[code][0]
 
         release = data["downloads"][_JB_ARCH_MAP[external_data.arches[0]]]
+
+        if self.robots_cache:
+            await self.robots_cache.ensure_allowed(release["checksumLink"])
 
         async with self.session.get(release["checksumLink"]) as response:
             result = await response.text()

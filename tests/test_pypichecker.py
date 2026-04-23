@@ -1,5 +1,6 @@
 import os
 import unittest
+from unittest import mock
 
 from packaging.version import Version
 
@@ -13,6 +14,11 @@ TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.valvesoftware.Steam
 class TestPyPIChecker(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         init_logging()
+        self.robots_patcher = mock.patch(
+            "src.lib.robots.RobotsCache.ensure_allowed", new_callable=mock.AsyncMock
+        )
+        self.robots_patcher.start()
+        self.addCleanup(self.robots_patcher.stop)
 
     async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)

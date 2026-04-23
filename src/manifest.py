@@ -47,11 +47,13 @@ from .lib.externaldata import (
     BuilderModule,
     ExternalBase,
 )
+from .lib.robots import RobotsCache
 from .lib.utils import asyncio_gather_failfast, dump_manifest, read_manifest
 
 MAIN_SRC_PROP = "is-main-source"
 IMPORTANT_SRC_PROP = "is-important"
 RELEASE_URL_TEMPLATE_PROP = "release-url-template"
+ROBOTS_TXT_PROP = "enable-robots-txt"
 MAX_MANIFEST_SIZE = 1024 * 1024
 
 
@@ -75,6 +77,7 @@ class CheckerOptions:
     allow_unsafe: bool = False
     max_manifest_size: int = MAX_MANIFEST_SIZE
     require_important_update: bool = False
+    enable_robots_txt: bool = False
 
 
 class ManifestChecker:
@@ -318,13 +321,22 @@ class ManifestChecker:
         counter: TasksCounter,
         http_session: aiohttp.ClientSession,
         data: ExternalBase,
+        global_robots_cache: RobotsCache,
     ) -> ExternalBase:
         src_rel_path = os.path.relpath(data.source_path, self._root_manifest_dir)
         if data.parent:
             await data.parent.checked.wait()
         data.checked.clear()
         counter.started += 1
-        checkers = [c(http_session) for c in self._checkers if c.should_check(data)]
+        enable_robots = self.opts.enable_robots_txt or data.checker_data.get(
+            ROBOTS_TXT_PROP, False
+        )
+        robots_cache = global_robots_cache if enable_robots else None
+        checkers = [
+            c(http_session, robots_cache)
+            for c in self._checkers
+            if c.should_check(data)
+        ]
         if not checkers:
             counter.finished += 1
             log.info(
@@ -409,11 +421,14 @@ class ManifestChecker:
             timeout=aiohttp.ClientTimeout(connect=TIMEOUT_CONNECT, total=TIMEOUT_TOTAL),
             trust_env=True,
         ) as http_session:
+            global_robots_cache = RobotsCache(http_session)
             check_tasks = []
             for data in external_data:
                 if data.state != data.State.UNKNOWN:
                     continue
-                check_tasks.append(self._check_data(counter, http_session, data))
+                check_tasks.append(
+                    self._check_data(counter, http_session, data, global_robots_cache)
+                )
 
             log.info("Checking %s external data items", counter.total)
             ext_data_checked = await asyncio_gather_failfast(check_tasks)
