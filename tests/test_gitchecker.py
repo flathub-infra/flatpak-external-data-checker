@@ -16,6 +16,11 @@ TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.virustotal.Uploader
 class TestGitChecker(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         init_logging()
+        self.robots_patcher = mock.patch(
+            "src.lib.robots.RobotsCache.ensure_allowed", new_callable=mock.AsyncMock
+        )
+        self.robots_patcher.start()
+        self.addCleanup(self.robots_patcher.stop)
 
     def test_sort_tags(self):
         t1 = TagWithVersion("x1", "v1.1", False, "1.1")

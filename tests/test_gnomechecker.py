@@ -19,6 +19,7 @@
 
 import os
 import unittest
+from unittest import mock
 
 from src.checkers.gnomechecker import VersionScheme, _is_stable
 from src.lib.checksums import MultiDigest
@@ -32,6 +33,11 @@ TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.gnome.baobab.json")
 class TestGNOMEChecker(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         init_logging()
+        self.robots_patcher = mock.patch(
+            "src.lib.robots.RobotsCache.ensure_allowed", new_callable=mock.AsyncMock
+        )
+        self.robots_patcher.start()
+        self.addCleanup(self.robots_patcher.stop)
 
     def test_is_stable(self):
         self.assertTrue(_is_stable("3.28.0"))

@@ -23,10 +23,26 @@ class SnapcraftChecker(Checker):
     _arches = {"x86_64": "amd64", "aarch64": "arm64", "arm": "armhf", "i386": "i386"}
     _BLOCK_SIZE = 65536
 
+    def __init__(self, *args, **kwargs):
+        new_args = list(args)
+
+        # Everything is blocked
+        # User-agent: *
+        # Disallow: /
+        if len(new_args) > 1:
+            new_args[1] = None
+        else:
+            kwargs["robots_cache"] = None
+
+        super().__init__(*new_args, **kwargs)
+
     async def _get_digests(self, url: str, sha3_384: str):
         assert self.session is not None
         multihash = MultiHash()
         sha3 = hashlib.sha3_384()
+
+        if self.robots_cache:
+            await self.robots_cache.ensure_allowed(url)
 
         async with self.session.get(url) as response:
             async for data in response.content.iter_chunked(self._BLOCK_SIZE):
@@ -44,6 +60,9 @@ class SnapcraftChecker(Checker):
 
         url = f"http://api.snapcraft.io/v2/snaps/info/{name}"
         header = {"Snap-Device-Series": "16"}
+
+        if self.robots_cache:
+            await self.robots_cache.ensure_allowed(url)
 
         async with self.session.get(url, headers=header) as response:
             js = await response.json()

@@ -26,6 +26,19 @@ class RustChecker(Checker):
         "required": ["package", "target"],
     }
 
+    def __init__(self, *args, **kwargs):
+        new_args = list(args)
+
+        # Everything is blocked
+        # User-agent: *
+        # Disallow: /
+        if len(new_args) > 1:
+            new_args[1] = None
+        else:
+            kwargs["robots_cache"] = None
+
+        super().__init__(*new_args, **kwargs)
+
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
 
@@ -34,6 +47,9 @@ class RustChecker(Checker):
         target_name = external_data.checker_data["target"]
 
         url = f"https://static.rust-lang.org/dist/channel-rust-{channel}.toml"
+
+        if self.robots_cache:
+            await self.robots_cache.ensure_allowed(url)
 
         async with self.session.get(url) as response:
             data = toml.loads(await response.text())

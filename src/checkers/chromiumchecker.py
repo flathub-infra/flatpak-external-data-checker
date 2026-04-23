@@ -13,6 +13,7 @@ from ..lib.externaldata import (
     ExternalGitRef,
     ExternalGitRepo,
 )
+from ..lib.robots import RobotsCache
 from ..lib.utils import get_extra_data_info_from_url
 from . import Checker
 
@@ -28,7 +29,11 @@ class Component:
         session: aiohttp.ClientSession,
         external_data: ExternalBase,
         latest_version: str,
+        robots_cache: RobotsCache | None = None,
     ) -> None:
+        # https://chromium.googlesource.com/robots.txt
+        # Disallow: /?format=TEXT
+        self.robots_cache = None
         self.session = session
         self.external_data = external_data
         self.latest_version = latest_version
@@ -42,7 +47,9 @@ class Component:
         assert latest_url is not None
 
         try:
-            new_version = await get_extra_data_info_from_url(latest_url, self.session)
+            new_version = await get_extra_data_info_from_url(
+                latest_url, self.session, robots_cache=self.robots_cache
+            )
         except NETWORK_ERRORS as err:
             raise CheckerFetchError from err
         else:
@@ -106,6 +113,8 @@ class LLVMComponent(Component):
 
     async def get_llvm_version(self) -> "LLVMComponent.Version":
         url = self._UPDATE_PY_URL_FORMAT.format(version=self.latest_version)
+        if self.robots_cache:
+            await self.robots_cache.ensure_allowed(url)
 
         try:
             async with self.session.get(url, params=self._UPDATE_PY_PARAMS) as response:
@@ -123,7 +132,8 @@ class LLVMComponent(Component):
             fallback_url = self._UPDATE_PY_FALLBACK_URL_FORMAT.format(
                 version=self.latest_version
             )
-
+            if self.robots_cache:
+                await self.robots_cache.ensure_allowed(fallback_url)
             async with self.session.get(fallback_url) as response:
                 response.raise_for_status()
                 update_py = await response.text()
@@ -204,8 +214,11 @@ class ChromiumChecker(Checker):
     _CHROMIUM_VERSIONS_PARAMS = {"platform": "Linux", "channel": "Stable", "num": "1"}
 
     async def _get_latest_chromium(self) -> str:
+        url = self._CHROMIUM_VERSIONS_URL
+        if self.robots_cache:
+            await self.robots_cache.ensure_allowed(url)
         async with self.session.get(
-            self._CHROMIUM_VERSIONS_URL, params=self._CHROMIUM_VERSIONS_PARAMS
+            url, params=self._CHROMIUM_VERSIONS_PARAMS
         ) as response:
             result = await response.json()
 
@@ -226,5 +239,7 @@ class ChromiumChecker(Checker):
             )
 
         latest_version = await self._get_latest_chromium()
-        component = component_class(self.session, external_data, latest_version)
+        component = component_class(
+            self.session, external_data, latest_version, self.robots_cache
+        )
         await component.check()

@@ -268,3 +268,14 @@ class TestForceForkTristate(unittest.TestCase):
     def test_both_fork_args(self):
         with self.assertRaises(SystemExit):
             main.parse_cli_args(["--always-fork", "--never-fork", TEST_MANIFEST])
+
+
+class TestRobotsTxtArg(unittest.TestCase):
+    def test_enable_robots_txt_flag(self):
+        with self.subTest("default is False"):
+            args = main.parse_cli_args([TEST_MANIFEST])
+            self.assertFalse(args.enable_robots_txt)
+
+        with self.subTest("flag sets True"):
+            args = main.parse_cli_args(["--enable-robots-txt", TEST_MANIFEST])
+            self.assertTrue(args.enable_robots_txt)

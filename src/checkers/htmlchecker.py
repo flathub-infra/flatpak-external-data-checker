@@ -104,6 +104,9 @@ class HTMLChecker(Checker):
         return encoding
 
     async def _get_text(self, url: URL | str) -> str:
+        if self.robots_cache:
+            await self.robots_cache.ensure_allowed(url)
+
         try:
             async with self.session.get(url) as response:
                 encoding = await self._get_encoding(response)

@@ -47,6 +47,9 @@ class ElectronChecker(Checker):
                 URL("latest-linux.yml")
             )
 
+        if self.robots_cache:
+            await self.robots_cache.ensure_allowed(metadata_url)
+
         try:
             async with self.session.get(metadata_url) as resp:
                 metadata = yaml.load(await resp.read())

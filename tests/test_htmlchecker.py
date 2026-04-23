@@ -23,6 +23,7 @@
 import base64
 import os
 import unittest
+from unittest import mock
 
 import aiohttp
 
@@ -45,9 +46,14 @@ class TestHTMLTools(unittest.IsolatedAsyncioTestCase):
         self.session = aiohttp.ClientSession(
             raise_for_status=True, timeout=aiohttp.ClientTimeout(total=5)
         )
+        self.robots_patcher = mock.patch(
+            "src.lib.robots.RobotsCache.ensure_allowed", new_callable=mock.AsyncMock
+        )
+        self.robots_patcher.start()
 
     async def asyncTearDown(self):
         await self.session.close()
+        self.robots_patcher.stop()
 
     def _encoded_url(self, data: bytes):
         return "https://httpbingo.org/base64/decode/" + base64.b64encode(data).decode()
@@ -71,6 +77,11 @@ TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.x.xeyes.yml")
 class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         init_logging()
+        self.robots_patcher = mock.patch(
+            "src.lib.robots.RobotsCache.ensure_allowed", new_callable=mock.AsyncMock
+        )
+        self.robots_patcher.start()
+        self.addCleanup(self.robots_patcher.stop)
 
     async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)

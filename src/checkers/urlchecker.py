@@ -119,6 +119,9 @@ class URLChecker(Checker):
 
         try:
             if strip_query:
+                if self.robots_cache:
+                    await self.robots_cache.ensure_allowed(url)
+
                 async with self.session.head(
                     url, allow_redirects=True, headers=HTTP_CLIENT_HEADERS
                 ) as head:
@@ -127,7 +130,10 @@ class URLChecker(Checker):
             if url.endswith(".AppImage"):
                 with tempfile.NamedTemporaryFile("w+b") as tmpfile:
                     new_version = await utils.get_extra_data_info_from_url(
-                        url, session=self.session, dest_io=tmpfile
+                        url,
+                        session=self.session,
+                        dest_io=tmpfile,
+                        robots_cache=self.robots_cache,
                     )
                     version_string = await utils.extract_appimage_version(
                         tmpfile,
@@ -135,14 +141,19 @@ class URLChecker(Checker):
             if url.endswith(".deb"):
                 with tempfile.NamedTemporaryFile("w+b") as tmpfile:
                     new_version = await utils.get_extra_data_info_from_url(
-                        url, session=self.session, dest_io=tmpfile
+                        url,
+                        session=self.session,
+                        dest_io=tmpfile,
+                        robots_cache=self.robots_cache,
                     )
                     version_string = utils.extract_deb_version(
                         tmpfile,
                     )
             else:
                 new_version = await utils.get_extra_data_info_from_url(
-                    url, session=self.session
+                    url,
+                    session=self.session,
+                    robots_cache=self.robots_cache,
                 )
         except NETWORK_ERRORS as err:
             if not is_rotating:

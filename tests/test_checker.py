@@ -26,6 +26,7 @@ import logging
 import os
 import tempfile
 import unittest
+from unittest import mock
 from xml.dom import minidom
 
 import aiohttp
@@ -171,6 +172,11 @@ class TestExternalDataChecker(_TestWithInlineManifest):
 
     def setUp(self):
         init_logging()
+        self.robots_patcher = mock.patch(
+            "src.lib.robots.RobotsCache.ensure_allowed", new_callable=mock.AsyncMock
+        )
+        self.robots_patcher.start()
+        self.addCleanup(self.robots_patcher.stop)
 
     async def test_check_filtered(self):
         # Use only the URLChecker which is fast so we don't have to wait a lot
@@ -506,6 +512,11 @@ size: {UpdateEverythingChecker.SIZE}
 class TestCheckerHelpers(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         init_logging()
+        self.robots_patcher = mock.patch(
+            "src.lib.robots.RobotsCache.ensure_allowed", new_callable=mock.AsyncMock
+        )
+        self.robots_patcher.start()
+        self.addCleanup(self.robots_patcher.stop)
 
     async def asyncSetUp(self):
         self.http = aiohttp.ClientSession(
@@ -605,6 +616,11 @@ class TestImportantGitExternalDataChecker(_TestWithInlineManifest):
 
     def setUp(self):
         init_logging()
+        self.robots_patcher = mock.patch(
+            "src.lib.robots.RobotsCache.ensure_allowed", new_callable=mock.AsyncMock
+        )
+        self.robots_patcher.start()
+        self.addCleanup(self.robots_patcher.stop)
 
     async def test_update_no_important_source_updated(self):
         """With two sources, while one source is updated it is not the important one,

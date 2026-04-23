@@ -66,6 +66,17 @@ class PyPIChecker(Checker):
         "required": ["name"],
     }
 
+    def __init__(self, *args, **kwargs):
+        new_args = list(args)
+
+        # /pypi/*/json is blocked
+        if len(new_args) > 1:
+            new_args[1] = None
+        else:
+            kwargs["robots_cache"] = None
+
+        super().__init__(*new_args, **kwargs)
+
     async def check(self, external_data: ExternalBase):
         package_name = external_data.checker_data["name"]
         package_type = external_data.checker_data.get("packagetype", "sdist")

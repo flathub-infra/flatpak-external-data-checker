@@ -95,8 +95,11 @@ class GNOMEChecker(Checker):
         assert isinstance(project_name, str)
 
         proj_url = GNOME_MIRROR / "sources" / project_name
+        cache_url = proj_url / "cache.json"
+        if self.robots_cache:
+            await self.robots_cache.ensure_allowed(cache_url)
         try:
-            async with self.session.get(proj_url / "cache.json") as cache_resp:
+            async with self.session.get(cache_url) as cache_resp:
                 # Some mirrors may sand invalid content-type; don't require it to be
                 # application/json
                 cache_json = await cache_resp.json(content_type=None)
@@ -141,8 +144,10 @@ class GNOMEChecker(Checker):
             "sha256sum",
             re.sub(f"\\.{tarball_type}$", ".sha256sum", tarball_path),
         )
-
-        async with self.session.get(proj_url / checksum_path) as cs_resp:
+        checksum_url = proj_url / checksum_path
+        if self.robots_cache:
+            await self.robots_cache.ensure_allowed(checksum_url)
+        async with self.session.get(checksum_url) as cs_resp:
             checksums = _parse_checksums(await cs_resp.text())
         checksum = checksums[tarball_path.split("/")[-1]]
 

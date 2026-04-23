@@ -39,6 +39,7 @@ from ..lib.externaldata import (
     ExternalFile,
     ExternalState,
 )
+from ..lib.robots import RobotsCache
 from ..lib.version import LooseVersion
 
 JSONType = str | int | float | bool | None | dict[str, t.Any] | list[t.Any]
@@ -70,8 +71,13 @@ class Checker:
             ALL_CHECKERS.append(cls)
             ALL_CHECKERS.sort(key=lambda c: c.PRIORITY)
 
-    def __init__(self, session: aiohttp.ClientSession):
+    def __init__(
+        self,
+        session: aiohttp.ClientSession,
+        robots_cache: RobotsCache | None = None,
+    ):
         self.session = session
+        self.robots_cache = robots_cache
 
     @classmethod
     def get_json_schema(self, data_class: type[ExternalBase]) -> dict[str, t.Any]:
@@ -117,6 +123,10 @@ class Checker:
         log.debug("Loading JSON from %s", url)
         if headers is None:
             headers = {}
+
+        if self.robots_cache:
+            await self.robots_cache.ensure_allowed(url)
+
         try:
             async with self.session.get(url, headers=headers) as response:
                 if re.match(r".+\.ya?ml$", response.url.name):
@@ -134,6 +144,8 @@ class Checker:
     async def _get_xml(self, url: URL) -> XMLElement:
         parser = ElementTree.XMLPullParser(load_dtd=False, resolve_entities=False)
         log.debug("Loading XML from %s", url)
+        if self.robots_cache:
+            await self.robots_cache.ensure_allowed(url)
         async with self.session.get(url) as resp:
             is_gzip = url.name.endswith(".gz")
             decompressor = zlib.decompressobj(16 + zlib.MAX_WBITS)
@@ -201,6 +213,8 @@ class Checker:
         Re-download given `url`, verify it against given `digests`,
         and return a `MultiDigest` with all digest types set.
         """
+        if self.robots_cache:
+            await self.robots_cache.ensure_allowed(url)
         multihash = MultiHash()
         try:
             async with self.session.get(url) as resp:
@@ -271,6 +285,7 @@ class Checker:
                 follow_redirects=follow_redirects,
                 session=self.session,
                 content_type_deny=wrong_content_types,
+                robots_cache=self.robots_cache,
             )
         except NETWORK_ERRORS as err:
             raise CheckerFetchError from err
