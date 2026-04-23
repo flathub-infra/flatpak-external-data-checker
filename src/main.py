@@ -438,8 +438,13 @@ def open_pr(
         log_url = f"https://github.com/{gh_repo_name}/actions/runs/{gh_run_id}"
         pr_message += f"\n\n[📋 View External data checker logs]({log_url})"
 
+    subject = change.subject or ""
+
+    if base != origin_repo.default_branch:
+        subject = f"[{base}] {subject}"
+
     pr = origin_repo.create_pull(
-        change.subject,
+        subject,
         pr_message,
         base,
         head,
