@@ -444,10 +444,10 @@ def open_pr(
         subject = f"[{base}] {subject}"
 
     pr = origin_repo.create_pull(
-        subject,
-        pr_message,
-        base,
-        head,
+        title=subject,
+        body=pr_message,
+        base=base,
+        head=head,
         maintainer_can_modify=True,
     )
     log.info("Opened pull request %s", pr.html_url)
