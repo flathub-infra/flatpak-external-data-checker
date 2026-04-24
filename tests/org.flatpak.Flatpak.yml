@@ -24,7 +24,7 @@ modules:
           versions:
             ==: "1.10.1"
           url-template: https://github.com/flatpak/flatpak/releases/download/$version/flatpak-$version.tar.xz
-          
+
   - name: boost
     sources:
       - type: archive
@@ -34,7 +34,7 @@ modules:
           type: anitya
           project-id: 6845
           stable-only: true
-          url-template: https://archives.boost.io/release/$version/source/boost_${major}_${minor}_$patch.tar.bz2
+          url-template: https://archives.boost.io/release/${major}.${minor}.${patch}/source/boost_${major}_${minor}_$patch.tar.bz2
 
   - name: glib-networking
     sources:
