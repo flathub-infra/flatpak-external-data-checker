@@ -13,75 +13,75 @@ env:
   DOCKER_IMAGE: ${{ github.repository }}
 
 jobs:
-  check-formatting:
-    name: Check formatting
+  check-lint:
+    name: Check lint
     runs-on: ubuntu-latest
     container: debian:bookworm
     permissions:
       contents: read
-
+    env:
+      PIP_CACHE_DIR: "/.pip"
     steps:
-      - uses: actions/checkout@v6
+        # 6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
-      - name: Install dependencies
-        run: |
-          apt-get update
-          apt-get install -y \
-            $(xargs < dependencies.apt.txt) \
-            python3-setuptools
-          python3 -m pip install --break-system-packages \
-            black
-
-      - name: Run black
-        run: |
-          python3 -m black --check --diff .
-
-      - name: Run flake8
-        run: |
-          python3 -m flake8
-
-  check-typing:
-    name: Static type check
-    runs-on: ubuntu-latest
-    container: debian:bookworm
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Prime pip cache
-        uses: actions/cache@v5
+      - name: Cache pip downloads
+        # 5.0.5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         with:
           path: /.pip
-          key: |
-            pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          key: pip-${{ runner.os }}-lint-1
           restore-keys: |
             pip-${{ runner.os }}-
 
+      - name: Prime mypy cache
+        # 5.0.5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        with:
+          path: .mypy_cache
+          key: mypy-${{ runner.os }}-${{ hashFiles('**/*.py') }}
+          restore-keys: |
+            mypy-${{ runner.os }}-
+
       - name: Install dependencies
         run: |
           apt-get update
           apt-get install -y \
             $(xargs < dependencies.apt.txt) \
-            python3-setuptools
-          python3 -m pip install --break-system-packages \
-            --cache-dir=/.pip \
-            mypy \
-            lxml-stubs
+            python3-setuptools \
+            python3-venv
 
-      - name: Prime mypy cache
-        uses: actions/cache@v5
-        with:
-          path: .mypy_cache
-          key: |
-            mypy-${{ runner.os }}-${{ github.run_id }}
-          restore-keys: |
-            mypy-${{ runner.os }}-
+      - name: Install lint tools
+        run: |
+          python3 -m venv venv
+          . venv/bin/activate
+
+          # Bump cache key above when changing versions
+          pip install 'black==26.5.0' 'flake8==7.3.0'
+
+      - name: Run black
+        run: |
+          . venv/bin/activate
+          black --check --diff --extend-exclude '/venv/' .
+
+      - name: Run flake8
+        run: |
+          . venv/bin/activate
+          flake8 --extend-exclude=./venv
+
+      - name: Install mypy
+        run: |
+          python3 -m venv --system-site-packages mypyvenv
+          . mypyvenv/bin/activate
+
+          # Bump cache key above when changing versions
+          pip install 'mypy==2.1.0' 'lxml-stubs==0.5.1'
 
       - name: Run mypy check
         run: |
-          env PIP_BREAK_SYSTEM_PACKAGES=1 \
-            PIP_CACHE_DIR=/.pip python3 -m mypy \
+          . mypyvenv/bin/activate
+
+          mypy \
             --install-types \
             --non-interactive \
             src
@@ -92,14 +92,17 @@ jobs:
     permissions:
       packages: write
     steps:
-      - uses: actions/checkout@v6
+        # 6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        # 4.0.0
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
 
       - name: Build container
         id: docker_build
-        uses: docker/build-push-action@v7
+        # 7.1.0
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f
         with:
           context: .
           file: ./Dockerfile
@@ -114,19 +117,31 @@ jobs:
           docker run -v $PWD:$PWD -w $PWD --entrypoint bash ${{ env.DOCKER_IMAGE }}:build -c \
           "apt-get install python3-coverage && python3 -m coverage run -m unittest discover --verbose --buffer"
 
+      - name: Cache pip downloads
+        # 5.0.5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        with:
+          path: ~/.pip
+          key: pip-${{ runner.os }}-coveralls-4.1.0
+          restore-keys: |
+            pip-${{ runner.os }}-
+
       - name: Submit code coverage to Coveralls.io
         if: github.event.pull_request.head.repo.fork == false
         env:
+          PIP_CACHE_DIR: "~/.pip"
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         run: |
           python3 -m venv venv
           . venv/bin/activate
+          # Bump cache key above
           pip install 'coveralls==4.1.0'
           coveralls
 
       - name: Login to registry
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4
+        # 4.1.0
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121
         with:
           registry: ${{ env.DOCKER_REGISTRY }}
           username: ${{ github.actor }}
@@ -134,7 +149,8 @@ jobs:
 
       - name: Push image to registry
         if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v7
+        # 7.1.0
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f
         with:
           context: .
           file: ./Dockerfile
@@ -143,7 +159,8 @@ jobs:
 
       - name: Login to ghcr.io using Flathub credentials
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4
+        # 4.1.0
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121
         with:
           registry: ghcr.io
           username: ${{ secrets.FLATHUB_ORG_USER }}
@@ -151,7 +168,8 @@ jobs:
 
       - name: Push image to the old location
         if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v7
+        # 7.1.0
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f
         with:
           context: .
           file: ./Dockerfile
