@@ -543,35 +543,37 @@ def dump_manifest(
     assert manifest_path.is_absolute()
     conf = editorconfig.get_properties(manifest_path)
 
-    indent: t.Union[str, int]
+    json_indent: t.Union[str, int]
     if conf.get("indent_style") == "space":
-        indent = int(conf.get("indent_size", 4))
+        json_indent = int(conf.get("indent_size", 4))
     elif conf.get("indent_style") == "tab":
-        indent = "\t"
+        json_indent = "\t"
     else:
-        indent = 4
+        json_indent = 4
 
-    if max_line_length := conf.get("max_line_length"):
+    if yaml_max_line_length := conf.get("max_line_length"):
         try:
             # See https://sourceforge.net/p/ruamel-yaml/tickets/322/
-            _yaml.width = int(max_line_length)  # type: ignore
+            _yaml.width = int(yaml_max_line_length)  # type: ignore
         except ValueError:
-            log.warning("Ignoring invalid max_line_length %r", max_line_length)
+            log.warning("Ignoring invalid max_line_length %r", yaml_max_line_length)
 
-    newline: t.Optional[bool]
+    json_newline_pref: t.Optional[bool]
     if "insert_final_newline" in conf:
-        newline = {"true": True, "false": False}.get(conf["insert_final_newline"])
+        json_newline_pref = {"true": True, "false": False}.get(
+            conf["insert_final_newline"]
+        )
     else:
         with manifest_path.open("r") as fp:
-            newline = _check_newline(fp)
+            json_newline_pref = _check_newline(fp)
 
     with manifest_path.open("w", encoding="utf-8") as fp:
         if manifest_path.suffix in (".yaml", ".yml"):
             _yaml.explicit_start = has_yaml_header  # type: ignore[assignment]
             _yaml.dump(contents, fp)
         else:
-            json.dump(obj=contents, fp=fp, indent=indent)
-            if newline:
+            json.dump(obj=contents, fp=fp, indent=json_indent)
+            if json_newline_pref:
                 fp.write("\n")
 
 
