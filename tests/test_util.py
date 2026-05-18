@@ -40,6 +40,7 @@ from src.lib.utils import (
     get_extra_data_info_from_url,
     Command,
     dump_manifest,
+    _detect_json_flatpak_manifest_indent,
 )
 
 
@@ -228,6 +229,119 @@ class TestDownload(unittest.IsolatedAsyncioTestCase):
             )
 
 
+class TestDetectJsonIndent(unittest.TestCase):
+    def test_2_spaces_app_manifest(self):
+        text = dedent("""\
+            {
+              "app-id": "com.example.App",
+              "modules": []
+            }
+            """)
+        self.assertEqual(_detect_json_flatpak_manifest_indent(text), 2)
+
+    def test_4_spaces_app_manifest(self):
+        text = dedent("""\
+            {
+                "app-id": "com.example.App",
+                "modules": []
+            }
+            """)
+        self.assertEqual(_detect_json_flatpak_manifest_indent(text), 4)
+
+    def test_tab_app_manifest(self):
+        text = dedent("""\
+            {
+            \t"app-id": "com.example.App",
+            \t"modules": []
+            }
+            """)
+        self.assertEqual(_detect_json_flatpak_manifest_indent(text), "\t")
+
+    def test_2_spaces_module_manifest(self):
+        text = dedent("""\
+            {
+              "name": "foo",
+              "sources": []
+            }
+            """)
+        self.assertEqual(_detect_json_flatpak_manifest_indent(text), 2)
+
+    def test_2_spaces_source_list(self):
+        text = dedent("""\
+            [
+              {
+                "type": "archive",
+                "url": "https://example.com/foo.tar.gz"
+              }
+            ]
+            """)
+        self.assertEqual(_detect_json_flatpak_manifest_indent(text), 2)
+
+    def test_4_spaces_source_list(self):
+        text = dedent("""\
+            [
+                {
+                    "type": "archive",
+                    "url": "https://example.com/foo.tar.gz"
+                }
+            ]
+            """)
+        self.assertEqual(_detect_json_flatpak_manifest_indent(text), 4)
+
+    def test_tab_source_list(self):
+        text = dedent("""\
+            [
+            \t{
+            \t\t"type": "archive",
+            \t\t"url": "https://example.com/foo.tar.gz"
+            \t}
+            ]
+            """)
+        self.assertEqual(_detect_json_flatpak_manifest_indent(text), "\t")
+
+    def test_name_nested_in_checker_data(self):
+        text = dedent("""\
+            {
+                "name": "glycin",
+                "sources": [
+                    {
+                        "type": "archive",
+                        "x-checker-data": {
+                            "name": "glycin",
+                            "type": "gnome"
+                        }
+                    }
+                ]
+            }
+            """)
+        self.assertEqual(_detect_json_flatpak_manifest_indent(text), 4)
+
+    def test_modules_key_preferred_over_name(self):
+        text = dedent("""\
+            {
+                "modules": [
+                    {
+                        "name": "libde265",
+                        "sources": [
+                            {
+                                "x-checker-data": {
+                                    "name": "libde265"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "name": "glycin"
+            }
+            """)
+        self.assertEqual(_detect_json_flatpak_manifest_indent(text), 4)
+
+    def test_no_indent(self):
+        self.assertIsNone(
+            _detect_json_flatpak_manifest_indent('{"app-id": "com.example.App"}')
+        )
+
+
 EDITORCONFIG_SAMPLE_DATA = {"first": 1, "second": [2, 3]}
 EDITORCONFIG_STYLES = [
     # 2-space with newline
@@ -281,6 +395,58 @@ EDITORCONFIG_STYLES = [
     ),
 ]
 
+ORIGINAL_INDENT_STYLES = [
+    # 2-space
+    (
+        dedent("""\
+            {
+              "app-id": "com.example.App"
+            }
+            """),
+        dedent("""\
+            {
+              "first": 1,
+              "second": [
+                2,
+                3
+              ]
+            }
+            """),
+    ),
+    # Tab
+    (
+        dedent("""\
+            {
+            \t"app-id": "com.example.App"
+            }"""),
+        dedent("""\
+            {
+            \t"first": 1,
+            \t"second": [
+            \t\t2,
+            \t\t3
+            \t]
+            }"""),
+    ),
+    # 4-space with trailing newline
+    (
+        dedent("""\
+            {
+                "app-id": "com.example.App"
+            }
+            """),
+        dedent("""\
+            {
+                "first": 1,
+                "second": [
+                    2,
+                    3
+                ]
+            }
+            """),
+    ),
+]
+
 
 class TestDumpManifest(unittest.TestCase):
     tmpdir: TemporaryDirectory
@@ -299,6 +465,43 @@ class TestDumpManifest(unittest.TestCase):
             if econfig:
                 (path.parent / ".editorconfig").write_text(econfig)
             path.write_text("{}")  # Can be anything, just the file need to pre-exist
+            dump_manifest(EDITORCONFIG_SAMPLE_DATA, path)
+            self.assertEqual(path.read_text(), expected_data)
+
+    def test_editorconfig_prio_over_original(self):
+        original = dedent("""\
+            {
+            \t"old": true
+            }
+            """)
+        econfig = dedent("""\
+            [*.json]
+            indent_style = space
+            indent_size = 2
+            insert_final_newline = true
+            """)
+        expected = dedent("""\
+            {
+              "first": 1,
+              "second": [
+                2,
+                3
+              ]
+            }
+            """)
+        path = Path(self.tmpdir.name) / "override" / "test.json"
+        path.parent.mkdir(parents=True)
+        (path.parent / ".editorconfig").write_text(econfig)
+        path.write_text(original)
+        dump_manifest(EDITORCONFIG_SAMPLE_DATA, path)
+        self.assertEqual(path.read_text(), expected)
+
+    def test_original_indent_preserved_no_editorconfig(self):
+        for i, _style in enumerate(ORIGINAL_INDENT_STYLES):
+            original, expected_data = _style
+            path = Path(self.tmpdir.name) / f"orig_{i}" / f"{i}.json"
+            path.parent.mkdir(parents=True)
+            path.write_text(original)
             dump_manifest(EDITORCONFIG_SAMPLE_DATA, path)
             self.assertEqual(path.read_text(), expected_data)
 

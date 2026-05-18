@@ -25,6 +25,7 @@ import zoneinfo
 import json
 import logging
 import os
+import io
 import re
 import subprocess
 import tempfile
@@ -113,6 +114,51 @@ def _check_newline(fp):
         return True
     else:
         return False
+
+
+def _detect_json_flatpak_manifest_indent(text: str) -> int | str | None:
+    def _indent_value(indent: str) -> int | str:
+        return "\t" if "\t" in indent else len(indent)
+
+    try:
+        root = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+
+    lines = text.splitlines()
+
+    if isinstance(root, list):
+        for line in lines:
+            stripped = line.lstrip(" \t")
+            if stripped == "{":
+                return _indent_value(line[: len(line) - len(stripped)])
+        return None
+
+    if isinstance(root, dict):
+        if "app-id" in root:
+            anchor_key = '"app-id"'
+        elif "id" in root:
+            anchor_key = '"id"'
+        elif "modules" in root:
+            anchor_key = '"modules"'
+        elif "name" in root:
+            anchor_key = '"name"'
+        else:
+            return None
+        shallowest: tuple[int, str | int] | None = None
+        for line in lines:
+            stripped = line.lstrip(" \t")
+            if not stripped or stripped == line:
+                continue
+            if stripped.startswith(anchor_key):
+                indent = line[: len(line) - len(stripped)]
+                depth = len(indent)
+                if shallowest is None or depth < shallowest[0]:
+                    shallowest = (depth, _indent_value(indent))
+        if shallowest is not None:
+            return shallowest[1]
+
+    return None
 
 
 def strip_query(url):
@@ -541,6 +587,10 @@ def dump_manifest(
 ):
     manifest_path = Path(manifest_path)
     assert manifest_path.is_absolute()
+
+    with manifest_path.open("r", encoding="utf-8") as fp:
+        original_manifest = fp.read()
+
     conf = editorconfig.get_properties(manifest_path)
 
     json_indent: t.Union[str, int]
@@ -549,7 +599,7 @@ def dump_manifest(
     elif conf.get("indent_style") == "tab":
         json_indent = "\t"
     else:
-        json_indent = 4
+        json_indent = _detect_json_flatpak_manifest_indent(original_manifest) or 4
 
     if yaml_max_line_length := conf.get("max_line_length"):
         try:
@@ -564,8 +614,7 @@ def dump_manifest(
             conf["insert_final_newline"]
         )
     else:
-        with manifest_path.open("r") as fp:
-            json_newline_pref = _check_newline(fp)
+        json_newline_pref = _check_newline(io.StringIO(original_manifest))
 
     with manifest_path.open("w", encoding="utf-8") as fp:
         if manifest_path.suffix in (".yaml", ".yml"):
