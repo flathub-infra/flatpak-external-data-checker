@@ -121,7 +121,7 @@ jobs:
         run: |
           python3 -m venv venv
           . venv/bin/activate
-          pip install coveralls
+          pip install 'coveralls==4.1.0'
           coveralls
 
       - name: Login to registry
