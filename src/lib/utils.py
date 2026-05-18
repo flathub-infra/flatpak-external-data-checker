@@ -539,17 +539,10 @@ def read_manifest(manifest_path: t.Union[Path, str]):
 def dump_manifest(
     contents: t.Dict, manifest_path: t.Union[Path, str], has_yaml_header: bool = False
 ):
-    """Writes back 'contents' to 'manifest_path'.
-
-    For YAML, we make a best-effort attempt to preserve
-    formatting; for JSON, we use the canonical 4-space indentation,
-    but add a trailing newline if originally present."""
     manifest_path = Path(manifest_path)
-
     assert manifest_path.is_absolute()
     conf = editorconfig.get_properties(manifest_path)
 
-    # Determine indentation preference
     indent: t.Union[str, int]
     if conf.get("indent_style") == "space":
         indent = int(conf.get("indent_size", 4))
@@ -558,7 +551,6 @@ def dump_manifest(
     else:
         indent = 4
 
-    # Determine max line length preference
     if max_line_length := conf.get("max_line_length"):
         try:
             # See https://sourceforge.net/p/ruamel-yaml/tickets/322/
@@ -566,7 +558,6 @@ def dump_manifest(
         except ValueError:
             log.warning("Ignoring invalid max_line_length %r", max_line_length)
 
-    # Determine trailing newline preference
     newline: t.Optional[bool]
     if "insert_final_newline" in conf:
         newline = {"true": True, "false": False}.get(conf["insert_final_newline"])
