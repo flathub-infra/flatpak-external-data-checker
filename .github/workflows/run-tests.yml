@@ -118,11 +118,10 @@ jobs:
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         run: |
-          sudo apt-get install -y \
-            python3-setuptools
-          sudo python3 -m pip install \
-            coveralls
-          python3 -m coveralls
+          python3 -m venv venv
+          . venv/bin/activate
+          pip install coveralls
+          coveralls
         continue-on-error: true
 
       - name: Login to registry
