@@ -24,10 +24,12 @@ jobs:
     steps:
         # 6.0.2
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
 
       - name: Cache pip downloads
         # 5.0.5
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae
         with:
           path: /.pip
           key: pip-${{ runner.os }}-lint-1
@@ -36,7 +38,7 @@ jobs:
 
       - name: Prime mypy cache
         # 5.0.5
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae
         with:
           path: .mypy_cache
           key: mypy-${{ runner.os }}-${{ hashFiles('**/*.py') }}
@@ -86,6 +88,22 @@ jobs:
             --non-interactive \
             src
 
+      - name: Save mypy cache
+        # 5.0.5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        if: github.repository == 'flathub-infra/flatpak-external-data-checker' && github.ref == 'refs/heads/master'
+        with:
+          path: .mypy_cache
+          key: mypy-${{ runner.os }}-${{ hashFiles('**/*.py') }}
+
+      - name: Save pip downloads cache
+        # 5.0.5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        if: github.repository == 'flathub-infra/flatpak-external-data-checker' && github.ref == 'refs/heads/master'
+        with:
+          path: /.pip
+          key: pip-${{ runner.os }}-lint-1
+
   build-and-test-container:
     name: Build and test container
     runs-on: ubuntu-latest
@@ -94,6 +112,8 @@ jobs:
     steps:
         # 6.0.2
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         # 4.0.0
@@ -114,12 +134,12 @@ jobs:
 
       - name: Run tests in container
         run: |
-          docker run -v $PWD:$PWD -w $PWD --entrypoint bash ${{ env.DOCKER_IMAGE }}:build -c \
+          docker run -v $PWD:$PWD -w $PWD --entrypoint bash "$DOCKER_IMAGE":build -c \
           "apt-get install python3-coverage && python3 -m coverage run -m unittest discover --verbose --buffer"
 
       - name: Cache pip downloads
         # 5.0.5
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae
         with:
           path: ~/.pip
           key: pip-${{ runner.os }}-coveralls-4.1.0
@@ -175,3 +195,11 @@ jobs:
           file: ./Dockerfile
           tags: ghcr.io/flathub/flatpak-external-data-checker:latest
           push: true
+
+      - name: Save pip downloads cache
+        # 5.0.5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        if: github.repository == 'flathub-infra/flatpak-external-data-checker' && github.ref == 'refs/heads/master'
+        with:
+          path: ~/.pip
+          key: pip-${{ runner.os }}-coveralls-4.1.0
