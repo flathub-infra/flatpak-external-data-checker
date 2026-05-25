@@ -96,6 +96,11 @@ class LLVMComponent(Component):
         "/{version}/tools/clang/scripts/update.py"
     )
 
+    _UPDATE_PY_FALLBACK_URL_FORMAT = (
+        "https://raw.githubusercontent.com/chromium/chromium/"
+        "refs/tags/{version}/tools/clang/scripts/update.py"
+    )
+
     _UPDATE_PY_PARAMS = {"format": "TEXT"}
 
     _CLANG_REVISION_RE = re.compile(r"CLANG_REVISION = '(.*)'")
@@ -103,10 +108,27 @@ class LLVMComponent(Component):
 
     async def get_llvm_version(self) -> "LLVMComponent.Version":
         url = self._UPDATE_PY_URL_FORMAT.format(version=self.latest_version)
-        async with self.session.get(url, params=self._UPDATE_PY_PARAMS) as response:
-            result = await response.text()
 
-        update_py = base64.b64decode(result).decode("utf-8")
+        try:
+            async with self.session.get(url, params=self._UPDATE_PY_PARAMS) as response:
+                response.raise_for_status()
+                result = await response.text()
+
+            update_py = base64.b64decode(result).decode("utf-8")
+        except aiohttp.ClientResponseError as err:
+            if err.status < 500:
+                raise
+
+            log.warning(
+                "chromium.googlesource.com failed, using GitHub fallback: %s", err
+            )
+            fallback_url = self._UPDATE_PY_FALLBACK_URL_FORMAT.format(
+                version=self.latest_version
+            )
+
+            async with self.session.get(fallback_url) as response:
+                response.raise_for_status()
+                update_py = await response.text()
 
         revision_match = self._CLANG_REVISION_RE.search(update_py)
         assert revision_match is not None, url
