@@ -159,6 +159,7 @@ class LLVMGitComponent(LLVMComponent):
             branch=None,
             version=self.latest_version,
             timestamp=None,
+            changelog_url=None,
         )
         self.external_data.set_new_version(new_version)
 

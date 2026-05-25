@@ -100,6 +100,7 @@ class AnityaChecker(Checker):
             branch=None,
             version=latest_version,
             timestamp=None,
+            changelog_url=None,
         ).fetch_remote()
 
         external_data.set_new_version(new_version)

@@ -102,5 +102,6 @@ class PyPIChecker(Checker):
             size=pypi_download["size"],
             version=pypi_version.orig_str,
             timestamp=pypi_date,
+            changelog_url=None,
         )
         external_data.set_new_version(new_version)
