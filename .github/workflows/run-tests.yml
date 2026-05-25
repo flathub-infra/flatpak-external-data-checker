@@ -151,6 +151,7 @@ jobs:
         env:
           PIP_CACHE_DIR: "~/.pip"
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python3 -m venv venv
           . venv/bin/activate
