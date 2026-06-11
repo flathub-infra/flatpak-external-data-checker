@@ -129,7 +129,7 @@ class BuilderSource(abc.ABC):
     source_path: str
     checker_data: dict[str, t.Any]
     module: BuilderModule | None
-    parent: BuilderSource | None = dataclasses.field(init=False, default=None)
+    parent: ExternalBase | None = dataclasses.field(init=False, default=None)
     checked: asyncio.Event = dataclasses.field(
         init=False,
         default_factory=asyncio.Event,
