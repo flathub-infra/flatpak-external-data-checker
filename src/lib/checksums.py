@@ -71,7 +71,7 @@ class MultiHash:
         self.sha256.update(data)
         self.sha512.update(data)
 
-    def hexdigest(self):
+    def hexdigest(self) -> MultiDigest:
         return MultiDigest(
             md5=self.md5.hexdigest(),
             sha1=self.sha1.hexdigest(),

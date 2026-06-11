@@ -250,7 +250,7 @@ class VersionComparisonError(CheckerQueryError):
 class FallbackVersion(t.NamedTuple):  # noqa: PLW1641
     s: str
 
-    def __compare(self, oper, other) -> bool:
+    def __compare(self, oper: t.Callable[[t.Any, t.Any], bool], other) -> bool:
         try:
             return oper(Version(self.s), Version(other.s))
         except ValueError:
