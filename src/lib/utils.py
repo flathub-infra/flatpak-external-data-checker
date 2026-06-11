@@ -247,7 +247,7 @@ class VersionComparisonError(CheckerQueryError):
         super().__init__(f"Can't compare {self.left} and {self.right}")
 
 
-class FallbackVersion(t.NamedTuple):
+class FallbackVersion(t.NamedTuple):  # noqa: PLW1641
     s: str
 
     def __compare(self, oper, other) -> bool:
