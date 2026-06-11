@@ -1,17 +1,16 @@
 import logging
-import typing as t
 
 from yarl import URL
 
-from ..lib import OPERATORS_SCHEMA, NETWORK_ERRORS
+from ..lib import NETWORK_ERRORS, OPERATORS_SCHEMA
+from ..lib.errors import CheckerQueryError
 from ..lib.externaldata import (
     ExternalBase,
     ExternalData,
-    ExternalGitRepo,
     ExternalGitRef,
+    ExternalGitRepo,
 )
 from ..lib.utils import filter_versions
-from ..lib.errors import CheckerQueryError
 from . import Checker
 
 log = logging.getLogger(__name__)
@@ -33,7 +32,7 @@ class AnityaChecker(Checker):
     SUPPORTED_DATA_CLASSES = [ExternalData, ExternalGitRepo]
 
     @classmethod
-    def get_json_schema(cls, data_class: t.Type[ExternalBase]):
+    def get_json_schema(cls, data_class: type[ExternalBase]):
         schema = super().get_json_schema(data_class).copy()
         if issubclass(data_class, ExternalGitRepo):
             schema["required"] = ["project-id", "tag-template"]

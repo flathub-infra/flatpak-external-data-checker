@@ -1,10 +1,10 @@
+import datetime
 import os
 import unittest
-import datetime
 
-from src.manifest import ManifestChecker
-from src.lib.utils import init_logging
 from src.lib.checksums import MultiDigest
+from src.lib.utils import init_logging
+from src.manifest import ManifestChecker
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "fedc.test.ElectronChecker.yml")
 

@@ -1,10 +1,10 @@
-from datetime import datetime
 import logging
+from datetime import datetime
 
 from yarl import URL
 
-from ..lib.externaldata import ExternalBase, ExternalFile
 from ..lib.checksums import MultiDigest
+from ..lib.externaldata import ExternalBase, ExternalFile
 from ..lib.utils import FallbackVersion
 from . import Checker, XMLElement
 

@@ -20,18 +20,18 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import os
 import base64
+import os
 import unittest
 
 import aiohttp
 
-from src.lib.utils import init_logging
-from src.manifest import ManifestChecker
-from src.lib.checksums import MultiDigest
 from src.checkers.htmlchecker import HTMLChecker
+from src.lib.checksums import MultiDigest
 from src.lib.errors import CheckerError
+from src.lib.utils import init_logging
 from src.lib.version import LooseVersion
+from src.manifest import ManifestChecker
 
 
 class TestHTMLTools(unittest.IsolatedAsyncioTestCase):
@@ -108,7 +108,7 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             data.new_version.checksum,
             MultiDigest(
-                sha256="d73b62f29eb98d850f16b76d759395180b860b613fbe1686b18eee99a6e3773f"  # noqa: E501
+                sha256="d73b62f29eb98d850f16b76d759395180b860b613fbe1686b18eee99a6e3773f"
             ),
         )
 
@@ -121,12 +121,12 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         )
         self.assertRegex(
             data.new_version.url,
-            r"^https?://www.x.org/releases/individual/lib/libXScrnSaver-[\d\.-]+.tar.bz2$",  # noqa: E501
+            r"^https?://www.x.org/releases/individual/lib/libXScrnSaver-[\d\.-]+.tar.bz2$",
         )
         self.assertNotEqual(
             data.new_version.checksum,
             MultiDigest(
-                sha256="0000000000000000000000000000000000000000000000000000000000000000"  # noqa: E501
+                sha256="0000000000000000000000000000000000000000000000000000000000000000"
             ),
         )
 
@@ -139,12 +139,12 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         )
         self.assertRegex(
             data.new_version.url,
-            r"^https://sourceforge\.net/projects/qrupdate/.+/qrupdate-\d[\d\.]+\d\.tar\.gz$",  # noqa: E501
+            r"^https://sourceforge\.net/projects/qrupdate/.+/qrupdate-\d[\d\.]+\d\.tar\.gz$",
         )
         self.assertNotEqual(
             data.new_version.checksum,
             MultiDigest(
-                sha256="0000000000000000000000000000000000000000000000000000000000000000"  # noqa: E501
+                sha256="0000000000000000000000000000000000000000000000000000000000000000"
             ),
         )
 
@@ -175,7 +175,7 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
             child.new_version.checksum,
             # curl https://httpbingo.org/response-headers?version=1.0.0 | sha256sum
             MultiDigest(
-                sha256="81f3779437618c7f9ff38b53ce6f5ed99e626ba82a7c31107400a2ef97592882"  # noqa: E501
+                sha256="81f3779437618c7f9ff38b53ce6f5ed99e626ba82a7c31107400a2ef97592882"
             ),
         )
         self.assertEqual(parent.new_version.checksum, child.new_version.checksum)
@@ -184,8 +184,7 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         for data in ext_data:
             if data.filename == filename:
                 return data
-        else:
-            return None
+        return None
 
 
 if __name__ == "__main__":

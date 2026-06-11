@@ -18,22 +18,22 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import codecs
+import io
 import logging
 import re
-import urllib.parse
-import io
-import codecs
 import typing as t
+import urllib.parse
 
 import aiohttp
-from yarl import URL
 import semver
+from yarl import URL
 
 from ..lib import NETWORK_ERRORS, OPERATORS_SCHEMA
+from ..lib.errors import CheckerFetchError, CheckerQueryError
 from ..lib.externaldata import ExternalBase, ExternalData
-from ..lib.errors import CheckerQueryError, CheckerFetchError
+from ..lib.utils import FallbackVersion, filter_versioned_items
 from . import Checker
-from ..lib.utils import filter_versioned_items, FallbackVersion
 
 log = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ def _semantic_version(version: str) -> semver.VersionInfo:
 
 _VersionCallable = t.Callable[[str], FallbackVersion | semver.VersionInfo]
 
-_VERSION_SCHEMES: t.Dict[str, _VersionCallable] = {
+_VERSION_SCHEMES: dict[str, _VersionCallable] = {
     "loose": FallbackVersion,
     "semantic": _semantic_version,
 }
@@ -99,7 +99,7 @@ class HTMLChecker(Checker):
             encoding = "utf-8"
         return encoding
 
-    async def _get_text(self, url: t.Union[URL, str]) -> str:
+    async def _get_text(self, url: URL | str) -> str:
         try:
             async with self.session.get(url) as response:
                 encoding = await self._get_encoding(response)

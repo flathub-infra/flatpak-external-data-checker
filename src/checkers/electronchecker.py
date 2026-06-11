@@ -1,19 +1,18 @@
-import logging
 import base64
+import logging
 from datetime import datetime
-import typing as t
 
-from yarl import URL
 import ruamel.yaml
+from yarl import URL
 
 from ..lib import NETWORK_ERRORS
+from ..lib.checksums import MultiDigest
+from ..lib.errors import CheckerQueryError
 from ..lib.externaldata import (
     ExternalBase,
     ExternalData,
     ExternalFile,
 )
-from ..lib.errors import CheckerQueryError
-from ..lib.checksums import MultiDigest
 from . import Checker
 from .jsonchecker import parse_timestamp
 
@@ -31,8 +30,8 @@ class ElectronChecker(Checker):
     }
 
     @staticmethod
-    def _read_digests(obj: t.Dict) -> MultiDigest:
-        digests: t.Dict[str, str] = {}
+    def _read_digests(obj: dict) -> MultiDigest:
+        digests: dict[str, str] = {}
         for _k in MultiDigest._fields:  # pylint: disable=no-member
             if _k in obj:
                 digests[_k] = base64.b64decode(obj[_k]).hex()
@@ -66,7 +65,7 @@ class ElectronChecker(Checker):
             file_size = None
             checksum = self._read_digests(metadata)
 
-        timestamp: t.Optional[datetime]
+        timestamp: datetime | None
         if isinstance(metadata["releaseDate"], datetime):
             timestamp = metadata["releaseDate"]
         else:

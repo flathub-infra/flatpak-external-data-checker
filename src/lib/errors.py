@@ -1,10 +1,7 @@
-import typing as t
-
-
 class FlatpakExternalDataCheckerError(Exception):
     """Base class for errors in the proram"""
 
-    def __init__(self, message: t.Optional[str] = None):
+    def __init__(self, message: str | None = None):
         super().__init__(message)
         self.message = message or self.__doc__
 

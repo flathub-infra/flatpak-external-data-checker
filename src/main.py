@@ -23,23 +23,23 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import argparse
+import asyncio
 import contextlib
 import getpass
 import json
 import logging
 import os
-from pathlib import Path
 import subprocess
 import sys
-import asyncio
-from enum import IntFlag
 import typing as t
+from enum import IntFlag
+from pathlib import Path
 
 from github import Github
 
-from .lib.utils import parse_github_url, init_logging
-from .lib.externaldata import ExternalData
 from . import manifest
+from .lib.externaldata import ExternalData
+from .lib.utils import init_logging, parse_github_url
 
 log = logging.getLogger(__name__)
 
@@ -102,8 +102,7 @@ def print_outdated_external_data(manifest_checker: manifest.ManifestChecker):
         elif data.State.BROKEN in data.state:
             message_tmpl = (
                 # fmt: off
-                "{data_state}: {data_name}\n"
-                " Couldn't get new version for {url}\n"
+                "{data_state}: {data_name}\n Couldn't get new version for {url}\n"
                 # fmt: on
             )
             message_args = data.current_version._asdict()
@@ -128,7 +127,7 @@ def check_call(args):
     subprocess.check_call(args)
 
 
-def get_manifest_git_checkout(manifest: t.Union[Path, str]) -> Path:
+def get_manifest_git_checkout(manifest: Path | str) -> Path:
     # Can't use git rev-parse --show-toplevel because of a chicken-and-egg problem: we
     # need to find the checkout directory so that we can mark it as safe so that we can
     # use git against it.
@@ -170,13 +169,13 @@ def ensure_git_safe_directory(checkout: Path):
 
 class CommittedChanges(t.NamedTuple):
     subject: str
-    body: t.Optional[str]
-    commit: t.Optional[str]
+    body: str | None
+    commit: str | None
     branch: str
-    base_branch: t.Optional[str]
+    base_branch: str | None
 
 
-def commit_message(changes: t.List[str]) -> str:
+def commit_message(changes: list[str]) -> str:
     assert len(changes) >= 1
 
     if len(changes) == 1:
@@ -218,10 +217,10 @@ def branch_exists(branch: str) -> bool:
 
 
 def commit_changes(
-    changes: t.List[str], commit_to_base: bool = False
-) -> t.Optional[CommittedChanges]:
+    changes: list[str], commit_to_base: bool = False
+) -> CommittedChanges | None:
     log.info("Committing updates")
-    body: t.Optional[str]
+    body: str | None
     subject = commit_message(changes)
     if len(changes) > 1:
         body = "\n".join(changes)
@@ -231,7 +230,7 @@ def commit_changes(
         message = subject
 
     # Remember the base branch
-    base_branch: t.Optional[str]
+    base_branch: str | None
     base_branch = subprocess.check_output(
         ["git", "branch", "--show-current"], text=True
     ).strip()
@@ -242,8 +241,7 @@ def commit_changes(
         if not base_branch:
             log.error("Failed to determine the base branch: cannot commit to it")
             return None
-        else:
-            branch = base_branch
+        branch = base_branch
     else:
         # Moved to detached HEAD
         log.info("Switching to detached HEAD")
@@ -254,7 +252,6 @@ def commit_changes(
         check_call(["git", "commit", "-am", message])
     except subprocess.CalledProcessError:
         retry_commit = True
-        pass
 
     if retry_commit:
         log.warning("Committing failed. Falling back to a sanitised config")
@@ -328,9 +325,9 @@ AUTOMERGE_DUE_TO_BROKEN_URLS = (
 
 def open_pr(
     change: CommittedChanges,
-    manifest_checker: t.Optional[manifest.ManifestChecker] = None,
-    fork: t.Optional[bool] = None,
-    pr_labels: t.Optional[t.List[str]] = None,
+    manifest_checker: manifest.ManifestChecker | None = None,
+    fork: bool | None = None,
+    pr_labels: list[str] | None = None,
 ):
 
     try:
@@ -367,7 +364,7 @@ def open_pr(
 
     base = change.base_branch or origin_repo.default_branch
 
-    head = "{}:{}".format(repo.owner.login, change.branch)
+    head = f"{repo.owner.login}:{change.branch}"
     pr_message = ((change.body or "") + "\n\n" + DISCLAIMER).strip()
 
     try:
@@ -564,7 +561,7 @@ def parse_cli_args(cli_args=None):
     return args
 
 
-async def run_with_args(args: argparse.Namespace) -> t.Tuple[int, int, bool]:
+async def run_with_args(args: argparse.Namespace) -> tuple[int, int, bool]:
     init_logging(logging.DEBUG if args.verbose else logging.INFO)
 
     should_update = args.update or args.commit_only or args.edit_only

@@ -10,20 +10,20 @@ log = logging.getLogger(__name__)
 
 
 class MultiDigest(t.NamedTuple):
-    md5: t.Optional[str] = None
-    sha1: t.Optional[str] = None
-    sha256: t.Optional[str] = None
-    sha512: t.Optional[str] = None
+    md5: str | None = None
+    sha1: str | None = None
+    sha256: str | None = None
+    sha512: str | None = None
 
     @classmethod
-    def from_source(cls, source: t.Dict) -> MultiDigest:
+    def from_source(cls, source: dict) -> MultiDigest:
         # pylint: disable=no-member
         digests = {k: source[k] for k in cls._fields if k in source}
         assert digests, source
         return cls(**digests)
 
     @property
-    def digests(self) -> t.Set[str]:
+    def digests(self) -> set[str]:
         # pylint: disable=no-member
         return {k for k in self._fields if getattr(self, k) is not None}
 
@@ -42,7 +42,7 @@ class MultiDigest(t.NamedTuple):
     def __ne__(self, other):
         return not self == other
 
-    def update_source(self, source: t.Dict):
+    def update_source(self, source: dict):
         # Find digest types that are both not null in self and set in the source
         to_update = {
             kind: digest

@@ -1,13 +1,13 @@
-import unittest
 import json
 import os
 import random
 import string
 import tempfile
+import unittest
 
-from src.manifest import ManifestChecker
-from src.lib.externaldata import ExternalGitRef
 from src.lib.errors import ManifestLoadError
+from src.lib.externaldata import ExternalGitRef
+from src.manifest import ManifestChecker
 
 TEST_MANIFEST_DATA = {
     "id": "fedc.test.Loader",

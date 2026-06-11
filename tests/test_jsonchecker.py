@@ -1,11 +1,11 @@
+import datetime
 import os
 import unittest
-import datetime
 
-from src.manifest import ManifestChecker
-from src.lib.utils import init_logging
-from src.lib.externaldata import ExternalFile, ExternalGitRef
 from src.lib.checksums import MultiDigest
+from src.lib.externaldata import ExternalFile, ExternalGitRef
+from src.lib.utils import init_logging
+from src.manifest import ManifestChecker
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "io.github.stedolan.jq.yml")
 
@@ -26,7 +26,7 @@ class TestJSONChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertNotEqual(data.current_version.url, data.new_version.url)
                 self.assertRegex(
                     data.new_version.url,
-                    r"^https://github.com/jqlang/jq/releases/download/jq-[0-9\.\w]+/jq-[0-9\.\w]+\.tar.gz$",  # noqa: E501
+                    r"^https://github.com/jqlang/jq/releases/download/jq-[0-9\.\w]+/jq-[0-9\.\w]+\.tar.gz$",
                 )
                 self.assertIsInstance(data.new_version.size, int)
                 self.assertGreater(data.new_version.size, 0)
@@ -35,7 +35,7 @@ class TestJSONChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertNotEqual(
                     data.new_version.checksum,
                     MultiDigest(
-                        sha256="0000000000000000000000000000000000000000000000000000000000000000"  # noqa: E501
+                        sha256="0000000000000000000000000000000000000000000000000000000000000000"
                     ),
                 )
             elif data.filename == "jq-1.4.tarball.tar.gz":
@@ -80,9 +80,7 @@ class TestJSONChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(
                     data.new_version.commit, "63a934db1ed212ebf8aaaa20f0010dd7b0d7b396"
                 )
-            elif data.filename == "lib_webrtc.git":
-                self.assertIsNone(data.new_version)
-            elif data.filename == "tg_angle.git":
+            elif data.filename == "lib_webrtc.git" or data.filename == "tg_angle.git":
                 self.assertIsNone(data.new_version)
             else:
                 self.fail(f"Unhandled data {data.filename}")

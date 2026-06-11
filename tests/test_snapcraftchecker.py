@@ -1,9 +1,9 @@
 import os
 import unittest
 
-from src.manifest import ManifestChecker
-from src.lib.utils import init_logging
 from src.lib.checksums import MultiDigest
+from src.lib.utils import init_logging
+from src.manifest import ManifestChecker
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.nordpass.NordPass.yaml")
 
@@ -22,7 +22,7 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(data.new_version)
         self.assertRegex(
             data.new_version.url,
-            r"^https://api\.snapcraft\.io/api/v1/snaps/download/[A-Za-z0-9]{32}_[0-9]+.snap$",  # noqa: E501
+            r"^https://api\.snapcraft\.io/api/v1/snaps/download/[A-Za-z0-9]{32}_[0-9]+.snap$",
         )
         self.assertIsInstance(data.new_version.size, int)
         self.assertGreater(data.new_version.size, 0)
@@ -31,7 +31,7 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(
             data.new_version.checksum,
             MultiDigest(
-                sha256="0000000000000000000000000000000000000000000000000000000000000000"  # noqa: E501
+                sha256="0000000000000000000000000000000000000000000000000000000000000000"
             ),
         )
 
@@ -39,8 +39,7 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
         for data in ext_data:
             if data.filename == filename:
                 return data
-        else:
-            return None
+        return None
 
 
 if __name__ == "__main__":

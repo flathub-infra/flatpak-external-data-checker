@@ -6,14 +6,14 @@ import typing as t
 import aiohttp
 
 from ..lib import NETWORK_ERRORS
+from ..lib.errors import CheckerFetchError, CheckerMetadataError
 from ..lib.externaldata import (
     ExternalBase,
     ExternalData,
-    ExternalGitRepo,
     ExternalGitRef,
+    ExternalGitRepo,
 )
 from ..lib.utils import get_extra_data_info_from_url
-from ..lib.errors import CheckerMetadataError, CheckerFetchError
 from . import Checker
 
 log = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 
 class Component:
     NAME: str
-    DATA_CLASS: t.Type[ExternalBase]
+    DATA_CLASS: type[ExternalBase]
 
     def __init__(
         self,

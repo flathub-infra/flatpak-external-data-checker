@@ -1,9 +1,9 @@
-import unittest
 import os
+import unittest
 
-from src.manifest import ManifestChecker
-from src.lib.utils import init_logging
 from src.lib.checksums import MultiDigest
+from src.lib.utils import init_logging
+from src.manifest import ManifestChecker
 
 
 class TestURLChecker(unittest.IsolatedAsyncioTestCase):
@@ -29,7 +29,7 @@ class TestURLChecker(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(
             data.new_version.checksum,
             MultiDigest(
-                sha256="0000000000000000000000000000000000000000000000000000000000000000"  # noqa: E501
+                sha256="0000000000000000000000000000000000000000000000000000000000000000"
             ),
         )
         self.assertIsNotNone(data.new_version.version)
@@ -51,7 +51,7 @@ class TestURLChecker(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(
             data.new_version.checksum,
             MultiDigest(
-                sha256="0000000000000000000000000000000000000000000000000000000000000000"  # noqa: E501
+                sha256="0000000000000000000000000000000000000000000000000000000000000000"
             ),
         )
         self.assertIsNotNone(data.new_version.version)
@@ -60,8 +60,7 @@ class TestURLChecker(unittest.IsolatedAsyncioTestCase):
         for data in ext_data:
             if data.filename == filename:
                 return data
-        else:
-            return None
+        return None
 
 
 if __name__ == "__main__":

@@ -1,14 +1,13 @@
 import logging
 import re
-import typing as t
-
 from enum import StrEnum
+
 from yarl import URL
 
-from ..lib import OPERATORS_SCHEMA, NETWORK_ERRORS
+from ..lib import NETWORK_ERRORS, OPERATORS_SCHEMA
+from ..lib.checksums import MultiDigest
 from ..lib.errors import CheckerQueryError
 from ..lib.externaldata import ExternalBase, ExternalFile
-from ..lib.checksums import MultiDigest
 from ..lib.utils import filter_versions
 from . import Checker
 
@@ -22,7 +21,7 @@ class VersionScheme(StrEnum):
     ODD_MINOR_IS_UNSTABLE = "odd-minor-is-unstable"
 
 
-def _parse_checksums(text: str) -> t.Dict[str, str]:
+def _parse_checksums(text: str) -> dict[str, str]:
     result = {}
     for line in text.splitlines():
         digest, filename = line.strip().split(maxsplit=1)
