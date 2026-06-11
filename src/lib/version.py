@@ -26,6 +26,9 @@ class LooseVersion:
         self.vstring: str = vstring
         self.version: list[int | str] = self._parse_components(vstring)
 
+    def __hash__(self):
+        return hash(self.vstring)
+
     def _parse_components(self, vstring: str) -> list[int | str]:
         pattern: t.Pattern[str] = re.compile(r"(\d+|[a-z]+|\.)", re.VERBOSE)
         parts: list[str] = [p for p in pattern.split(vstring) if p and p != "."]

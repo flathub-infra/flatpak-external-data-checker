@@ -9,7 +9,7 @@ from .errors import SourceUpdateError
 log = logging.getLogger(__name__)
 
 
-class MultiDigest(t.NamedTuple):
+class MultiDigest(t.NamedTuple):  # noqa: PLW1641
     md5: str | None = None
     sha1: str | None = None
     sha256: str | None = None
