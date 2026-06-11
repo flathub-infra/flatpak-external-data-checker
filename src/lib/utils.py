@@ -321,7 +321,7 @@ def filter_versions(
 ) -> t.List[str]:
     return filter_versioned_items(
         versions,
-        ((o, FallbackVersion(l)) for o, l in constraints),
+        ((operator, version) for operator, version in constraints),
         to_version=FallbackVersion,
         sort=sort,
     )
