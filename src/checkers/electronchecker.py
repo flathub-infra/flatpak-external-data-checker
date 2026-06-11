@@ -32,7 +32,7 @@ class ElectronChecker(Checker):
     @staticmethod
     def _read_digests(obj: dict) -> MultiDigest:
         digests: dict[str, str] = {}
-        for _k in MultiDigest._fields:  # pylint: disable=no-member
+        for _k in MultiDigest._fields:
             if _k in obj:
                 digests[_k] = base64.b64decode(obj[_k]).hex()
         return MultiDigest(**digests)

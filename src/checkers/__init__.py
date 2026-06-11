@@ -42,7 +42,7 @@ from ..lib.externaldata import (
 from ..lib.version import LooseVersion
 
 JSONType = str | int | float | bool | None | dict[str, t.Any] | list[t.Any]
-XMLElement: TypeAlias = ElementTree._Element  # pylint: disable=protected-access
+XMLElement: TypeAlias = ElementTree._Element
 
 yaml = ruamel.yaml.YAML(typ="safe")
 log = logging.getLogger(__name__)
@@ -73,7 +73,6 @@ class Checker:
     def __init__(self, session: aiohttp.ClientSession):
         self.session = session
 
-    # pylint: disable=unused-argument
     @classmethod
     def get_json_schema(self, data_class: type[ExternalBase]) -> dict[str, t.Any]:
         if not hasattr(self, "CHECKER_DATA_SCHEMA"):
@@ -276,9 +275,7 @@ class Checker:
         except NETWORK_ERRORS as err:
             raise CheckerFetchError from err
 
-        new_version = new_version._replace(
-            version=latest_version  # pylint: disable=no-member
-        )
+        new_version = new_version._replace(version=latest_version)
         if timestamp is not None:
             new_version = new_version._replace(timestamp=timestamp)
         external_data.set_new_version(new_version)

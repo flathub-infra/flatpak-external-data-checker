@@ -157,12 +157,10 @@ class URLChecker(Checker):
 
         if version_string is not None:
             log.debug("%s is version %s", external_data.filename, version_string)
-            new_version = new_version._replace(  # pylint: disable=no-member
-                version=version_string
-            )
+            new_version = new_version._replace(version=version_string)
 
         if not is_rotating:
-            new_version = new_version._replace(url=url)  # pylint: disable=no-member
+            new_version = new_version._replace(url=url)
 
         same_version = is_same_version(
             external_data.checker_data, external_data.current_version.url, new_version
