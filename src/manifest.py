@@ -166,6 +166,7 @@ class ManifestChecker:
                 contents, has_yaml_header = ret
             else:
                 contents, has_yaml_header = ret, False
+            assert isinstance(contents, (list, dict))
         except FileNotFoundError as err:
             raise ManifestFileOpenError from err
         self._manifest_contents[manifest_path] = contents
@@ -177,15 +178,17 @@ class ManifestChecker:
         modified."""
         contents = self._manifest_contents[path]
         has_yaml_header = self._manifest_headers.get(path, False)
-        dump_manifest(contents, path, has_yaml_header)
+        dump_manifest(t.cast(dict, contents), path, has_yaml_header)
 
     def _collect_external_data(self):
         if self.kind == self.Kind.APP:
+            assert isinstance(self._root_manifest, dict)
             modules = self._root_manifest.get("modules", [])
             assert isinstance(modules, list)
             for module in modules:
                 self._collect_module_data(self._root_manifest_path, module)
         elif self.kind == self.Kind.MODULE:
+            assert isinstance(self._root_manifest, dict)
             self._collect_module_data(self._root_manifest_path, self._root_manifest)
         elif self.kind in [self.Kind.SOURCE, self.Kind.SOURCES]:
             self._collect_source_data(self._root_manifest_path, self._root_manifest)
@@ -515,6 +518,7 @@ class ManifestChecker:
         last_update = selected_data.new_version
 
         if selected_data.has_version_changed:
+            assert last_update is not None
             log.info("Version changed, adding release to %s", appdata)
             if last_update.timestamp is None:
                 log.warning("Using current time in appdata release")
@@ -522,9 +526,11 @@ class ManifestChecker:
             else:
                 timestamp = last_update.timestamp
             try:
+                version_str = last_update.version
+                assert version_str is not None
                 add_release_to_file(
                     appdata,
-                    last_update.version,
+                    version_str,
                     timestamp.strftime("%F"),
                     release_url_template,
                 )

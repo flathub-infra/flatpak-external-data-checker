@@ -9,7 +9,7 @@ import re
 import typing as t
 import zlib
 from string import Template
-from typing import TypeAlias
+from typing import TypeAlias, cast
 
 import aiohttp
 import jsonschema
@@ -122,11 +122,11 @@ class Checker:
             async with self.session.get(url, headers=headers) as response:
                 if re.match(r".+\.ya?ml$", response.url.name):
                     try:
-                        return yaml.load(await response.read())
+                        return cast(JSONType, yaml.load(await response.read()))
                     except ruamel.yaml.error.YAMLError as err:
                         raise CheckerQueryError("Failed to parse YAML") from err
                 try:
-                    return await response.json(content_type=None)
+                    return cast(JSONType, await response.json(content_type=None))
                 except (UnicodeDecodeError, json.JSONDecodeError) as err:
                     raise CheckerQueryError("Failed to parse JSON") from err
         except NETWORK_ERRORS as err:
