@@ -17,21 +17,21 @@ class MultiDigest(t.NamedTuple):  # noqa: PLW1641
 
     @classmethod
     def from_source(cls, source: dict) -> MultiDigest:
-        # pylint: disable=no-member
+
         digests = {k: source[k] for k in cls._fields if k in source}
         assert digests, source
         return cls(**digests)
 
     @property
     def digests(self) -> set[str]:
-        # pylint: disable=no-member
+
         return {k for k in self._fields if getattr(self, k) is not None}
 
     def __eq__(self, other):
         assert isinstance(other, type(self)), other
         # Iterate digest types from strongest to weakest,
         # if both sides have a type in common - compare it and return result
-        for kind in reversed(self._fields):  # pylint: disable=no-member
+        for kind in reversed(self._fields):
             self_digest = getattr(self, kind)
             other_digest = getattr(other, kind)
             if self_digest is not None and other_digest is not None:
@@ -46,7 +46,7 @@ class MultiDigest(t.NamedTuple):  # noqa: PLW1641
         # Find digest types that are both not null in self and set in the source
         to_update = {
             kind: digest
-            for kind, digest in self._asdict().items()  # pylint: disable=no-member
+            for kind, digest in self._asdict().items()
             if kind in source and digest is not None
         }
         if not to_update:

@@ -314,7 +314,7 @@ class ExternalFile(ExternalState):
     @property
     def json(self) -> dict[str, t.Any]:
         return super().json | {
-            "checksum": self.checksum._asdict(),  # pylint: disable=no-member
+            "checksum": self.checksum._asdict(),
         }
 
     def matches(self, other: ExternalFile):
@@ -464,7 +464,7 @@ class ExternalGitRef(ExternalState):
         except KeyError as err:
             raise CheckerFetchError(f"Ref not found in {self.url}") from err
 
-        return self._replace(commit=got_commit)  # pylint: disable=no-member
+        return self._replace(commit=got_commit)
 
     def matches(self, other: ExternalGitRef):
         return self.url == other.url and (

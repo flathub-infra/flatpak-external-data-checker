@@ -164,7 +164,6 @@ TEST_MANIFEST_INVALID_LOOP = {
 }
 
 
-# pylint: disable=protected-access
 class TestManifestLoader(unittest.IsolatedAsyncioTestCase):
     test_dir: tempfile.TemporaryDirectory
 

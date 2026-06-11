@@ -46,9 +46,7 @@ class Component:
         except NETWORK_ERRORS as err:
             raise CheckerFetchError from err
         else:
-            new_version = new_version._replace(  # pylint: disable=no-member
-                version=self.latest_version
-            )
+            new_version = new_version._replace(version=self.latest_version)
             self.external_data.set_new_version(new_version)
 
 

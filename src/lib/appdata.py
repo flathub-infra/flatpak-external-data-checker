@@ -29,7 +29,7 @@ from typing import TypeAlias
 
 import lxml.etree as ElementTree
 
-XMLElement: TypeAlias = ElementTree._Element  # pylint: disable=protected-access
+XMLElement: TypeAlias = ElementTree._Element
 
 DEFAULT_INDENT = "  "
 

@@ -548,7 +548,7 @@ def read_json_manifest(manifest_path: Path):
         parser.load_from_file(str(manifest_path))
     except GLib.Error as err:
         if err.matches(GLib.file_error_quark(), GLib.FileError.NOENT):
-            raise FileNotFoundError(err.message) from err  # pylint: disable=no-member
+            raise FileNotFoundError(err.message) from err
         raise
     root = parser.get_root()
     clean_manifest = Json.to_string(root, False)
