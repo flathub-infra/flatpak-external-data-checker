@@ -80,7 +80,7 @@ class UpdateEverythingChecker(DummyChecker, register=False):
     # echo -n | sha256sum
     CHECKSUM = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     VERSION = "1.2.3.4"
-    TIMESTAMP = dt.datetime(2019, 8, 28, 0, 0, 0)
+    TIMESTAMP = dt.datetime(2019, 8, 28, 0, 0, 0, tzinfo=dt.timezone.utc)
 
     async def check(self, external_data):
         external_data.state |= external_data.State.BROKEN

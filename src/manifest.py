@@ -514,7 +514,7 @@ class ManifestChecker:
             log.info("Version changed, adding release to %s", appdata)
             if last_update.timestamp is None:
                 log.warning("Using current time in appdata release")
-                timestamp = datetime.datetime.now()
+                timestamp = datetime.datetime.now(tz=datetime.timezone.utc)
             else:
                 timestamp = last_update.timestamp
             try:
