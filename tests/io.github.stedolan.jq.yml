@@ -102,4 +102,3 @@ modules:
           type: json
           url: https://httpbingo.org/404
           tag-query: .some_gibberish_query
-
