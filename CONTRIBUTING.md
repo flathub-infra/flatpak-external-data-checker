@@ -1,16 +1,16 @@
 # Code style
 
-All Python code should be formatted by [Black](https://github.com/psf/black).
-We don't make the rules! Install Black, then run:
-
 ```
-black .
+uv sync --all-extras --all-groups --frozen --allow-python-downloads
+uv run ruff format
+uv run ruff check . --fix
+uv run mypy .
 ```
 
 # Running tests
 
 There is a moderately-comprehensive test suite. Currently, it requires an
-internet connection and takes a few minutes to run. 
+internet connection and takes a few minutes to run.
 
 ```bash
 # Run all the tests (some of which need an internet connection):

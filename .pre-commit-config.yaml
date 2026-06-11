@@ -1,0 +1,46 @@
+default_install_hook_types:
+  - pre-commit
+default_stages:
+  - pre-commit
+fail_fast: true
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-added-large-files
+        args: ['--maxkb=100']
+      - id: check-shebang-scripts-are-executable
+      - id: check-executables-have-shebangs
+      - id: check-symlinks
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  - repo: local
+    hooks:
+      - id: uv-lock
+        name: uv lock
+        description: Sync uv lock
+        entry: uv lock --quiet
+        language: python
+        pass_filenames: false
+      - id: ruff-format
+        name: ruff format
+        description: Format with ruff
+        entry: uv run -q ruff format
+        language: system
+        pass_filenames: false
+      - id: ruff-check
+        name: ruff
+        description: Lint with ruff
+        entry: uv run -q ruff check --fix --exit-non-zero-on-fix
+        language: system
+        pass_filenames: false
+      - id: mypy-check
+        name: mypy
+        description: Check types with mypy
+        entry: uv run -q mypy .
+        language: system
+        pass_filenames: false
+        files: \.py$
