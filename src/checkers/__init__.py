@@ -1,23 +1,15 @@
 from __future__ import annotations
 
 import datetime
+import importlib
 import json
 import logging
+import pkgutil
 import re
-import sys
 import typing as t
 import zlib
 from string import Template
-
-# pylint: disable=wrong-import-position
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias
-else:
-    from typing import TypeAlias
-# pylint: enable=wrong-import-position
-
-import importlib
-import pkgutil
+from typing import TypeAlias
 
 import aiohttp
 import jsonschema

@@ -24,15 +24,8 @@ missing.
 """
 
 import io
-import sys
 import typing as t
-
-# pylint: disable=wrong-import-position
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias
-else:
-    from typing import TypeAlias
-# pylint: enable=wrong-import-position
+from typing import TypeAlias
 
 import lxml.etree as ElementTree
 
