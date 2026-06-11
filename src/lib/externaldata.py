@@ -26,6 +26,7 @@ import datetime
 import logging
 import typing as t
 from enum import Enum, IntFlag
+from typing import cast
 
 import jsonschema
 from yarl import URL
@@ -170,7 +171,7 @@ class BuilderSource(abc.ABC):
 
         data_cls = cls.data_classes()[data_type]
 
-        return data_cls.from_source_impl(source_path, source, module)
+        return cast(_BS, data_cls.from_source_impl(source_path, source, module))
 
     @classmethod
     def from_source_impl(
@@ -184,7 +185,7 @@ class BuilderSource(abc.ABC):
     @property
     def ident(self) -> str:
         if "source-id" in self.checker_data:
-            return self.checker_data["source-id"]
+            return str(self.checker_data["source-id"])
         if self.module:
             index = [s for s in self.module.sources if s.type == self.type].index(self)
             return f"{self.module.name}-{self.type.value}-{index}"

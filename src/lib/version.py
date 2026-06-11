@@ -31,8 +31,8 @@ class LooseVersion:
 
     def _parse_components(self, vstring: str) -> list[int | str]:
         pattern: t.Pattern[str] = re.compile(r"(\d+|[a-z]+|\.)", re.VERBOSE)
-        parts: list[str] = [p for p in pattern.split(vstring) if p and p != "."]
 
+        parts: list[str] = [p for p in pattern.split(vstring) if p and p != "."]
         result: list[int | str] = []
         for part in parts:
             try:
@@ -62,10 +62,12 @@ class LooseVersion:
                 return -1
             if isinstance(left, str) and isinstance(right, int):
                 return 1
-
-            if (isinstance(left, int) and isinstance(right, int)) or (
-                isinstance(left, str) and isinstance(right, str)
-            ):
+            if isinstance(left, int) and isinstance(right, int):
+                if left < right:
+                    return -1
+                if left > right:
+                    return 1
+            elif isinstance(left, str) and isinstance(right, str):
                 if left < right:
                     return -1
                 if left > right:

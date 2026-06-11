@@ -212,7 +212,7 @@ class ChromiumChecker(Checker):
             result = await response.json()
 
         assert len(result) == 1, result
-        return result[0]["version"]
+        return str(result[0]["version"])
 
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)

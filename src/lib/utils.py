@@ -589,7 +589,7 @@ def dump_manifest(
     with manifest_path.open("r", encoding="utf-8") as fp:
         original_manifest = fp.read()
 
-    conf = editorconfig.get_properties(manifest_path)
+    conf = editorconfig.get_properties(str(manifest_path))
 
     json_indent: str | int
     if conf.get("indent_style") == "space":
