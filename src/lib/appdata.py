@@ -102,7 +102,7 @@ def add_release(
         dst,
         # XXX: lxml uses single quotes for doctype line if generated with
         # xml_declaration=True,
-        doctype='<?xml version="1.0" encoding="UTF-8"?>',  # type: ignore[call-arg]
+        doctype='<?xml version="1.0" encoding="UTF-8"?>',
         encoding="utf-8",
         pretty_print=True,
     )
