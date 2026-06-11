@@ -53,7 +53,10 @@ from .version import LooseVersion
 import gi
 
 gi.require_version("Json", "1.0")
-from gi.repository import GLib, Json  # noqa: E402
+from gi.repository import (  # type: ignore[attr-defined] # noqa: E402 # noqa: I001 # type: ignore[attr-defined]
+    GLib,
+    Json,
+)
 
 log = logging.getLogger(__name__)
 
