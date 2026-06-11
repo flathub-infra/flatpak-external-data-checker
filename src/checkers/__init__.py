@@ -41,7 +41,7 @@ from ..lib.externaldata import (
 )
 from ..lib.version import LooseVersion
 
-JSONType = t.Union[str, int, float, bool, None, dict[str, t.Any], list[t.Any]]
+JSONType = str | int | float | bool | None | dict[str, t.Any] | list[t.Any]
 XMLElement: TypeAlias = ElementTree._Element  # pylint: disable=protected-access
 
 yaml = ruamel.yaml.YAML(typ="safe")
