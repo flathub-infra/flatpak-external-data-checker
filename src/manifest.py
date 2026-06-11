@@ -459,9 +459,13 @@ class ManifestChecker:
             if data.new_version is None:
                 continue
 
+            data_new_ver_version = data.new_version.version
+
             data.update()
-            if data.new_version.version is not None:
-                message = f"{data.module}: Update {data.filename} to {data.new_version.version}"
+            if data_new_ver_version is not None:
+                message = (
+                    f"{data.module}: Update {data.filename} to {data_new_ver_version}"
+                )
             else:
                 message = f"{data.module}: Update {data.filename}"
 
