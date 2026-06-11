@@ -3,9 +3,9 @@ import unittest
 
 from packaging.version import Version
 
-from src.manifest import ManifestChecker
-from src.lib.utils import init_logging
 from src.lib.checksums import MultiDigest
+from src.lib.utils import init_logging
+from src.manifest import ManifestChecker
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.valvesoftware.Steam.yml")
 
@@ -33,17 +33,17 @@ class TestPyPIChecker(unittest.IsolatedAsyncioTestCase):
             if data.filename == "setuptools-50.3.2-py3-none-any.whl":
                 self.assertRegex(
                     data.new_version.url,
-                    r"https://files.pythonhosted.org/packages/[a-f0-9/]+/setuptools-[\d\.]+-[\S\.]+-none-any.whl",  # noqa: E501
+                    r"https://files.pythonhosted.org/packages/[a-f0-9/]+/setuptools-[\d\.]+-[\S\.]+-none-any.whl",
                 )
             elif data.filename == "PyYAML-5.3.1.tar.gz":
                 self.assertRegex(
                     data.new_version.url,
-                    r"https://files.pythonhosted.org/packages/[a-f0-9/]+/(?i:PyYAML-)[\d\.]+.(tar.(gz|xz|bz2)|zip)",  # noqa: E501
+                    r"https://files.pythonhosted.org/packages/[a-f0-9/]+/(?i:PyYAML-)[\d\.]+.(tar.(gz|xz|bz2)|zip)",
                 )
             elif data.filename == "vdf-3.1-py2.py3-none-any.whl":
                 self.assertRegex(
                     data.new_version.url,
-                    r"https://files.pythonhosted.org/packages/[a-f0-9/]+/vdf-[\d\.]+-[\S\.]+-none-any.whl",  # noqa: E501
+                    r"https://files.pythonhosted.org/packages/[a-f0-9/]+/vdf-[\d\.]+-[\S\.]+-none-any.whl",
                 )
                 self.assertEqual(data.new_version.version, "3.2")
             elif data.filename == "Pillow-7.2.0.tar.gz":

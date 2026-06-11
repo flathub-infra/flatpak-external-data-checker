@@ -17,30 +17,30 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-import unittest
-import subprocess
-from datetime import datetime, timezone
-from time import perf_counter
-from contextlib import contextmanager
 import re
+import subprocess
+import unittest
+from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
+from time import perf_counter
 
 import aiohttp
 
 from src.lib.errors import CheckerFetchError
 from src.lib.utils import (
+    Command,
+    FallbackVersion,
+    _detect_json_flatpak_manifest_indent,
+    dump_manifest,
+    filter_versioned_items,
+    filter_versions,
+    get_extra_data_info_from_url,
+    parse_date_header,
     parse_github_url,
     strip_query,
-    filter_versions,
-    filter_versioned_items,
-    FallbackVersion,
-    parse_date_header,
-    get_extra_data_info_from_url,
-    Command,
-    dump_manifest,
-    _detect_json_flatpak_manifest_indent,
 )
 
 
@@ -64,8 +64,8 @@ class TestParseGitHubUrl(unittest.TestCase):
 
 class TestStripQuery(unittest.TestCase):
     def test_strip_query(self):
-        url = "https://d11yldzmag5yn.cloudfront.net/prod/3.5.372466.0322/zoom_x86_64.tar.xz?_x_zm_rtaid=muDd1uOqSZ-xUScZF698QQ.1585134521724.21e5ab14908b2121f5ed53882df91cb9&_x_zm_rhtaid=732"  # noqa: E501
-        expected = "https://d11yldzmag5yn.cloudfront.net/prod/3.5.372466.0322/zoom_x86_64.tar.xz"  # noqa: E501
+        url = "https://d11yldzmag5yn.cloudfront.net/prod/3.5.372466.0322/zoom_x86_64.tar.xz?_x_zm_rtaid=muDd1uOqSZ-xUScZF698QQ.1585134521724.21e5ab14908b2121f5ed53882df91cb9&_x_zm_rhtaid=732"
+        expected = "https://d11yldzmag5yn.cloudfront.net/prod/3.5.372466.0322/zoom_x86_64.tar.xz"
         self.assertEqual(strip_query(url), expected)
 
     def test_preserve_nice_query(self):
@@ -176,8 +176,13 @@ class TestParseHTTPDate(unittest.TestCase):
                 parsed,
                 datetime(
                     # fmt: off
-                    2021, 1, 20, 15, 25, 15,
-                    tzinfo=timezone.utc if parsed.tzinfo else None
+                    2021,
+                    1,
+                    20,
+                    15,
+                    25,
+                    15,
+                    tzinfo=timezone.utc if parsed.tzinfo else None,
                     # fmt: on
                 ),
             )
@@ -223,7 +228,7 @@ class TestDownload(unittest.IsolatedAsyncioTestCase):
         # 2. As a result it is rejected
         with self.assertRaises(CheckerFetchError):
             await get_extra_data_info_from_url(
-                url="https://httpbingo.org/response-headers?Content-Type=application/gzip",  # noqa: E501
+                url="https://httpbingo.org/response-headers?Content-Type=application/gzip",
                 session=self.http,
                 content_type_deny=[re.compile(r"^application/json$")],
             )

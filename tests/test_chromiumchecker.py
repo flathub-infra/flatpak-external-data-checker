@@ -6,17 +6,17 @@ from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
 
-from src.manifest import ManifestChecker
 from src.checkers.chromiumchecker import LLVMGitComponent
+from src.lib.checksums import MultiDigest
 from src.lib.externaldata import (
     ExternalData,
     ExternalFile,
     ExternalGitRef,
     ExternalGitRepo,
 )
-from src.lib.checksums import MultiDigest
 from src.lib.utils import init_logging
 from src.lib.version import LooseVersion
+from src.manifest import ManifestChecker
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.chromium.Chromium.yaml")
 
@@ -44,23 +44,23 @@ class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
                 if data.filename.startswith("chromium-"):
                     self.assertRegex(
                         data.new_version.url,
-                        r"^https://(commondatastorage.googleapis.com/chromium-browser-official|chromium-tarballs.distfiles.gentoo.org)/chromium-[\d.]+\.tar\.xz$",  # noqa: E501
+                        r"^https://(commondatastorage.googleapis.com/chromium-browser-official|chromium-tarballs.distfiles.gentoo.org)/chromium-[\d.]+\.tar\.xz$",
                     )
                     self.assertNotEqual(
                         data.new_version.checksum,
                         MultiDigest(
-                            sha256="a68d31f77a6b7700a5161d82f5932c2822f85f7ae68ad51be3d3cf689a3fe2b0"  # noqa: E501
+                            sha256="a68d31f77a6b7700a5161d82f5932c2822f85f7ae68ad51be3d3cf689a3fe2b0"
                         ),
                     )
                 elif data.filename.startswith("clang-"):
                     self.assertRegex(
                         data.new_version.url,
-                        r"^https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-.*\.tar\.xz$",  # noqa: E501
+                        r"^https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-.*\.tar\.xz$",
                     )
                     self.assertNotEqual(
                         data.new_version.checksum,
                         MultiDigest(
-                            sha256="cf6b516a4e410d79439a150927fc8b450b325e2a6349395ae153c9d2dd6c6ed2"  # noqa: E501
+                            sha256="cf6b516a4e410d79439a150927fc8b450b325e2a6349395ae153c9d2dd6c6ed2"
                         ),
                     )
                 else:

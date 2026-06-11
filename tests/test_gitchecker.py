@@ -1,13 +1,14 @@
 import copy
 import os
 import unittest
-import aiohttp
 from unittest import mock
 
-from src.manifest import ManifestChecker
-from src.lib.externaldata import ExternalGitRepo, ExternalGitRef
+import aiohttp
+
+from src.checkers.gitchecker import GitChecker, TagWithSemver, TagWithVersion
+from src.lib.externaldata import ExternalGitRef, ExternalGitRepo
 from src.lib.utils import init_logging
-from src.checkers.gitchecker import TagWithVersion, TagWithSemver, GitChecker
+from src.manifest import ManifestChecker
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.virustotal.Uploader.yml")
 
@@ -101,13 +102,12 @@ class TestGitChecker(unittest.IsolatedAsyncioTestCase):
         data.update()
         if data.filename == "qt-virustotal-uploader.git":
             self.assertEqual(data.source, orig_source)
-        if data.filename == "protobuf-c.git":
-            self.assertEqual(data.source, orig_source)
-        elif data.filename == "yara.git":
-            self.assertEqual(data.source, orig_source)
-        elif data.filename == "yara-python.git":
-            self.assertEqual(data.source, orig_source)
-        elif data.filename == "jansson.git":
+        if (
+            data.filename == "protobuf-c.git"
+            or data.filename == "yara.git"
+            or data.filename == "yara-python.git"
+            or data.filename == "jansson.git"
+        ):
             self.assertEqual(data.source, orig_source)
         elif data.filename == "c-vtapi.git":
             self.assertNotEqual(data.source, orig_source)

@@ -17,9 +17,9 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import unittest
 import os
 import tempfile
+import unittest
 
 from src.lib.utils import (
     _check_newline,
@@ -43,11 +43,11 @@ class TestNewlinePreservation(unittest.TestCase):
             fp = os.path.join(d, "trailingnewline.json")
             with open(fp, "w") as f:
                 f.write(MANIFEST_WITH_NEWLINE)
-            with open(fp, "r") as f:
+            with open(fp) as f:
                 self.assertTrue(_check_newline(f))
             manifest = read_manifest(fp)
             dump_manifest(manifest, fp)
-            with open(fp, "r") as f:
+            with open(fp) as f:
                 self.assertTrue(_check_newline(f))
 
     def test_no_newline(self):
@@ -55,11 +55,11 @@ class TestNewlinePreservation(unittest.TestCase):
             fp = os.path.join(d, "notrailingnewline.json")
             with open(fp, "w") as f:
                 f.write(MANIFEST_NO_NEWLINE)
-            with open(fp, "r") as f:
+            with open(fp) as f:
                 self.assertFalse(_check_newline(f))
             manifest = read_manifest(fp)
             dump_manifest(manifest, fp)
-            with open(fp, "r") as f:
+            with open(fp) as f:
                 self.assertFalse(_check_newline(f))
 
 

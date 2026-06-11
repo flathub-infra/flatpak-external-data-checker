@@ -1,27 +1,27 @@
-import logging
 import json
-import re
-from datetime import datetime
-import typing as t
-import subprocess
+import logging
 import os
+import re
+import subprocess
+import typing as t
+from datetime import datetime
 
 from yarl import URL
 
 from ..lib import utils
+from ..lib.errors import CheckerQueryError
 from ..lib.externaldata import (
     ExternalBase,
     ExternalData,
-    ExternalGitRepo,
     ExternalGitRef,
+    ExternalGitRepo,
 )
-from ..lib.errors import CheckerQueryError
 from . import Checker, JSONType
 
 log = logging.getLogger(__name__)
 
 
-async def _jq(query: str, data: JSONType, variables: t.Dict[str, JSONType]) -> str:
+async def _jq(query: str, data: JSONType, variables: dict[str, JSONType]) -> str:
     var_args = []
     for var_name, var_value in variables.items():
         var_args += ["--argjson", var_name, json.dumps(var_value)]
@@ -43,7 +43,7 @@ async def _jq(query: str, data: JSONType, variables: t.Dict[str, JSONType]) -> s
     raise CheckerQueryError(f"Invalid jq output type {type(result)}")
 
 
-def parse_timestamp(date_string: t.Optional[str]) -> t.Optional[datetime]:
+def parse_timestamp(date_string: str | None) -> datetime | None:
     if date_string is None:
         return None
     try:
@@ -55,7 +55,7 @@ def parse_timestamp(date_string: t.Optional[str]) -> t.Optional[datetime]:
 class _Query(t.NamedTuple):
     name: str
     value_expr: str
-    url_expr: t.Optional[str]
+    url_expr: str | None
 
 
 class JSONChecker(Checker):
@@ -79,7 +79,7 @@ class JSONChecker(Checker):
     SUPPORTED_DATA_CLASSES = [ExternalData, ExternalGitRepo]
 
     @classmethod
-    def get_json_schema(cls, data_class: t.Type[ExternalBase]):
+    def get_json_schema(cls, data_class: type[ExternalBase]):
         schema = super().get_json_schema(data_class).copy()
         if issubclass(data_class, ExternalGitRepo):
             schema["anyOf"] = schema.get("anyOf", []) + [
@@ -95,8 +95,8 @@ class JSONChecker(Checker):
 
     async def _get_json(
         self,
-        url: t.Union[str, URL],
-        headers: t.Optional[t.Dict[str, str]] = None,
+        url: str | URL,
+        headers: dict[str, str] | None = None,
     ) -> JSONType:
         url = URL(url)
 
@@ -111,10 +111,10 @@ class JSONChecker(Checker):
     async def _query_sequence(
         self,
         queries: t.Iterable[_Query],
-        json_vars: t.Dict[str, JSONType],
+        json_vars: dict[str, JSONType],
         init_json_data: JSONType = None,
-    ) -> t.Dict[str, str]:
-        results: t.Dict[str, str] = {}
+    ) -> dict[str, str]:
+        results: dict[str, str] = {}
         for query in queries:
             _vars = json_vars | results
             if query.url_expr:
@@ -128,7 +128,7 @@ class JSONChecker(Checker):
     @staticmethod
     def _read_q_seq(
         checker_data: t.Mapping,
-        sequence: t.List[str],
+        sequence: list[str],
     ) -> t.Iterable[_Query]:
         for query_name in sequence:
             q_prop = f"{query_name}-query"
@@ -147,12 +147,12 @@ class JSONChecker(Checker):
         json_url = external_data.checker_data.get("url")
         json_data = await self._get_json(json_url) if json_url else None
 
-        json_vars: t.Dict[str, JSONType] = {}
+        json_vars: dict[str, JSONType] = {}
 
         if external_data.parent:
             assert isinstance(external_data.parent, ExternalBase)
             # XXX This seemingly redundant extra variable is needed to make Mypy happy
-            parent_data: t.Dict[str, t.Optional[t.Dict[str, JSONType]]]
+            parent_data: dict[str, dict[str, JSONType] | None]
             parent_data = {
                 "current": external_data.parent.current_version.json,
                 "new": None,
@@ -163,14 +163,13 @@ class JSONChecker(Checker):
 
         if isinstance(external_data, ExternalGitRepo):
             return await self._check_git(json_data, json_vars, external_data)
-        else:
-            assert isinstance(external_data, ExternalData)
-            return await self._check_data(json_data, json_vars, external_data)
+        assert isinstance(external_data, ExternalData)
+        return await self._check_data(json_data, json_vars, external_data)
 
     async def _check_data(
         self,
         json_data: JSONType,
-        json_vars: t.Dict[str, JSONType],
+        json_vars: dict[str, JSONType],
         external_data: ExternalData,
     ):
         checker_data = external_data.checker_data
@@ -196,7 +195,7 @@ class JSONChecker(Checker):
     async def _check_git(
         self,
         json_data: JSONType,
-        json_vars: t.Dict[str, JSONType],
+        json_vars: dict[str, JSONType],
         external_data: ExternalGitRepo,
     ):
         checker_data = external_data.checker_data

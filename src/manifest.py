@@ -18,37 +18,37 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-from collections import OrderedDict
-import datetime
-import dataclasses
-import typing as t
 import asyncio
-from enum import IntEnum
+import dataclasses
+import datetime
 import logging
 import os
+import typing as t
+from collections import OrderedDict
+from enum import IntEnum
 
 import aiohttp
 from lxml.etree import XMLSyntaxError
 
+from .checkers import ALL_CHECKERS, Checker
 from .lib import HTTP_CLIENT_HEADERS, TIMEOUT_CONNECT, TIMEOUT_TOTAL
 from .lib.appdata import add_release_to_file
+from .lib.errors import (
+    AppdataError,
+    AppdataLoadError,
+    AppdataNotFound,
+    CheckerError,
+    ManifestFileOpenError,
+    ManifestFileTooLarge,
+    ManifestLoadError,
+    SourceLoadError,
+    SourceUnsupported,
+)
 from .lib.externaldata import (
     BuilderModule,
     ExternalBase,
 )
-from .lib.utils import read_manifest, dump_manifest
-from .lib.errors import (
-    CheckerError,
-    AppdataError,
-    AppdataNotFound,
-    AppdataLoadError,
-    ManifestLoadError,
-    ManifestFileTooLarge,
-    ManifestFileOpenError,
-    SourceLoadError,
-    SourceUnsupported,
-)
-from .checkers import Checker, ALL_CHECKERS
+from .lib.utils import dump_manifest, read_manifest
 
 MAIN_SRC_PROP = "is-main-source"
 IMPORTANT_SRC_PROP = "is-important"
@@ -93,9 +93,9 @@ class ManifestChecker:
         failed: int = 0
         total: int = 0
 
-    def __init__(self, manifest: str, options: t.Optional[CheckerOptions] = None):
+    def __init__(self, manifest: str, options: CheckerOptions | None = None):
         self.kind = self.Kind.UNKNOWN
-        self.app_id: t.Optional[str]
+        self.app_id: str | None
         self.app_id = None
 
         self.opts = options or CheckerOptions()
@@ -103,25 +103,25 @@ class ManifestChecker:
         self._root_manifest_path = manifest
         self._root_manifest_dir = os.path.dirname(self._root_manifest_path)
 
-        self._modules: t.Dict[str, t.List[BuilderModule]] = {}
-        self._external_data: t.Dict[str, t.List[ExternalBase]]
+        self._modules: dict[str, list[BuilderModule]] = {}
+        self._external_data: dict[str, list[ExternalBase]]
         self._external_data = {}
 
-        self._errors: t.List[Exception]
+        self._errors: list[Exception]
         self._errors = []
 
         # Initialize checkers
-        self._checkers: t.List[t.Type[Checker]]
+        self._checkers: list[type[Checker]]
         self._checkers = [checker_cls for checker_cls in ALL_CHECKERS]
         assert self._checkers
 
         # Map from filename to parsed contents of that file. Sources may be
         # specified as references to external files, which is why there can be
         # more than one file even though the input is a single filename.
-        self._manifest_contents: t.Dict[str, t.Union[t.List, t.Dict]]
+        self._manifest_contents: dict[str, list | dict]
         self._manifest_contents = {}
 
-        self._manifest_headers: t.Dict[str, bool] = {}
+        self._manifest_headers: dict[str, bool] = {}
 
         # Top-level manifest contents
         self._root_manifest = self._read_manifest(self._root_manifest_path)
@@ -151,7 +151,7 @@ class ManifestChecker:
             return
         raise ManifestLoadError("Can't determine manifest kind")
 
-    def _read_manifest(self, manifest_path: str) -> t.Union[t.List, t.Dict]:
+    def _read_manifest(self, manifest_path: str) -> list | dict:
         if manifest_path in self._manifest_contents:
             return self._manifest_contents[manifest_path]
         try:
@@ -215,8 +215,8 @@ class ManifestChecker:
     def _collect_module_data(
         self,
         module_path: str,
-        module: t.Union[str, t.Dict],
-        parent: t.Optional[BuilderModule] = None,
+        module: str | dict,
+        parent: BuilderModule | None = None,
     ):
         if isinstance(module, str):
             ext_module_path = os.path.join(os.path.dirname(module_path), module)
@@ -229,7 +229,7 @@ class ManifestChecker:
                 ext_module = self._read_manifest(ext_module_path)
             except ManifestFileOpenError as err:
                 log.warning(err)
-                return
+                return None
 
             assert isinstance(ext_module, dict), ext_module_path
             return self._collect_module_data(ext_module_path, ext_module, parent=parent)
@@ -249,8 +249,8 @@ class ManifestChecker:
     def _collect_source_data(
         self,
         source_path: str,
-        source: t.Union[str, t.Dict, t.List[t.Union[str, t.Dict]]],
-        module: t.Optional[BuilderModule] = None,
+        source: str | dict | list[str | dict],
+        module: BuilderModule | None = None,
         is_external: bool = False,  # This source mf was referenced from another mf
     ):
         if isinstance(source, list):
@@ -389,13 +389,13 @@ class ManifestChecker:
         data.checked.set()
         return data
 
-    async def check(self, filter_type=None) -> t.List[ExternalBase]:
+    async def check(self, filter_type=None) -> list[ExternalBase]:
         """Perform the check for all the external data in the manifest
 
         It initializes an internal list of all the external data objects
         found in the manifest.
         """
-        external_data: t.List[ExternalBase]
+        external_data: list[ExternalBase]
         external_data = sum(self._external_data.values(), [])
         if filter_type is not None:
             external_data = [d for d in external_data if d.type == filter_type]
@@ -418,7 +418,7 @@ class ManifestChecker:
 
         return ext_data_checked
 
-    def get_external_data(self, only_type=None) -> t.List[ExternalBase]:
+    def get_external_data(self, only_type=None) -> list[ExternalBase]:
         """Returns the list of the external data found in the manifest
 
         Should be called after the 'check' method.
@@ -433,15 +433,15 @@ class ManifestChecker:
 
     def get_errors(
         self,
-        only_type: t.Optional[t.Type[Exception]] = None,
-    ) -> t.List[Exception]:
+        only_type: type[Exception] | None = None,
+    ) -> list[Exception]:
         """Return a list of errors occurred while checking/updating the manifest"""
 
         return [
             e for e in self._errors if only_type is None or isinstance(e, only_type)
         ]
 
-    def get_outdated_external_data(self) -> t.List[ExternalBase]:
+    def get_outdated_external_data(self) -> list[ExternalBase]:
         """Returns a list of the outdated external data
 
         Outdated external data are the ones that either are broken
@@ -461,11 +461,9 @@ class ManifestChecker:
 
             data.update()
             if data.new_version.version is not None:
-                message = "{}: Update {} to {}".format(
-                    data.module, data.filename, data.new_version.version
-                )
+                message = f"{data.module}: Update {data.filename} to {data.new_version.version}"
             else:
-                message = "{}: Update {}".format(data.module, data.filename)
+                message = f"{data.module}: Update {data.filename}"
 
             changes[message] = None
             path_has_changes = True
@@ -492,7 +490,7 @@ class ManifestChecker:
                 selected_data = data
                 log.info("Selected upstream source: %s", selected_data)
                 break
-            elif data.source_path == self._root_manifest_path:
+            if data.source_path == self._root_manifest_path:
                 selected_data = data
         else:
             if selected_data is not None:
@@ -531,7 +529,7 @@ class ManifestChecker:
         else:
             log.debug("Version didn't change, not adding release")
 
-    def update_manifests(self) -> t.List[str]:
+    def update_manifests(self) -> list[str]:
         """Updates references to external data in manifests.
 
         If require_important_update is True, only update the manifest if at least one
@@ -539,7 +537,7 @@ class ManifestChecker:
         """
         # We want a list, without duplicates; Python provides an
         # insertion-order-preserving dictionary so we use that.
-        changes: t.Dict[str, t.Any]
+        changes: dict[str, t.Any]
         changes = OrderedDict()
 
         found_important_update = None

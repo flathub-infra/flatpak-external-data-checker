@@ -1,15 +1,15 @@
 import logging
-from datetime import datetime
 import re
 import typing as t
+from datetime import datetime
 
 from packaging.version import Version as PackagingVersion
 
 from ..lib import OPERATORS_SCHEMA
-from ..lib.externaldata import ExternalFile, ExternalBase
 from ..lib.checksums import MultiDigest
-from ..lib.utils import filter_versioned_items
 from ..lib.errors import CheckerQueryError
+from ..lib.externaldata import ExternalBase, ExternalFile
+from ..lib.utils import filter_versioned_items
 from . import Checker
 
 log = logging.getLogger(__name__)
@@ -26,11 +26,11 @@ class Version(PackagingVersion):
 
 
 def _filter_downloads(
-    pypy_releases: t.Dict[str, t.List[t.Dict]],
-    constraints: t.List[t.Tuple[str, Version]],
+    pypy_releases: dict[str, list[dict]],
+    constraints: list[tuple[str, Version]],
     packagetype: str,
     stable_only: bool = False,
-) -> t.Generator[t.Tuple[Version, t.Dict, datetime], None, None]:
+) -> t.Generator[tuple[Version, dict, datetime], None, None]:
     releases = filter_versioned_items(
         ((Version(v), d) for v, d in pypy_releases.items()),
         constraints,

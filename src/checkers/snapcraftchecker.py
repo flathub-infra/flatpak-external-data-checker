@@ -1,9 +1,9 @@
 import datetime
-import logging
 import hashlib
+import logging
 
-from ..lib.externaldata import ExternalBase, ExternalFile
 from ..lib.checksums import MultiHash
+from ..lib.externaldata import ExternalBase, ExternalFile
 from . import Checker
 
 log = logging.getLogger(__name__)

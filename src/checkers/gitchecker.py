@@ -5,9 +5,9 @@ import typing as t
 import semver
 
 from ..lib import OPERATORS_SCHEMA
-from ..lib.externaldata import ExternalBase, ExternalGitRepo, ExternalGitRef
-from ..lib.utils import git_ls_remote, filter_versioned_items, FallbackVersion
-from ..lib.errors import CheckerQueryError, CheckerFetchError
+from ..lib.errors import CheckerFetchError, CheckerQueryError
+from ..lib.externaldata import ExternalBase, ExternalGitRef, ExternalGitRepo
+from ..lib.utils import FallbackVersion, filter_versioned_items, git_ls_remote
 from . import Checker
 
 log = logging.getLogger(__name__)

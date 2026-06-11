@@ -31,7 +31,7 @@ import typing as t
 if sys.version_info >= (3, 10):
     from typing import TypeAlias
 else:
-    from typing_extensions import TypeAlias
+    from typing import TypeAlias
 # pylint: enable=wrong-import-position
 
 import lxml.etree as ElementTree
@@ -62,11 +62,11 @@ def _fill_padding(ele: XMLElement):
 
 
 def add_release(
-    src: t.Union[t.IO, str],
-    dst: t.Union[t.IO, str],
+    src: t.IO | str,
+    dst: t.IO | str,
     version: str,
     date: str,
-    release_url_template: t.Optional[str],
+    release_url_template: str | None,
 ):
     parser = ElementTree.XMLParser(load_dtd=False, resolve_entities=False)
     tree = ElementTree.parse(src, parser=parser)
@@ -116,7 +116,7 @@ def add_release(
 
 
 def add_release_to_file(
-    appdata_path: str, version: str, date: str, release_url_template: t.Optional[str]
+    appdata_path: str, version: str, date: str, release_url_template: str | None
 ):
     with io.BytesIO() as buf:
         add_release(appdata_path, buf, version, date, release_url_template)

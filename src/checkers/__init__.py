@@ -1,62 +1,61 @@
 from __future__ import annotations
 
-import logging
-from string import Template
 import datetime
 import json
+import logging
 import re
-import zlib
 import sys
 import typing as t
+import zlib
+from string import Template
 
 # pylint: disable=wrong-import-position
 if sys.version_info >= (3, 10):
     from typing import TypeAlias
 else:
-    from typing_extensions import TypeAlias
+    from typing import TypeAlias
 # pylint: enable=wrong-import-position
 
 import importlib
 import pkgutil
 
 import aiohttp
-from yarl import URL
 import jsonschema
-import ruamel.yaml
 import lxml.etree as ElementTree
-
-from ..lib.version import LooseVersion
+import ruamel.yaml
+from yarl import URL
 
 from ..lib import (
-    utils,
-    NETWORK_ERRORS,
-    WRONG_CONTENT_TYPES_FILE,
-    WRONG_CONTENT_TYPES_ARCHIVE,
     FILE_URL_SCHEMES,
+    NETWORK_ERRORS,
+    WRONG_CONTENT_TYPES_ARCHIVE,
+    WRONG_CONTENT_TYPES_FILE,
+    utils,
+)
+from ..lib.checksums import (
+    MultiDigest,
+    MultiHash,
+)
+from ..lib.errors import (
+    CheckerFetchError,
+    CheckerMetadataError,
+    CheckerQueryError,
 )
 from ..lib.externaldata import (
     ExternalBase,
     ExternalData,
-    ExternalState,
     ExternalFile,
+    ExternalState,
 )
-from ..lib.errors import (
-    CheckerMetadataError,
-    CheckerQueryError,
-    CheckerFetchError,
-)
-from ..lib.checksums import (
-    MultiHash,
-    MultiDigest,
-)
+from ..lib.version import LooseVersion
 
-JSONType = t.Union[str, int, float, bool, None, t.Dict[str, t.Any], t.List[t.Any]]
+JSONType = t.Union[str, int, float, bool, None, dict[str, t.Any], list[t.Any]]
 XMLElement: TypeAlias = ElementTree._Element  # pylint: disable=protected-access
 
 yaml = ruamel.yaml.YAML(typ="safe")
 log = logging.getLogger(__name__)
 
-ALL_CHECKERS: t.List[t.Type[Checker]] = []
+ALL_CHECKERS: list[type[Checker]] = []
 
 
 class Checker:
@@ -67,9 +66,9 @@ class Checker:
     """
 
     PRIORITY: t.ClassVar[int] = 0
-    CHECKER_DATA_TYPE: t.Optional[str] = None
-    CHECKER_DATA_SCHEMA: t.Dict[str, t.Any]
-    SUPPORTED_DATA_CLASSES: t.List[t.Type[ExternalBase]] = [ExternalData]
+    CHECKER_DATA_TYPE: str | None = None
+    CHECKER_DATA_SCHEMA: dict[str, t.Any]
+    SUPPORTED_DATA_CLASSES: list[type[ExternalBase]] = [ExternalData]
     session: aiohttp.ClientSession
 
     @classmethod
@@ -84,7 +83,7 @@ class Checker:
 
     # pylint: disable=unused-argument
     @classmethod
-    def get_json_schema(self, data_class: t.Type[ExternalBase]) -> t.Dict[str, t.Any]:
+    def get_json_schema(self, data_class: type[ExternalBase]) -> dict[str, t.Any]:
         if not hasattr(self, "CHECKER_DATA_SCHEMA"):
             raise NotImplementedError(
                 "If schema is not declared, this method must be overridden"
@@ -120,8 +119,8 @@ class Checker:
 
     async def _get_json(
         self,
-        url: t.Union[str, URL],
-        headers: t.Optional[t.Dict[str, str]] = None,
+        url: str | URL,
+        headers: dict[str, str] | None = None,
     ) -> JSONType:
         url = URL(url)
         log.debug("Loading JSON from %s", url)
@@ -152,12 +151,12 @@ class Checker:
         return parser.close()
 
     @staticmethod
-    def _version_parts(version: str) -> t.Dict[str, str]:
+    def _version_parts(version: str) -> dict[str, str]:
         """
         Parse version string and return a dict of named components.
         """
         version_list = LooseVersion(version).version
-        tmpl_vars: t.Dict[str, t.Union[str, int]]
+        tmpl_vars: dict[str, str | int]
         tmpl_vars = {"version": version}
         for i, version_part in enumerate(version_list):
             tmpl_vars[f"version{i}"] = version_part
@@ -173,7 +172,7 @@ class Checker:
     def _substitute_template(
         cls,
         template_string: str,
-        variables: t.Dict[str, t.Any],
+        variables: dict[str, t.Any],
     ) -> str:
         tmpl = Template(template_string)
         try:
@@ -184,10 +183,10 @@ class Checker:
     @classmethod
     def _get_pattern(
         cls,
-        checker_data: t.Dict,
+        checker_data: dict,
         pattern_name: str,
         expected_groups: int = 1,
-    ) -> t.Optional[re.Pattern]:
+    ) -> re.Pattern | None:
         try:
             pattern_str = checker_data[pattern_name]
         except KeyError:
@@ -205,7 +204,7 @@ class Checker:
         return pattern
 
     async def _complete_digests(
-        self, url: t.Union[str, URL], digests: MultiDigest
+        self, url: str | URL, digests: MultiDigest
     ) -> MultiDigest:
         """
         Re-download given `url`, verify it against given `digests`,
@@ -221,8 +220,7 @@ class Checker:
         new_digests = multihash.hexdigest()
         if new_digests != digests:
             raise CheckerFetchError(
-                f"Checksum mismatch for {url}: "
-                f"expected {digests}, got {new_digests}"
+                f"Checksum mismatch for {url}: expected {digests}, got {new_digests}"
             )
         return new_digests
 
@@ -255,7 +253,7 @@ class Checker:
         latest_version: str,
         latest_url: str,
         follow_redirects: bool = False,
-        timestamp: t.Optional[datetime.datetime] = None,
+        timestamp: datetime.datetime | None = None,
     ):
         assert latest_version is not None
         assert latest_url is not None

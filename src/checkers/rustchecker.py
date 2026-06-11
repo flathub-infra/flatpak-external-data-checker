@@ -4,8 +4,8 @@ import re
 
 import toml
 
-from ..lib.externaldata import ExternalBase, ExternalFile
 from ..lib.checksums import MultiDigest
+from ..lib.externaldata import ExternalBase, ExternalFile
 from . import Checker
 
 log = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ class RustChecker(Checker):
         assert version_match
         version, _, _ = version_match.groups()
         if channel == "nightly":
-            appstream_version = "{0}-{1:%Y%m%d}".format(version, release_date)
+            appstream_version = f"{version}-{release_date:%Y%m%d}"
         else:
             appstream_version = version
 

@@ -1,11 +1,11 @@
 import os
 import unittest
 
-from src.manifest import ManifestChecker
-from src.lib.externaldata import ExternalFile, ExternalGitRef
 from src.lib.checksums import MultiDigest
+from src.lib.externaldata import ExternalFile, ExternalGitRef
 from src.lib.utils import init_logging
 from src.lib.version import LooseVersion
+from src.manifest import ManifestChecker
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.flatpak.Flatpak.yml")
 
@@ -25,7 +25,7 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertIsInstance(data.new_version, ExternalFile)
                 self.assertRegex(
                     data.new_version.url,
-                    r"^https://download.gnome.org/sources/glib-networking/\d+.\d+/glib-networking-[\d.]+.tar.xz$",  # noqa: E501
+                    r"^https://download.gnome.org/sources/glib-networking/\d+.\d+/glib-networking-[\d.]+.tar.xz$",
                 )
                 self.assertIsNotNone(data.new_version.version)
                 self.assertGreater(
@@ -38,7 +38,7 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertNotEqual(
                     data.new_version.checksum,
                     MultiDigest(
-                        sha256="1f185aaef094123f8e25d8fa55661b3fd71020163a0174adb35a37685cda613b",  # noqa: E501
+                        sha256="1f185aaef094123f8e25d8fa55661b3fd71020163a0174adb35a37685cda613b",
                     ),
                 )
             elif data.filename == "boost_1_74_0.tar.bz2":
@@ -46,7 +46,7 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertIsInstance(data.new_version, ExternalFile)
                 self.assertRegex(
                     data.new_version.url,
-                    r"^https://archives\.boost\.io/release/[\d.]+/source/boost_[\d]+_[\d]+_[\d]+.tar.bz2$",  # noqa: E501
+                    r"^https://archives\.boost\.io/release/[\d.]+/source/boost_[\d]+_[\d]+_[\d]+.tar.bz2$",
                 )
                 self.assertIsNotNone(data.new_version.version)
                 self.assertGreater(
@@ -59,7 +59,7 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertNotEqual(
                     data.new_version.checksum,
                     MultiDigest(
-                        sha256="83bfc1507731a0906e387fc28b7ef5417d591429e51e788417fe9ff025e116b1"  # noqa: E501
+                        sha256="83bfc1507731a0906e387fc28b7ef5417d591429e51e788417fe9ff025e116b1"
                     ),
                 )
             elif data.filename == "flatpak-1.8.2.tar.xz":
@@ -67,7 +67,7 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertIsInstance(data.new_version, ExternalFile)
                 self.assertRegex(
                     data.new_version.url,
-                    r"^https://github.com/flatpak/flatpak/releases/download/[\w\d.]+/flatpak-[\w\d.]+.tar.xz$",  # noqa: E501
+                    r"^https://github.com/flatpak/flatpak/releases/download/[\w\d.]+/flatpak-[\w\d.]+.tar.xz$",
                 )
                 self.assertIsNotNone(data.new_version.version)
                 self.assertEqual(
@@ -80,7 +80,7 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertNotEqual(
                     data.new_version.checksum,
                     MultiDigest(
-                        sha256="7926625df7c2282a5ee1a8b3c317af53d40a663b1bc6b18a2dc8747e265085b0"  # noqa: E501
+                        sha256="7926625df7c2282a5ee1a8b3c317af53d40a663b1bc6b18a2dc8747e265085b0"
                     ),
                 )
             elif data.filename == "ostree.git":

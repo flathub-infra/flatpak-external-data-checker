@@ -18,39 +18,38 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import apt_inst
-import apt_pkg
+import asyncio
 import datetime as dt
-import zoneinfo
+import io
 import json
 import logging
+import operator
 import os
-import io
 import re
+import shlex
 import subprocess
 import tempfile
-import urllib.request
-import urllib.parse
 import typing as t
-from packaging.version import Version
-import asyncio
-import shlex
-from pathlib import Path
-import operator
-
+import urllib.parse
+import urllib.request
+import zoneinfo
 from collections import OrderedDict
-from ruamel.yaml import YAML
-from elftools.elf.elffile import ELFFile
+from pathlib import Path
+
 import aiohttp
+import apt_inst
+import apt_pkg
 import editorconfig
-import magic
-
-from . import externaldata, TIMEOUT_CONNECT, HTTP_CHUNK_SIZE, OPERATORS
-from .errors import CheckerRemoteError, CheckerQueryError, CheckerFetchError
-from .checksums import MultiHash
-from .version import LooseVersion
-
 import gi
+import magic
+from elftools.elf.elffile import ELFFile
+from packaging.version import Version
+from ruamel.yaml import YAML
+
+from . import HTTP_CHUNK_SIZE, OPERATORS, TIMEOUT_CONNECT, externaldata
+from .checksums import MultiHash
+from .errors import CheckerFetchError, CheckerQueryError, CheckerRemoteError
+from .version import LooseVersion
 
 gi.require_version("Json", "1.0")
 from gi.repository import (  # type: ignore[attr-defined] # noqa: E402 # noqa: I001 # type: ignore[attr-defined]
@@ -115,8 +114,7 @@ def _check_newline(fp):
     fp.seek(original_position, os.SEEK_SET)
     if last_char == "\n":
         return True
-    else:
-        return False
+    return False
 
 
 def _detect_json_flatpak_manifest_indent(text: str) -> int | str | None:
@@ -188,8 +186,8 @@ async def get_extra_data_info_from_url(
     url: str,
     session: aiohttp.ClientSession,
     follow_redirects: bool = True,
-    dest_io: t.Optional[t.IO] = None,
-    content_type_deny: t.Optional[t.Iterable[re.Pattern]] = None,
+    dest_io: t.IO | None = None,
+    content_type_deny: t.Iterable[re.Pattern] | None = None,
 ):
     async with session.get(
         url,
@@ -198,7 +196,7 @@ async def get_extra_data_info_from_url(
         real_url = str(response.url)
         info = response.headers
 
-        def content_type_rejected(content_type: t.Optional[str]) -> bool:
+        def content_type_rejected(content_type: str | None) -> bool:
             return (
                 content_type is not None
                 and content_type_deny is not None
@@ -291,10 +289,10 @@ _ComparableObj = t.TypeVar("_ComparableObj", bound=_SupportsComparison)
 
 def filter_versioned_items(
     items: t.Iterable[_VersionedObj],
-    constraints: t.Iterable[t.Tuple[str, _ComparableObj]],
+    constraints: t.Iterable[tuple[str, _ComparableObj]],
     to_version: t.Callable[[_VersionedObj], _ComparableObj],
     sort=False,
-) -> t.List[_VersionedObj]:
+) -> list[_VersionedObj]:
     constraints = list(constraints)
     new_items = []
     for item in items:
@@ -319,9 +317,9 @@ def filter_versioned_items(
 
 def filter_versions(
     versions: t.Iterable[str],
-    constraints: t.Iterable[t.Tuple[str, str]],
+    constraints: t.Iterable[tuple[str, str]],
     sort=False,
-) -> t.List[str]:
+) -> list[str]:
     return filter_versioned_items(
         versions,
         ((operator, FallbackVersion(version)) for operator, version in constraints),
@@ -364,26 +362,26 @@ class Command:
         optional: bool = False
 
         @property
-        def bwrap_args(self) -> t.List[str]:
+        def bwrap_args(self) -> list[str]:
             prefix = "ro-" if self.readonly else ""
             suffix = "-try" if self.optional else ""
             return [f"--{prefix}bind{suffix}", self.path, self.path]
 
-    argv: t.List[str]
+    argv: list[str]
     cwd: str
     sandbox: bool
 
     def __init__(
         self,
-        argv: t.List[str],
-        cwd: t.Optional[str] = None,
-        stdin: t.Optional[int] = subprocess.PIPE,
-        stdout: t.Optional[int] = subprocess.PIPE,
-        stderr: t.Optional[int] = None,
-        timeout: t.Optional[float] = None,
-        sandbox: t.Optional[bool] = None,
+        argv: list[str],
+        cwd: str | None = None,
+        stdin: int | None = subprocess.PIPE,
+        stdout: int | None = subprocess.PIPE,
+        stderr: int | None = None,
+        timeout: float | None = None,
+        sandbox: bool | None = None,
         allow_network: bool = False,
-        allow_paths: t.Optional[t.List[t.Union[str, SandboxPath]]] = None,
+        allow_paths: list[str | SandboxPath] | None = None,
     ):
         self.cwd = cwd or os.getcwd()
         self.stdin = stdin
@@ -412,7 +410,7 @@ class Command:
             self.argv = argv
         self._orig_argv = argv
 
-    async def run(self, input_data: t.Optional[bytes] = None) -> t.Tuple[bytes, bytes]:
+    async def run(self, input_data: bytes | None = None) -> tuple[bytes, bytes]:
         proc = await asyncio.create_subprocess_exec(
             *self.argv,
             cwd=self.cwd,
@@ -444,7 +442,7 @@ class Command:
             )
         return stdout, stderr
 
-    def run_sync(self, input_data: t.Optional[bytes] = None) -> t.Tuple[bytes, bytes]:
+    def run_sync(self, input_data: bytes | None = None) -> tuple[bytes, bytes]:
         proc = subprocess.run(
             self.argv,
             cwd=self.cwd,
@@ -461,7 +459,7 @@ class Command:
         return " ".join(shlex.quote(a) for a in self._orig_argv)
 
 
-async def git_ls_remote(url: str) -> t.Dict[str, str]:
+async def git_ls_remote(url: str) -> dict[str, str]:
     git_cmd = Command(
         ["git", "ls-remote", "--exit-code", url],
         timeout=TIMEOUT_CONNECT,
@@ -536,8 +534,7 @@ def parse_github_url(url):
     m = _GITHUB_URL_PATTERN.match(url)
     if m:
         return m.group("org_repo")
-    else:
-        raise ValueError(f"{url!r} doesn't look like a Git URL")
+    raise ValueError(f"{url!r} doesn't look like a Git URL")
 
 
 def read_json_manifest(manifest_path: Path):
@@ -576,17 +573,16 @@ def read_yaml_manifest(manifest_path: Path):
     return data, has_yaml_header
 
 
-def read_manifest(manifest_path: t.Union[Path, str]):
+def read_manifest(manifest_path: Path | str):
     """Reads a JSON or YAML manifest from 'manifest_path'."""
     manifest_path = Path(manifest_path)
     if manifest_path.suffix in (".yaml", ".yml"):
         return read_yaml_manifest(manifest_path)
-    else:
-        return read_json_manifest(manifest_path)
+    return read_json_manifest(manifest_path)
 
 
 def dump_manifest(
-    contents: t.Dict, manifest_path: t.Union[Path, str], has_yaml_header: bool = False
+    contents: dict, manifest_path: Path | str, has_yaml_header: bool = False
 ):
     manifest_path = Path(manifest_path)
     assert manifest_path.is_absolute()
@@ -596,7 +592,7 @@ def dump_manifest(
 
     conf = editorconfig.get_properties(manifest_path)
 
-    json_indent: t.Union[str, int]
+    json_indent: str | int
     if conf.get("indent_style") == "space":
         json_indent = int(conf.get("indent_size", 4))
     elif conf.get("indent_style") == "tab":
@@ -611,7 +607,7 @@ def dump_manifest(
         except ValueError:
             log.warning("Ignoring invalid max_line_length %r", yaml_max_line_length)
 
-    json_newline_pref: t.Optional[bool]
+    json_newline_pref: bool | None
     if "insert_final_newline" in conf:
         json_newline_pref = {"true": True, "false": False}.get(
             conf["insert_final_newline"]

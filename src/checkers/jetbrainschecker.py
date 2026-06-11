@@ -1,8 +1,8 @@
 import datetime
 import logging
 
-from ..lib.externaldata import ExternalBase, ExternalFile
 from ..lib.checksums import MultiDigest
+from ..lib.externaldata import ExternalBase, ExternalFile
 from . import Checker
 
 log = logging.getLogger(__name__)

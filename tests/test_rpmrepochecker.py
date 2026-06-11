@@ -1,9 +1,9 @@
-import unittest
 import os
+import unittest
 
-from src.manifest import ManifestChecker
-from src.lib.utils import init_logging
 from src.lib.checksums import MultiDigest
+from src.lib.utils import init_logging
+from src.manifest import ManifestChecker
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.visualstudio.code.yaml")
 
@@ -28,7 +28,5 @@ class TestRPMRepoChecker(unittest.IsolatedAsyncioTestCase):
             )
             self.assertRegex(
                 data.new_version.url,
-                r"https://packages\.microsoft\.com/yumrepos/.+?/code-.+\.{0}\.rpm".format(  # noqa: E501
-                    data.arches[0]
-                ),
+                rf"https://packages\.microsoft\.com/yumrepos/.+?/code-.+\.{data.arches[0]}\.rpm",
             )

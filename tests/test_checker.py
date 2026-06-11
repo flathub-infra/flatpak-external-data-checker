@@ -18,27 +18,25 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import base64
 import datetime as dt
+import hashlib
 import json
 import logging
 import os
-import unittest
 import tempfile
-import hashlib
-import base64
+import unittest
 from xml.dom import minidom
-import typing as t
 
 import aiohttp
 
-from src.lib.utils import init_logging
-from src.lib.externaldata import ExternalData
+from src import manifest
 from src.checkers import Checker
 from src.checkers.gitchecker import GitChecker
-from src.lib.externaldata import ExternalGitRepo
 from src.lib.checksums import MultiDigest
 from src.lib.errors import CheckerFetchError, CheckerQueryError
-from src import manifest
+from src.lib.externaldata import ExternalData, ExternalGitRepo
+from src.lib.utils import init_logging
 
 TEST_MANIFEST = os.path.join(
     os.path.dirname(__file__),
@@ -95,7 +93,7 @@ class UpdateEverythingChecker(DummyChecker, register=False):
 
 
 class _TestWithInlineManifest(unittest.IsolatedAsyncioTestCase):
-    _DUMMY_CHECKER_CLS: t.Type[Checker]
+    _DUMMY_CHECKER_CLS: type[Checker]
     maxDiff = None
 
     async def _test_update(
@@ -133,13 +131,13 @@ class _TestWithInlineManifest(unittest.IsolatedAsyncioTestCase):
             await checker.check()
             updates = checker.update_manifests()
 
-            with open(manifest_path, "r") as f:
+            with open(manifest_path) as f:
                 new_contents = f.read()
 
             self.assertEqual(new_contents, expected_new_contents)
             self.assertEqual(updates, expected_updates)
 
-            with open(appdata, "r") as f:
+            with open(appdata) as f:
                 appdata_doc = minidom.parse(f)
 
             releases = appdata_doc.getElementsByTagName("release")
@@ -217,7 +215,7 @@ class TestExternalDataChecker(_TestWithInlineManifest):
             ]
         }}
     ]
-}}""".lstrip()  # noqa: E501
+}}""".lstrip()
 
         await self._test_update(
             filename,
@@ -472,7 +470,7 @@ size: {UpdateEverythingChecker.SIZE}
         self.assertEqual(
             relative_redirect.new_version.checksum,
             MultiDigest(
-                sha256="e4d67702da4eeeb2f15629b65bf6767c028a511839c14ed44d9f34479eaa2b94"  # noqa: E501
+                sha256="e4d67702da4eeeb2f15629b65bf6767c028a511839c14ed44d9f34479eaa2b94"
             ),
         )
         self.assertEqual(relative_redirect.new_version.size, 18)
@@ -486,8 +484,7 @@ size: {UpdateEverythingChecker.SIZE}
         for data in ext_data:
             if data.filename == filename:
                 return data
-        else:
-            return None
+        return None
 
 
 class TestCheckerHelpers(unittest.IsolatedAsyncioTestCase):
@@ -517,8 +514,8 @@ class TestCheckerHelpers(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_complete_digests(self):
-        CORRECT = self._b64_pad("Correct".encode())
-        WRONG = self._b64_pad("Wrong".encode())
+        CORRECT = self._b64_pad(b"Correct")
+        WRONG = self._b64_pad(b"Wrong")
 
         checker = DummyChecker(self.http)
         sha256 = hashlib.sha256(CORRECT).hexdigest()

@@ -20,11 +20,11 @@
 import os
 import unittest
 
-from src.lib.utils import init_logging
-from src.manifest import ManifestChecker
+from src.checkers.gnomechecker import VersionScheme, _is_stable
 from src.lib.checksums import MultiDigest
+from src.lib.utils import init_logging
 from src.lib.version import LooseVersion
-from src.checkers.gnomechecker import _is_stable, VersionScheme
+from src.manifest import ManifestChecker
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.gnome.baobab.json")
 
@@ -92,7 +92,7 @@ class TestGNOMEChecker(unittest.IsolatedAsyncioTestCase):
             self.assertNotEqual(
                 data.new_version.checksum,
                 MultiDigest(
-                    sha256="0000000000000000000000000000000000000000000000000000000000000000"  # noqa: E501
+                    sha256="0000000000000000000000000000000000000000000000000000000000000000"
                 ),
             )
             self.assertIsNotNone(data.new_version.version)
@@ -114,14 +114,14 @@ class TestGNOMEChecker(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data.filename, "baobab-3.34.0.tar.xz")
         self.assertRegex(
             data.new_version.url,
-            r"^https://download\.gnome\.org/sources/baobab/.+/baobab-.+\.tar\.xz$",  # noqa: E501
+            r"^https://download\.gnome\.org/sources/baobab/.+/baobab-.+\.tar\.xz$",
         )
 
     def _test_include_unstable(self, data):
         self.assertEqual(data.filename, "pygobject-3.36.0.tar.xz")
         self.assertRegex(
             data.new_version.url,
-            r"^https://download\.gnome\.org/sources/pygobject/.+/pygobject-.+\.tar\.xz$",  # noqa: E501
+            r"^https://download\.gnome\.org/sources/pygobject/.+/pygobject-.+\.tar\.xz$",
         )
 
     def _test_non_standard_version(self, data):

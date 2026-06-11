@@ -1,6 +1,6 @@
 import os
-import subprocess
 import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch

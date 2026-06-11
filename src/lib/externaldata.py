@@ -20,23 +20,23 @@
 from __future__ import annotations
 
 import abc
-from enum import Enum, IntFlag
-import datetime
-import typing as t
-import dataclasses
-import logging
 import asyncio
+import dataclasses
+import datetime
+import logging
+import typing as t
+from enum import Enum, IntFlag
 
-from yarl import URL
 import jsonschema
+from yarl import URL
 
-from . import utils, FILE_URL_SCHEMES
+from . import FILE_URL_SCHEMES, utils
+from .checksums import MultiDigest
 from .errors import (
     CheckerFetchError,
     SourceLoadError,
     SourceUnsupported,
 )
-from .checksums import MultiDigest
 
 _BM = t.TypeVar("_BM", bound="BuilderModule")
 _BS = t.TypeVar("_BS", bound="BuilderSource")
@@ -65,17 +65,17 @@ log = logging.getLogger(__name__)
 @dataclasses.dataclass
 class BuilderModule:
     name: str
-    module: t.Dict[str, t.Any]
+    module: dict[str, t.Any]
     module_path: str
-    parent: t.Optional[BuilderModule] = None
-    sources: t.List[BuilderSource] = dataclasses.field(default_factory=lambda: [])
+    parent: BuilderModule | None = None
+    sources: list[BuilderSource] = dataclasses.field(default_factory=list)
 
     @classmethod
     def from_manifest(
-        cls: t.Type[_BM],
+        cls: type[_BM],
         module_path: str,
-        module: t.Dict,
-        parent: t.Optional[BuilderModule] = None,
+        module: dict,
+        parent: BuilderModule | None = None,
     ) -> _BM:
         return cls(
             name=module["name"],
@@ -124,12 +124,12 @@ class BuilderSource(abc.ABC):
 
     state: State
     filename: str
-    arches: t.List[str]
-    source: t.Dict[str, t.Any]
+    arches: list[str]
+    source: dict[str, t.Any]
     source_path: str
-    checker_data: t.Dict[str, t.Any]
-    module: t.Optional[BuilderModule]
-    parent: t.Optional[BuilderSource] = dataclasses.field(init=False, default=None)
+    checker_data: dict[str, t.Any]
+    module: BuilderModule | None
+    parent: BuilderSource | None = dataclasses.field(init=False, default=None)
     checked: asyncio.Event = dataclasses.field(
         init=False,
         default_factory=asyncio.Event,
@@ -143,7 +143,7 @@ class BuilderSource(abc.ABC):
         cls.source_validator = validator_cls(cls.SOURCE_SCHEMA)
 
     @classmethod
-    def data_classes(cls: t.Type[_BS]) -> t.Dict[Type, t.Type[_BS]]:
+    def data_classes(cls: type[_BS]) -> dict[Type, type[_BS]]:
         classes = {}
         if hasattr(cls, "type"):
             classes[cls.type] = cls
@@ -153,10 +153,10 @@ class BuilderSource(abc.ABC):
 
     @classmethod
     def from_source(
-        cls: t.Type[_BS],
+        cls: type[_BS],
         source_path: str,
-        source: t.Dict,
-        module: t.Optional[BuilderModule] = None,
+        source: dict,
+        module: BuilderModule | None = None,
     ) -> _BS:
         try:
             cls.source_validator.validate(source)
@@ -174,10 +174,10 @@ class BuilderSource(abc.ABC):
 
     @classmethod
     def from_source_impl(
-        cls: t.Type[_BS],
+        cls: type[_BS],
         source_path: str,
-        source: t.Dict,
-        module: t.Optional[BuilderModule] = None,
+        source: dict,
+        module: BuilderModule | None = None,
     ) -> _BS:
         raise NotImplementedError
 
@@ -203,17 +203,17 @@ class BuilderSource(abc.ABC):
 @dataclasses.dataclass(frozen=True)
 class ExternalState(abc.ABC):
     url: str
-    version: t.Optional[str]
-    timestamp: t.Optional[datetime.datetime]
+    version: str | None
+    timestamp: datetime.datetime | None
 
     def _replace(self: _ES, **kwargs) -> _ES:
         return dataclasses.replace(self, **kwargs)
 
-    def _asdict(self) -> t.Dict[str, t.Any]:
+    def _asdict(self) -> dict[str, t.Any]:
         return dataclasses.asdict(self)
 
     @property
-    def json(self) -> t.Dict[str, t.Any]:
+    def json(self) -> dict[str, t.Any]:
         return self._asdict() | {
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
         }
@@ -232,20 +232,20 @@ class ExternalBase(BuilderSource):
     """
 
     current_version: ExternalState
-    new_version: t.Optional[ExternalState]
+    new_version: ExternalState | None
 
     @staticmethod
-    def _name_from_url(url: t.Union[str, URL]) -> str:
+    def _name_from_url(url: str | URL) -> str:
         if not isinstance(url, URL):
             url = URL(url)
         return next(p for p in reversed(url.parts) if p)
 
     @classmethod
     def from_source(
-        cls: t.Type[_BS],
+        cls: type[_BS],
         source_path: str,
-        source: t.Dict,
-        module: t.Optional[BuilderModule] = None,
+        source: dict,
+        module: BuilderModule | None = None,
     ) -> _BS:
         if not source.get("url"):
             raise SourceUnsupported('Data is not external: no "url" property')
@@ -308,10 +308,10 @@ class ExternalBase(BuilderSource):
 @dataclasses.dataclass(frozen=True)
 class ExternalFile(ExternalState):
     checksum: MultiDigest
-    size: t.Optional[int]
+    size: int | None
 
     @property
-    def json(self) -> t.Dict[str, t.Any]:
+    def json(self) -> dict[str, t.Any]:
         return super().json | {
             "checksum": self.checksum._asdict(),  # pylint: disable=no-member
         }
@@ -331,14 +331,14 @@ class ExternalFile(ExternalState):
 @dataclasses.dataclass
 class ExternalData(ExternalBase):
     current_version: ExternalFile
-    new_version: t.Optional[ExternalFile]
+    new_version: ExternalFile | None
 
     @classmethod
     def from_source_impl(
         cls,
         source_path: str,
-        source: t.Dict,
-        module: t.Optional[BuilderModule] = None,
+        source: dict,
+        module: BuilderModule | None = None,
     ) -> ExternalData:
         data_type = cls.Type(source["type"])
         assert data_type == cls.type, data_type
@@ -424,11 +424,11 @@ class ExtraDataSource(ExternalData):
 
 @dataclasses.dataclass(frozen=True)
 class ExternalGitRef(ExternalState):
-    commit: t.Optional[str]
-    tag: t.Optional[str]
-    branch: t.Optional[str]
+    commit: str | None
+    tag: str | None
+    branch: str | None
 
-    def _get_tagged_commit(self, refs: t.Dict[str, str], tag: str) -> str:
+    def _get_tagged_commit(self, refs: dict[str, str], tag: str) -> str:
         annotated_tag_commit = refs.get(f"refs/tags/{tag}")
         lightweight_tag_commit = refs.get(f"refs/tags/{tag}^{{}}")
         # If either tag matched current commit, assume it's valid
@@ -472,10 +472,7 @@ class ExternalGitRef(ExternalState):
                 (self.commit is None and other.commit is None)
                 or self.commit == other.commit
             )
-            and (
-                (self.tag is None and other.tag is None)
-                or self.tag == other.tag
-            )
+            and ((self.tag is None and other.tag is None) or self.tag == other.tag)
             and (
                 (self.branch is None and other.branch is None)
                 or self.branch == other.branch
@@ -501,14 +498,14 @@ class ExternalGitRepo(ExternalBase):
     type = ExternalBase.Type.GIT
 
     current_version: ExternalGitRef
-    new_version: t.Optional[ExternalGitRef]
+    new_version: ExternalGitRef | None
 
     @classmethod
     def from_source_impl(
         cls,
         source_path: str,
-        source: t.Dict,
-        module: t.Optional[BuilderModule] = None,
+        source: dict,
+        module: BuilderModule | None = None,
     ) -> ExternalGitRepo:
         data_type = cls.Type(source["type"])
         assert data_type == cls.type, data_type

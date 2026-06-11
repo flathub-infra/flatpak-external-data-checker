@@ -33,16 +33,16 @@
 import contextlib
 import logging
 import os
-import tempfile
-import urllib.parse
 import re
+import tempfile
 import typing as t
+import urllib.parse
 
 import apt
 import apt_pkg
 
-from ..lib.externaldata import ExternalFile, ExternalBase
 from ..lib.checksums import MultiDigest
+from ..lib.externaldata import ExternalBase, ExternalFile
 from ..lib.utils import get_timestamp_from_url
 from . import Checker
 
@@ -70,7 +70,7 @@ LOG = logging.getLogger(__name__)
 
 
 def read_deb_hashes(deb_hashes: apt_pkg.HashStringList) -> MultiDigest:
-    digests: t.Dict[str, str] = {}
+    digests: dict[str, str] = {}
     deb_hash: apt_pkg.HashString
     for deb_hash in deb_hashes:  # type: ignore
         hash_type = DEB_HASH_MAP.get(deb_hash.hashtype)
