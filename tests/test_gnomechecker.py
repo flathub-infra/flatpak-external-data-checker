@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright © 2020–2021 Maximiliano Sandoval <msandova@protonmail.com>
 #
 # Authors:
