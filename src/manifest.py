@@ -206,7 +206,7 @@ class ManifestChecker:
                     f'Source {data}: parent source with ID "{parent_id}" not found'
                 ) from err
             # Check for inheritance loops
-            parent = data.parent
+            parent: ExternalBase | None = data.parent
             while parent is not None:
                 if parent is data:
                     raise ManifestLoadError(f"Source {data}: inheritance loop detected")
