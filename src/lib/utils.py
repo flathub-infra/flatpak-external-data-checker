@@ -80,11 +80,10 @@ def parse_date_header(date_str):
             "%a, %d-%b-%Y %H:%M:%S",
         ]:
             try:
-                dt_obj = dt.datetime.strptime(date_str_notz, date_fmt)
-                local_dt = dt.datetime.fromisoformat(str(dt_obj)).replace(
+                dt_obj = dt.datetime.strptime(date_str_notz, date_fmt).replace(
                     tzinfo=zoneinfo.ZoneInfo(tz)
                 )
-                utc_dt = local_dt.astimezone(zoneinfo.ZoneInfo("UTC"))
+                utc_dt = dt_obj.astimezone(zoneinfo.ZoneInfo("UTC"))
                 return utc_dt.replace(tzinfo=None)
             except ValueError:
                 continue
@@ -97,13 +96,13 @@ def parse_date_header(date_str):
         "%a, %d-%b-%Y %H:%M:%S %z",
     ]:
         try:
-            return dt.datetime.strptime(date_str, date_fmt)
+            return dt.datetime.strptime(date_str, date_fmt).astimezone(dt.timezone.utc)
         except ValueError:
             continue
         raise CheckerRemoteError(f"Cannot parse date/time: {date_str}")
 
     if not date_str:
-        return dt.datetime.now()  # what else can we do?
+        return dt.datetime.now(tz=dt.timezone.utc)  # what else can we do?
 
 
 def _check_newline(fp):

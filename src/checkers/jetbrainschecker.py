@@ -49,7 +49,9 @@ class JetBrainsChecker(Checker):
             checksum=MultiDigest(sha256=checksum),
             size=release["size"],
             version=data["version"],
-            timestamp=datetime.datetime.strptime(data["date"], "%Y-%m-%d"),
+            timestamp=datetime.datetime.strptime(data["date"], "%Y-%m-%d").replace(
+                tzinfo=datetime.timezone.utc
+            ),
         )
 
         external_data.set_new_version(new_version)

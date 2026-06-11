@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from yarl import URL
 
@@ -47,7 +47,9 @@ class RPMRepoChecker(Checker):
             checksum=MultiDigest.from_source(digests),
             size=int(child_prop("size", "archive")),
             version=child_prop("version", "ver"),
-            timestamp=datetime.utcfromtimestamp(int(child_prop("time", "file"))),
+            timestamp=datetime.fromtimestamp(
+                int(child_prop("time", "file")), tz=timezone.utc
+            ),
         )
 
     async def check(self, external_data: ExternalBase):
