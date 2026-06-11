@@ -45,7 +45,9 @@ def _semantic_version(version: str) -> semver.VersionInfo:
         raise CheckerQueryError("Can't parse version") from err
 
 
-_VERSION_SCHEMES = {
+_VersionCallable = t.Callable[[str], FallbackVersion | semver.VersionInfo]
+
+_VERSION_SCHEMES: t.Dict[str, _VersionCallable] = {
     "loose": FallbackVersion,
     "semantic": _semantic_version,
 }
