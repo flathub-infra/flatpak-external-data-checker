@@ -1,0 +1,133 @@
+[project]
+name = "flatpak_external_data_checker"
+version = "0.0.0"
+requires-python = "<4.0,>=3.10"
+# Sync with docker image
+dependencies = [
+    "aiohttp==3.8.4",
+    "editorconfig==0.12.3",
+    "jsonschema==4.10.3",
+    "lxml==4.9.2",
+    "packaging==23.0",
+    "pyelftools==0.29",
+    "PyGithub==1.55",
+    "PyGObject==3.42.2",
+    "python-magic==0.4.26",
+    "requests==2.28.1",
+    "ruamel.yaml==0.17.21",
+    "semver==2.10.2",
+    "toml==0.10.2",
+    "yarl==1.8.2",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.11.2,<2",
+    "PyGObject-stubs>=2.11.0,<3",
+    "ruff>=0.6.7,<1",
+    "types-jsonschema>=4.23.0.20240813,<5",
+    "types-lxml>=2024.9.16,<2027",
+    "types-toml<0.10,<1",
+    "pre-commit<5.0.0,>=3.8.0",
+]
+
+[ruff]
+line-length = 88
+include = ["*.py"]
+target-version = "py310"
+
+[ruff.format]
+line-ending = "lf"
+quote-style = "double"
+
+[tool.ruff.lint]
+select = [
+    "A",
+    "B",
+    "C4",
+    "DTZ",
+    "E",
+    "ERA",
+    "F",
+    "I",
+    "ICN",
+    "PIE",
+    "PL",
+    "Q",
+    "RSE",
+    "RUF",
+    "S",
+    "UP",
+    "W",
+]
+ignore = [
+    "B015",
+    "C400",
+    "C416",
+    "ERA001",
+    "PLR0911",
+    "PLR0912",
+    "PLR0913",
+    "PLR0915",
+    "PLR2004",
+    "RUF003",
+    "RUF005",
+    "RUF012",
+    "RUF015",
+    "RUF017",
+    "RUF028",
+    "RUF059",
+    "S101",
+    "S105",
+    "S324",
+    "S603",
+    "S607",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "B017",
+    "PLR1714",
+    "S101",
+    "S103",
+    "S318"
+]
+
+[tool.mypy]
+show_error_codes = true
+strict = true
+extra_checks = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unused_configs = true
+warn_unused_ignores = true
+cache_dir = "~/.cache/mypy"
+exclude = '^tests/'
+disable_error_code = [
+    "no-untyped-def",
+    "no-untyped-call",
+    "type-arg",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "apt",
+    "apt_inst",
+    "apt_pkg",
+    "editorconfig",
+    "elftools.*",
+    "semver",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["src.checkers.debianrepochecker"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["src.lib.externaldata"]
+disable_error_code = [
+    "valid-type",
+    "attr-defined",
+    "override",
+]
