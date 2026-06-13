@@ -1,5 +1,7 @@
 import asyncio
+import importlib
 import json
+import os
 import time
 import unittest
 import urllib.parse
@@ -10,6 +12,7 @@ from unittest import mock
 
 import aiohttp
 
+from src.lib import robots as robots_mod
 from src.lib.errors import CheckerFetchError
 from src.lib.robots import CACHE_TTL, RobotsCache
 
@@ -227,15 +230,15 @@ class TestRobotsCache(unittest.IsolatedAsyncioTestCase):
             fetch.assert_called_once()
         self.assertTrue(allowed)
 
-    async def test_load_from_disk_invalid_data(self):
-        bad_json = '{"timestamp": 123, "lines": "bad_list"}'
-        bad_dict = "[1, 2, 3]"
+    async def test_load_from_disk_lines_not_a_list(self):
+        path = self.cache._cache_path("example.com")
+        path.write_text(json.dumps({"timestamp": time.time(), "lines": "not-a-list"}))
+        self.assertIsNone(self.cache._load_from_disk("example.com"))
 
-        with mock.patch("src.lib.robots.Path.read_text", return_value=bad_json):
-            self.assertIsNone(self.cache._load_from_disk("example.com"))
-
-        with mock.patch("src.lib.robots.Path.read_text", return_value=bad_dict):
-            self.assertIsNone(self.cache._load_from_disk("example.com"))
+    async def test_load_from_disk_data_not_a_dict(self):
+        path = self.cache._cache_path("example.com")
+        path.write_text(json.dumps([1, 2, 3]))
+        self.assertIsNone(self.cache._load_from_disk("example.com"))
 
     async def test_disk_errors_handling(self):
         with (
@@ -268,6 +271,22 @@ class TestRobotsCache(unittest.IsolatedAsyncioTestCase):
             self.assertRaisesRegex(RuntimeError, "outside cache directory"),
         ):
             self.cache._cache_path("example.com")
+
+    async def test_xdg_cache_home_used(self):
+        with mock.patch.dict(os.environ, {"XDG_CACHE_HOME": "/tmp/xdg-test"}):
+            importlib.reload(robots_mod)
+            self.assertEqual(
+                robots_mod.CACHE_DIR,
+                Path("/tmp/xdg-test") / "fedc" / "robots",
+            )
+
+    async def test_fetch_200_parses_body(self):
+        body = "User-agent: *\nDisallow: /secret"
+        with mock.patch.object(self.session, "get", side_effect=_fake_get(200, body)):
+            allowed_root = await self.cache._is_allowed("https://example.com/")
+            allowed_secret = await self.cache._is_allowed("https://example.com/secret")
+        self.assertTrue(allowed_root)
+        self.assertFalse(allowed_secret)
 
 
 if __name__ == "__main__":
