@@ -116,7 +116,11 @@ jobs:
             pip-${{ runner.os }}-
 
       - name: Submit code coverage to Coveralls.io
-        if: github.event.pull_request.head.repo.fork == false
+        if: |
+          (github.event_name == 'push' &&
+           github.ref == 'refs/heads/master') ||
+          (github.event_name == 'pull_request' &&
+           github.event.pull_request.head.repo.fork == false)
         env:
           PIP_CACHE_DIR: "~/.pip"
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
