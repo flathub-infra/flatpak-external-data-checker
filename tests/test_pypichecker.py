@@ -4,6 +4,7 @@ from unittest import mock
 
 from packaging.version import Version
 
+from src.checkers.pypichecker import PyPIChecker
 from src.lib.checksums import MultiDigest
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
@@ -66,3 +67,57 @@ class TestPyPIChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNone(Version(data.new_version.version).pre)
             else:
                 self.fail(f"Unknown data {data.filename}")
+
+    async def test_skips_any_wheels(self):
+        mock_json_data = {
+            "info": {"version": "1.0.0"},
+            "urls": [
+                {
+                    "filename": "cryptography-1.0.0-cp311-cp311-manylinux_2_28_x86_64.whl",  # noqa: E501
+                    "packagetype": "bdist_wheel",
+                    "python_version": "py3",
+                    "upload_time_iso_8601": "2026-01-01T00:00:00Z",
+                    "url": "https://files.pythonhosted.org/packages/xx/cryptography-1.0.0-cp311-cp311-manylinux_2_28_x86_64.whl",
+                    "digests": {"sha256": "abc123"},
+                    "size": 1000,
+                },
+                {
+                    "filename": "cryptography-1.0.0-py3-none-any.whl",
+                    "packagetype": "bdist_wheel",
+                    "python_version": "py3",
+                    "upload_time_iso_8601": "2026-01-01T00:00:01Z",
+                    "url": "https://files.pythonhosted.org/packages/xx/cryptography-1.0.0-py3-none-any.whl",
+                    "digests": {"sha256": "def456"},
+                    "size": 2000,
+                },
+            ],
+            "releases": {},
+        }
+
+        dummy_ext_data = mock.MagicMock()
+        dummy_ext_data.checker_data = {
+            "name": "cryptography",
+            "packagetype": "bdist_wheel",
+        }
+
+        mock_response = mock.AsyncMock()
+        mock_response.__aenter__ = mock.AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = mock.AsyncMock(return_value=False)
+        mock_response.json.return_value = mock_json_data
+
+        mock_session = mock.MagicMock()
+        mock_session.get.return_value = mock_response
+
+        checker = PyPIChecker(mock_session)
+        await checker.check(dummy_ext_data)
+
+        dummy_ext_data.set_new_version.assert_called_once()
+        call_args = dummy_ext_data.set_new_version.call_args[0][0]
+        self.assertEqual(
+            call_args.url,
+            "https://files.pythonhosted.org/packages/xx/cryptography-1.0.0-py3-none-any.whl",
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
