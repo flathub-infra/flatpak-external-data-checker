@@ -4,6 +4,20 @@ from src.lib.version import LooseVersion
 
 
 class TestLooseVersion(unittest.TestCase):
+    def test_hash(self):
+        v1 = LooseVersion("1.5.1")
+        v2 = LooseVersion("1.5.1")
+        v3 = LooseVersion("1.5.2")
+
+        self.assertEqual(hash(v1), hash(v2))
+        self.assertEqual(hash(v1), hash("1.5.1"))
+        self.assertNotEqual(hash(v1), hash(v3))
+
+        version_set = {v1, v3}
+
+        self.assertIn(v2, version_set)
+        self.assertEqual(len(version_set), 2)
+
     def test_cmp(self):
         test_cases = [
             ("1.5.1", "1.5.2b2", -1),
