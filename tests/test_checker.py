@@ -35,7 +35,7 @@ from src import manifest
 from src.checkers import Checker
 from src.checkers.gitchecker import GitChecker
 from src.lib.checksums import MultiDigest
-from src.lib.errors import CheckerFetchError, CheckerQueryError
+from src.lib.errors import CheckerFetchError, CheckerQueryError, SourceUpdateError
 from src.lib.externaldata import ExternalData, ExternalGitRepo
 from src.lib.utils import init_logging
 
@@ -1205,6 +1205,26 @@ modules:
             new_release=False,
             require_important_update=True,
         )
+
+
+class TestRaisesPaths(unittest.TestCase):
+    def test_eq_raises_no_digest_type(self):
+        a = MultiDigest(sha256="abc123")
+        b = MultiDigest(md5="def456")
+        with self.assertRaisesRegex(ValueError, "No common digest type"):
+            _ = a == b
+
+    def test_ne_raises_no_digest_type(self):
+        a = MultiDigest(sha256="abc123")
+        b = MultiDigest(md5="def456")
+        with self.assertRaisesRegex(ValueError, "No common digest type"):
+            _ = a != b
+
+    def test_update_source_raises_no_digest_type(self):
+        digest = MultiDigest(sha256="abc123")
+        source = {"md5": "def456"}
+        with self.assertRaisesRegex(SourceUpdateError, "No matching digest type"):
+            digest.update_source(source)
 
 
 if __name__ == "__main__":
