@@ -2,6 +2,7 @@
 
 ```
 uv sync --all-extras --all-groups --frozen --allow-python-downloads
+
 uv run ruff format
 uv run ruff check . --fix
 uv run mypy .
@@ -9,38 +10,19 @@ uv run mypy .
 
 # Running tests
 
-There is a moderately-comprehensive test suite. Currently, it requires an
-internet connection and takes a few minutes to run.
+Currently the test suite requires, network connection and may take a
+while to run. All new tests should try to work in a non-networked
+setup where possible or only depend on external URLs from GitHub.
+
+The tests can be run in the Docker image:
 
 ```bash
-# Run all the tests (some of which need an internet connection):
-python3 -m unittest discover
-
-# Run one suite of tests
-python3 -m unittest tests.test_appdata
-
-# More information
-python3 -m unittest --help
-```
-
-# Dependencies
-
-See the `Dockerfile` for the Debian and PyPI dependencies. unappimage is
-optional, as is bubblewrap: we recommend one or the other.
-
-## Using a `podman` container
-
-The easiest way to get all the dependencies this tool needs is to build & run
-the container image specified in the `Dockerfile`. There's a wrapper script,
-whose only dependency is the `podman` command:
-
-```bash
-# Run all the tests (some of which need an internet connection):
+# Run all the tests
 ./run-in-container.sh python3 -m unittest discover
 
-# Run one suite of tests
-./run-in-container.sh python3 -m unittest tests.test_appdata
+# Run one of the tests test_htmlchecker
+./run-in-container.sh python3 -m unittest tests.test_htmlchecker
 
-# More information
-./run-in-container.sh python3 -m unittest --help
+# Run a particular test class
+./run-in-container.sh python3 -m unittest -vvv tests.test_anityachecker.TestParseTimestamp
 ```
