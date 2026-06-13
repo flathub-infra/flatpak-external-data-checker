@@ -2,8 +2,17 @@ import os
 import unittest
 from unittest import mock
 
+import aiohttp
+
+from src.checkers.anityachecker import AnityaChecker
 from src.lib.checksums import MultiDigest
-from src.lib.externaldata import ExternalFile, ExternalGitRef
+from src.lib.errors import CheckerQueryError
+from src.lib.externaldata import (
+    ExternalData,
+    ExternalFile,
+    ExternalGitRef,
+    ExternalGitRepo,
+)
 from src.lib.utils import init_logging
 from src.lib.version import LooseVersion
 from src.manifest import ManifestChecker
@@ -127,6 +136,141 @@ class TestAnityaChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertIsInstance(data.new_version.checksum, MultiDigest)
             else:
                 self.fail(f"Unknown data {data.filename}")
+
+
+class TestAnityaCheckerMocked(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        init_logging()
+
+        robots_patcher = mock.patch(
+            "src.lib.robots.RobotsCache.ensure_allowed", new_callable=mock.AsyncMock
+        )
+        robots_patcher.start()
+        self.addCleanup(robots_patcher.stop)
+
+        self.checker = AnityaChecker.__new__(AnityaChecker)
+        self.checker.robots_cache = None
+
+    def _make_external_data(self, checker_data):
+        ed = mock.MagicMock(spec=ExternalData)
+        ed.checker_data = checker_data
+        ed.checker_data["type"] = "anitya"
+        return ed
+
+    def _make_external_git_repo(self, checker_data):
+        eg = mock.MagicMock(spec=ExternalGitRepo)
+        eg.checker_data = checker_data
+        eg.checker_data["type"] = "anitya"
+        eg.current_version = mock.MagicMock()
+        eg.current_version.url = "https://github.com/example/repo.git"
+        return eg
+
+    def _mock_session_response(self, payload):
+        resp = mock.AsyncMock()
+        resp.json = mock.AsyncMock(return_value=payload)
+        resp.__aenter__ = mock.AsyncMock(return_value=resp)
+        resp.__aexit__ = mock.AsyncMock(return_value=False)
+        session = mock.MagicMock()
+        session.get = mock.MagicMock(return_value=resp)
+        self.checker.session = session
+
+    async def test_network_error_on_raises(self):
+        resp = mock.AsyncMock()
+        resp.json = mock.AsyncMock(side_effect=aiohttp.ClientError("boom"))
+        resp.__aenter__ = mock.AsyncMock(return_value=resp)
+        resp.__aexit__ = mock.AsyncMock(return_value=False)
+        session = mock.MagicMock()
+        session.get = mock.MagicMock(return_value=resp)
+        self.checker.session = session
+
+        ed = self._make_external_data(
+            {"project-id": 1, "url-template": "https://example.com/{version}.tar.gz"}
+        )
+
+        with self.assertRaises(CheckerQueryError):
+            await self.checker.check(ed)
+
+    async def test_no_constraints_uses_latest(self):
+        payload = {
+            "latest_version": "3.0.0",
+            "stable_versions": ["2.0.0"],
+            "versions": ["3.0.0-alpha", "2.0.0"],
+        }
+        self._mock_session_response(payload)
+
+        ed = self._make_external_data(
+            {
+                "project-id": 42,
+                "stable-only": False,
+                "url-template": "https://example.com/{version}.tar.gz",
+            }
+        )
+
+        self.checker._check_data = mock.AsyncMock()
+        await self.checker.check(ed)
+
+        self.checker._check_data.assert_awaited_once_with(ed, "3.0.0")
+
+    async def test_stable_only_selects_first_stable(self):
+        payload = {
+            "latest_version": "3.0.0-alpha",
+            "stable_versions": ["2.0.0", "1.9.0"],
+            "versions": ["3.0.0-alpha", "2.0.0", "1.9.0"],
+        }
+        self._mock_session_response(payload)
+
+        ed = self._make_external_data(
+            {
+                "project-id": 42,
+                "url-template": "https://example.com/{version}.tar.gz",
+            }
+        )
+
+        self.checker._check_data = mock.AsyncMock()
+        await self.checker.check(ed)
+
+        self.checker._check_data.assert_awaited_once_with(ed, "2.0.0")
+
+    async def test_filter_no_match_raises(self):
+
+        payload = {
+            "latest_version": "3.0.0",
+            "stable_versions": ["3.0.0", "2.0.0"],
+            "versions": ["3.0.0", "2.0.0"],
+        }
+        self._mock_session_response(payload)
+
+        ed = self._make_external_data(
+            {
+                "project-id": 42,
+                "stable-only": False,
+                "versions": {"<": "1.0.0"},
+                "url-template": "https://example.com/{version}.tar.gz",
+            }
+        )
+
+        with self.assertRaises(CheckerQueryError):
+            await self.checker.check(ed)
+
+    async def test_external_git_repo_dispatches_to_check_git(self):
+        payload = {
+            "latest_version": "2023.1",
+            "stable_versions": ["2023.1"],
+            "versions": ["2023.1"],
+        }
+        self._mock_session_response(payload)
+
+        eg = self._make_external_git_repo(
+            {
+                "project-id": 99,
+                "tag-template": "v{version}",
+            }
+        )
+
+        self.checker._check_git = mock.AsyncMock()
+        await self.checker.check(eg)
+
+        self.checker._check_git.assert_awaited_once_with(eg, "2023.1")
 
 
 if __name__ == "__main__":
