@@ -1,7 +1,7 @@
 # Flatpak External Data Checker
 
 ![Tests](https://github.com/flathub-infra/flatpak-external-data-checker/workflows/Tests/badge.svg)
-[![Coverage Status](https://coveralls.io/repos/github/flathub/flatpak-external-data-checker/badge.svg)](https://coveralls.io/github/flathub/flatpak-external-data-checker)
+[![Coverage Status](https://coveralls.io/repos/github/flathub/flatpak-external-data-checker/badge.svg)](https://coveralls.io/github/flathub/flatpak-external-data-checker?branch=master)
 
 This is a tool for checking for outdated or broken links of external
 data in Flatpak manifests.
