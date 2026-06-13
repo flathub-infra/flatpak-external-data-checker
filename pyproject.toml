@@ -7,7 +7,7 @@ dependencies = [
     "aiohttp==3.8.4",
     "editorconfig==0.12.3",
     "jsonschema==4.10.3",
-    "lxml==4.9.2",
+    "lxml==6.1.0",
     "packaging==23.0",
     "pyelftools==0.29",
     "PyGithub==1.55",
