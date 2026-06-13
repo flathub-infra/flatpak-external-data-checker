@@ -1,12 +1,29 @@
 name: Tests
 
 on:
-  pull_request:
   push:
     branches:
       - master
-    tags:
-      - "**"
+    paths-ignore:
+      - '.github/dependabot.yml'
+      - '.gitattributes'
+      - '.gitignore'
+      - '.pre-commit-config.yaml'
+      - 'CONTRIBUTING.md'
+      - 'LICENSE'
+      - 'README.md'
+  pull_request:
+    branches:
+      - master
+    paths-ignore:
+      - '.github/dependabot.yml'
+      - '.gitattributes'
+      - '.gitignore'
+      - '.pre-commit-config.yaml'
+      - 'CONTRIBUTING.md'
+      - 'LICENSE'
+      - 'README.md'
+  workflow_dispatch:
 
 env:
   DOCKER_REGISTRY: ghcr.io
