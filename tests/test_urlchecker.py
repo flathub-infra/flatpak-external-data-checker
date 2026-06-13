@@ -1,10 +1,19 @@
 import os
 import unittest
 from unittest import mock
+from unittest.mock import MagicMock
 
+from src.checkers.urlchecker import is_same_version
 from src.lib.checksums import MultiDigest
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
+
+
+def _make_version(url, version=None):
+    v = MagicMock()
+    v.url = url
+    v.version = version
+    return v
 
 
 class TestURLChecker(unittest.IsolatedAsyncioTestCase):
@@ -67,6 +76,44 @@ class TestURLChecker(unittest.IsolatedAsyncioTestCase):
             if data.filename == filename:
                 return data
         return None
+
+
+CHECKER_DATA_WITH_PATTERN = {"pattern": r"https://example\.com/prog_([\d.]+)\.tar\.gz"}
+CHECKER_DATA_NO_PATTERN = {}
+CURRENT_URL = "https://example.com/prog_1.2.3.tar.gz"
+
+
+class TestIsSameVersion(unittest.TestCase):
+    def test_none_new_version_returns_false(self):
+        self.assertFalse(is_same_version(CHECKER_DATA_NO_PATTERN, CURRENT_URL, None))
+
+    def test_no_version_same_url_returns_true(self):
+        nv = _make_version(url=CURRENT_URL, version=None)
+        self.assertTrue(is_same_version(CHECKER_DATA_NO_PATTERN, CURRENT_URL, nv))
+
+    def test_no_version_different_url_returns_false(self):
+        nv = _make_version(url="https://example.com/prog_1.2.4.tar.gz", version=None)
+        self.assertFalse(is_same_version(CHECKER_DATA_NO_PATTERN, CURRENT_URL, nv))
+
+    def test_pattern_no_match_on_current_url_same_url(self):
+        bad_url = "https://other.example.com/something"
+        nv = _make_version(url=bad_url, version="1.2.3")
+        self.assertTrue(is_same_version(CHECKER_DATA_WITH_PATTERN, bad_url, nv))
+
+    def test_pattern_no_match_on_current_url_different_url(self):
+        bad_url = "https://other.example.com/something"
+        nv = _make_version(
+            url="https://other.example.com/something-else", version="1.2.4"
+        )
+        self.assertFalse(is_same_version(CHECKER_DATA_WITH_PATTERN, bad_url, nv))
+
+    def test_pattern_match_same_version(self):
+        nv = _make_version(url="https://example.com/prog_1.2.3.tar.gz", version="1.2.3")
+        self.assertTrue(is_same_version(CHECKER_DATA_WITH_PATTERN, CURRENT_URL, nv))
+
+    def test_pattern_match_different_version(self):
+        nv = _make_version(url="https://example.com/prog_1.2.4.tar.gz", version="1.2.4")
+        self.assertFalse(is_same_version(CHECKER_DATA_WITH_PATTERN, CURRENT_URL, nv))
 
 
 if __name__ == "__main__":
