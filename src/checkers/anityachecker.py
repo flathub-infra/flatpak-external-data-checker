@@ -1,4 +1,6 @@
 import logging
+import re
+from datetime import datetime, timezone
 
 from yarl import URL
 
@@ -14,6 +16,20 @@ from ..lib.utils import expand_version_constraints, filter_versions
 from . import Checker
 
 log = logging.getLogger(__name__)
+
+
+def _parse_timestamp(date_string: str | None) -> datetime | None:
+    # https://release-monitoring.org/api/v2/versions/?project_id=1
+    # latest_version_created_on: "2022-08-20T04:31:41.440163"
+    if date_string is None:
+        return None
+    try:
+        dt = datetime.fromisoformat(re.sub(r"Z$", "+00:00", date_string))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except ValueError as err:
+        raise CheckerQueryError("Failed to parse timestamp") from err
 
 
 class AnityaChecker(Checker):
@@ -79,22 +95,40 @@ class AnityaChecker(Checker):
         else:
             latest_version = result["latest_version"]
 
-        if isinstance(external_data, ExternalGitRepo):
-            return await self._check_git(external_data, latest_version)
-        assert isinstance(external_data, ExternalData)
-        return await self._check_data(external_data, latest_version)
+        latest_timestamp = _parse_timestamp(result.get("latest_version_created_on"))
 
-    async def _check_data(self, external_data: ExternalData, latest_version):
+        if isinstance(external_data, ExternalGitRepo):
+            return await self._check_git(
+                external_data, latest_version, latest_timestamp
+            )
+        assert isinstance(external_data, ExternalData)
+        return await self._check_data(external_data, latest_version, latest_timestamp)
+
+    async def _check_data(
+        self,
+        external_data: ExternalData,
+        latest_version: str,
+        latest_timestamp: datetime | None,
+    ):
         url_template = external_data.checker_data["url-template"]
         latest_url = self._substitute_template(
             url_template, self._version_parts(latest_version)
         )
 
         await self._update_version(
-            external_data, latest_version, latest_url, follow_redirects=False
+            external_data,
+            latest_version,
+            latest_url,
+            follow_redirects=False,
+            timestamp=latest_timestamp,
         )
 
-    async def _check_git(self, external_data: ExternalGitRepo, latest_version):
+    async def _check_git(
+        self,
+        external_data: ExternalGitRepo,
+        latest_version: str,
+        latest_timestamp: datetime | None,
+    ):
         tag_template = external_data.checker_data["tag-template"]
         latest_tag = self._substitute_template(
             tag_template, self._version_parts(latest_version)
@@ -106,7 +140,7 @@ class AnityaChecker(Checker):
             tag=latest_tag,
             branch=None,
             version=latest_version,
-            timestamp=None,
+            timestamp=latest_timestamp,
         ).fetch_remote()
 
         external_data.set_new_version(new_version)
