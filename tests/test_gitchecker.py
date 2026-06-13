@@ -6,6 +6,7 @@ from unittest import mock
 import aiohttp
 
 from src.checkers.gitchecker import GitChecker, TagWithSemver, TagWithVersion
+from src.lib.errors import CheckerQueryError
 from src.lib.externaldata import ExternalGitRef, ExternalGitRepo
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
@@ -169,62 +170,128 @@ class TestGitChecker(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(external_data.new_version.version, "3.0.0")
         self.assertEqual(external_data.new_version.commit, "commit5")
 
-        async def test_exclude_versions(self):
-            cases = [
-                {
-                    "name": "single_exclude",
-                    "mock_refs": {
-                        "refs/tags/v1.0.0": "commit1",
-                        "refs/tags/v2.0.0": "commit2",
-                        "refs/tags/v3.0.0": "commit3",
-                    },
-                    "versions": {"!=": "3.0.0"},
-                    "expected": ("v2.0.0", "2.0.0", "commit2"),
-                },
-                {
-                    "name": "multi_exclude",
-                    "mock_refs": {
-                        "refs/tags/v1.0.0": "commit1",
-                        "refs/tags/v2.0.0": "commit2",
-                        "refs/tags/v2.1.0": "commit3",
-                        "refs/tags/v3.0.0": "commit4",
-                    },
-                    "versions": {"!=": ["2.0.0", "2.1.0"]},
-                    "expected": ("v3.0.0", "3.0.0", "commit4"),
-                },
-            ]
+    async def test_default_tag_pattern(self):
+        mock_refs = {
+            "refs/tags/v1.0": "commit1",
+            "refs/tags/V2.3.4": "commit2",
+            "refs/tags/notaversion": "commit3",
+            "refs/tags/v3.0.0": "commit4",
+        }
 
-            for case in cases:
-                with self.subTest(case=case["name"]):
-                    external_data = ExternalGitRepo.from_source_impl(
-                        source_path="test.git",
-                        source={
+        external_data = ExternalGitRepo.from_source_impl(
+            source_path="test.git",
+            source={
+                "type": "git",
+                "url": "https://example.com/test.git",
+                "tag": "v1.0",
+                "commit": "commit1",
+                "x-checker-data": {"type": "git"},
+            },
+        )
+
+        with mock.patch(
+            "src.checkers.gitchecker.git_ls_remote",
+            new_callable=mock.AsyncMock,
+            return_value=mock_refs,
+        ):
+            async with aiohttp.ClientSession() as session:
+                checker = GitChecker(session)
+                await checker.check(external_data)
+
+        self.assertIsNotNone(external_data.new_version)
+        self.assertEqual(external_data.new_version.tag, "v3.0.0")
+        self.assertEqual(external_data.new_version.version, "3.0.0")
+        self.assertEqual(external_data.new_version.commit, "commit4")
+
+    async def test_no_matching_tags_raises(self):
+        mock_refs = {
+            "refs/tags/notaversion": "commit1",
+            "refs/tags/also-not": "commit2",
+        }
+
+        external_data = ExternalGitRepo.from_source_impl(
+            source_path="test.git",
+            source={
+                "type": "git",
+                "url": "https://example.com/test.git",
+                "tag": "v1.0.0",
+                "commit": "commit1",
+                "x-checker-data": {
+                    "type": "git",
+                    "tag-pattern": r"^v([\d.]+)$",
+                },
+            },
+        )
+
+        with mock.patch(
+            "src.checkers.gitchecker.git_ls_remote",
+            new_callable=mock.AsyncMock,
+            return_value=mock_refs,
+        ):
+            async with aiohttp.ClientSession() as session:
+                checker = GitChecker(session)
+                with self.assertRaises(CheckerQueryError) as ctx:
+                    await checker.check(external_data)
+
+        self.assertIn("https://example.com/test.git", str(ctx.exception))
+        self.assertIn(r"^v([\d.]+)$", str(ctx.exception))
+
+    async def test_exclude_versions(self):
+        cases = [
+            {
+                "name": "single_exclude",
+                "mock_refs": {
+                    "refs/tags/v1.0.0": "commit1",
+                    "refs/tags/v2.0.0": "commit2",
+                    "refs/tags/v3.0.0": "commit3",
+                },
+                "versions": {"!=": "3.0.0"},
+                "expected": ("v2.0.0", "2.0.0", "commit2"),
+            },
+            {
+                "name": "multi_exclude",
+                "mock_refs": {
+                    "refs/tags/v1.0.0": "commit1",
+                    "refs/tags/v2.0.0": "commit2",
+                    "refs/tags/v2.1.0": "commit3",
+                    "refs/tags/v3.0.0": "commit4",
+                },
+                "versions": {"!=": ["2.0.0", "2.1.0"]},
+                "expected": ("v3.0.0", "3.0.0", "commit4"),
+            },
+        ]
+
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                external_data = ExternalGitRepo.from_source_impl(
+                    source_path="test.git",
+                    source={
+                        "type": "git",
+                        "url": "https://example.com/test.git",
+                        "tag": "v1.0.0",
+                        "commit": "commit1",
+                        "x-checker-data": {
                             "type": "git",
-                            "url": "https://example.com/test.git",
-                            "tag": "v1.0.0",
-                            "commit": "commit1",
-                            "x-checker-data": {
-                                "type": "git",
-                                "tag-pattern": r"^v([\d.]+)$",
-                                "versions": case["versions"],
-                            },
+                            "tag-pattern": r"^v([\d.]+)$",
+                            "versions": case["versions"],
                         },
-                    )
+                    },
+                )
 
-                    with mock.patch(
-                        "src.checkers.gitchecker.git_ls_remote",
-                        new_callable=mock.AsyncMock,
-                        return_value=case["mock_refs"],
-                    ):
-                        async with aiohttp.ClientSession() as session:
-                            checker = GitChecker(session)
-                            await checker.check(external_data)
+                with mock.patch(
+                    "src.checkers.gitchecker.git_ls_remote",
+                    new_callable=mock.AsyncMock,
+                    return_value=case["mock_refs"],
+                ):
+                    async with aiohttp.ClientSession() as session:
+                        checker = GitChecker(session)
+                        await checker.check(external_data)
 
-                    self.assertIsNotNone(external_data.new_version)
-                    tag, version, commit = case["expected"]
-                    self.assertEqual(external_data.new_version.tag, tag)
-                    self.assertEqual(external_data.new_version.version, version)
-                    self.assertEqual(external_data.new_version.commit, commit)
+                self.assertIsNotNone(external_data.new_version)
+                tag, version, commit = case["expected"]
+                self.assertEqual(external_data.new_version.tag, tag)
+                self.assertEqual(external_data.new_version.version, version)
+                self.assertEqual(external_data.new_version.commit, commit)
 
 
 if __name__ == "__main__":
