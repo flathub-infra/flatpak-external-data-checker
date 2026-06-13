@@ -26,10 +26,12 @@ import unittest
 from unittest import mock
 
 import aiohttp
+import semver
 
-from src.checkers.htmlchecker import HTMLChecker
+from src.checkers.htmlchecker import HTMLChecker, _semantic_version
 from src.lib.checksums import MultiDigest
-from src.lib.errors import CheckerError
+from src.lib.errors import CheckerError, CheckerFetchError, CheckerQueryError
+from src.lib.externaldata import ExternalData
 from src.lib.utils import init_logging
 from src.lib.version import LooseVersion
 from src.manifest import ManifestChecker
@@ -58,6 +60,45 @@ class TestHTMLTools(unittest.IsolatedAsyncioTestCase):
     def _encoded_url(self, data: bytes):
         return "https://httpbingo.org/base64/decode/" + base64.b64encode(data).decode()
 
+    def test_semantic_version_parses(self):
+        self.assertEqual(_semantic_version("1.2.3"), semver.VersionInfo(1, 2, 3))
+
+    def test_semantic_version_invalid_raises(self):
+        with self.assertRaises(CheckerQueryError):
+            _semantic_version("not-a-version")
+
+    async def test_get_text_raises_on_network_error(self):
+        checker = HTMLChecker(self.session)
+        with mock.patch.object(
+            self.session,
+            "get",
+            side_effect=aiohttp.ClientConnectionError("connection refused"),
+        ):
+            with self.assertRaises(CheckerQueryError):
+                await checker._get_text("https://example.com/page.html")
+
+    async def test_get_encoding_explicit_charset(self):
+        checker = HTMLChecker(self.session)
+        resp = mock.MagicMock(spec=aiohttp.ClientResponse)
+        resp.headers = {aiohttp.hdrs.CONTENT_TYPE: "text/html; charset=iso-8859-1"}
+        resp.url = "https://example.com/test"
+        self.assertEqual(await checker._get_encoding(resp), "iso-8859-1")
+
+    async def test_get_encoding_no_charset_falls_back_to_utf8(self):
+        checker = HTMLChecker(self.session)
+        resp = mock.MagicMock(spec=aiohttp.ClientResponse)
+        resp.headers = {aiohttp.hdrs.CONTENT_TYPE: "text/html"}
+        resp.url = "https://example.com/test"
+        self.assertEqual(await checker._get_encoding(resp), "utf-8")
+
+    async def test_get_encoding_unknown_charset_raises(self):
+        checker = HTMLChecker(self.session)
+        resp = mock.MagicMock(spec=aiohttp.ClientResponse)
+        resp.headers = {aiohttp.hdrs.CONTENT_TYPE: "text/html; charset=not-a-charset"}
+        resp.url = "https://example.com/test"
+        with self.assertRaises(CheckerFetchError):
+            await checker._get_encoding(resp)
+
     async def test_get_text(self):
         checker = HTMLChecker(self.session)
 
@@ -69,6 +110,16 @@ class TestHTMLTools(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(CheckerError):
             await checker._get_text("https://httpbingo.org/image/jpeg")
+
+    async def test_get_text_unicode_decode_error_raises(self):
+        checker = HTMLChecker(self.session)
+        with self.assertRaises(CheckerError):
+            await checker._get_text("https://httpbingo.org/image/jpeg")
+
+    async def test_get_text_returns_decoded_body(self):
+        checker = HTMLChecker(self.session)
+        result = await checker._get_text(self._encoded_url(b"hello world"))
+        self.assertEqual(result, "hello world")
 
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.x.xeyes.yml")
@@ -102,6 +153,9 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         self._test_parent_child(
             self._find_by_filename(ext_data, "parent.txt"),
             self._find_by_filename(ext_data, "child.txt"),
+        )
+        self._test_get_latest_match(
+            self._find_by_filename(ext_data, "libXScrnSaver-1.2.2.tar.bz2")
         )
 
     def _test_check_with_url_template(self, data):
@@ -178,6 +232,17 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(data)
         self.assertIsNone(data.new_version)
 
+    def _test_get_latest_match(self, data):
+        self.assertIsNotNone(data)
+        self.assertIsNotNone(data.new_version)
+        self.assertGreaterEqual(
+            LooseVersion(data.new_version.version), LooseVersion("1.2.2")
+        )
+        self.assertRegex(
+            data.new_version.url,
+            r"^https?://.*libXScrnSaver-[\d\.-]+\.tar\.bz2$",
+        )
+
     def _test_parent_child(self, parent, child):
         self.assertIs(child.parent, parent)
         self.assertIsNotNone(parent.new_version)
@@ -190,6 +255,36 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
             ),
         )
         self.assertEqual(parent.new_version.checksum, child.new_version.checksum)
+
+    async def test_check_index_error_in_get_latest_raises(self):
+        class _UnsubscriptableList(list):
+            def __getitem__(self, idx):
+                raise IndexError("forced")
+
+        external_data = mock.MagicMock(spec=ExternalData)
+        external_data.parent = None
+        external_data.checker_data = {
+            "url": "https://example.com/page.html",
+            "pattern": r"(pkg-([\d.]+)\.tar\.gz)",
+        }
+
+        mock_session = mock.MagicMock(spec=aiohttp.ClientSession)
+        checker = HTMLChecker(mock_session)
+
+        with (
+            mock.patch.object(checker, "should_check", return_value=True),
+            mock.patch.object(
+                checker,
+                "_get_text",
+                new=mock.AsyncMock(return_value="pkg-1.0.0.tar.gz"),
+            ),
+            mock.patch(
+                "src.checkers.htmlchecker.filter_versioned_items",
+                return_value=_UnsubscriptableList([mock.MagicMock()]),
+            ),
+        ):
+            with self.assertRaises(CheckerQueryError):
+                await checker.check(external_data)
 
     def _find_by_filename(self, ext_data, filename):
         for data in ext_data:
