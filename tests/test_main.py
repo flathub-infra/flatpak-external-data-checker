@@ -3,9 +3,11 @@ import shutil
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from src import main
+from src.lib.externaldata import ExternalData
 
 TEST_MANIFEST = os.path.join(
     os.path.dirname(__file__), "net.invisible_island.xterm.yml"
@@ -279,3 +281,513 @@ class TestRobotsTxtArg(unittest.TestCase):
         with self.subTest("flag sets True"):
             args = main.parse_cli_args(["--enable-robots-txt", TEST_MANIFEST])
             self.assertTrue(args.enable_robots_txt)
+
+
+class TestPrintOutdatedBrokenState(unittest.TestCase):
+    def _make_broken_data(self):
+        data = MagicMock()
+        data.state = MagicMock()
+        data.state.name = "BROKEN"
+        data.State.BROKEN.__contains__ = MagicMock(return_value=True)
+        data.new_version = None
+        data.filename = "somelib.tar.gz"
+        data.current_version._asdict.return_value = {
+            "url": "https://example.com/somelib.tar.gz"
+        }
+        return data
+
+    def test_broken_state_no_new_version(self):
+        checker = MagicMock()
+        broken = self._make_broken_data()
+        broken.State.BROKEN.__ror__ = MagicMock(return_value=True)
+        checker.get_outdated_external_data.return_value = [broken]
+
+        with patch("builtins.print"):
+            result = main.print_outdated_external_data(checker)
+        self.assertEqual(result, 1)
+
+    def test_broken_state_message_args(self):
+        checker = MagicMock()
+
+        broken = MagicMock()
+        broken.new_version = None
+        broken.filename = "somelib.tar.gz"
+        broken.state = ExternalData.State.BROKEN
+        broken.State = ExternalData.State
+        broken.current_version._asdict.return_value = {
+            "url": "https://example.com/somelib.tar.gz"
+        }
+
+        checker.get_outdated_external_data.return_value = [broken]
+
+        with patch("builtins.print"):
+            result = main.print_outdated_external_data(checker)
+
+        self.assertEqual(result, 1)
+        broken.current_version._asdict.assert_called_once()
+
+
+class TestGetManifestGitCheckout(unittest.TestCase):
+    def test_no_git_checkout_raises(self):
+        with tempfile.TemporaryDirectory() as d:
+            fake_manifest = os.path.join(d, "manifest.yml")
+            with self.assertRaises(FileNotFoundError):
+                main.get_manifest_git_checkout(fake_manifest)
+
+
+class TestEnsureGitSafeDirectory(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.TemporaryDirectory()
+
+    def tearDown(self):
+        self.test_dir.cleanup()
+
+    def test_same_uid_returns_early(self):
+        checkout = Path(self.test_dir.name)
+        uid = os.getuid()
+        with patch("os.stat") as mock_stat:
+            mock_stat.return_value.st_uid = uid
+            main.ensure_git_safe_directory(checkout)
+
+    def test_different_uid_no_safe_dir_adds(self):
+        checkout = Path(self.test_dir.name)
+        with (
+            patch("os.getuid", return_value=1000),
+            patch("os.stat") as mock_stat,
+            patch("subprocess.run") as mock_run,
+            patch("src.main.check_call") as mock_check_call,
+        ):
+            mock_stat.return_value.st_uid = 9999
+            err = subprocess.CalledProcessError(1, "git")
+            mock_run.side_effect = err
+            main.ensure_git_safe_directory(checkout)
+            mock_check_call.assert_called_once()
+            args = mock_check_call.call_args[0][0]
+            self.assertIn("safe.directory", args)
+
+    def test_different_uid__reraises(self):
+        checkout = Path(self.test_dir.name)
+        with (
+            patch("os.getuid", return_value=1000),
+            patch("os.stat") as mock_stat,
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_stat.return_value.st_uid = 9999
+            err = subprocess.CalledProcessError(2, "git")
+            mock_run.side_effect = err
+            with self.assertRaises(subprocess.CalledProcessError):
+                main.ensure_git_safe_directory(checkout)
+
+    def test_different_uid_already_safe(self):
+        checkout = Path(self.test_dir.name)
+        with (
+            patch("os.getuid", return_value=1000),
+            patch("os.stat") as mock_stat,
+            patch("subprocess.run") as mock_run,
+            patch("src.main.check_call") as mock_check_call,
+        ):
+            mock_stat.return_value.st_uid = 9999
+            result = MagicMock()
+            result.stdout = str(checkout) + "\n"
+            mock_run.return_value = result
+            main.ensure_git_safe_directory(checkout)
+            mock_check_call.assert_not_called()
+
+
+class TestCommitMessage(unittest.TestCase):
+    def test_single_change(self):
+        self.assertEqual(
+            main.commit_message(["foo: Update foo-1.0"]), "foo: Update foo-1.0"
+        )
+
+    def test_single_module_multiple_changes(self):
+        result = main.commit_message(["foo: change 1", "foo: change 2"])
+        self.assertEqual(result, "Update foo module")
+
+    def test_two_modules(self):
+        result = main.commit_message(["foo: change", "bar: change"])
+        self.assertIn("foo", result)
+        self.assertIn("bar", result)
+
+    def test_subject_truncation(self):
+        changes = [f"module{i}: change" for i in range(10)]
+        result = main.commit_message(changes)
+        self.assertLessEqual(len(result), 70)
+
+    def test_suffix(self):
+        changes = [f"module{i}: change" for i in range(10)]
+        result = main.commit_message(changes)
+        self.assertIn("module", result)
+
+    def test_three_modules(self):
+        changes = ["aaa: c", "bbb: c", "ccc: c", "ddd: c"]
+        result = main.commit_message(changes)
+        self.assertIsInstance(result, str)
+        self.assertGreater(len(result), 0)
+
+    def test_commit_message_long(self):
+        long_name = "a" * 35
+        changes = [f"{long_name}{i}: change" for i in range(10)]
+        result = main.commit_message(changes)
+        self.assertEqual(result, "Update 10 modules")
+
+
+class TestOpenPR(unittest.TestCase):
+    def _make_change(self):
+        return main.CommittedChanges(
+            subject="Update foo",
+            body="foo: update details",
+            commit="abc1234",
+            branch="update-abc1234",
+            base_branch="main",
+        )
+
+    def _setup_mocks(
+        self, mock_github, open_prs=None, closed_prs=None, push_permission=True
+    ):
+        g = MagicMock()
+        mock_github.return_value = g
+        user = MagicMock()
+        g.get_user.return_value = user
+
+        origin_repo = MagicMock()
+        origin_repo.permissions.push = push_permission
+        origin_repo.default_branch = "main"
+        origin_repo.full_name = "owner/repo"
+        origin_repo.html_url = "https://github.com/owner/repo"
+        g.get_repo.return_value = origin_repo
+
+        all_prs = (closed_prs or []) + (open_prs or [])
+        origin_repo.get_pulls.return_value = all_prs
+
+        return g, user, origin_repo
+
+    def test_missing_github_token_exits(self):
+        change = main.CommittedChanges(
+            subject="Update foo",
+            body=None,
+            commit="abc1234",
+            branch="update-abc1234",
+            base_branch="main",
+        )
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("GITHUB_TOKEN", None)
+            with self.assertRaises(SystemExit):
+                main.open_pr(change)
+
+    @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
+    @patch("src.main.Github")
+    def test_closed_pr_returns_early(self, mock_github, mock_check_output):
+        closed_pr = MagicMock()
+        closed_pr.state = "closed"
+        closed_pr.is_merged.return_value = False
+        closed_pr.html_url = "https://github.com/owner/repo/pull/1"
+
+        self._setup_mocks(mock_github, closed_prs=[closed_pr])
+
+        with patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}):
+            main.open_pr(self._make_change())
+
+    @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
+    @patch("src.main.check_call")
+    @patch("src.main.Github")
+    def test_no_existing_prs_creates_pr(
+        self, mock_github, mock_check_call, mock_check_output
+    ):
+        _, _, origin_repo = self._setup_mocks(mock_github, open_prs=[], closed_prs=[])
+        pr = MagicMock()
+        pr.html_url = "https://github.com/owner/repo/pull/2"
+        origin_repo.create_pull.return_value = pr
+
+        with patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}):
+            main.open_pr(self._make_change(), pr_labels=["label1"])
+
+        origin_repo.create_pull.assert_called_once()
+        pr.set_labels.assert_called_once_with("label1")
+
+    @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
+    @patch("src.main.check_call")
+    @patch("src.main.Github")
+    def test_open_pr_automerge_config(
+        self, mock_github, mock_check_call, mock_check_output
+    ):
+        open_pr = MagicMock()
+        open_pr.state = "open"
+        open_pr.html_url = "https://github.com/owner/repo/pull/3"
+        open_pr.mergeable = True
+        pr_commit = MagicMock()
+        pr_commit.get_combined_status.return_value.state = "success"
+        open_pr.head.repo.get_commit.return_value = pr_commit
+
+        _, _, origin_repo = self._setup_mocks(mock_github, open_prs=[open_pr])
+
+        with (
+            patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}),
+            patch(
+                "builtins.open",
+                unittest.mock.mock_open(read_data='{"automerge-flathubbot-prs": true}'),
+            ),
+        ):
+            main.open_pr(self._make_change())
+
+        open_pr.merge.assert_called_once_with(merge_method="rebase")
+        open_pr.create_issue_comment.assert_called_once_with(
+            main.AUTOMERGE_DUE_TO_CONFIG
+        )
+
+    @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
+    @patch("src.main.check_call")
+    @patch("src.main.Github")
+    def test_open_pr_force_automerge_broken_urls(
+        self, mock_github, mock_check_call, mock_check_output
+    ):
+        open_pr_mock = MagicMock()
+        open_pr_mock.state = "open"
+        open_pr_mock.html_url = "https://github.com/owner/repo/pull/4"
+        open_pr_mock.mergeable = True
+        pr_commit = MagicMock()
+        pr_commit.get_combined_status.return_value.state = "success"
+        open_pr_mock.head.repo.get_commit.return_value = pr_commit
+
+        _, _, origin_repo = self._setup_mocks(mock_github, open_prs=[open_pr_mock])
+
+        broken_data = MagicMock()
+        broken_data.Type = ExternalData.Type
+        broken_data.State = ExternalData.State
+        broken_data.type = ExternalData.Type.EXTRA_DATA
+        broken_data.state = [ExternalData.State.BROKEN]
+        broken_data.new_version = MagicMock()
+
+        checker = MagicMock()
+        checker.get_outdated_external_data.return_value = [broken_data]
+
+        with (
+            patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}),
+            patch("builtins.open", side_effect=FileNotFoundError),
+        ):
+            main.open_pr(self._make_change(), manifest_checker=checker)
+
+            open_pr_mock.create_issue_comment.assert_called_once_with(
+                main.AUTOMERGE_DUE_TO_BROKEN_URLS
+            )
+            open_pr_mock.merge.assert_called_once_with(merge_method="rebase")
+
+    @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
+    @patch("src.main.check_call")
+    @patch("src.main.Github")
+    def test_always_fork(self, mock_github, mock_check_call, mock_check_output):
+        _, user, origin_repo = self._setup_mocks(
+            mock_github, open_prs=[], closed_prs=[]
+        )
+        pr = MagicMock()
+        pr.html_url = "https://github.com/owner/repo/pull/5"
+        origin_repo.create_pull.return_value = pr
+
+        fork_repo = MagicMock()
+        fork_repo.full_name = "forkowner/repo"
+        fork_repo.owner.login = "forkowner"
+        user.create_fork.return_value = fork_repo
+
+        with patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}):
+            main.open_pr(self._make_change(), fork=True)
+
+        user.create_fork.assert_called_once_with(origin_repo)
+
+    @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
+    @patch("src.main.check_call")
+    @patch("src.main.Github")
+    def test_never_fork(self, mock_github, mock_check_call, mock_check_output):
+        _, user, origin_repo = self._setup_mocks(
+            mock_github, open_prs=[], closed_prs=[], push_permission=False
+        )
+        pr = MagicMock()
+        pr.html_url = "https://github.com/owner/repo/pull/6"
+        origin_repo.create_pull.return_value = pr
+
+        with patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}):
+            main.open_pr(self._make_change(), fork=False)
+
+        user.create_fork.assert_not_called()
+
+    @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
+    @patch("src.main.check_call")
+    @patch("src.main.Github")
+    def test_non_default_base_branch_prefixes_subject(
+        self, mock_github, mock_check_call, mock_check_output
+    ):
+        _, _, origin_repo = self._setup_mocks(mock_github, open_prs=[], closed_prs=[])
+        origin_repo.default_branch = "main"
+        pr = MagicMock()
+        pr.html_url = "https://github.com/owner/repo/pull/7"
+        origin_repo.create_pull.return_value = pr
+
+        change = main.CommittedChanges(
+            subject="Update foo",
+            body=None,
+            commit="abc1234",
+            branch="update-abc1234",
+            base_branch="stable-1.0",
+        )
+
+        with patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}):
+            main.open_pr(change)
+
+        call_kwargs = origin_repo.create_pull.call_args[1]
+        self.assertTrue(call_kwargs["title"].startswith("[stable-1.0]"))
+
+    @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
+    @patch("src.main.check_call")
+    @patch("src.main.Github")
+    def test_github_run_id_appends_log_url(
+        self, mock_github, mock_check_call, mock_check_output
+    ):
+        _, _, origin_repo = self._setup_mocks(mock_github, open_prs=[], closed_prs=[])
+        pr = MagicMock()
+        pr.html_url = "https://github.com/owner/repo/pull/8"
+        origin_repo.create_pull.return_value = pr
+
+        with patch.dict(
+            os.environ,
+            {
+                "GITHUB_TOKEN": "fake-token",
+                "GITHUB_RUN_ID": "12345",
+                "GITHUB_REPOSITORY": "owner/repo",
+            },
+        ):
+            main.open_pr(self._make_change())
+
+        call_kwargs = origin_repo.create_pull.call_args[1]
+        self.assertIn("actions/runs/12345", call_kwargs["body"])
+
+    @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
+    @patch("src.main.check_call")
+    @patch("src.main.Github")
+    def test_no_push_permission_creates_fork(
+        self, mock_github, mock_check_call, mock_check_output
+    ):
+        _, user, origin_repo = self._setup_mocks(
+            mock_github, open_prs=[], closed_prs=[], push_permission=False
+        )
+        fork_repo = MagicMock()
+        fork_repo.full_name = "forkowner/repo"
+        fork_repo.owner.login = "forkowner"
+        user.create_fork.return_value = fork_repo
+
+        pr = MagicMock()
+        pr.html_url = "https://github.com/owner/repo/pull/99"
+        origin_repo.create_pull.return_value = pr
+
+        with patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}):
+            main.open_pr(self._make_change(), fork=None)
+
+        user.create_fork.assert_called_once_with(origin_repo)
+
+
+class TestMain(unittest.IsolatedAsyncioTestCase):
+    @patch("src.main.asyncio")
+    @patch("src.main.parse_cli_args")
+    def test_main_error_result(self, mock_parse, mock_asyncio):
+        mock_parse.return_value = MagicMock(check_outdated=False)
+        mock_asyncio.run.return_value = (-1, -1, False)
+        with self.assertRaises(SystemExit) as ctx:
+            main.main()
+        self.assertTrue(int(ctx.exception.code) & int(main.ResultCode.ERROR))
+
+    @patch("src.main.asyncio")
+    @patch("src.main.parse_cli_args")
+    def test_main_outdated_not_updated(self, mock_parse, mock_asyncio):
+        args = MagicMock(check_outdated=True)
+        mock_parse.return_value = args
+        mock_asyncio.run.return_value = (3, 0, False)
+        with self.assertRaises(SystemExit) as ctx:
+            main.main()
+        self.assertTrue(int(ctx.exception.code) & int(main.ResultCode.OUTDATED))
+
+    @patch("src.main.asyncio")
+    @patch("src.main.parse_cli_args")
+    def test_main_success(self, mock_parse, mock_asyncio):
+        args = MagicMock(check_outdated=False)
+        mock_parse.return_value = args
+        mock_asyncio.run.return_value = (0, 0, False)
+        with self.assertRaises(SystemExit) as ctx:
+            main.main()
+        self.assertEqual(int(ctx.exception.code), int(main.ResultCode.SUCCESS))
+
+    @patch("src.main.asyncio")
+    @patch("src.main.parse_cli_args")
+    def test_main_errors_num_sets_error(self, mock_parse, mock_asyncio):
+        args = MagicMock(check_outdated=False)
+        mock_parse.return_value = args
+        mock_asyncio.run.return_value = (0, 2, False)
+        with self.assertRaises(SystemExit) as ctx:
+            main.main()
+        self.assertTrue(int(ctx.exception.code) & int(main.ResultCode.ERROR))
+
+    @patch("src.main.open_pr")
+    @patch("src.main.commit_changes")
+    @patch("src.main.ensure_git_safe_directory")
+    @patch("src.main.get_manifest_git_checkout")
+    @patch("src.main.indir")
+    async def test_run_with_args_calls_open_pr(
+        self, mock_indir, mock_checkout, mock_safe, mock_commit, mock_open_pr
+    ):
+        mock_indir.return_value = MagicMock(
+            __enter__=lambda s: s, __exit__=MagicMock(return_value=False)
+        )
+        mock_checkout.return_value = Path("/fake/checkout")
+        committed = main.CommittedChanges(
+            subject="Update foo",
+            body=None,
+            commit="abc123",
+            branch="update-abc123",
+            base_branch="main",
+        )
+        mock_commit.return_value = committed
+
+        with patch("src.main.manifest.ManifestChecker") as MockChecker:
+            checker = MockChecker.return_value
+            checker.check = AsyncMock(return_value=None)
+
+            mock_data = MagicMock()
+
+            mock_data.__class__ = ExternalData
+
+            mock_data.type = ExternalData.Type.EXTRA_DATA
+            mock_data.State = ExternalData.State
+
+            mock_data.state = MagicMock()
+            mock_data.state.name = "UNKNOWN"
+
+            mock_data.filename = "foo.tar.gz"
+
+            mock_data.new_version._asdict.return_value = {
+                "url": "https://example.com/foo.tar.gz",
+                "version": "1.0",
+                "timestamp": "now",
+            }
+            mock_data.new_version.checksum._asdict.return_value = {
+                "md5": "1",
+                "sha1": "2",
+                "sha256": "3",
+                "sha512": "4",
+                "size": 100,
+            }
+
+            checker.get_outdated_external_data.return_value = [mock_data]
+
+            checker.update_manifests.return_value = ["foo: update"]
+            checker.get_errors.return_value = []
+
+            args = main.parse_cli_args(["--update", "/fake/manifest.yml"])
+            args.commit_only = False
+            args.commit_to_current_branch = False
+
+            with patch("builtins.print"):
+                result = await main.run_with_args(args)
+
+        mock_open_pr.assert_called_once()
+        self.assertEqual(result[2], True)
+
+
+if __name__ == "__main__":
+    unittest.main()
