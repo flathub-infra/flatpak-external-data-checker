@@ -4,9 +4,17 @@ import random
 import string
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from src.lib.errors import ManifestLoadError
-from src.lib.externaldata import ExternalGitRef
+from src.lib.checksums import MultiDigest
+from src.lib.errors import ManifestLoadError, SourceLoadError
+from src.lib.externaldata import (
+    BuilderSource,
+    ExternalBase,
+    ExternalFile,
+    ExternalGitRef,
+    FileSource,
+)
 from src.manifest import ManifestChecker
 
 TEST_MANIFEST_DATA = {
@@ -317,3 +325,91 @@ class TestManifestLoader(unittest.IsolatedAsyncioTestCase):
             self._load_manifest(TEST_MANIFEST_INVALID_NO_ID)
         with self.assertRaises(ManifestLoadError):
             self._load_manifest(TEST_MANIFEST_INVALID_LOOP)
+
+
+class TestExternalData(unittest.IsolatedAsyncioTestCase):
+    def test_schema_validation_error(self):
+        with self.assertRaises(SourceLoadError):
+            ExternalBase.from_source(
+                "foo.json", {"type": 123, "url": "http://example.com"}
+            )
+
+    def test_missing_extra_data_checksum(self):
+        with self.assertRaises(SourceLoadError):
+            ExternalBase.from_source(
+                "foo.json", {"type": "extra-data", "url": "http://example.com"}
+            )
+
+    def test_missing_file_checksum(self):
+        with self.assertRaises(SourceLoadError):
+            ExternalBase.from_source(
+                "foo.json", {"type": "file", "url": "http://example.com"}
+            )
+
+    def test_ident_and_repr_without_module(self):
+        source_dict = {
+            "type": "file",
+            "url": "http://example.com/file.txt",
+            "sha256": "x",
+        }
+        source = FileSource.from_source("foo.json", source_dict, module=None)
+
+        with self.assertRaises(SourceLoadError):
+            _ = source.ident
+
+        self.assertIn("FileSource file", BuilderSource.__repr__(source))
+
+    def test_update_removes_size_for_non_extra_data(self):
+        source_dict = {
+            "type": "file",
+            "url": "http://old.com/file",
+            "sha256": "a" * 64,
+            "size": 1024,
+        }
+        source = FileSource.from_source("foo.json", source_dict)
+        source.new_version = ExternalFile(
+            url="http://new.com/file",
+            checksum=MultiDigest(sha256="b" * 64),
+            size=2048,
+            version=None,
+            timestamp=None,
+        )
+        source.update()
+
+        self.assertNotIn("size", source.source)
+
+    def test_git_ref_lightweight_tag_match(self):
+        ref = ExternalGitRef(
+            url="http://repo",
+            commit="lightweight",
+            tag="v1",
+            branch=None,
+            version=None,
+            timestamp=None,
+        )
+        refs = {
+            "refs/tags/v1": "annotated",
+            "refs/tags/v1^{}": "lightweight",
+        }
+        got = ref._get_tagged_commit(refs, "v1")
+
+        self.assertEqual(got, "lightweight")
+
+    @patch("src.lib.externaldata.utils.git_ls_remote")
+    async def test_fetch_remote_head(self, mock_ls_remote):
+        mock_ls_remote.return_value = {"HEAD": "head-commit"}
+        ref = ExternalGitRef(
+            url="http://repo",
+            commit=None,
+            tag=None,
+            branch=None,
+            version=None,
+            timestamp=None,
+        )
+        new_ref = await ref.fetch_remote()
+
+        self.assertEqual(new_ref.commit, "head-commit")
+
+
+if __name__ == "__main__":
+    unittest.main()
