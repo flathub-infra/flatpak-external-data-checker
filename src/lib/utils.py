@@ -73,6 +73,9 @@ def parse_date_header(date_str):
 
     In addition to standard(ish) formats, non-standard formats where the
     timezone is a named zone rather than an offset are detected and handled."""
+    if not date_str:
+        return dt.datetime.now(tz=dt.timezone.utc)  # what else can we do?
+
     for tz in zoneinfo.available_timezones():
         if tz in ("UTC", "GMT") or not date_str.endswith(tz):
             continue
@@ -103,9 +106,6 @@ def parse_date_header(date_str):
         except ValueError:
             continue
         raise CheckerRemoteError(f"Cannot parse date/time: {date_str}")
-
-    if not date_str:
-        return dt.datetime.now(tz=dt.timezone.utc)  # what else can we do?
 
 
 def _check_newline(fp):
