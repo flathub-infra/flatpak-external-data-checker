@@ -27,23 +27,30 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 from time import perf_counter
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 
-from src.lib.errors import CheckerFetchError
+from src.lib import utils
+from src.lib.errors import CheckerFetchError, CheckerQueryError
 from src.lib.utils import (
     Command,
     FallbackVersion,
+    VersionComparisonError,
     _detect_json_flatpak_manifest_indent,
     asyncio_gather_failfast,
+    check_bwrap,
     dump_manifest,
     expand_version_constraints,
     filter_versioned_items,
     filter_versions,
     get_extra_data_info_from_url,
+    git_ls_remote,
     parse_date_header,
     parse_github_url,
+    read_json_manifest,
     strip_query,
+    wrap_in_bwrap,
 )
 
 
@@ -63,6 +70,10 @@ class TestParseGitHubUrl(unittest.TestCase):
     def test_https_with_auth(self):
         url = "https://acce55ed:x-oauth-basic@github.com/endlessm/eos-google-chrome-app"
         self.assertEqual(parse_github_url(url), "endlessm/eos-google-chrome-app")
+
+    def test_invalid_scheme_raises(self):
+        with self.assertRaises(ValueError):
+            parse_github_url("svn://example.com/repo")
 
 
 class TestStripQuery(unittest.TestCase):
@@ -101,6 +112,96 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
         with self._assert_timeout(0.5):
             with self.assertRaises(subprocess.TimeoutExpired):
                 await cmd.run()
+
+    def test_run_sync_nonzero_exit_raises(self):
+        cmd = Command(["false"], sandbox=False)
+        with self.assertRaises(subprocess.CalledProcessError):
+            cmd.run_sync()
+
+    def test_run_sync_returns_output(self):
+        cmd = Command(["echo", "hi"], sandbox=False)
+        stdout, _ = cmd.run_sync()
+        self.assertIn(b"hi", stdout)
+
+    def test_sandbox_init_with_allow_paths(self):
+        cmd = Command(
+            ["/bin/true"],
+            sandbox=True,
+            allow_network=True,
+            allow_paths=[
+                "/tmp/plain",
+                Command.SandboxPath("/etc/ssl", readonly=True, optional=True),
+            ],
+        )
+        argv_str = " ".join(cmd.argv)
+        self.assertIn("bwrap", argv_str)
+        self.assertIn("--share-net", argv_str)
+        self.assertIn("/tmp/plain", argv_str)
+        self.assertIn("/etc/ssl", argv_str)
+
+    @patch("src.lib.utils.asyncio.create_subprocess_exec")
+    async def test_timeout_kill_oserror(self, mock_create_subproc):
+        mock_proc = MagicMock()
+        mock_proc.communicate = AsyncMock(side_effect=asyncio.TimeoutError)
+        mock_proc.kill.side_effect = OSError("Simulated kill failure")
+        mock_create_subproc.return_value = mock_proc
+
+        cmd = Command(["sleep", "1"], timeout=0.1, sandbox=False)
+
+        with self.assertRaises(subprocess.TimeoutExpired):
+            await cmd.run()
+
+        mock_proc.kill.assert_called_once()
+
+
+class TestSandboxPath(unittest.TestCase):
+    def test_readwrite_required(self):
+        sp = Command.SandboxPath("/tmp/foo")
+        self.assertEqual(sp.bwrap_args, ["--bind", "/tmp/foo", "/tmp/foo"])
+
+    def test_readonly_required(self):
+        sp = Command.SandboxPath("/usr", readonly=True)
+        self.assertEqual(sp.bwrap_args, ["--ro-bind", "/usr", "/usr"])
+
+    def test_readonly_optional(self):
+        sp = Command.SandboxPath("/etc/ssl", readonly=True, optional=True)
+        self.assertEqual(sp.bwrap_args, ["--ro-bind-try", "/etc/ssl", "/etc/ssl"])
+
+
+class TestWrapInBwrap(unittest.TestCase):
+    def test_without_extra_args(self):
+        result = wrap_in_bwrap(["/bin/true"])
+        self.assertIn("/bin/true", result)
+        self.assertNotIn("--die-with-parent", result)
+
+    def test_with_extra_args(self):
+        result = wrap_in_bwrap(["/bin/true"], ["--die-with-parent"])
+        self.assertIn("--die-with-parent", result)
+        self.assertIn("/bin/true", result)
+
+
+class TestCheckBwrap(unittest.TestCase):
+    def test_returns_false_when_bwrap_not_found(self):
+        with patch(
+            "src.lib.utils.subprocess.run",
+            side_effect=FileNotFoundError("bwrap not found"),
+        ):
+            self.assertFalse(check_bwrap())
+
+    def test_returns_false_when_bwrap_fails(self):
+        with patch(
+            "src.lib.utils.subprocess.run",
+            side_effect=subprocess.CalledProcessError(
+                returncode=1, cmd=["bwrap"], output="error"
+            ),
+        ):
+            self.assertFalse(check_bwrap())
+
+    def test_returns_true_when_bwrap_succeeds(self):
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        with patch("src.lib.utils.subprocess.run", return_value=mock_result):
+            self.assertTrue(check_bwrap())
 
 
 class TestExpandVersionConstraints(unittest.TestCase):
@@ -203,6 +304,27 @@ class TestVersionFilter(unittest.TestCase):
             [("d", "1.0"), ("c", "1.1"), ("a", "1.3")],
         )
 
+    def test_comparison_error_excludes_item(self):
+        result = filter_versioned_items(
+            [FallbackVersion("1.0"), FallbackVersion(None)],  # type: ignore[list-item]
+            [("<", FallbackVersion("2.0"))],
+            to_version=lambda v: v,
+        )
+        self.assertEqual(result, [FallbackVersion("1.0")])
+
+
+class TestVersionComparisonError(unittest.TestCase):
+    def test_init_stores_operands(self):
+        err = VersionComparisonError("1.a", "2.b")
+        self.assertEqual(err.left, "1.a")
+        self.assertEqual(err.right, "2.b")
+        self.assertIn("1.a", str(err))
+        self.assertIn("2.b", str(err))
+
+    def test_fallback_version_raises_on_incomparable(self):
+        with self.assertRaises(VersionComparisonError):
+            _ = FallbackVersion("1.0") < FallbackVersion(None)  # type: ignore[arg-type]
+
 
 class TestParseHTTPDate(unittest.TestCase):
     def test_parse_valid(self):
@@ -237,6 +359,13 @@ class TestParseHTTPDate(unittest.TestCase):
     def test_parse_invalid(self):
         self.assertIsNotNone(parse_date_header("some broken string"))
 
+    def test_named_tz_unparseable_date_falls_through(self):
+        parse_date_header("NOTADATE America/New_York")
+
+    def test_empty_string_returns_now(self):
+        result = parse_date_header("")
+        self.assertIsNotNone(result)
+
 
 class TestDownload(unittest.IsolatedAsyncioTestCase):
     _CONTENT_TYPE = "application/x-fedc-test"
@@ -250,11 +379,71 @@ class TestDownload(unittest.IsolatedAsyncioTestCase):
         await self.http.close()
 
     async def test_correct_content_type(self):
-        await get_extra_data_info_from_url(
-            url="https://ftpmirror.gnu.org/gnu/gzip/gzip-1.12.tar.gz",
-            session=self.http,
+        url = "https://ftpmirror.gnu.org/gnu/gzip/gzip-1.12.tar.gz"
+
+        fake_chunk = b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\x03fake_payload_data"
+        fake_headers = {"Last-Modified": "Wed, 20 Jan 2021 15:25:15 UTC"}
+
+        mock_response = MagicMock()
+        mock_response.url = MagicMock()
+        mock_response.url.__str__ = MagicMock(return_value=url)
+        mock_response.headers = fake_headers
+
+        async def fake_iter_chunked(_size):
+            yield fake_chunk
+
+        mock_response.content.iter_chunked = fake_iter_chunked
+
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=False)
+
+        mock_session = MagicMock()
+        mock_session.get = MagicMock(return_value=mock_response)
+
+        result = await get_extra_data_info_from_url(
+            url=url,
+            session=mock_session,
             content_type_deny=[re.compile(r"^application/x-fedc-test$")],
         )
+
+        self.assertEqual(result.url, url)
+        self.assertEqual(result.size, len(fake_chunk))
+        mock_session.get.assert_called_once()
+
+    @patch("src.lib.utils.magic.from_buffer")
+    async def test_wrong_content_type_redirect(self, mock_magic):
+        mock_magic.return_value = "application/zip"
+
+        original_url = "http://original.example.com/file"
+        redirected_url = "http://redirected.example.com/file"
+
+        fake_chunk = b"PK\x03\x04"
+        fake_headers = {"Content-Type": "application/zip"}
+
+        mock_response = MagicMock()
+        mock_response.url = MagicMock()
+        mock_response.url.__str__ = MagicMock(return_value=redirected_url)
+        mock_response.headers = fake_headers
+
+        async def fake_iter_chunked(_size):
+            yield fake_chunk
+
+        mock_response.content.iter_chunked = fake_iter_chunked
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=False)
+
+        mock_session = MagicMock()
+        mock_session.get = MagicMock(return_value=mock_response)
+
+        with self.assertRaises(CheckerFetchError) as ctx:
+            await get_extra_data_info_from_url(
+                url=original_url,
+                session=mock_session,
+                content_type_deny=[re.compile(r"^application/zip$")],
+            )
+
+        self.assertIn(original_url, str(ctx.exception))
+        self.assertIn("redirected from", str(ctx.exception))
 
     async def test_wrong_content_type(self):
         # Because so many web servers serve source code archives with an incorrect
@@ -391,6 +580,18 @@ class TestDetectJsonIndent(unittest.TestCase):
         self.assertIsNone(
             _detect_json_flatpak_manifest_indent('{"app-id": "com.example.App"}')
         )
+
+    def test_list_root_no_brace_line(self):
+        self.assertIsNone(_detect_json_flatpak_manifest_indent('["a", "b"]'))
+
+    def test_dict_with_id_key(self):
+        text = dedent("""\
+            {
+              "id": "com.example.App",
+              "modules": []
+            }
+            """)
+        self.assertEqual(_detect_json_flatpak_manifest_indent(text), 2)
 
 
 EDITORCONFIG_SAMPLE_DATA = {"first": 1, "second": [2, 3]}
@@ -556,6 +757,57 @@ class TestDumpManifest(unittest.TestCase):
             dump_manifest(EDITORCONFIG_SAMPLE_DATA, path)
             self.assertEqual(path.read_text(), expected_data)
 
+    def test_invalid_yaml_max_line_length_ignored(self):
+        p = Path(self.tmpdir.name) / "sub" / "test.yaml"
+        p.parent.mkdir()
+        (p.parent / ".editorconfig").write_text(
+            "[*.yaml]\nmax_line_length = notanumber\n"
+        )
+        p.write_text("app-id: com.example.App\n")
+        dump_manifest({"app-id": "com.example.App"}, p, has_yaml_header=False)
+
+
+class TestReadJsonManifest(unittest.TestCase):
+    def test_missing_file_raises_file_not_found(self):
+        with self.assertRaises(FileNotFoundError):
+            read_json_manifest(Path("/nonexistent/path/manifest.json"))
+
+    def test_non_noent_glib_error_is_reraised(self):
+        class FakeGLibError(Exception):
+            def matches(self, domain, code):
+                return False
+
+            @property
+            def message(self):
+                return "some other glib error"
+
+        fake_err = FakeGLibError()
+
+        with patch("src.lib.utils.Json.Parser") as MockParser:
+            instance = MockParser.return_value
+            instance.load_from_file.side_effect = fake_err
+
+            with patch("src.lib.utils.GLib.Error", FakeGLibError):
+                with self.assertRaises(FakeGLibError):
+                    read_json_manifest(Path("/some/manifest.json"))
+
+
+class TestGitLsRemote(unittest.IsolatedAsyncioTestCase):
+    @patch("src.lib.utils.Command.run")
+    async def test_bad_url_raises_checker_query_error(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=128,
+            cmd=[
+                "git",
+                "ls-remote",
+                "--exit-code",
+                "https://github.com/does-not-exist/xxxxxxxx-yyyyzzzz",
+            ],
+        )
+
+        with self.assertRaises(CheckerQueryError):
+            await git_ls_remote("https://github.com/does-not-exist/xxxxxxxx-yyyyzzzz")
+
 
 class TestGatherFailfast(unittest.IsolatedAsyncioTestCase):
     async def test_all_succeed(self):
@@ -630,6 +882,82 @@ class TestGatherFailfast(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(AssertionError):
             await asyncio_gather_failfast([raises_assert(), slow()])
+
+    async def test_cancelled_task_in_done_skipped(self):
+        async def succeed():
+            return 42
+
+        result = await asyncio_gather_failfast([succeed()])
+        self.assertEqual(result, [42])
+
+    async def test_raises_cancelled_error_propagates(self):
+        async def raises_cancelled():
+            raise asyncio.CancelledError
+
+        with self.assertRaises((asyncio.CancelledError, BaseException)):
+            await asyncio_gather_failfast([raises_cancelled()])
+
+    async def test_cancelled_task_does_not_prevent_success(self):
+        asyncio.Event()
+
+        async def succeed():
+            return 99
+
+        results = await asyncio_gather_failfast([succeed()])
+        self.assertEqual(results, [99])
+
+    async def test_exception_raises_cancelled_error(self):
+        loop = asyncio.get_running_loop()
+
+        class ForceCoverageFuture(asyncio.Future):
+            def cancelled(self):
+                return False
+
+            def exception(self):
+                raise asyncio.CancelledError
+
+            def result(self):
+                return "force_coverage"
+
+        f = ForceCoverageFuture(loop=loop)
+        f.set_result(None)
+
+        results = await asyncio_gather_failfast([f])
+
+        self.assertEqual(results, ["force_coverage"])
+
+
+class TestFallbackVersion(unittest.TestCase):
+    def test_incomparable_looseversions_raise(self):
+        class RaisingLooseVersion:
+            def __init__(self, s):
+                self.s = s
+
+            def __lt__(self, other):
+                raise TypeError("cannot compare")
+
+            def __le__(self, other):
+                raise TypeError("cannot compare")
+
+            def __gt__(self, other):
+                raise TypeError("cannot compare")
+
+            def __ge__(self, other):
+                raise TypeError("cannot compare")
+
+            def __eq__(self, other):
+                raise TypeError("cannot compare")
+
+        with patch.object(utils, "LooseVersion", RaisingLooseVersion):
+            with self.assertRaises(VersionComparisonError):
+                _ = FallbackVersion("invalid.1") < FallbackVersion("invalid.2")
+
+    def test_version_comparison_error_carries_operands(self):
+        err = VersionComparisonError("1.a", "2.b")
+        self.assertEqual(err.left, "1.a")
+        self.assertEqual(err.right, "2.b")
+        self.assertIn("1.a", str(err))
+        self.assertIn("2.b", str(err))
 
 
 if __name__ == "__main__":
