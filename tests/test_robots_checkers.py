@@ -775,8 +775,12 @@ class TestChromiumRobotsCoverage(unittest.IsolatedAsyncioTestCase):
         component.robots_cache = self.robots_cache
 
         raw_text = b"CLANG_REVISION = '1234'\nCLANG_SUB_REVISION = 1"
-        mock_response = mock.AsyncMock()
-        mock_response.text.return_value = base64.b64encode(raw_text).decode()
+
+        mock_response = mock.MagicMock()
+        mock_response.raise_for_status = mock.MagicMock()
+        mock_response.text = mock.AsyncMock(
+            return_value=base64.b64encode(raw_text).decode()
+        )
         self.session.get.return_value.__aenter__.return_value = mock_response
 
         await component.get_llvm_version()
@@ -800,6 +804,45 @@ class TestChromiumRobotsCoverage(unittest.IsolatedAsyncioTestCase):
             self.assertRaises(CheckerMetadataError),
         ):
             await checker.check(data)
+
+    async def test_get_llvm_version_fallback_robots_call(self):
+        component = LLVMComponent(self.session, mock.Mock(), "124.0.0.0")
+        component.robots_cache = self.robots_cache
+
+        raw_text = b"CLANG_REVISION = '1234'\nCLANG_SUB_REVISION = 1"
+
+        primary_err = aiohttp.ClientResponseError(
+            request_info=mock.Mock(),
+            history=(),
+            status=503,
+        )
+        primary_resp = mock.MagicMock()
+        primary_resp.raise_for_status = mock.MagicMock(side_effect=primary_err)
+        primary_resp.text = mock.AsyncMock()
+
+        fallback_resp = mock.MagicMock()
+        fallback_resp.raise_for_status = mock.MagicMock()
+        fallback_resp.text = mock.AsyncMock(return_value=raw_text.decode())
+
+        self.session.get.side_effect = [
+            mock.AsyncMock(
+                __aenter__=mock.AsyncMock(return_value=primary_resp),
+                __aexit__=mock.AsyncMock(return_value=False),
+            ),
+            mock.AsyncMock(
+                __aenter__=mock.AsyncMock(return_value=fallback_resp),
+                __aexit__=mock.AsyncMock(return_value=False),
+            ),
+        ]
+
+        await component.get_llvm_version()
+
+        ensure_calls = [
+            str(c[0][0]) for c in self.robots_cache.ensure_allowed.call_args_list
+        ]
+        self.assertEqual(len(ensure_calls), 2)
+        self.assertTrue(any("googlesource.com" in u for u in ensure_calls))
+        self.assertTrue(any("raw.githubusercontent.com" in u for u in ensure_calls))
 
 
 class TestPyPICheckerInitCoverage(unittest.IsolatedAsyncioTestCase):

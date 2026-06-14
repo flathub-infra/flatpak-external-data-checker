@@ -7,8 +7,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
 
-from src.checkers.chromiumchecker import LLVMGitComponent
+from src.checkers.chromiumchecker import ChromiumComponent, LLVMGitComponent
 from src.lib.checksums import MultiDigest
+from src.lib.errors import CheckerFetchError
 from src.lib.externaldata import (
     ExternalData,
     ExternalFile,
@@ -192,3 +193,101 @@ class TestLLVMComponent(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(aiohttp.ClientResponseError):
             await component.get_llvm_version()
+
+
+class TestComponentUpdateExternalSource(unittest.IsolatedAsyncioTestCase):
+    async def test_update_network_error(self):
+        external_data = MagicMock()
+        session = MagicMock()
+
+        component = LLVMGitComponent(session, external_data, "148.0.7778.178", None)
+
+        with mock.patch(
+            "src.checkers.chromiumchecker.get_extra_data_info_from_url",
+            new_callable=AsyncMock,
+            side_effect=aiohttp.ClientConnectorError(
+                connection_key=MagicMock(), os_error=OSError()
+            ),
+        ):
+            with self.assertRaises(CheckerFetchError):
+                await component.update_external_source_version(
+                    "https://example.com/file.tar.xz"
+                )
+
+    async def test_check_404_fallback(self):
+        external_data = MagicMock(spec=ExternalData)
+        session = MagicMock()
+
+        component = ChromiumComponent(session, external_data, "126.0.6478.182")
+
+        cause = aiohttp.ClientResponseError(
+            request_info=MagicMock(),
+            history=(),
+            status=404,
+            message="Not Found",
+        )
+        fetch_error = CheckerFetchError()
+        fetch_error.__cause__ = cause
+
+        with mock.patch(
+            "src.checkers.chromiumchecker.get_extra_data_info_from_url",
+            new_callable=AsyncMock,
+        ) as mock_get:
+            mock_get.side_effect = [
+                fetch_error,
+                ExternalFile(
+                    url="https://chromium-tarballs.distfiles.gentoo.org/chromium-126.0.6478.182-linux.tar.xz",
+                    checksum=MultiDigest(sha256="a" * 64),
+                    size=100,
+                    version="126.0.6478.182",
+                    timestamp=None,
+                ),
+            ]
+            await component.check()
+
+        external_data.set_new_version.assert_called_once()
+
+    async def test_check_non_404_reraises_chromium(self):
+        external_data = MagicMock(spec=ExternalData)
+        session = MagicMock()
+
+        component = ChromiumComponent(session, external_data, "126.0.6478.182")
+
+        cause = aiohttp.ClientResponseError(
+            request_info=MagicMock(),
+            history=(),
+            status=503,
+            message="Service Unavailable",
+        )
+        fetch_error = CheckerFetchError()
+        fetch_error.__cause__ = cause
+
+        with mock.patch(
+            "src.checkers.chromiumchecker.get_extra_data_info_from_url",
+            new_callable=AsyncMock,
+            side_effect=fetch_error,
+        ):
+            with self.assertRaises(CheckerFetchError):
+                await component.check()
+
+    async def test_check_non_404_reraises(self):
+        external_data = MagicMock()
+        session = MagicMock()
+
+        component = LLVMGitComponent(session, external_data, "148.0.7778.178")
+
+        with mock.patch(
+            "src.checkers.chromiumchecker.get_extra_data_info_from_url",
+            new_callable=AsyncMock,
+            side_effect=aiohttp.ClientConnectorError(
+                connection_key=MagicMock(), os_error=OSError()
+            ),
+        ):
+            with self.assertRaises(CheckerFetchError):
+                await component.update_external_source_version(
+                    "https://example.com/file.tar.xz"
+                )
+
+
+if __name__ == "__main__":
+    unittest.main()
