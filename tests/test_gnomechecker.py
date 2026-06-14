@@ -21,8 +21,11 @@ import os
 import unittest
 from unittest import mock
 
-from src.checkers.gnomechecker import VersionScheme, _is_stable
+from aiohttp import ClientError
+
+from src.checkers.gnomechecker import GNOMEChecker, VersionScheme, _is_stable
 from src.lib.checksums import MultiDigest
+from src.lib.errors import CheckerQueryError
 from src.lib.utils import init_logging
 from src.lib.version import LooseVersion
 from src.manifest import ManifestChecker
@@ -136,6 +139,88 @@ class TestGNOMEChecker(unittest.IsolatedAsyncioTestCase):
             data.new_version.version,
             "0.9.8",
         )
+
+
+class TestGNOMECheckerMocked(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        init_logging()
+
+    def _make_checker(self):
+        checker = GNOMEChecker.__new__(GNOMEChecker)
+        checker.robots_cache = None
+        return checker
+
+    def _make_session(self, cache_json, checksum_text="abc123  proj-1.0.tar.xz\n"):
+        cache_resp = mock.AsyncMock()
+        cache_resp.json = mock.AsyncMock(return_value=cache_json)
+
+        checksum_resp = mock.AsyncMock()
+        checksum_resp.text = mock.AsyncMock(return_value=checksum_text)
+
+        session = mock.MagicMock()
+        session.get.return_value.__aenter__ = mock.AsyncMock(
+            side_effect=[cache_resp, checksum_resp]
+        )
+        session.get.return_value.__aexit__ = mock.AsyncMock(return_value=False)
+        return session
+
+    async def test_network_error_raises_checker_query_error(self):
+        checker = self._make_checker()
+        session = mock.MagicMock()
+        session.get.return_value.__aenter__ = mock.AsyncMock(side_effect=ClientError())
+        session.get.return_value.__aexit__ = mock.AsyncMock(return_value=False)
+        checker.session = session
+
+        external_data = mock.MagicMock()
+        external_data.checker_data = {"name": "baobab"}
+
+        with self.assertRaises(CheckerQueryError):
+            await checker.check(external_data)
+
+    async def test_no_stable_version_falls_back_to_latest(self):
+        proj = "baobab"
+        versions = ["3.34.0.alpha", "3.35.0.beta"]
+
+        cache_json = [
+            4,
+            {
+                proj: {
+                    "3.34.0.alpha": {
+                        "tar.xz": "3.34.0.alpha/baobab-3.34.0.alpha.tar.xz",
+                        "sha256sum": "3.34.0.alpha/baobab-3.34.0.alpha.sha256sum",
+                    },
+                    "3.35.0.beta": {
+                        "tar.xz": "3.35.0.beta/baobab-3.35.0.beta.tar.xz",
+                        "sha256sum": "3.35.0.beta/baobab-3.35.0.beta.sha256sum",
+                    },
+                }
+            },
+            {proj: versions},
+            {
+                "3.34.0.alpha": [],
+                "3.35.0.beta": [],
+            },
+        ]
+
+        checksum_text = "deadbeef  baobab-3.35.0.beta.tar.xz\n"
+
+        checker = self._make_checker()
+        checker.session = self._make_session(cache_json, checksum_text)
+
+        external_data = mock.MagicMock()
+        external_data.checker_data = {"name": proj}
+
+        with self.assertLogs("src.checkers.gnomechecker", level="WARNING") as cm:
+            await checker.check(external_data)
+
+        self.assertTrue(
+            any("Couldn't find any stable version" in line for line in cm.output)
+        )
+
+        external_data.set_new_version.assert_called_once()
+        new_ver = external_data.set_new_version.call_args[0][0]
+
+        self.assertEqual(new_ver.version, "3.35.0.beta")
 
 
 if __name__ == "__main__":
