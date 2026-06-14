@@ -21,9 +21,11 @@
 import base64
 import datetime as dt
 import hashlib
+import importlib
 import json
 import logging
 import os
+import pkgutil
 import tempfile
 import unittest
 from unittest import mock
@@ -31,11 +33,16 @@ from xml.dom import minidom
 
 import aiohttp
 
-from src import manifest
+from src import checkers, manifest
 from src.checkers import Checker
 from src.checkers.gitchecker import GitChecker
 from src.lib.checksums import MultiDigest
-from src.lib.errors import CheckerFetchError, CheckerQueryError, SourceUpdateError
+from src.lib.errors import (
+    CheckerFetchError,
+    CheckerMetadataError,
+    CheckerQueryError,
+    SourceUpdateError,
+)
 from src.lib.externaldata import ExternalData, ExternalGitRepo
 from src.lib.utils import init_logging
 
@@ -1225,6 +1232,82 @@ class TestRaisesPaths(unittest.TestCase):
         source = {"md5": "def456"}
         with self.assertRaisesRegex(SourceUpdateError, "No matching digest type"):
             digest.update_source(source)
+
+
+class TestCheckerBaseHelpers(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    def _make_external_data(url, checker_type, extra_checker_data=None):
+        source = {
+            "type": "extra-data",
+            "filename": "test.tar.gz",
+            "url": url,
+            "sha256": "0" * 64,
+            "size": 0,
+            "x-checker-data": {"type": checker_type, **(extra_checker_data or {})},
+        }
+        return ExternalData.from_source("test.yaml", source)
+
+    def setUp(self):
+        init_logging()
+
+    async def asyncSetUp(self):
+        self.session = mock.AsyncMock(spec=aiohttp.ClientSession)
+        self.checker = DummyChecker(self.session)
+
+    async def test_validate_checker_data_invalid_schema(self):
+        data = self._make_external_data(
+            "https://example.com/file.tar.gz",
+            "html",
+            {"url": "https://example.com/", "version-pattern": r"([\d.]+)"},
+        )
+        with mock.patch.object(
+            self.checker, "get_json_schema", return_value={"type": "string"}
+        ):
+            with self.assertRaises(CheckerMetadataError):
+                await self.checker.validate_checker_data(data)
+
+    async def test_get_json_yaml_parse_error(self):
+        mock_resp = mock.MagicMock()
+        mock_resp.url.name = "releases.yaml"
+        mock_resp.read = mock.AsyncMock(return_value=b": invalid: yaml: {")
+        mock_resp.raise_for_status = mock.MagicMock()
+
+        self.session.get.return_value.__aenter__.return_value = mock_resp
+        with self.assertRaises(CheckerQueryError):
+            await self.checker._get_json("https://example.com/releases.yaml")
+
+    def test_substitute_template_key_error(self):
+        with self.assertRaises(CheckerMetadataError):
+            self.checker._substitute_template("$missing", {})
+
+    def test_get_pattern_invalid_regex(self):
+        with self.assertRaises(CheckerMetadataError):
+            self.checker._get_pattern({"pattern": "["}, "pattern")
+
+    def test_get_pattern_wrong_group_count(self):
+        with self.assertRaises(CheckerMetadataError):
+            self.checker._get_pattern(
+                {"pattern": "(a)(b)"}, "pattern", expected_groups=1
+            )
+
+    async def test_update_version_invalid_url_scheme(self):
+        data = self._make_external_data("https://example.com/file-1.0.tar.gz", "html")
+        with self.assertRaises(CheckerMetadataError):
+            await self.checker._update_version(
+                data, "2.0", "ftp://example.com/file-2.0.tar.gz"
+            )
+
+    def test_load_checkers_import_error(self):
+        fake_module = mock.Mock()
+        fake_module.name = "brokenmodule"
+
+        with (
+            mock.patch.object(pkgutil, "iter_modules", return_value=[fake_module]),
+            mock.patch.object(
+                importlib, "import_module", side_effect=ImportError("boom")
+            ),
+        ):
+            checkers.load_checkers()
 
 
 if __name__ == "__main__":
