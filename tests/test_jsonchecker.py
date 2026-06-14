@@ -1,9 +1,12 @@
 import datetime
+import json
 import os
 import unittest
 from unittest import mock
 
+from src.checkers.jsonchecker import JSONChecker, _jq, parse_timestamp
 from src.lib.checksums import MultiDigest
+from src.lib.errors import CheckerQueryError
 from src.lib.externaldata import ExternalFile, ExternalGitRef
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
@@ -90,3 +93,108 @@ class TestJSONChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNone(data.new_version)
             else:
                 self.fail(f"Unhandled data {data.filename}")
+
+
+class TestJSONCheckerMocked(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        init_logging()
+
+    async def _make_checker(self):
+        return JSONChecker.__new__(JSONChecker)
+
+    async def test_jq_invalid_json_output_raises(self):
+        with mock.patch(
+            "src.checkers.jsonchecker.utils.Command.run",
+            new_callable=mock.AsyncMock,
+            return_value=(b"this is not json", b""),
+        ):
+            with self.assertRaises(CheckerQueryError) as ctx:
+                await _jq(".foo", {"foo": 1}, {})
+        self.assertIn("Error reading jq output", str(ctx.exception))
+
+    async def test_jq_object_result_raises(self):
+        with mock.patch(
+            "src.checkers.jsonchecker.utils.Command.run",
+            new_callable=mock.AsyncMock,
+            return_value=(json.dumps({"key": "value"}).encode(), b""),
+        ):
+            with self.assertRaises(CheckerQueryError) as ctx:
+                await _jq(".", {"key": "value"}, {})
+        self.assertIn("Invalid jq output type", str(ctx.exception))
+
+    async def test_jq_string_result_ok(self):
+        with mock.patch(
+            "src.checkers.jsonchecker.utils.Command.run",
+            new_callable=mock.AsyncMock,
+            return_value=(json.dumps("hello").encode(), b""),
+        ):
+            result = await _jq(".x", {"x": "hello"}, {})
+        self.assertEqual(result, "hello")
+
+    def test_parse_timestamp_partial_date_raises(self):
+        with self.assertRaises(CheckerQueryError):
+            parse_timestamp("2024-13-99T99:99:99")
+
+    def test_parse_timestamp_utc_z_suffix(self):
+        result = parse_timestamp("2018-11-02T01:54:23Z")
+        self.assertEqual(
+            result,
+            datetime.datetime(2018, 11, 2, 1, 54, 23, tzinfo=datetime.timezone.utc),
+        )
+
+    def test_parse_timestamp_explicit_offset(self):
+        result = parse_timestamp("2018-11-02T01:54:23+00:00")
+        self.assertEqual(
+            result,
+            datetime.datetime(2018, 11, 2, 1, 54, 23, tzinfo=datetime.timezone.utc),
+        )
+
+    async def test_github_token_injected(self):
+        checker = await self._make_checker()
+        captured_headers: dict = {}
+
+        async def fake_parent_get_json(self, url, headers=None):
+            captured_headers.update(headers or {})
+            return {"data": "ok"}
+
+        with mock.patch.dict("os.environ", {"GITHUB_TOKEN": "ghp_TESTTOKEN123"}):
+            with mock.patch.object(
+                JSONChecker.__bases__[0], "_get_json", new=fake_parent_get_json
+            ):
+                await checker._get_json("https://api.github.com/repos/foo/bar")
+        self.assertIn("Authorization", captured_headers)
+        self.assertEqual(captured_headers["Authorization"], "token ghp_TESTTOKEN123")
+
+    async def test_github_token_not_injected(self):
+        checker = await self._make_checker()
+        captured_headers: dict = {}
+
+        async def fake_parent_get_json(self, url, headers=None):
+            captured_headers.update(headers or {})
+            return {}
+
+        with mock.patch.dict("os.environ", {"GITHUB_TOKEN": "ghp_TESTTOKEN123"}):
+            with mock.patch.object(
+                JSONChecker.__bases__[0], "_get_json", new=fake_parent_get_json
+            ):
+                await checker._get_json("https://example.com/api/releases")
+        self.assertNotIn("Authorization", captured_headers)
+
+    async def test_no_github_token_env_var(self):
+        checker = await self._make_checker()
+        captured_headers: dict = {}
+
+        async def fake_parent_get_json(self, url, headers=None):
+            captured_headers.update(headers or {})
+            return {}
+
+        with mock.patch.dict("os.environ", {}, clear=True):
+            with mock.patch.object(
+                JSONChecker.__bases__[0], "_get_json", new=fake_parent_get_json
+            ):
+                await checker._get_json("https://api.github.com/repos/foo/bar")
+        self.assertNotIn("Authorization", captured_headers)
+
+
+if __name__ == "__main__":
+    unittest.main()
