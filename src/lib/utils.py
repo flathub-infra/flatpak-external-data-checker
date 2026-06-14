@@ -274,6 +274,8 @@ class FallbackVersion(t.NamedTuple):  # noqa: PLW1641
     s: str
 
     def __compare(self, oper: t.Callable[[t.Any, t.Any], bool], other) -> bool:
+        if self.s is None or other.s is None:
+            raise VersionComparisonError(self.s, other.s)
         try:
             return oper(Version(self.s), Version(other.s))
         except ValueError:
