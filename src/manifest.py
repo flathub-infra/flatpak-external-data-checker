@@ -381,7 +381,7 @@ class ManifestChecker:
                 log.debug(
                     "Source %s: got new %s from %s, skipping remaining checkers",
                     data,
-                    data.state,
+                    data.state.name,
                     checker.__class__.__name__,
                 )
                 break

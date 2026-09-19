@@ -295,9 +295,9 @@ class ExternalBase(BuilderSource):
         """Detect if some external data had a version change"""
         if self.new_version is None:
             return False
-        return (
-            self.new_version.version is not None
-            and not self.current_version.is_same_version(self.new_version)
+        return self.new_version.version is not None and (
+            not self.current_version.is_same_version(self.new_version)
+            or not self.current_version.matches(self.new_version)
         )
 
     def update(self):
@@ -394,18 +394,6 @@ class ExternalData(ExternalBase):
                     self.source_path,
                 )
                 self.source.pop("size", None)
-
-    @property
-    def has_version_changed(self) -> bool:
-        # TODO We can't reliably tell if the appimage version stayed the same
-        # without downloading it, so just assume it changed
-        if (
-            self.new_version is not None
-            and self.new_version.version is not None
-            and self.new_version.url.endswith(".AppImage")
-        ):
-            return True
-        return super().has_version_changed
 
 
 @dataclasses.dataclass
