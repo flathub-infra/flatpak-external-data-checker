@@ -360,7 +360,7 @@ def open_pr(
         log.debug("origin repo not writable; creating fork")
         repo = user.create_fork(origin_repo)
 
-    remote_url = f"https://{github_token}:x-oauth-basic@github.com/{repo.full_name}"
+    remote_url = f"https://x-access-token:{github_token}@github.com/{repo.full_name}"
 
     base = change.base_branch or origin_repo.default_branch
 
