@@ -33,7 +33,7 @@ jobs:
   check-lint:
     name: Check lint
     runs-on: ubuntu-latest
-    container: debian:bookworm
+    container: debian:trixie
     permissions:
       contents: read
     steps:
