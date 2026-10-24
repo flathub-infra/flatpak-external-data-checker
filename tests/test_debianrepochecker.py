@@ -70,7 +70,7 @@ class TestDebianRepoCheckerMocked(unittest.IsolatedAsyncioTestCase):
         self.robots_patcher.start()
         self.addCleanup(self.robots_patcher.stop)
 
-    def _make_external_data(self, component="main", dist="bookworm", arches=None):
+    def _make_external_data(self, component="main", dist="trixie", arches=None):
         ed = mock.MagicMock()
         ed.checker_data = {
             "package-name": "apt",
@@ -93,7 +93,7 @@ class TestDebianRepoCheckerMocked(unittest.IsolatedAsyncioTestCase):
         checker.session = mock.AsyncMock()
         checker.robots_cache = mock.MagicMock()
 
-        external_data = self._make_external_data(component="", dist="bookworm")
+        external_data = self._make_external_data(component="", dist="trixie")
 
         with mock.patch.object(DebianRepoChecker, "should_check", return_value=True):
             with mock.patch.object(DebianRepoChecker, "_load_repo") as mock_load:

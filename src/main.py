@@ -338,7 +338,6 @@ def open_pr(
 
     log.info("Opening pull request for branch %s", change.branch)
     g = Github(github_token)
-    user = g.get_user()
 
     origin_url = (
         subprocess.check_output(["git", "remote", "get-url", "origin"])
@@ -349,7 +348,7 @@ def open_pr(
 
     if fork is True:
         log.debug("creating fork (as requested)")
-        repo = user.create_fork(origin_repo)
+        repo = origin_repo.create_fork()
     elif fork is False:
         log.debug("not creating fork (as requested)")
         repo = origin_repo
@@ -358,7 +357,7 @@ def open_pr(
         repo = origin_repo
     else:
         log.debug("origin repo not writable; creating fork")
-        repo = user.create_fork(origin_repo)
+        repo = origin_repo.create_fork()
 
     remote_url = f"https://x-access-token:{github_token}@github.com/{repo.full_name}"
 

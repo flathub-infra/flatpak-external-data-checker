@@ -595,12 +595,11 @@ class TestOpenPR(unittest.TestCase):
         fork_repo = MagicMock()
         fork_repo.full_name = "forkowner/repo"
         fork_repo.owner.login = "forkowner"
-        user.create_fork.return_value = fork_repo
+        origin_repo.create_fork.return_value = fork_repo
 
         with patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}):
             main.open_pr(self._make_change(), fork=True)
-
-        user.create_fork.assert_called_once_with(origin_repo)
+        origin_repo.create_fork.assert_called_once_with()
 
     @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
     @patch("src.main.check_call")
@@ -680,7 +679,7 @@ class TestOpenPR(unittest.TestCase):
         fork_repo = MagicMock()
         fork_repo.full_name = "forkowner/repo"
         fork_repo.owner.login = "forkowner"
-        user.create_fork.return_value = fork_repo
+        origin_repo.create_fork.return_value = fork_repo
 
         pr = MagicMock()
         pr.html_url = "https://github.com/owner/repo/pull/99"
@@ -689,7 +688,7 @@ class TestOpenPR(unittest.TestCase):
         with patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}):
             main.open_pr(self._make_change(), fork=None)
 
-        user.create_fork.assert_called_once_with(origin_repo)
+        origin_repo.create_fork.assert_called_once_with()
 
 
 class TestMain(unittest.IsolatedAsyncioTestCase):
