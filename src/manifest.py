@@ -55,6 +55,9 @@ IMPORTANT_SRC_PROP = "is-important"
 RELEASE_URL_TEMPLATE_PROP = "release-url-template"
 ROBOTS_TXT_PROP = "enable-robots-txt"
 MAX_MANIFEST_SIZE = 1024 * 1024
+# aiohttp's 8190 byte default is too small for some servers, e.g. GitHub's
+# release download redirects carry a ~9 KiB Content-Security-Policy header.
+MAXIMUM_HEADER_SIZE = 65536
 
 
 log = logging.getLogger(__name__)
@@ -420,6 +423,8 @@ class ManifestChecker:
             headers=HTTP_CLIENT_HEADERS,
             timeout=aiohttp.ClientTimeout(connect=TIMEOUT_CONNECT, total=TIMEOUT_TOTAL),
             trust_env=True,
+            max_field_size=MAXIMUM_HEADER_SIZE,
+            max_line_size=MAXIMUM_HEADER_SIZE,
         ) as http_session:
             global_robots_cache = RobotsCache(http_session)
             check_tasks = []
