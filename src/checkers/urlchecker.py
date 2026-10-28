@@ -138,7 +138,7 @@ class URLChecker(Checker):
                     version_string = await utils.extract_appimage_version(
                         tmpfile,
                     )
-            if url.endswith(".deb"):
+            elif url.endswith(".deb"):
                 with tempfile.NamedTemporaryFile("w+b") as tmpfile:
                     new_version = await utils.get_extra_data_info_from_url(
                         url,
