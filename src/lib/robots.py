@@ -46,8 +46,8 @@ class RobotsCache:
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         self._base_dir = self._cache_dir.resolve()
 
-    def _cache_path(self, netloc: str) -> Path:
-        digest = hashlib.sha256(netloc.encode("utf-8")).hexdigest()
+    def _cache_path(self, origin: str) -> Path:
+        digest = hashlib.sha256(origin.encode("utf-8")).hexdigest()
         path = self._cache_dir / f"{digest}.json"
         resolved = path.resolve(strict=False)
 
@@ -58,14 +58,14 @@ class RobotsCache:
 
         return resolved
 
-    def _load_from_disk(self, netloc: str) -> urllib.robotparser.RobotFileParser | None:
-        path = self._cache_path(netloc)
+    def _load_from_disk(self, origin: str) -> urllib.robotparser.RobotFileParser | None:
+        path = self._cache_path(origin)
         try:
             data = json.loads(path.read_text())
         except (FileNotFoundError, json.JSONDecodeError):
             return None
         except OSError as err:
-            log.debug("Failed to read robots cache for %s: %s", netloc, err)
+            log.debug("Failed to read robots cache for %s: %s", origin, err)
             return None
 
         if not isinstance(data, dict):
@@ -83,8 +83,8 @@ class RobotsCache:
         rp.parse(lines)
         return rp
 
-    def _save_to_disk(self, netloc: str, lines: list[str]):
-        path = self._cache_path(netloc)
+    def _save_to_disk(self, origin: str, lines: list[str]):
+        path = self._cache_path(origin)
         try:
             path.write_text(
                 json.dumps(
@@ -95,10 +95,10 @@ class RobotsCache:
                 )
             )
         except OSError as err:
-            log.debug("Failed to write robots cache for %s: %s", netloc, err)
+            log.debug("Failed to write robots cache for %s: %s", origin, err)
 
     async def _fetch_parser(
-        self, robots_url: str, netloc: str
+        self, robots_url: str, origin: str
     ) -> urllib.robotparser.RobotFileParser:
         rp = urllib.robotparser.RobotFileParser()
         lines: list[str]
@@ -128,7 +128,7 @@ class RobotsCache:
             return rp
 
         rp.parse(lines)
-        self._save_to_disk(netloc, lines)
+        self._save_to_disk(origin, lines)
         return rp
 
     async def _is_allowed(
@@ -141,24 +141,31 @@ class RobotsCache:
             url = str(url)
 
         parsed = urllib.parse.urlparse(url)
-        netloc = parsed.netloc
+        host = parsed.hostname or ""
+        if ":" in host:
+            host = f"[{host}]"
+        port = parsed.port
+        if port is None:
+            port = {"http": 80, "https": 443}.get(parsed.scheme)
+        authority = f"{host}:{port}" if port is not None else host
+        origin = f"{parsed.scheme}://{authority}"
 
-        if netloc in self._memory:
-            rp = self._memory[netloc]
+        if origin in self._memory:
+            rp = self._memory[origin]
         else:
-            if netloc not in self._locks:
-                self._locks[netloc] = asyncio.Lock()
-            async with self._locks[netloc]:
-                if netloc in self._memory:
-                    rp = self._memory[netloc]
+            if origin not in self._locks:
+                self._locks[origin] = asyncio.Lock()
+            async with self._locks[origin]:
+                if origin in self._memory:
+                    rp = self._memory[origin]
                 else:
-                    cached = self._load_from_disk(netloc)
+                    cached = self._load_from_disk(origin)
                     if cached is not None:
                         rp = cached
                     else:
-                        robots_url = f"{parsed.scheme}://{netloc}/robots.txt"
-                        rp = await self._fetch_parser(robots_url, netloc)
-                    self._memory[netloc] = rp
+                        robots_url = f"{origin}/robots.txt"
+                        rp = await self._fetch_parser(robots_url, origin)
+                    self._memory[origin] = rp
 
         allowed = rp.can_fetch(USER_AGENT, url)
         if not allowed:
