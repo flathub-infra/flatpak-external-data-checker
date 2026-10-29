@@ -692,6 +692,6 @@ async def asyncio_gather_failfast(
     if exc:
         for task in pending:
             task.cancel()
-        await asyncio.gather(*pending, return_exceptions=True)
+        await asyncio.gather(*tasks, return_exceptions=True)
         raise exc
     return [task.result() for task in tasks]

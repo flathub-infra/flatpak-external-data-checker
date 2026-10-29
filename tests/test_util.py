@@ -18,6 +18,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import asyncio
+import gc
 import re
 import subprocess
 import unittest
@@ -810,6 +811,84 @@ class TestGitLsRemote(unittest.IsolatedAsyncioTestCase):
 
 
 class TestGatherFailfast(unittest.IsolatedAsyncioTestCase):
+    async def test_simultaneous_failures_are_all_retrieved(self):
+        loop = asyncio.get_running_loop()
+        handler = MagicMock()
+        previous_handler = loop.get_exception_handler()
+        loop.set_exception_handler(handler)
+        self.addCleanup(loop.set_exception_handler, previous_handler)
+
+        async def fail():
+            raise ValueError("simultaneous failure")
+
+        with self.assertRaises(ValueError):
+            await asyncio_gather_failfast([fail(), fail()])
+
+        # Collect task/traceback cycles so the loop reports unconsumed exceptions.
+        gc.collect()
+        handler.assert_not_called()
+
+    async def test_pending_cleanup_finishes_without_replacing_original_exception(self):
+        started = asyncio.Event()
+        cleaned_up = asyncio.Event()
+        original_error = ValueError("original failure")
+
+        async def hang():
+            started.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                await asyncio.sleep(0)
+                cleaned_up.set()
+                raise RuntimeError("cleanup failure")
+
+        async def fail():
+            await started.wait()
+            raise original_error
+
+        pending = asyncio.create_task(hang())
+        with self.assertRaises(ValueError) as ctx:
+            await asyncio.wait_for(
+                asyncio_gather_failfast([pending, fail()]), timeout=1
+            )
+
+        self.assertIs(ctx.exception, original_error)
+        self.assertTrue(pending.done())
+        self.assertTrue(cleaned_up.is_set())
+
+    async def test_results_remain_in_input_order(self):
+        second_finished = asyncio.Event()
+
+        async def first():
+            await second_finished.wait()
+            return 1
+
+        async def second():
+            second_finished.set()
+            return 2
+
+        self.assertEqual(await asyncio_gather_failfast([first(), second()]), [1, 2])
+
+    async def test_cancelled_child_propagates(self):
+        async def cancelled():
+            raise asyncio.CancelledError
+
+        async def succeed():
+            return 1
+
+        with self.assertRaises(asyncio.CancelledError):
+            await asyncio_gather_failfast([cancelled(), succeed()])
+
+    async def test_cancelled_child_does_not_mask_failure(self):
+        async def cancelled():
+            raise asyncio.CancelledError
+
+        async def fail():
+            raise ValueError("original failure")
+
+        with self.assertRaisesRegex(ValueError, "original failure"):
+            await asyncio_gather_failfast([cancelled(), fail()])
+
     async def test_all_succeed(self):
         async def succeed(val):
             return val
