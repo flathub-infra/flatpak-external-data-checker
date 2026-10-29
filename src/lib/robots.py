@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import math
 import os
 import time
 import urllib.parse
@@ -71,12 +72,28 @@ class RobotsCache:
         if not isinstance(data, dict):
             return None
 
-        if time.time() - data.get("timestamp", 0) > CACHE_TTL:
-            path.unlink(missing_ok=True)
+        timestamp = data.get("timestamp")
+        if isinstance(timestamp, bool) or not isinstance(timestamp, (int, float)):
+            return None
+        try:
+            if not math.isfinite(timestamp):
+                return None
+        except OverflowError:
+            return None
+
+        if time.time() - timestamp > CACHE_TTL:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError as err:
+                log.debug(
+                    "Failed to remove expired robots cache for %s: %s", origin, err
+                )
             return None
 
         lines = data.get("lines")
-        if not isinstance(lines, list):
+        if not isinstance(lines, list) or not all(
+            isinstance(line, str) for line in lines
+        ):
             return None
 
         rp = urllib.robotparser.RobotFileParser()
