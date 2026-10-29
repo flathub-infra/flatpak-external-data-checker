@@ -1,9 +1,12 @@
+import asyncio
+import contextlib
 import copy
 import datetime as dt
 import os
 import unittest
 from unittest import mock
 
+import aiohttp
 import apt
 import apt_pkg
 
@@ -261,6 +264,146 @@ class TestDebianRepoCheckerErrors(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(working.checked.is_set())
                 bad_cache.close.assert_called_once_with()
                 good_cache.close.assert_called_once_with()
+
+
+class TestDebianRepoCheckerTimestamps(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.manifest = ManifestChecker(TEST_MANIFEST)
+        self.manifest._checkers = [DebianRepoChecker]
+        self.data = self.manifest.get_external_data()
+        self.url = "https://example.com/package-2.tar.xz"
+        self.cache = mock.MagicMock()
+        candidate = self.cache.__getitem__.return_value.candidate
+        candidate.uri = self.url
+        candidate.version = "2.0"
+        candidate.size = 123
+        self.source_record = mock.MagicMock()
+        self.source_record.version = "2.0"
+        self.source_record.files = [
+            mock.Mock(type="tar", path="package-2.tar.xz", size=123)
+        ]
+        self.head = mock.MagicMock()
+        self.response = self.head.return_value.__aenter__.return_value
+        self.response.url = self.url
+        self.response.headers = {}
+        for target, options in (
+            (
+                "src.checkers.debianrepochecker.DebianRepoChecker._load_repo",
+                {"side_effect": lambda *a: contextlib.nullcontext(self.cache)},
+            ),
+            ("apt_pkg.SourceRecords", {"return_value": self.source_record}),
+            (
+                "src.checkers.debianrepochecker.read_deb_hashes",
+                {"return_value": MultiDigest(sha256="1" * 64)},
+            ),
+            ("aiohttp.ClientSession.head", {"new": self.head}),
+            (
+                "src.lib.robots.RobotsCache.ensure_allowed",
+                {"new_callable": mock.AsyncMock},
+            ),
+        ):
+            patcher = mock.patch(target, **options)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.session = mock.MagicMock()
+        self.session.head = self.head
+        self.checker = DebianRepoChecker(self.session)
+
+    def _prepare(self, data):
+        # SourceRecords.lookup advances through the repository's source records.
+        self.source_record.lookup.side_effect = [True, False]
+        if data.checker_data.get("source"):
+            return data.checker_data["root"].rstrip("/") + "/package-2.tar.xz"
+        return self.url
+
+    async def test_head_failures_are_checker_errors(self):
+        for data in self.data:
+            for error in (
+                aiohttp.ConnectionTimeoutError("connection timed out"),
+                asyncio.TimeoutError(),
+                aiohttp.ClientConnectionError("connection reset"),
+                aiohttp.ClientResponseError(
+                    mock.Mock(real_url=self.url), (), status=503
+                ),
+            ):
+                with self.subTest(source=data.checker_data.get("source"), error=error):
+                    url = self._prepare(data)
+                    self.head.return_value.__aenter__.side_effect = error
+                    with self.assertRaises(CheckerQueryError) as caught:
+                        await self.checker.check(data)
+                    self.assertIs(caught.exception.__cause__, error)
+                    self.assertIn(url, str(caught.exception))
+                    self.assertIsNone(data.new_version)
+
+    async def test_manifest_records_head_timeout_and_checks_independent_source(self):
+        for data in self.data:
+            with self.subTest(source=data.checker_data.get("source")):
+                failed = copy.deepcopy(data)
+                working = copy.deepcopy(data)
+                working.checker_data["source"] = False
+                working.checker_data["package-name"] = "working"
+                self.manifest._external_data = {TEST_MANIFEST: [failed, working]}
+                self._prepare(failed)
+                error = aiohttp.ConnectionTimeoutError("connection timed out")
+                self.head.return_value.__aenter__.side_effect = [error, self.response]
+                self.manifest._errors.clear()
+
+                checked = await self.manifest.check()
+
+                self.assertEqual(checked, [failed, working])
+                self.assertEqual(len(self.manifest.get_errors()), 1)
+                caught = self.manifest.get_errors()[0]
+                self.assertIsInstance(caught, CheckerQueryError)
+                self.assertIs(caught.__cause__, error)
+                self.assertIsNone(failed.new_version)
+                self.assertIsNotNone(working.new_version)
+                self.assertEqual(working.new_version.url, self.url)
+                self.assertTrue(failed.checked.is_set())
+                self.assertTrue(working.checked.is_set())
+
+    async def test_head_cancellation_propagates(self):
+        for data in self.data:
+            with self.subTest(source=data.checker_data.get("source")):
+                self._prepare(data)
+                error = asyncio.CancelledError()
+                self.head.return_value.__aenter__.side_effect = error
+                with self.assertRaises(asyncio.CancelledError) as caught:
+                    await self.checker.check(data)
+                self.assertIs(caught.exception, error)
+                self.assertIsNone(data.new_version)
+
+    async def test_missing_last_modified_uses_date(self):
+        self.response.headers = {"Date": "Thu, 29 Oct 2026 12:00:00 GMT"}
+        for data in self.data:
+            with self.subTest(source=data.checker_data.get("source")):
+                url = self._prepare(data)
+                await self.checker.check(data)
+                self.head.assert_called_with(url, allow_redirects=True)
+                self.assertEqual(
+                    data.new_version.timestamp,
+                    dt.datetime(2026, 10, 29, 12, tzinfo=dt.timezone.utc),
+                )
+
+    async def test_missing_date_headers_still_succeeds(self):
+        for data in self.data:
+            with self.subTest(source=data.checker_data.get("source")):
+                self._prepare(data)
+                before = dt.datetime.now(tz=dt.timezone.utc)
+                await self.checker.check(data)
+                after = dt.datetime.now(tz=dt.timezone.utc)
+                self.assertGreaterEqual(data.new_version.timestamp, before)
+                self.assertLessEqual(data.new_version.timestamp, after)
+
+    async def test_unexpected_head_errors_propagate(self):
+        for data in self.data:
+            with self.subTest(source=data.checker_data.get("source")):
+                self._prepare(data)
+                error = RuntimeError("unexpected failure")
+                self.head.return_value.__aenter__.side_effect = error
+                with self.assertRaises(RuntimeError) as caught:
+                    await self.checker.check(data)
+                self.assertIs(caught.exception, error)
+                self.assertIsNone(data.new_version)
 
 
 if __name__ == "__main__":
