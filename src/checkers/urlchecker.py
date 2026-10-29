@@ -36,7 +36,13 @@ import logging
 import re
 import tempfile
 
-from ..lib import HTTP_CLIENT_HEADERS, NETWORK_ERRORS, utils
+from ..lib import (
+    HTTP_CLIENT_HEADERS,
+    NETWORK_ERRORS,
+    WRONG_CONTENT_TYPES_ARCHIVE,
+    WRONG_CONTENT_TYPES_FILE,
+    utils,
+)
 from ..lib.errors import CheckerFetchError
 from ..lib.externaldata import ExternalBase, ExternalData
 from . import Checker
@@ -115,6 +121,11 @@ class URLChecker(Checker):
 
         strip_query = external_data.checker_data.get("strip-query", False)
 
+        if external_data.type == ExternalData.Type.ARCHIVE:
+            wrong_content_types = WRONG_CONTENT_TYPES_ARCHIVE
+        else:
+            wrong_content_types = WRONG_CONTENT_TYPES_FILE
+
         version_string = None
 
         try:
@@ -133,6 +144,7 @@ class URLChecker(Checker):
                         url,
                         session=self.session,
                         dest_io=tmpfile,
+                        content_type_deny=wrong_content_types,
                         robots_cache=self.robots_cache,
                     )
                     version_string = await utils.extract_appimage_version(
@@ -144,6 +156,7 @@ class URLChecker(Checker):
                         url,
                         session=self.session,
                         dest_io=tmpfile,
+                        content_type_deny=wrong_content_types,
                         robots_cache=self.robots_cache,
                     )
                     version_string = utils.extract_deb_version(
@@ -153,6 +166,7 @@ class URLChecker(Checker):
                 new_version = await utils.get_extra_data_info_from_url(
                     url,
                     session=self.session,
+                    content_type_deny=wrong_content_types,
                     robots_cache=self.robots_cache,
                 )
         except NETWORK_ERRORS as err:
