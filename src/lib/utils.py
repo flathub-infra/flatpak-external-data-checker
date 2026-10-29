@@ -68,16 +68,19 @@ def _extract_timestamp(info):
     return parse_date_header(date_str)
 
 
-def parse_date_header(date_str):
-    """Parse a stringified date, from a Last-Modified or Date header.
+def parse_date_header(date_str: str | None) -> dt.datetime:
+    """Parse a Last-Modified or Date header into a UTC-aware datetime.
 
     In addition to standard(ish) formats, non-standard formats where the
-    timezone is a named zone rather than an offset are detected and handled."""
+    timezone is a named zone rather than an offset are detected and handled.
+    Empty headers default to now; malformed nonempty headers raise
+    CheckerRemoteError.
+    """
     if not date_str:
         return dt.datetime.now(tz=dt.timezone.utc)  # what else can we do?
 
     for tz in zoneinfo.available_timezones():
-        if tz in ("UTC", "GMT") or not date_str.endswith(tz):
+        if not date_str.endswith(f" {tz}"):
             continue
 
         date_str_notz = date_str[: -(len(tz) + 1)]
@@ -89,23 +92,19 @@ def parse_date_header(date_str):
                 dt_obj = dt.datetime.strptime(date_str_notz, date_fmt).replace(
                     tzinfo=zoneinfo.ZoneInfo(tz)
                 )
-                utc_dt = dt_obj.astimezone(zoneinfo.ZoneInfo("UTC"))
-                return utc_dt.replace(tzinfo=None)
+                return dt_obj.astimezone(dt.timezone.utc)
             except ValueError:
                 continue
-            raise CheckerRemoteError(f"Cannot parse date/time: {date_str}")
 
     for date_fmt in [
-        "%a, %d %b %Y %H:%M:%S %Z",
         "%a, %d %b %Y %H:%M:%S %z",
-        "%a, %d-%b-%Y %H:%M:%S %Z",
         "%a, %d-%b-%Y %H:%M:%S %z",
     ]:
         try:
             return dt.datetime.strptime(date_str, date_fmt).astimezone(dt.timezone.utc)
         except ValueError:
             continue
-        raise CheckerRemoteError(f"Cannot parse date/time: {date_str}")
+    raise CheckerRemoteError(f"Cannot parse date/time: {date_str}")
 
 
 def _check_newline(fp):
