@@ -116,11 +116,12 @@ class HTMLChecker(Checker):
                 decoder_cls = codecs.getincrementaldecoder(encoding)
                 decoder = decoder_cls(errors="strict")
                 with io.StringIO() as buf:
-                    async for chunk, _ in response.content.iter_chunks():
-                        try:
+                    try:
+                        async for chunk, _ in response.content.iter_chunks():
                             buf.write(decoder.decode(chunk))
-                        except UnicodeDecodeError as err:
-                            raise CheckerQueryError from err
+                        buf.write(decoder.decode(b"", final=True))
+                    except UnicodeDecodeError as err:
+                        raise CheckerQueryError from err
                     return buf.getvalue()
         except NETWORK_ERRORS as err:
             raise CheckerQueryError from err
