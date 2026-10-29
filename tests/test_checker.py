@@ -546,6 +546,42 @@ size: {UpdateEverythingChecker.SIZE}
         return None
 
 
+class TestVersionTemplates(unittest.TestCase):
+    def test_leading_zeroes_in_url(self):
+        base = "https://downloads.sourceforge.net/project/tuxpaint/tuxpaint-stamps/"
+        for directory in ("$major-$minor-$patch", "$version0-$version1-$version2"):
+            with self.subTest(directory=directory):
+                self.assertEqual(
+                    Checker._substitute_template(
+                        base + directory + "/tuxpaint-stamps-$version.tar.gz",
+                        Checker._version_parts("2021.06.28"),
+                    ),
+                    base + "2021-06-28/tuxpaint-stamps-2021.06.28.tar.gz",
+                )
+
+    def test_component_spelling_and_boundaries(self):
+        cases = [
+            ("", []),
+            ("001", ["001"]),
+            ("01.00.003.0004", ["01", "00", "003", "0004"]),
+            ("1.5.2b02", ["1", "5", "2", "b", "02"]),
+            ("13.00-beta03", ["13", "00", "-", "beta", "03"]),
+            ("01.02RC03", ["01", "02", "RC", "03"]),
+            ("1.13++", ["1", "13", "++"]),
+            ("1..02.", ["1", "02"]),
+        ]
+        for version, components in cases:
+            with self.subTest(version=version):
+                expected = {"version": version}
+                expected.update(
+                    (f"version{i}", part) for i, part in enumerate(components)
+                )
+                expected.update(
+                    zip(("major", "minor", "patch"), components, strict=False)
+                )
+                self.assertEqual(Checker._version_parts(version), expected)
+
+
 class TestCheckerHelpers(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         init_logging()
