@@ -1,3 +1,5 @@
+import io
+import logging
 import os
 import shutil
 import subprocess
@@ -7,6 +9,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from src import main
+from src.lib.errors import AppdataLoadError, CheckerFetchError, SourceLoadError
 from src.lib.externaldata import ExternalData
 
 TEST_MANIFEST = os.path.join(
@@ -325,6 +328,58 @@ class TestPrintOutdatedBrokenState(unittest.TestCase):
 
         self.assertEqual(result, 1)
         broken.current_version._asdict.assert_called_once()
+
+
+class TestErrorSummary(unittest.IsolatedAsyncioTestCase):
+    async def _check_summary(self, errors, expected):
+        with (
+            patch("src.main.manifest.ManifestChecker", autospec=True) as factory,
+            patch("src.main.init_logging"),
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+            self.assertLogs("src.main", level="INFO") as logs,
+        ):
+            checker = factory.return_value
+            checker.get_errors.return_value = errors
+            checker.get_outdated_external_data.return_value = []
+            result = await main.run_with_args(main.parse_cli_args([TEST_MANIFEST]))
+
+        self.assertEqual(result, (0, len(errors), False))
+        checker.check.assert_awaited_once_with(None)
+        checker.get_errors.assert_called_once_with()
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertEqual(len(logs.records), 1)
+        self.assertEqual(logs.records[0].getMessage(), expected)
+        self.assertEqual(
+            logs.records[0].levelno, logging.WARNING if errors else logging.INFO
+        )
+        self.assertIsNone(logs.records[0].exc_info)
+
+    async def test_zero_errors(self):
+        await self._check_summary([], "Check finished with 0 error(s)")
+
+    async def test_one_error(self):
+        await self._check_summary(
+            [SourceLoadError("Invalid source in module.json")],
+            "Check finished with 1 error(s)\n  1. Invalid source in module.json",
+        )
+
+    async def test_multiple_errors(self):
+        await self._check_summary(
+            [SourceLoadError("Invalid source"), AppdataLoadError()],
+            "Check finished with 2 error(s)\n  1. Invalid source"
+            "\n  2. Error loading metainfo.xml",
+        )
+
+    async def test_chained_error(self):
+        cause = CheckerFetchError("Download failed")
+        cause.__cause__ = ValueError("Invalid URL")
+        error = SourceLoadError("Invalid source")
+        error.__cause__ = cause
+        await self._check_summary(
+            [error],
+            "Check finished with 1 error(s)"
+            "\n  1. Invalid source: Download failed: Invalid URL",
+        )
 
 
 class TestGetManifestGitCheckout(unittest.TestCase):

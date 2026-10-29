@@ -117,8 +117,14 @@ def print_outdated_external_data(manifest_checker: manifest.ManifestChecker):
 
 
 def print_errors(manifest_checker: manifest.ManifestChecker) -> int:
-    # TODO: Actually do pretty-print collected errors
     errors = manifest_checker.get_errors()
+    details = "".join(f"\n  {i}. {error}" for i, error in enumerate(errors, start=1))
+    log.log(
+        logging.WARNING if errors else logging.INFO,
+        "Check finished with %i error(s)%s",
+        len(errors),
+        details,
+    )
     return len(errors)
 
 
@@ -605,12 +611,6 @@ async def run_with_args(args: argparse.Namespace) -> tuple[int, int, bool]:
         did_update = True
 
     errors_num = print_errors(manifest_checker)
-
-    log.log(
-        logging.WARNING if errors_num else logging.INFO,
-        "Check finished with %i error(s)",
-        errors_num,
-    )
 
     return outdated_num, errors_num, did_update
 
