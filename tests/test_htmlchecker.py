@@ -37,6 +37,46 @@ from src.lib.version import LooseVersion
 from src.manifest import ManifestChecker
 
 
+class TestHTMLStreamDecoding(unittest.IsolatedAsyncioTestCase):
+    async def _get_text(self, chunks, charset="utf-8"):
+        response = mock.MagicMock(spec=aiohttp.ClientResponse)
+        response.headers = {aiohttp.hdrs.CONTENT_TYPE: f"text/html; charset={charset}"}
+        response.content = mock.MagicMock()
+        response.content.iter_chunks.return_value.__aiter__.return_value = [
+            (chunk, False) for chunk in chunks
+        ]
+        session = mock.MagicMock(spec=aiohttp.ClientSession)
+        session.get.return_value.__aenter__.return_value = response
+        return await HTMLChecker(session)._get_text("https://example.com/page.html")
+
+    async def test_multibyte_sequences_split_across_chunks(self):
+        self.assertEqual(
+            await self._get_text(
+                [b"hello \xe2", b"\x82", b"\xac \xf0\x9f", b"\x8c\x8d"]
+            ),
+            "hello € 🌍",
+        )
+
+    async def test_incomplete_trailing_sequence_raises(self):
+        with self.assertRaises(CheckerQueryError) as raised:
+            await self._get_text([b"valid text\xe2\x82"])
+        self.assertIsInstance(raised.exception.__cause__, UnicodeDecodeError)
+
+    async def test_invalid_sequence_in_chunk_raises(self):
+        with self.assertRaises(CheckerQueryError) as raised:
+            await self._get_text([b"valid text\xff"])
+        self.assertIsInstance(raised.exception.__cause__, UnicodeDecodeError)
+
+    async def test_empty_stream(self):
+        self.assertEqual(await self._get_text([]), "")
+
+    async def test_valid_content(self):
+        self.assertEqual(await self._get_text([b"hello ", b"world"]), "hello world")
+
+    async def test_final_decoder_output_is_appended(self):
+        self.assertEqual(await self._get_text([b"hello +AKM"], "utf-7"), "hello £")
+
+
 class TestHTMLTools(unittest.IsolatedAsyncioTestCase):
     SAMPLES = {
         "utf-8": "🙋, 🌍!\n…"
