@@ -18,6 +18,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import asyncio
 import base64
 import datetime as dt
 import hashlib
@@ -458,7 +459,36 @@ size: {UpdateEverythingChecker.SIZE}
 
     async def test_check(self):
         checker = manifest.ManifestChecker(TEST_MANIFEST)
-        ext_data = await checker.check()
+
+        async def incomplete_response(reader, writer):
+            try:
+                await reader.readuntil(b"\r\n\r\n")
+                writer.write(
+                    b"HTTP/1.1 200 OK\r\nContent-Length: 1000\r\n"
+                    b"Connection: close\r\n\r\nshort body"
+                )
+                await writer.drain()
+            finally:
+                writer.close()
+                await writer.wait_closed()
+
+        async with await asyncio.start_server(
+            incomplete_response, "127.0.0.1", 0
+        ) as server:
+            port = server.sockets[0].getsockname()[1]
+            incomplete_sources = [
+                self._find_by_filename(checker.get_external_data(), filename)
+                for filename in ("incomplete-read.txt", "incomplete-read-2.txt")
+            ]
+            for data in incomplete_sources:
+                data.current_version = data.current_version._replace(
+                    url=f"http://127.0.0.1:{port}/{data.filename}"
+                )
+            ext_data = await checker.check()
+
+        for data in incomplete_sources:
+            self.assertTrue(data.state & data.State.BROKEN)
+            self.assertIsNone(data.new_version)
 
         self.assertEqual(len(ext_data), NUM_ALL_EXT_DATA)
 
