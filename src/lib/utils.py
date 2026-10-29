@@ -657,9 +657,10 @@ def dump_manifest(
     else:
         json_indent = _detect_json_flatpak_manifest_indent(original_manifest) or 4
 
+    yaml_width = None
     if yaml_max_line_length := conf.get("max_line_length"):
         try:
-            _yaml.width = int(yaml_max_line_length)
+            yaml_width = int(yaml_max_line_length)
         except ValueError:
             log.warning("Ignoring invalid max_line_length %r", yaml_max_line_length)
 
@@ -673,6 +674,7 @@ def dump_manifest(
 
     with manifest_path.open("w", encoding="utf-8") as fp:
         if manifest_path.suffix in (".yaml", ".yml"):
+            _yaml.width = yaml_width
             _yaml.explicit_start = has_yaml_header
             _yaml.dump(contents, fp)
         else:
