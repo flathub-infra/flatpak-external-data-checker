@@ -3,6 +3,7 @@ import re
 import typing as t
 from datetime import datetime
 
+from packaging.version import InvalidVersion
 from packaging.version import Version as PackagingVersion
 
 from ..lib import OPERATORS_SCHEMA
@@ -31,16 +32,27 @@ def _filter_downloads(
     packagetype: str,
     stable_only: bool = False,
 ) -> t.Generator[tuple[Version, dict, datetime], None, None]:
+    parsed_releases = []
+    for version, downloads in pypy_releases.items():
+        try:
+            parsed_version = Version(version)
+        except InvalidVersion:
+            log.debug("Skipping invalid PyPI release version %r", version)
+            continue
+        parsed_releases.append((parsed_version, downloads))
+
     releases = filter_versioned_items(
-        ((Version(v), d) for v, d in pypy_releases.items()),
+        parsed_releases,
         constraints,
         to_version=lambda r: r[0],
         sort=True,
     )
     for pypi_version, pypi_downloads in releases:
-        if stable_only and pypi_version.pre:
+        if stable_only and pypi_version.is_prerelease:
             continue
         for download in pypi_downloads:
+            if download.get("yanked", False):
+                continue
             if download["packagetype"] != packagetype:
                 continue
             if download["python_version"] not in ["source", "py3", "py2.py3"]:
@@ -91,14 +103,18 @@ class PyPIChecker(Checker):
         async with self.session.get(f"{PYPI_INDEX}/{package_name}/json") as response:
             pypi_data = await response.json()
 
-        if constraints:
-            releases = pypi_data["releases"]
-        else:
+        downloads = []
+        if stable_only and not constraints:
             releases = {pypi_data["info"]["version"]: pypi_data["urls"]}
-
-        downloads = list(
-            _filter_downloads(releases, constraints, package_type, stable_only)
-        )
+            downloads = list(
+                _filter_downloads(releases, constraints, package_type, stable_only)
+            )
+        if not downloads:
+            downloads = list(
+                _filter_downloads(
+                    pypi_data["releases"], constraints, package_type, stable_only
+                )
+            )
 
         try:
             pypi_version, pypi_download, pypi_date = downloads[-1]
