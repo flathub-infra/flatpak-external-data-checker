@@ -1,3 +1,4 @@
+import asyncio
 import operator
 import re
 
@@ -17,6 +18,7 @@ HTTP_CLIENT_HEADERS = {"User-Agent": USER_AGENT}
 HTTP_CHUNK_SIZE = 1024 * 64
 
 NETWORK_ERRORS = (
+    asyncio.TimeoutError,
     aiohttp.ClientError,
     aiohttp.ServerConnectionError,
     aiohttp.ServerDisconnectedError,

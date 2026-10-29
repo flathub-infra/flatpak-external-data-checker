@@ -135,7 +135,7 @@ class RobotsCache:
                 else:
                     text = await resp.text()
                     lines = text.splitlines()
-        except (asyncio.TimeoutError, *NETWORK_ERRORS) as err:
+        except NETWORK_ERRORS as err:
             log.debug(
                 "Failed to fetch %s: %s, failing open (not cached)",
                 robots_url,
