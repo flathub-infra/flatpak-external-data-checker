@@ -158,8 +158,7 @@ class Checker:
         """
         Parse version string and return a dict of named components.
         """
-        version_list = LooseVersion(version).version
-        tmpl_vars: dict[str, str | int]
+        version_list = LooseVersion.split_components(version)
         tmpl_vars = {"version": version}
         for i, version_part in enumerate(version_list):
             tmpl_vars[f"version{i}"] = version_part
@@ -169,7 +168,7 @@ class Checker:
                 tmpl_vars["minor"] = version_part
             elif i == 2:
                 tmpl_vars["patch"] = version_part
-        return {k: str(v) for k, v in tmpl_vars.items()}
+        return tmpl_vars
 
     @classmethod
     def _substitute_template(

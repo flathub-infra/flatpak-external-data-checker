@@ -29,12 +29,15 @@ class LooseVersion:
     def __hash__(self):
         return hash(self.vstring)
 
-    def _parse_components(self, vstring: str) -> list[int | str]:
+    @staticmethod
+    def split_components(vstring: str) -> list[str]:
+        """Split a version without normalizing the spelling of its components."""
         pattern: t.Pattern[str] = re.compile(r"(\d+|[a-z]+|\.)", re.VERBOSE)
+        return [p for p in pattern.split(vstring) if p and p != "."]
 
-        parts: list[str] = [p for p in pattern.split(vstring) if p and p != "."]
+    def _parse_components(self, vstring: str) -> list[int | str]:
         result: list[int | str] = []
-        for part in parts:
+        for part in self.split_components(vstring):
             try:
                 result.append(int(part))
             except ValueError:

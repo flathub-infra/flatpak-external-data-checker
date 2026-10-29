@@ -259,7 +259,18 @@ The HTML checker also supports building the download URL using
 the retrieved version string, its components according to our
 LooseVersion implementation (see `src/lib/version.py` based on
 distutils' implementation before it was removed from Python stdlib in
-3.12) and semantic versioning fields:
+3.12). `$version` is the complete version string; `$version0`, `$version1`,
+and so on are its components. `$major`, `$minor`, and `$patch` are aliases
+for the first three components, when present.
+
+Components retain their original spelling, including leading zeroes: for
+`2021.06.28`, `$minor` and `$version1` are both `06`. Dots are discarded,
+but mixed-format versions keep LooseVersion's component boundaries. For
+example, `1.02b03` has components `1`, `02`, `b`, `03`, so `$patch` is `b`
+and `$version3` is `03`. These template values do not change numeric version
+comparison. The same rules apply to Anitya URL and tag templates.
+
+For example:
 
 ```json
 "x-checker-data": {
