@@ -33,7 +33,6 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import logging
-import re
 import tempfile
 
 from ..lib import HTTP_CLIENT_HEADERS, NETWORK_ERRORS, utils
@@ -49,12 +48,11 @@ def extract_version(checker_data, url):
     If checker_data contains a "pattern", matches 'url' against it and returns the
     first capture group (which is assumed to be the version number).
     """
-    try:
-        pattern = checker_data["pattern"]
-    except KeyError:
+    pattern = Checker._get_pattern(checker_data, "pattern")
+    if pattern is None:
         return None
 
-    m = re.match(pattern, url)
+    m = pattern.match(url)
     if m is None:
         return None
 
@@ -101,8 +99,8 @@ class URLChecker(Checker):
 
     async def validate_checker_data(self, external_data: ExternalBase):
         if external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE:
-            return await super().validate_checker_data(external_data)
-        return None
+            await super().validate_checker_data(external_data)
+        self._get_pattern(external_data.checker_data, "pattern")
 
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
