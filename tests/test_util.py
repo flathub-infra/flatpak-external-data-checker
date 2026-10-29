@@ -19,8 +19,10 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import asyncio
 import gc
+import os
 import re
 import subprocess
+import time
 import unittest
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -33,7 +35,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import aiohttp
 
 from src.lib import utils
-from src.lib.errors import CheckerFetchError, CheckerQueryError
+from src.lib.errors import CheckerFetchError, CheckerQueryError, CheckerRemoteError
 from src.lib.utils import (
     Command,
     FallbackVersion,
@@ -331,6 +333,7 @@ class TestParseHTTPDate(unittest.TestCase):
     def test_parse_valid(self):
         for date_str in [
             "Wed, 20 Jan 2021 15:25:15 UTC",
+            "Wed, 20 Jan 2021 15:25:15 GMT",
             "Wed, 20-Jan-2021 15:25:15 UTC",
             "Wed, 20-Jan-2021 15:25:15 GMT",
             "Wed, 20 Jan 2021 15:25:15 +0000",
@@ -339,33 +342,71 @@ class TestParseHTTPDate(unittest.TestCase):
             # https://github.com/flathub-infra/flatpak-external-data-checker/issues/370
             "Wed, 20 Jan 2021 23:25:15 +0800",
             "Wed, 20 Jan 2021 23:25:15 Asia/Shanghai",
+            "Wed, 20-Jan-2021 23:25:15 Asia/Shanghai",
+            "Wed, 20 Jan 2021 10:25:15 America/New_York",
+            "Wed, 20-Jan-2021 18:25:15 +0300",
         ]:
-            parsed = parse_date_header(date_str)
-            self.assertEqual(
-                parsed,
-                datetime(
-                    # fmt: off
-                    2021,
-                    1,
-                    20,
-                    15,
-                    25,
-                    15,
-                    tzinfo=timezone.utc if parsed.tzinfo else None,
-                    # fmt: on
-                ),
-            )
+            with self.subTest(date_str=date_str):
+                parsed = parse_date_header(date_str)
+                self.assertEqual(
+                    parsed, datetime(2021, 1, 20, 15, 25, 15, tzinfo=timezone.utc)
+                )
+                self.assertIs(parsed.tzinfo, timezone.utc)
 
-    @unittest.expectedFailure
     def test_parse_invalid(self):
-        self.assertIsNotNone(parse_date_header("some broken string"))
+        for date_str in [
+            "some broken string",
+            "NOTADATE America/New_York",
+            "Wed, 32 Jan 2021 15:25:15 GMT",
+            "Wed, 32 Jan 2021 15:25:15 Asia/Shanghai",
+            "Wed, 20 Jan 2021 15:25:15 +2500",
+            "Wed, 20 Jan 2021 15:25:15 Unknown/Zone",
+            "Wed, 20 Jan 2021 15:25:15",
+            "Wed, 20 Jan 2021 15:25:15 xAsia/Shanghai",
+            " ",
+        ]:
+            with self.subTest(date_str=date_str):
+                with self.assertRaisesRegex(
+                    CheckerRemoteError, "Cannot parse date/time"
+                ):
+                    parse_date_header(date_str)
 
-    def test_named_tz_unparseable_date_falls_through(self):
-        parse_date_header("NOTADATE America/New_York")
+    @unittest.skipUnless(hasattr(time, "tzset"), "requires time.tzset")
+    def test_non_utc_host(self):
+        try:
+            with patch.dict(os.environ, {"TZ": "America/New_York"}):
+                time.tzset()
+                self.test_parse_valid()
+        finally:
+            time.tzset()
 
-    def test_empty_string_returns_now(self):
-        result = parse_date_header("")
-        self.assertIsNotNone(result)
+    def test_named_zone_daylight_saving(self):
+        result = parse_date_header("Tue, 20 Jul 2021 11:25:15 America/New_York")
+        self.assertEqual(result, datetime(2021, 7, 20, 15, 25, 15, tzinfo=timezone.utc))
+        self.assertIs(result.tzinfo, timezone.utc)
+
+    def test_empty_header_returns_now(self):
+        for date_str in ("", None):
+            with self.subTest(date_str=date_str):
+                before = datetime.now(timezone.utc)
+                result = parse_date_header(date_str)
+                after = datetime.now(timezone.utc)
+                self.assertLessEqual(before, result)
+                self.assertLessEqual(result, after)
+                self.assertIs(result.tzinfo, timezone.utc)
+
+    def test_extract_timestamp_header_precedence(self):
+        expected = datetime(2021, 1, 20, 15, 25, 15, tzinfo=timezone.utc)
+        headers = {
+            "Last-Modified": "Wed, 20 Jan 2021 23:25:15 Asia/Shanghai",
+            "Date": "Thu, 21 Jan 2021 15:25:15 GMT",
+        }
+        self.assertEqual(utils._extract_timestamp(headers), expected)
+        headers["Last-Modified"] = ""
+        self.assertEqual(utils._extract_timestamp(headers), expected.replace(day=21))
+        headers["Last-Modified"] = "invalid"
+        with self.assertRaises(CheckerRemoteError):
+            utils._extract_timestamp(headers)
 
 
 class TestDownload(unittest.IsolatedAsyncioTestCase):
@@ -409,6 +450,10 @@ class TestDownload(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.url, url)
         self.assertEqual(result.size, len(fake_chunk))
+        self.assertEqual(
+            result.timestamp, datetime(2021, 1, 20, 15, 25, 15, tzinfo=timezone.utc)
+        )
+        self.assertEqual(result.json["timestamp"], "2021-01-20T15:25:15+00:00")
         mock_session.get.assert_called_once()
 
     @patch("src.lib.utils.magic.from_buffer")
