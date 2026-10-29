@@ -46,7 +46,7 @@ from elftools.elf.elffile import ELFFile
 from packaging.version import Version
 from ruamel.yaml import YAML
 
-from . import HTTP_CHUNK_SIZE, OPERATORS, TIMEOUT_CONNECT, externaldata
+from . import HTTP_CHUNK_SIZE, NETWORK_ERRORS, OPERATORS, TIMEOUT_CONNECT, externaldata
 from .checksums import MultiHash
 from .errors import CheckerFetchError, CheckerQueryError, CheckerRemoteError
 from .robots import RobotsCache
@@ -186,13 +186,16 @@ async def get_timestamp_from_url(
     if robots_cache:
         await robots_cache.ensure_allowed(url)
 
-    async with session.head(url, allow_redirects=True) as response:
-        real_url = str(response.url)
+    try:
+        async with session.head(url, allow_redirects=True) as response:
+            real_url = str(response.url)
 
-        if robots_cache and real_url != url:
-            await robots_cache.ensure_allowed(real_url)
+            if robots_cache and real_url != url:
+                await robots_cache.ensure_allowed(real_url)
 
-        return _extract_timestamp(response.headers)
+            return _extract_timestamp(response.headers)
+    except (asyncio.TimeoutError, *NETWORK_ERRORS) as err:
+        raise CheckerQueryError(f"Failed to query timestamp for {url}") from err
 
 
 async def get_extra_data_info_from_url(
