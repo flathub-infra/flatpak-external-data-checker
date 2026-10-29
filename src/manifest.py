@@ -30,7 +30,7 @@ import aiohttp
 from lxml.etree import XMLSyntaxError
 
 from .checkers import ALL_CHECKERS, Checker
-from .lib import HTTP_CLIENT_HEADERS, TIMEOUT_CONNECT, TIMEOUT_TOTAL
+from .lib import HTTP_CLIENT_HEADERS, TIMEOUT_CONNECT, TIMEOUT_SOCK_READ, TIMEOUT_TOTAL
 from .lib.appdata import add_release_to_file
 from .lib.errors import (
     AppdataError,
@@ -421,7 +421,11 @@ class ManifestChecker:
         async with aiohttp.ClientSession(
             raise_for_status=True,
             headers=HTTP_CLIENT_HEADERS,
-            timeout=aiohttp.ClientTimeout(connect=TIMEOUT_CONNECT, total=TIMEOUT_TOTAL),
+            timeout=aiohttp.ClientTimeout(
+                connect=TIMEOUT_CONNECT,
+                sock_read=TIMEOUT_SOCK_READ,
+                total=TIMEOUT_TOTAL,
+            ),
             trust_env=True,
             max_field_size=MAXIMUM_HEADER_SIZE,
             max_line_size=MAXIMUM_HEADER_SIZE,
