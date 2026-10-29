@@ -97,6 +97,28 @@ class TestStripQuery(unittest.TestCase):
         expected = url
         self.assertEqual(strip_query(url), expected)
 
+    def test_preserve_empty_query_value(self):
+        url = "https://example.org/file?download=&_tracking=x"
+        expected = "https://example.org/file?download="
+        self.assertEqual(strip_query(url), expected)
+
+    def test_preserve_bare_query_parameter(self):
+        url = "https://example.org/file?download&_tracking=x"
+        expected = "https://example.org/file?download="
+        self.assertEqual(strip_query(url), expected)
+
+    def test_preserve_repeated_query_parameters(self):
+        url = (
+            "https://example.org/file?tag=first&tag=&_tracking=x&tag&tag=last#fragment"
+        )
+        expected = "https://example.org/file?tag=first&tag=&tag=&tag=last#fragment"
+        self.assertEqual(strip_query(url), expected)
+
+    def test_strip_empty_and_bare_tracking_parameters(self):
+        url = "https://example.org/file?_empty=&_bare&_tracking=x#fragment"
+        expected = "https://example.org/file#fragment"
+        self.assertEqual(strip_query(url), expected)
+
 
 class TestCommand(unittest.IsolatedAsyncioTestCase):
     @contextmanager

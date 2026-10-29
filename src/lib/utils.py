@@ -170,7 +170,7 @@ def strip_query(url):
     parts = urllib.parse.urlparse(url)
     if not parts.query:
         return url
-    qsl = urllib.parse.parse_qsl(parts.query)
+    qsl = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
     qsl_stripped = [(k, v) for (k, v) in qsl if not k.startswith("_")]
     query_stripped = urllib.parse.urlencode(qsl_stripped)
     stripped = urllib.parse.urlunparse(parts._replace(query=query_stripped))
