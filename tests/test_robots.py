@@ -207,6 +207,87 @@ class TestRobotsCache(unittest.IsolatedAsyncioTestCase):
         self.cache._cache_path("https://example.com:443").write_text("not-json")
         self.assertIsNone(self.cache._load_from_disk("https://example.com:443"))
 
+    async def test_invalid_cache_fields_refetch(self):
+        now = 1_700_000_000
+        invalid_timestamps = [
+            "invalid",
+            None,
+            True,
+            False,
+            [],
+            {},
+            float("nan"),
+            float("inf"),
+            float("-inf"),
+            10**400,
+            -(10**400),
+        ]
+        invalid_lines = [None, "not-a-list", {}, [None], [1], [True], [[]], [{}]]
+        entries = [
+            {"timestamp": timestamp, "lines": []} for timestamp in invalid_timestamps
+        ]
+        entries.extend({"timestamp": now, "lines": lines} for lines in invalid_lines)
+        entries.extend([{"lines": []}, {"timestamp": now}, {}])
+        path = self.cache._cache_path("https://example.com:443")
+        for entry in entries:
+            with self.subTest(entry=entry):
+                path.write_text(json.dumps(entry))
+                cache = RobotsCache(self.session, cache_dir=self.cache_dir)
+                with (
+                    mock.patch("src.lib.robots.time.time", return_value=now),
+                    mock.patch.object(
+                        self.session, "get", side_effect=_fake_get(403)
+                    ) as get,
+                ):
+                    self.assertIsNone(cache._load_from_disk("https://example.com:443"))
+                    self.assertFalse(await cache._is_allowed("https://example.com/foo"))
+                    get.assert_called_once_with(
+                        "https://example.com:443/robots.txt", raise_for_status=False
+                    )
+
+    async def test_valid_cache_fields(self):
+        now = 1_700_000_000
+        path = self.cache._cache_path("https://example.com:443")
+        for timestamp in [now, now - 0.5, now - CACHE_TTL]:
+            for lines in [[], ["User-agent: *", "Disallow: /secret"]]:
+                with self.subTest(timestamp=timestamp, lines=lines):
+                    path.write_text(
+                        json.dumps({"timestamp": timestamp, "lines": lines})
+                    )
+                    cache = RobotsCache(self.session, cache_dir=self.cache_dir)
+                    with (
+                        mock.patch("src.lib.robots.time.time", return_value=now),
+                        mock.patch.object(self.session, "get") as get,
+                    ):
+                        self.assertTrue(await cache._is_allowed("https://example.com/"))
+                        self.assertEqual(
+                            await cache._is_allowed("https://example.com/secret"),
+                            not lines,
+                        )
+                        get.assert_not_called()
+
+    async def test_expired_cache_cleanup_failure_refetches(self):
+        now = 1_700_000_000
+        path = self.cache._cache_path("https://example.com:443")
+        for error in [PermissionError("read-only cache"), OSError("disk error")]:
+            with self.subTest(error=error):
+                path.write_text(
+                    json.dumps({"timestamp": now - CACHE_TTL - 1, "lines": []})
+                )
+                cache = RobotsCache(self.session, cache_dir=self.cache_dir)
+                with (
+                    mock.patch("src.lib.robots.time.time", return_value=now),
+                    mock.patch("src.lib.robots.Path.unlink", side_effect=error),
+                    mock.patch.object(
+                        self.session, "get", side_effect=_fake_get(403)
+                    ) as get,
+                ):
+                    self.assertIsNone(cache._load_from_disk("https://example.com:443"))
+                    self.assertFalse(await cache._is_allowed("https://example.com/foo"))
+                    get.assert_called_once_with(
+                        "https://example.com:443/robots.txt", raise_for_status=False
+                    )
+
     async def test_cache_overwrite(self):
         self.cache._save_to_disk(
             "https://example.com:443", ["User-agent: *", "Disallow: /"]
