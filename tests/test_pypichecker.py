@@ -6,6 +6,7 @@ from packaging.version import Version
 
 from src.checkers.pypichecker import PyPIChecker
 from src.lib.checksums import MultiDigest
+from src.lib.errors import CheckerQueryError
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
 
@@ -91,8 +92,8 @@ class TestPyPIChecker(unittest.IsolatedAsyncioTestCase):
                     "size": 2000,
                 },
             ],
-            "releases": {},
         }
+        mock_json_data["releases"] = {"1.0.0": mock_json_data["urls"]}
 
         dummy_ext_data = mock.MagicMock()
         dummy_ext_data.checker_data = {
@@ -117,6 +118,175 @@ class TestPyPIChecker(unittest.IsolatedAsyncioTestCase):
             call_args.url,
             "https://files.pythonhosted.org/packages/xx/cryptography-1.0.0-py3-none-any.whl",
         )
+
+
+class TestPyPIReleaseEligibility(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    def download(version, **overrides):
+        download = {
+            "filename": f"example-{version}.tar.gz",
+            "packagetype": "sdist",
+            "python_version": "source",
+            "upload_time_iso_8601": "2026-01-01T00:00:00Z",
+            "url": f"https://example.org/example-{version}.tar.gz",
+            "digests": {"sha256": "abc123"},
+            "size": 1000,
+            "yanked": False,
+        }
+        download.update(overrides)
+        return download
+
+    async def check_releases(self, releases, latest, **options):
+        response = mock.AsyncMock()
+        response.__aenter__.return_value = response
+        response.json.return_value = {
+            "info": {"version": latest},
+            "urls": releases.get(latest, []),
+            "releases": releases,
+        }
+        session = mock.MagicMock()
+        session.get.return_value = response
+        data = mock.MagicMock()
+        data.checker_data = {"name": "example", **options}
+        await PyPIChecker(session).check(data)
+        data.set_new_version.assert_called_once()
+        return data.set_new_version.call_args.args[0]
+
+    async def test_release_kinds(self):
+        for version, stable in (
+            ("2.0", True),
+            ("2.0.dev1", False),
+            ("2.0a1", False),
+            ("2.0b1", False),
+            ("2.0rc1", False),
+            ("2.0.post1", True),
+            ("2.0.post1.dev1", False),
+        ):
+            for stable_only in (True, False):
+                with self.subTest(version=version, stable_only=stable_only):
+                    releases = {
+                        version: [self.download(version)],
+                        "1.0": [self.download("1.0")],
+                    }
+                    result = await self.check_releases(
+                        releases, version, **{"stable-only": stable_only}
+                    )
+                    expected = "1.0" if stable_only and not stable else version
+                    self.assertEqual(result.version, expected)
+
+    async def test_yanked_artifacts(self):
+        for stable_only in (True, False):
+            with self.subTest(stable_only=stable_only):
+                eligible = self.download("2.0")
+                releases = {
+                    "3.0": [self.download("3.0", yanked=True)],
+                    "2.0": [
+                        self.download("2.0", yanked=True),
+                        eligible,
+                        self.download(
+                            "2.0", yanked=True, url="https://example.org/yanked"
+                        ),
+                    ],
+                    "1.0": [self.download("1.0")],
+                }
+                result = await self.check_releases(
+                    releases, "3.0", **{"stable-only": stable_only}
+                )
+                self.assertEqual(result.version, "2.0")
+                self.assertEqual(result.url, eligible["url"])
+
+    async def test_constraints_apply_to_remaining_candidates(self):
+        releases = {
+            "4.0": [self.download("4.0")],
+            "3.0": [self.download("3.0", yanked=True)],
+            "2.0": [self.download("2.0")],
+            "1.0": [self.download("1.0")],
+        }
+        result = await self.check_releases(
+            releases, "4.0", versions={"<": "4.0", ">=": "2.0"}
+        )
+        self.assertEqual(result.version, "2.0")
+
+    async def test_legacy_versions_do_not_hide_eligible_releases(self):
+        releases = {
+            "2004d": [self.download("2004d")],
+            "2026.6": [self.download("2026.6")],
+        }
+        result = await self.check_releases(
+            releases, "2026.6", versions={">=": "2026.0"}
+        )
+        self.assertEqual(result.version, "2026.6")
+
+    async def test_latest_stable_does_not_scan_release_history(self):
+        releases = mock.MagicMock(
+            wraps={
+                "1.0": [self.download("1.0")],
+                "2.0": [self.download("2.0")],
+            }
+        )
+        result = await self.check_releases(releases, "2.0")
+        self.assertEqual(result.version, "2.0")
+        releases.items.assert_not_called()
+
+    async def test_prereleases_newer_than_advertised_latest(self):
+        releases = {
+            "2.0": [self.download("2.0")],
+            "3.0rc1": [self.download("3.0rc1")],
+        }
+        result = await self.check_releases(releases, "2.0", **{"stable-only": False})
+        self.assertEqual(result.version, "3.0rc1")
+
+    async def test_remaining_artifacts_must_be_compatible(self):
+        for overrides in (
+            {"packagetype": "sdist"},
+            {"python_version": "py2"},
+            {"filename": "example-2.0-cp311-cp311-linux_x86_64.whl"},
+        ):
+            with self.subTest(overrides=overrides):
+                eligible = self.download(
+                    "1.0",
+                    packagetype="bdist_wheel",
+                    python_version="py3",
+                    filename="example-1.0-py3-none-any.whl",
+                )
+                incompatible = {**eligible, **overrides}
+                releases = {
+                    "2.0": [{**eligible, "yanked": True}, incompatible],
+                    "1.0": [eligible],
+                }
+                result = await self.check_releases(
+                    releases, "2.0", packagetype="bdist_wheel"
+                )
+                self.assertEqual(result.version, "1.0")
+
+    async def test_no_eligible_candidates(self):
+        cases = [
+            ({}, {}),
+            ({"2004d": [self.download("2004d")]}, {}),
+            ({"2.0": []}, {}),
+            ({"2.0.dev1": [self.download("2.0.dev1", yanked=True)]}, {}),
+            ({"2.0": [self.download("2.0", yanked=True)]}, {"stable-only": False}),
+            ({"2.0rc1": [self.download("2.0rc1")]}, {}),
+            (
+                {"2.0": [self.download("2.0", yanked=True)]},
+                {"versions": {"==": "2.0"}},
+            ),
+            (
+                {
+                    "1.0": [self.download("1.0")],
+                    "2.0": [self.download("2.0", yanked=True)],
+                },
+                {"versions": {">=": "2.0"}},
+            ),
+        ]
+        for releases, options in cases:
+            with self.subTest(releases=releases, options=options):
+                with self.assertRaisesRegex(
+                    CheckerQueryError, "Couldn't find sdist for package example"
+                ):
+                    await self.check_releases(
+                        releases, next(iter(releases), "2.0"), **options
+                    )
 
 
 if __name__ == "__main__":
