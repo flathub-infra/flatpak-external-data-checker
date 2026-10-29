@@ -95,7 +95,9 @@ class AnityaChecker(Checker):
         else:
             latest_version = result["latest_version"]
 
-        latest_timestamp = _parse_timestamp(result.get("latest_version_created_on"))
+        latest_timestamp = None
+        if latest_version == result.get("latest_version"):
+            latest_timestamp = _parse_timestamp(result.get("latest_version_created_on"))
 
         if isinstance(external_data, ExternalGitRepo):
             return await self._check_git(

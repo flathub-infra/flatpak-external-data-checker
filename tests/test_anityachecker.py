@@ -317,26 +317,118 @@ class TestAnityaCheckerMocked(unittest.IsolatedAsyncioTestCase):
 
         self.checker._check_git.assert_awaited_once_with(eg, "2023.1", None)
 
-    async def test_flatpak_timestamp(self):
-        checker = ManifestChecker(TEST_MANIFEST)
-        ext_data = await checker.check()
-
-        flatpak = next(d for d in ext_data if d.filename == "flatpak-1.8.2.tar.xz")
-
-        self.assertIsNotNone(flatpak.new_version)
-        self.assertIsInstance(flatpak.new_version, ExternalFile)
-
-        self.assertEqual(flatpak.new_version.version, "1.10.1")
-        self.assertEqual(
-            flatpak.new_version.url,
-            "https://github.com/flatpak/flatpak/releases/download/1.10.1/flatpak-1.10.1.tar.xz",
+    async def test_selected_release_timestamp(self):
+        upstream_timestamp = datetime(
+            2026, 6, 8, 18, 54, 44, 176150, tzinfo=timezone.utc
         )
+        download_timestamp = datetime(2024, 1, 2, tzinfo=timezone.utc)
+        cases = [
+            ("latest stable", {}, {}, "1.18.0", True),
+            ("latest unfiltered", {"stable-only": False}, {}, "1.18.0", True),
+            ("matching constraint", {"versions": {">=": "1.16.0"}}, {}, "1.18.0", True),
+            ("older stable", {"versions": {"<": "1.12.0"}}, {}, "1.10.1", False),
+            (
+                "older unfiltered",
+                {"stable-only": False, "versions": {"<": "1.12.0"}},
+                {},
+                "1.10.1",
+                False,
+            ),
+            (
+                "stable below prerelease",
+                {},
+                {"latest_version": "1.19.0-alpha"},
+                "1.18.0",
+                False,
+            ),
+            (
+                "irrelevant malformed timestamp",
+                {"versions": {"<": "1.12.0"}},
+                {"latest_version_created_on": "not-a-date"},
+                "1.10.1",
+                False,
+            ),
+            (
+                "null timestamp",
+                {},
+                {"latest_version_created_on": None},
+                "1.18.0",
+                False,
+            ),
+        ]
+        for name, settings, overrides, version, use_upstream in cases:
+            for git in (False, True):
+                with self.subTest(case=name, git=git):
+                    self._mock_session_response(_FLATPAK_ANITYA_RESPONSE | overrides)
+                    if git:
+                        data = self._make_external_git_repo(
+                            {"project-id": 1, "tag-template": "v$version"} | settings
+                        )
+                        with mock.patch(
+                            "src.lib.utils.git_ls_remote",
+                            return_value={f"refs/tags/v{version}": "a" * 40},
+                        ) as remote:
+                            await self.checker.check(data)
+                        remote.assert_awaited_once_with(data.current_version.url)
+                    else:
+                        data = self._make_external_data(
+                            {
+                                "project-id": 1,
+                                "url-template": "https://example.invalid/$version.tar.xz",
+                            }
+                            | settings
+                        )
+                        data.current_version = _FAKE_ARCHIVE
+                        data.type = ExternalData.Type.ARCHIVE
+                        with mock.patch(
+                            "src.lib.utils.get_extra_data_info_from_url",
+                            return_value=_FAKE_ARCHIVE._replace(
+                                timestamp=download_timestamp
+                            ),
+                        ) as fetch:
+                            await self.checker.check(data)
+                        self.assertEqual(
+                            fetch.call_args.kwargs["url"],
+                            f"https://example.invalid/{version}.tar.xz",
+                        )
+                    data.set_new_version.assert_called_once()
+                    new_version = data.set_new_version.call_args.args[0]
+                    self.assertEqual(new_version.version, version)
+                    fallback = None if git else download_timestamp
+                    self.assertEqual(
+                        new_version.timestamp,
+                        upstream_timestamp if use_upstream else fallback,
+                    )
 
-        self.assertIsNotNone(flatpak.new_version.timestamp)
-        self.assertEqual(
-            flatpak.new_version.timestamp,
-            datetime(2026, 6, 8, 18, 54, 44, 176150, tzinfo=timezone.utc),
+    async def test_selected_latest_malformed_timestamp_raises(self):
+        self._mock_session_response(
+            _FLATPAK_ANITYA_RESPONSE | {"latest_version_created_on": "not-a-date"}
         )
+        data = self._make_external_data(
+            {"project-id": 1, "url-template": "https://example.invalid/$version.tar.xz"}
+        )
+        with self.assertRaisesRegex(CheckerQueryError, "Failed to parse timestamp"):
+            await self.checker.check(data)
+        data.set_new_version.assert_not_called()
+
+    async def test_older_release_without_download_timestamp(self):
+        self._mock_session_response(_FLATPAK_ANITYA_RESPONSE)
+        data = self._make_external_data(
+            {
+                "project-id": 1,
+                "versions": {"<": "1.12.0"},
+                "url-template": "https://example.invalid/$version.tar.xz",
+            }
+        )
+        data.current_version = _FAKE_ARCHIVE
+        data.type = ExternalData.Type.ARCHIVE
+
+        await self.checker.check(data)
+
+        data.set_new_version.assert_called_once()
+        new_version = data.set_new_version.call_args.args[0]
+        self.assertEqual(new_version.version, "1.10.1")
+        self.assertIsNone(new_version.timestamp)
 
 
 class TestParseTimestamp(unittest.TestCase):

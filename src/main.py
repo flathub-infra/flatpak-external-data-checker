@@ -437,7 +437,7 @@ def open_pr(
     # An empty lease requires the remote ref to be absent, even if another
     # writer creates it after the PR lookup.
     ref = f"refs/heads/{change.branch}"
-    result = subprocess.run(
+    push_result = subprocess.run(
         [
             "git",
             "push",
@@ -450,15 +450,17 @@ def open_pr(
         text=True,
         check=False,
     )
-    if result.returncode:
-        details = (result.stdout + result.stderr).replace(github_token, "<REDACTED>")
+    if push_result.returncode:
+        details = (push_result.stdout + push_result.stderr).replace(
+            github_token, "<REDACTED>"
+        )
         log.error(
             "Failed to publish update branch %s in %s (git exit %s). "
             "If the branch already exists without a matching PR, inspect it "
             "before retrying; existing remote work will not be overwritten.\n%s",
             change.branch,
             repo.full_name,
-            result.returncode,
+            push_result.returncode,
             details.strip(),
         )
         return False
