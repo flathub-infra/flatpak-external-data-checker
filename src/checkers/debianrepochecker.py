@@ -42,6 +42,7 @@ import apt
 import apt_pkg
 
 from ..lib.checksums import MultiDigest
+from ..lib.errors import CheckerFetchError, CheckerQueryError
 from ..lib.externaldata import ExternalBase, ExternalFile
 from ..lib.utils import get_timestamp_from_url
 from . import Checker
@@ -140,7 +141,9 @@ class DebianRepoChecker(Checker):
                 while src_record.lookup(package_name):
                     source_version, source_files = src_record.version, src_record.files
                 if not source_version:
-                    raise ValueError(f"No source package {package_name}")
+                    raise CheckerQueryError(
+                        f"No source package {package_name} in {root}"
+                    )
                 assert source_files is not None
 
                 source_file = next(f for f in source_files if f.type == "tar")
@@ -160,10 +163,21 @@ class DebianRepoChecker(Checker):
                     ),
                 )
             else:
-                package = cache[package_name]
+                try:
+                    package = cache[package_name]
+                except KeyError as err:
+                    raise CheckerQueryError(
+                        f"No binary package {package_name} in {root} for {arch}"
+                    ) from err
                 candidate = package.candidate
-                assert candidate is not None
-                assert candidate.uri is not None
+                if candidate is None:
+                    raise CheckerQueryError(
+                        f"No candidate for package {package_name} in {root} for {arch}"
+                    )
+                if not candidate.uri:
+                    raise CheckerQueryError(
+                        f"No URI for package {package_name} in {root} for {arch}"
+                    )
 
                 new_version = ExternalFile(
                     url=candidate.uri,
@@ -234,10 +248,13 @@ class DebianRepoChecker(Checker):
             # Create a new cache with the appropriate architecture
             apt_pkg.config.set("APT::Architecture", arch)
             apt_pkg.config.set("APT::Architectures", arch)
-            cache = apt.Cache()
-            cache.update(progress)
-            cache.open()
+            with contextlib.closing(apt.Cache()) as cache:
+                try:
+                    cache.update(progress)
+                except apt.cache.FetchFailedException as err:
+                    raise CheckerFetchError(
+                        f"Failed to update Debian repository {deb_root} ({dist})"
+                    ) from err
+                cache.open()
 
-            yield cache
-
-            cache.close()
+                yield cache
