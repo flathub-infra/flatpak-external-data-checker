@@ -59,7 +59,7 @@ jobs:
           # source using cc e.g. pycairo
           apt update
           apt install -y build-essential pkg-config libcairo2-dev \
-            libgirepository1.0-dev python3-dev
+            libgirepository-2.0-dev python3-dev
 
       - name: Sync uv environment
         run: uv sync --all-extras --all-groups --frozen --allow-python-downloads
