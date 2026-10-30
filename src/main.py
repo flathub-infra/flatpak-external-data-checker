@@ -38,6 +38,7 @@ from pathlib import Path
 from github import Github
 
 from . import manifest
+from .lib.errors import ManifestLoadError
 from .lib.externaldata import ExternalData
 from .lib.utils import init_logging, parse_github_url
 
@@ -584,7 +585,11 @@ async def run_with_args(args: argparse.Namespace) -> tuple[int, int, bool]:
         enable_robots_txt=args.enable_robots_txt,
     )
 
-    manifest_checker = manifest.ManifestChecker(args.manifest, options)
+    try:
+        manifest_checker = manifest.ManifestChecker(args.manifest, options)
+    except ManifestLoadError as err:
+        log.error("Failed to load manifest %s: %s", args.manifest, err)
+        return 0, 1, False
 
     await manifest_checker.check(args.filter_type)
 
