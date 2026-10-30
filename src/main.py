@@ -35,7 +35,7 @@ import typing as t
 from enum import IntFlag
 from pathlib import Path
 
-from github import Github
+from github import Github, GithubException
 
 from . import manifest
 from .lib.externaldata import ExternalData
@@ -419,8 +419,17 @@ def open_pr(
                     pr.create_issue_comment(AUTOMERGE_DUE_TO_CONFIG)
                 else:  # force_automerge
                     pr.create_issue_comment(AUTOMERGE_DUE_TO_BROKEN_URLS)
-                pr.merge(merge_method="rebase")
-                origin_repo.get_git_ref(f"heads/{pr.head.ref}").delete()
+                result = pr.merge(merge_method="rebase")
+                if not result.merged:
+                    raise RuntimeError(
+                        f"Failed to merge {pr.html_url}: {result.message}"
+                    )
+                try:
+                    origin_repo.get_git_ref(f"heads/{pr.head.ref}").delete()
+                except GithubException as error:
+                    if error.status != 404:
+                        raise
+                    log.info("Merged PR branch %s is already deleted", pr.head.ref)
 
         return
 
