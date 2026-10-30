@@ -335,7 +335,7 @@ def open_pr(
     manifest_checker: manifest.ManifestChecker | None = None,
     fork: bool | None = None,
     pr_labels: list[str] | None = None,
-):
+) -> bool:
 
     try:
         github_token = os.environ["GITHUB_TOKEN"]
@@ -406,7 +406,7 @@ def open_pr(
             "merged" if pr.is_merged() else pr.state,
             pr.html_url,
         )
-        return
+        return True
 
     open_prs = [pr for pr in prs if pr.state == "open"]
     for pr in open_prs:
@@ -432,9 +432,36 @@ def open_pr(
                         raise
                     log.info("Merged PR branch %s is already deleted", pr.head.ref)
 
-        return
+        return True
 
-    check_call(["git", "push", "-u", remote_url, change.branch])
+    # An empty lease requires the remote ref to be absent, even if another
+    # writer creates it after the PR lookup.
+    ref = f"refs/heads/{change.branch}"
+    result = subprocess.run(
+        [
+            "git",
+            "push",
+            "--porcelain",
+            f"--force-with-lease={ref}:",
+            remote_url,
+            f"HEAD:{ref}",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode:
+        details = (result.stdout + result.stderr).replace(github_token, "<REDACTED>")
+        log.error(
+            "Failed to publish update branch %s in %s (git exit %s). "
+            "If the branch already exists without a matching PR, inspect it "
+            "before retrying; existing remote work will not be overwritten.\n%s",
+            change.branch,
+            repo.full_name,
+            result.returncode,
+            details.strip(),
+        )
+        return False
 
     log.info(
         "Creating pull request in %s from head `%s` to base `%s`",
@@ -466,6 +493,7 @@ def open_pr(
     if pr_labels:
         log.info("Adding labels to PR: %s", ", ".join(pr_labels))
         pr.set_labels(*pr_labels)
+    return True
 
 
 def parse_cli_args(cli_args=None):
@@ -616,12 +644,13 @@ async def run_with_args(args: argparse.Namespace) -> tuple[int, int, bool]:
                 if not committed_changes:
                     return (-1, -1, False)
                 if not (args.commit_only or args.commit_to_current_branch):
-                    open_pr(
+                    if not open_pr(
                         committed_changes,
                         manifest_checker=manifest_checker,
                         fork=args.fork,
                         pr_labels=args.pr_labels,
-                    )
+                    ):
+                        return (-1, -1, False)
         did_update = True
 
     errors_num = print_errors(manifest_checker)

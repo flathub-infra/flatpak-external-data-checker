@@ -488,6 +488,14 @@ class TestCommitMessage(unittest.TestCase):
 
 
 class TestOpenPR(unittest.TestCase):
+    def setUp(self):
+        push = patch(
+            "subprocess.run",
+            return_value=subprocess.CompletedProcess([], 0, "", ""),
+        )
+        self.push = push.start()
+        self.addCleanup(push.stop)
+
     def _make_change(self):
         return main.CommittedChanges(
             subject="Update foo",
@@ -557,14 +565,18 @@ class TestOpenPR(unittest.TestCase):
         with patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}):
             main.open_pr(self._make_change(), pr_labels=["label1"])
 
-        mock_check_call.assert_called_once_with(
+        self.push.assert_called_once_with(
             [
                 "git",
                 "push",
-                "-u",
+                "--porcelain",
+                "--force-with-lease=refs/heads/update-abc1234:",
                 "https://x-access-token:fake-token@github.com/owner/repo",
-                "update-abc1234",
-            ]
+                "HEAD:refs/heads/update-abc1234",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
         )
         origin_repo.create_pull.assert_called_once()
         pr.set_labels.assert_called_once_with("label1")
