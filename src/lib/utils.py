@@ -424,12 +424,14 @@ class Command:
         sandbox: bool | None = None,
         allow_network: bool = False,
         allow_paths: list[str | SandboxPath] | None = None,
+        env: dict[str, str] | None = None,
     ):
         self.cwd = cwd or os.getcwd()
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
         self.timeout = timeout
+        self.env = env
         # If sandbox not explicitly enabled or disabled, try to use it if available,
         # and proceed unsandboxed if sandbox is unavailable
         if sandbox is None:
@@ -459,6 +461,7 @@ class Command:
             stdin=self.stdin,
             stdout=self.stdout,
             stderr=self.stderr,
+            env=self.env,
         )
         try:
             stdout, stderr = await asyncio.wait_for(
@@ -492,6 +495,7 @@ class Command:
             stdout=self.stdout,
             stderr=self.stderr,
             timeout=self.timeout,
+            env=self.env,
             check=False,
         )
         proc.check_returncode()

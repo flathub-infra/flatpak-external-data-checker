@@ -23,6 +23,19 @@ class TestJSONChecker(unittest.IsolatedAsyncioTestCase):
         self.robots_patcher.start()
         self.addCleanup(self.robots_patcher.stop)
 
+    async def test_jq_cannot_read_environment(self):
+        environment = {
+            "GITHUB_TOKEN": "github-token-sentinel",
+            "FLATHUBBOT_TOKEN": "flathubbot-token-sentinel",
+            "FEDC_TEST_VARIABLE": "unrelated-sentinel",
+        }
+        with mock.patch.dict(os.environ, environment):
+            for query in ("env | tojson", "$ENV | tojson"):
+                with self.subTest(query=query):
+                    self.assertEqual(await _jq(query, {}, {}), "{}")
+            for name, value in environment.items():
+                self.assertEqual(os.environ[name], value)
+
     async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = await checker.check()

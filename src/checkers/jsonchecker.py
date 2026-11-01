@@ -28,7 +28,9 @@ async def _jq(query: str, data: JSONType, variables: dict[str, JSONType]) -> str
 
     jq_cmd = ["jq"] + var_args + ["-e", query]
     try:
-        jq_stdout, _ = await utils.Command(jq_cmd).run(json.dumps(data).encode())
+        jq_stdout, _ = await utils.Command(jq_cmd, env={}).run(
+            json.dumps(data).encode()
+        )
     except subprocess.CalledProcessError as err:
         raise CheckerQueryError("Error running jq") from err
 
