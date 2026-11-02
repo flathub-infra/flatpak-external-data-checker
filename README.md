@@ -37,6 +37,28 @@ flatpak-external-data-checker MANIFEST_FILE
 
 it should display messages about any broken or outdated external data.
 
+### Offline linting
+
+Check a manifest's `x-checker-data` offline:
+
+```sh
+flatpak-external-data-checker --lint MANIFEST_FILE
+```
+
+`--lint` reads JSON and YAML manifests, including referenced module and source
+files. For each source with `x-checker-data`, it checks required fields and value
+types. It rejects unknown or incompatible checkers and checks regex syntax,
+capture groups, jq syntax, and version-template syntax and variable names.
+It also checks parent references for missing sources and inheritance cycles.
+
+Errors include the filename and field location. The command exits with status 0
+on success or 1 on lint errors. It makes no network requests and changes no files.
+`--max-manifest-size` applies to referenced files too.
+
+Linting cannot tell whether a query matches an upstream response. It is not a full
+Flatpak manifest validator. You cannot combine `--lint` with update options or
+`--filter-type`.
+
 ### Installation
 
 This tool itself is available in Flatpak format from Flathub. Install with

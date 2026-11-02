@@ -41,6 +41,7 @@ from . import manifest
 from .lib.errors import ManifestLoadError
 from .lib.externaldata import ExternalData
 from .lib.utils import init_logging, parse_github_url
+from .lint import ManifestLinter
 
 log = logging.getLogger(__name__)
 
@@ -507,6 +508,11 @@ def parse_cli_args(cli_args=None):
         "-v", "--verbose", help="Print debug messages", action="store_true"
     )
     parser.add_argument(
+        "--lint",
+        help="Validate manifest and checker metadata offline without changing files",
+        action="store_true",
+    )
+    parser.add_argument(
         "--update",
         help="Update manifest(s) to refer to new versions of "
         "external data - also open PRs for changes unless "
@@ -604,6 +610,17 @@ def parse_cli_args(cli_args=None):
     )
 
     args = parser.parse_args(cli_args)
+    if args.lint and (
+        args.update
+        or args.commit_only
+        or args.edit_only
+        or args.check_outdated
+        or args.filter_type
+        or args.commit_to_current_branch
+    ):
+        parser.error(
+            "--lint cannot be combined with update or source-filtering options"
+        )
     args.pr_labels = [
         label.strip() for label in args.pr_labels.split(",") if label.strip()
     ]
@@ -613,6 +630,13 @@ def parse_cli_args(cli_args=None):
 
 async def run_with_args(args: argparse.Namespace) -> tuple[int, int, bool]:
     init_logging(logging.DEBUG if args.verbose else logging.INFO)
+
+    if args.lint:
+        errors = ManifestLinter(args.max_manifest_size).lint(Path(args.manifest))
+        for error in errors:
+            log.error("%s", error)
+        log.info("Lint finished with %d error(s)", len(errors))
+        return 0, len(errors), False
 
     should_update = args.update or args.commit_only or args.edit_only
     did_update = False

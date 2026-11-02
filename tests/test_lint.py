@@ -1,0 +1,384 @@
+import asyncio
+import contextlib
+import io
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from src import main
+from src.checkers.anityachecker import AnityaChecker
+from src.lib.externaldata import ArchiveSource, ExternalGitRepo
+from src.lint import ManifestLinter
+
+
+class TestLint(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+
+    def write(self, name, value):
+        path = self.root / name
+        path.write_text(json.dumps(value))
+        return path
+
+    def source(self, metadata):
+        return {
+            "type": "archive",
+            "url": "https://example.invalid/source.tar.gz",
+            "sha256": "0" * 64,
+            "x-checker-data": metadata,
+        }
+
+    def lint(self, metadata):
+        return ManifestLinter(1024 * 1024).lint(
+            self.write("source.json", self.source(metadata))
+        )
+
+    def test_schema_errors_and_unknown_types(self):
+        for metadata, expected in [
+            ({"type": "unknown"}, "Unknown checker"),
+            ({"type": "git"}, "does not support"),
+            ({"type": "anitya"}, "project-id"),
+            ({"type": "anitya", "project-id": "1"}, "not of type"),
+            ({}, "required property"),
+            ([], "not of type"),
+        ]:
+            with self.subTest(metadata=metadata):
+                errors = self.lint(metadata)
+                self.assertTrue(errors)
+                self.assertIn(expected, "\n".join(errors))
+                self.assertIn("source.json:$.x-checker-data", errors[0])
+
+    def test_regex_validation(self):
+        for pattern, expected in [
+            ("[", "unterminated"),
+            ("abc", "capture group"),
+            ("", "capture group"),
+        ]:
+            with self.subTest(pattern=pattern):
+                errors = self.lint(
+                    {"type": "html", "url": "https://example.org", "pattern": pattern}
+                )
+                self.assertIn(expected, "\n".join(errors))
+
+    def test_queries_compile_without_execution(self):
+        metadata = {
+            "type": "json",
+            "tag-query": ".tag",
+            "version-query": '$tag | sub("v"; "")',
+            "url-query": 'error("must not execute") | $version',
+        }
+        self.assertEqual(self.lint(metadata), [])
+        metadata["version-query"] = "$unknown"
+        self.assertIn("not defined", "\n".join(self.lint(metadata)))
+        metadata["version-query"] = ".["
+        self.assertIn("syntax error", "\n".join(self.lint(metadata)))
+
+    def test_version_templates(self):
+        for template, expected in [
+            ("redeclipse_$version_nix.tar.gz", "'version_nix'"),
+            ("boost_$major_$minor_$patch.tar.gz", "'major_'"),
+            ("$versiondocs.7z", "'versiondocs'"),
+            ("${version", "Invalid template placeholder"),
+            ("$", "Invalid template placeholder"),
+            ("$version01", "'version01'"),
+            ("${version}_nix-$major.${minor}.$patch-$version0-$version12-$$", None),
+        ]:
+            for checker in ("anitya", "html"):
+                with self.subTest(template=template, checker=checker):
+                    metadata = {
+                        "type": checker,
+                        "url-template": "https://example.org/" + template,
+                    }
+                    if checker == "anitya":
+                        metadata["project-id"] = 1
+                    else:
+                        metadata.update(
+                            url="https://example.org", **{"version-pattern": "(.*)"}
+                        )
+                    errors = self.lint(metadata)
+                    if expected:
+                        self.assertIn(expected, "\n".join(errors))
+                        self.assertIn(
+                            "source.json:$.x-checker-data.url-template", errors[0]
+                        )
+                    else:
+                        self.assertEqual(errors, [])
+
+    def test_only_executed_version_templates_are_checked(self):
+        source = {
+            "type": "git",
+            "url": "https://example.org/repo.git",
+            "tag": "v1",
+            "x-checker-data": {
+                "type": "anitya",
+                "project-id": 1,
+                "tag-template": "v$major_$minor",
+                "url-template": "$unused",
+            },
+        }
+        path = self.write("git.json", source)
+        errors = ManifestLinter(1024 * 1024).lint(path)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("tag-template", errors[0])
+        self.assertIn("'major_'", errors[0])
+        source["x-checker-data"]["tag-template"] = "v${major}_${minor}"
+        self.write("git.json", source)
+        self.assertEqual(ManifestLinter(1024 * 1024).lint(path), [])
+        self.assertEqual(
+            self.lint(
+                {
+                    "type": "html",
+                    "url": "https://example.org",
+                    "pattern": "(url)(version)",
+                    "url-template": "$unused",
+                }
+            ),
+            [],
+        )
+
+    def test_git_queries_do_not_define_url(self):
+        metadata = {
+            "type": "json",
+            "tag-query": '"v2"',
+            "url-query": '"https://example.org"',
+            "timestamp-query": "$url",
+        }
+        source = {
+            "type": "git",
+            "url": "https://example.org/repo.git",
+            "tag": "v1",
+            "x-checker-data": metadata,
+        }
+        path = self.write("git.json", source)
+        errors = ManifestLinter(1024 * 1024).lint(path)
+        self.assertIn("timestamp-query", "\n".join(errors))
+        self.assertIn("$url is not defined", "\n".join(errors))
+
+        # Git never executes url-query or an orphaned data-url expression.
+        metadata["url-query"] = ".["
+        metadata["version-data-url"] = ".["
+        metadata["timestamp-query"] = '$tag | "2026-01-01T00:00:00Z"'
+        self.write("git.json", source)
+        self.assertEqual(ManifestLinter(1024 * 1024).lint(path), [])
+
+    def test_data_url_uses_only_preceding_variables(self):
+        metadata = {
+            "type": "json",
+            "version-query": '"1"',
+            "url-data-url": '$version | "https://example.org"',
+            "url-query": ".url",
+        }
+        self.assertEqual(self.lint(metadata), [])
+        metadata["url-data-url"] = "$url"
+        self.assertIn("$url is not defined", "\n".join(self.lint(metadata)))
+
+    def test_malformed_unannotated_source_exits_cleanly(self):
+        path = self.write(
+            "manifest.json",
+            {
+                "name": "test",
+                "sources": [{"type": "archive", "url": 123, "sha256": "0" * 64}],
+            },
+        )
+        result = subprocess.run(
+            [sys.executable, "flatpak-external-data-checker", "--lint", str(path)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(str(path), result.stderr)
+        self.assertIn("Constructor parameter should be str", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_loader_errors_fail_lint(self):
+        path = self.write(
+            "source.json",
+            {"type": "archive", "url": "https://example.org/source.tar.gz"},
+        )
+        result = subprocess.run(
+            [sys.executable, "flatpak-external-data-checker", "--lint", str(path)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(f"{path}:$: Data is missing checksum", result.stderr)
+        self.assertIn("Lint finished with 1 error(s)", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_offline_cli_and_referenced_yaml(self):
+        module = self.root / "module.yml"
+        module.write_text("name: test\nsources:\n  - source.json\n")
+        source = self.write(
+            "source.json",
+            self.source(
+                {
+                    "type": "anitya",
+                    "project-id": 1,
+                    "url-template": "https://example.org/$version",
+                }
+            ),
+        )
+        root = self.write(
+            "app.json", {"app-id": "org.example.App", "modules": ["module.yml"]}
+        )
+        original = {p: p.read_bytes() for p in (root, module, source)}
+        args = main.parse_cli_args(["--lint", str(root)])
+        with (
+            patch(
+                "aiohttp.ClientSession", side_effect=AssertionError("network session")
+            ),
+            patch(
+                "src.main.manifest.ManifestChecker.check",
+                side_effect=AssertionError("online check"),
+            ),
+        ):
+            self.assertEqual(asyncio.run(main.run_with_args(args)), (0, 0, False))
+        for path, contents in original.items():
+            self.assertEqual(path.read_bytes(), contents)
+
+    def test_missing_reference_and_cycle(self):
+        root = self.write(
+            "app.json",
+            {"app-id": "org.example.App", "modules": ["missing.json", "app.json"]},
+        )
+        errors = ManifestLinter(1024).lint(root)
+        self.assertEqual(len(errors), 2)
+        self.assertIn("missing.json", errors[0])
+        self.assertIn("Circular", errors[1])
+
+    def test_invalid_manifests_exit_cleanly(self):
+        for name, text in [
+            ("bad.json", "{"),
+            ("bad.yml", "modules: ["),
+            ("empty.yml", ""),
+            ("empty.json", "   \n"),
+            ("scalar.json", "42"),
+        ]:
+            with self.subTest(name=name):
+                path = self.root / name
+                path.write_text(text)
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        "flatpak-external-data-checker",
+                        "--lint",
+                        str(path),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(str(path), result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+
+    def test_size_limit_and_multiple_errors(self):
+        path = self.write(
+            "sources.json",
+            [self.source({"type": "unknown"}), self.source({"type": "other"})],
+        )
+        self.assertEqual(len(ManifestLinter(1024 * 1024).lint(path)), 2)
+        self.assertIn("maximum file size", ManifestLinter(1).lint(path)[0])
+
+    def test_update_options_rejected(self):
+        for option in ("--update", "--edit-only", "--commit-only", "--check-outdated"):
+            with (
+                self.subTest(option=option),
+                contextlib.redirect_stderr(io.StringIO()),
+                self.assertRaises(SystemExit) as err,
+            ):
+                main.parse_cli_args(["--lint", option, "manifest.json"])
+            self.assertEqual(err.exception.code, 2)
+
+    def test_nested_external_sources(self):
+        root = self.write("app.json", {"name": "test", "sources": ["sources.json"]})
+        self.write("sources.json", ["nested.json"])
+        self.write("nested.json", self.source({"type": "unknown"}))
+        self.assertIn("Nested external", ManifestLinter(1024).lint(root)[0])
+
+    def test_recursive_yaml_alias(self):
+        root = self.root / "module.yml"
+        root.write_text("&module\nname: recursive\nmodules: [*module]\n")
+        self.assertIn("Circular YAML alias", ManifestLinter(1024).lint(root)[0])
+
+    def test_schema_lookup_for_source_types(self):
+        self.assertIn(
+            "url-template", AnityaChecker.get_json_schema(ArchiveSource)["required"]
+        )
+        self.assertIn(
+            "tag-template", AnityaChecker.get_json_schema(ExternalGitRepo)["required"]
+        )
+
+    def test_named_source_is_not_a_module(self):
+        source = self.source({"type": "unknown"})
+        source.update(type="extra-data", name="vendor", filename="vendor.bin", size=1)
+        path = self.write("source.json", source)
+        self.assertIn("Unknown checker", "\n".join(ManifestLinter(1024).lint(path)))
+
+    def test_parent_relationships(self):
+        def source(ident, parent=None):
+            metadata = {"type": "git", "source-id": ident}
+            if parent is not None:
+                metadata["parent-id"] = parent
+            return {
+                "type": "git",
+                "url": "https://example.org/repo.git",
+                "tag": "v1",
+                "x-checker-data": metadata,
+            }
+
+        for sources, expected in [
+            ([source("child", "missing")], "not found"),
+            ([source("self", "self")], "inheritance loop"),
+            ([source("a", "b"), source("b", "a")], "inheritance loop"),
+            ([source("child", "parent"), source("parent")], None),
+        ]:
+            with self.subTest(sources=sources):
+                path = self.write("sources.json", sources)
+                errors = ManifestLinter(1024 * 1024).lint(path)
+                if expected:
+                    self.assertIn(expected, "\n".join(errors))
+                    self.assertIn(str(path), errors[0])
+                else:
+                    self.assertEqual(errors, [])
+
+    def test_implicit_parent_in_referenced_module(self):
+        self.write(
+            "parent.json",
+            {
+                "name": "parent",
+                "sources": [
+                    {
+                        "type": "git",
+                        "url": "https://example.org/parent.git",
+                        "tag": "v1",
+                    }
+                ],
+            },
+        )
+        child = {
+            "type": "git",
+            "url": "https://example.org/child.git",
+            "tag": "v1",
+            "x-checker-data": {"type": "git", "parent-id": "parent-git-0"},
+        }
+        self.write("child.json", child)
+        root = self.write(
+            "app.json",
+            {
+                "app-id": "org.example.App",
+                "modules": [
+                    "parent.json",
+                    {"name": "child", "sources": ["child.json"]},
+                ],
+            },
+        )
+        self.assertEqual(ManifestLinter(1024 * 1024).lint(root), [])
