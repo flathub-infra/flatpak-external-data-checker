@@ -80,13 +80,13 @@ class Checker:
         self.robots_cache = robots_cache
 
     @classmethod
-    def get_json_schema(self, data_class: type[ExternalBase]) -> dict[str, t.Any]:
-        if not hasattr(self, "CHECKER_DATA_SCHEMA"):
+    def get_json_schema(cls, data_class: type[ExternalBase]) -> dict[str, t.Any]:
+        if not hasattr(cls, "CHECKER_DATA_SCHEMA"):
             raise NotImplementedError(
                 "If schema is not declared, this method must be overridden"
             )
 
-        return self.CHECKER_DATA_SCHEMA
+        return cls.CHECKER_DATA_SCHEMA
 
     @classmethod
     def should_check(cls, external_data: ExternalBase) -> bool:

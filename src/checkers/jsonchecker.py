@@ -143,6 +143,14 @@ class JSONChecker(Checker):
                 url_expr=checker_data.get(url_prop),
             )
 
+    @classmethod
+    def get_queries(cls, external_data: ExternalBase) -> t.Iterable[_Query]:
+        sequence = ["tag", "commit", "version"]
+        if not isinstance(external_data, ExternalGitRepo):
+            sequence.append("url")
+        sequence.append("timestamp")
+        return cls._read_q_seq(external_data.checker_data, sequence)
+
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
 
@@ -174,11 +182,8 @@ class JSONChecker(Checker):
         json_vars: dict[str, JSONType],
         external_data: ExternalData,
     ):
-        checker_data = external_data.checker_data
         results = await self._query_sequence(
-            self._read_q_seq(
-                checker_data, ["tag", "commit", "version", "url", "timestamp"]
-            ),
+            self.get_queries(external_data),
             json_vars,
             json_data,
         )
@@ -200,9 +205,8 @@ class JSONChecker(Checker):
         json_vars: dict[str, JSONType],
         external_data: ExternalGitRepo,
     ):
-        checker_data = external_data.checker_data
         results = await self._query_sequence(
-            self._read_q_seq(checker_data, ["tag", "commit", "version", "timestamp"]),
+            self.get_queries(external_data),
             json_vars,
             json_data,
         )

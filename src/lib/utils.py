@@ -615,6 +615,8 @@ def read_json_manifest(manifest_path: Path):
             raise
 
     root = parser.get_root()
+    if root is None:
+        raise ValueError(f"Manifest is empty: {manifest_path}")
     clean_manifest = Json.to_string(root, False)
 
     return json.loads(clean_manifest, object_pairs_hook=OrderedDict)

@@ -7,7 +7,7 @@ from unittest import mock
 from src.checkers.jsonchecker import JSONChecker, _jq, parse_timestamp
 from src.lib.checksums import MultiDigest
 from src.lib.errors import CheckerQueryError
-from src.lib.externaldata import ExternalFile, ExternalGitRef
+from src.lib.externaldata import ExternalBase, ExternalFile, ExternalGitRef
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
 
@@ -114,6 +114,29 @@ class TestJSONCheckerMocked(unittest.IsolatedAsyncioTestCase):
 
     async def _make_checker(self):
         return JSONChecker.__new__(JSONChecker)
+
+    async def test_git_query_sequence_skips_url(self):
+        data = ExternalBase.from_source(
+            "git.json",
+            {
+                "type": "git",
+                "url": "https://example.org/repo.git",
+                "tag": "v1",
+                "x-checker-data": {
+                    "type": "json",
+                    "tag-query": '"v2"',
+                    "commit-query": json.dumps("b" * 40),
+                    "version-query": '$tag | ltrimstr("v")',
+                    "url-query": 'error("Git must skip url-query")',
+                    "timestamp-query": '"2026-01-01T00:00:00Z"',
+                },
+            },
+        )
+        checker = await self._make_checker()
+        await checker.check(data)
+        self.assertEqual(data.new_version.tag, "v2")
+        self.assertEqual(data.new_version.commit, "b" * 40)
+        self.assertEqual(data.new_version.version, "2")
 
     async def test_jq_invalid_json_output_raises(self):
         with mock.patch(
