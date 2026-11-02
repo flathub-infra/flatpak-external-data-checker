@@ -27,7 +27,7 @@ class ManifestLinter:
         self.errors.append(f"{path}:{location}: {message}")
 
     def lint(self, path: Path) -> list[str]:
-        path = path.resolve()
+        path = path.absolute()
         self._file(path, "root")
         if not self.errors:
             # The constructor validates parent relationships without network access.
@@ -42,16 +42,23 @@ class ManifestLinter:
         return self.errors
 
     def _file(self, path: Path, kind: str):
-        path = path.resolve()
-        if path in self._active:
-            self._error(path, "$", "Circular manifest reference")
-            return
         try:
+            resolved = path.resolve()
+            if resolved in self._active:
+                self._error(path, "$", "Circular manifest reference")
+                return
             if path.stat().st_size > self.max_manifest_size:
                 self._error(path, "$", "Manifest exceeds maximum file size")
                 return
             contents = read_manifest(path)
-        except (OSError, UnicodeError, ValueError, YAMLError, GLib.Error) as err:
+        except (
+            OSError,
+            RuntimeError,
+            UnicodeError,
+            ValueError,
+            YAMLError,
+            GLib.Error,
+        ) as err:
             self._error(path, "$", str(err))
             return
         if isinstance(contents, tuple):
@@ -59,7 +66,7 @@ class ManifestLinter:
         if kind == "module" and not isinstance(contents, dict):
             self._error(path, "$", "Expected a module object")
             return
-        self._active.add(path)
+        self._active.add(resolved)
         if kind == "source":
             self._external_sources.add(path)
         try:
@@ -77,7 +84,7 @@ class ManifestLinter:
                         kind = "source"
             self._walk(path, "$", contents, kind)
         finally:
-            self._active.remove(path)
+            self._active.remove(resolved)
             self._external_sources.discard(path)
 
     def _walk(self, path: Path, location: str, value, kind: str):

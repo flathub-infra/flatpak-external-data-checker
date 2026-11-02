@@ -254,6 +254,49 @@ class TestLint(unittest.TestCase):
         self.assertIn("missing.json", errors[0])
         self.assertIn("Circular", errors[1])
 
+    def test_symlinked_manifests_keep_relative_includes(self):
+        (self.root / "shared").mkdir()
+        (self.root / "app").mkdir()
+        self.write("shared/module.json", {"name": "dep", "sources": ["source.json"]})
+        module = self.root / "app/module.json"
+        module.symlink_to("../shared/module.json")
+        self.write(
+            "app/source.json",
+            self.source(
+                {
+                    "type": "anitya",
+                    "project-id": 1,
+                    "url-template": "https://example.org/$version",
+                }
+            ),
+        )
+        app = self.write(
+            "app/app.json", {"app-id": "org.example.App", "modules": ["module.json"]}
+        )
+        for path in (module, app):
+            with self.subTest(path=path):
+                self.assertEqual(ManifestLinter(1024 * 1024).lint(path), [])
+
+    def test_symlink_name_selects_manifest_parser(self):
+        target = self.root / "source.txt"
+        target.write_text(
+            "type: git\nurl: https://example.org/repo.git\n"
+            "x-checker-data:\n  type: git\n"
+        )
+        path = self.root / "source.yaml"
+        path.symlink_to(target.name)
+        self.assertEqual(ManifestLinter(1024 * 1024).lint(path), [])
+
+    def test_symlink_cycles(self):
+        path = self.write("module.json", {"name": "dep", "modules": ["alias.json"]})
+        (self.root / "alias.json").symlink_to(path.name)
+        errors = ManifestLinter(1024 * 1024).lint(path)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("alias.json:$: Circular manifest reference", errors[0])
+        loop = self.root / "loop.json"
+        loop.symlink_to(loop.name)
+        self.assertTrue(ManifestLinter(1024 * 1024).lint(loop))
+
     def test_invalid_manifests_exit_cleanly(self):
         for name, text in [
             ("bad.json", "{"),
