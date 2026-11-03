@@ -65,6 +65,21 @@ class TestSourceUpdates(unittest.TestCase):
         self.assertEqual(update.old_version, update.new_version)
         self.assertNotIn("upgrade", format_source_updates([update]))
 
+    def test_previous_release_download_tag(self):
+        for arch in ("x86_64", "aarch64"):
+            with self.subTest(arch=arch):
+                data = self.file_source()
+                data.current_version = data.current_version._replace(
+                    url="https://github.com/litocpp/lito/releases/download/"
+                    f"v0.8.7/lito-v0.8.7-linux-{arch}.tar.gz"
+                )
+                data.new_version = data.new_version._replace(version="0.8.8")
+                update = SourceUpdate.from_source(data)
+                self.assertEqual(update.old_version, "tag v0.8.7")
+                self.assertEqual(update.new_version, "0.8.8")
+                data.current_version = data.current_version._replace(version="0.8.7")
+                self.assertEqual(SourceUpdate.from_source(data).old_version, "0.8.7")
+
     def test_github_release_download(self):
         data = self.file_source()
         data.new_version = data.new_version._replace(
@@ -82,6 +97,7 @@ class TestSourceUpdates(unittest.TestCase):
             SourceUpdate.from_source(data).release_url,
             "https://github.com/owner/app/releases/tag/release%2F2",
         )
+        self.assertEqual(SourceUpdate.from_source(data).new_version, "tag release/2")
         data.checker_data["release-url-template"] = "https://example.org/changelog"
         self.assertEqual(
             SourceUpdate.from_source(data).release_url,

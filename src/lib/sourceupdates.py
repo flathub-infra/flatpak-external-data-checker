@@ -1,7 +1,7 @@
 import dataclasses
 import html
 import re
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 from ..checkers.urlchecker import URLChecker, extract_version
 from .externaldata import ExternalBase, ExternalGitRef, ExternalState
@@ -21,6 +21,10 @@ def _version(data: ExternalBase, state: ExternalState) -> str:
     version = state.version
     if not version and data.checker_data.get("type") == URLChecker.CHECKER_DATA_TYPE:
         version = extract_version(data.checker_data, state.url)
+    if not version:
+        release_url = download_release_url(state.url)
+        if release_url:
+            return f"tag {unquote(release_url.rsplit('/', 1)[1])}"
     return version or "unknown"
 
 
