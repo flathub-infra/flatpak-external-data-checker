@@ -635,7 +635,7 @@ class _ManifestEmitter(RoundTripEmitter):
         if not text:
             return
         if not self.whitespace:
-            data = " "
+            data: t.Any = " "
             self.column += len(data)
             if self.encoding:
                 data = data.encode(self.encoding)
@@ -661,7 +661,7 @@ class _ManifestEmitter(RoundTripEmitter):
                         self.stream.write(data)
                     start = end
             elif breaks:
-                if ch not in "\n\x85\u2028\u2029":
+                if ch is None or ch not in "\n\x85\u2028\u2029":
                     if text[start] == "\n":
                         self.write_line_break()
                     for br in text[start:end]:
