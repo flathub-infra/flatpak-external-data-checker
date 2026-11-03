@@ -45,6 +45,7 @@ import magic
 from elftools.elf.elffile import ELFFile
 from packaging.version import Version
 from ruamel.yaml import YAML
+from ruamel.yaml.emitter import RoundTripEmitter
 
 from . import HTTP_CHUNK_SIZE, NETWORK_ERRORS, OPERATORS, TIMEOUT_CONNECT, externaldata
 from .checksums import MultiHash
@@ -622,7 +623,68 @@ def read_json_manifest(manifest_path: Path):
     return json.loads(clean_manifest, object_pairs_hook=OrderedDict)
 
 
+class _ManifestEmitter(RoundTripEmitter):
+    def write_plain(self, text, split=True):
+        if self.root_context:
+            if self.requested_indent is not None:
+                self.write_line_break()
+                if self.requested_indent != 0:
+                    self.write_indent()
+            else:
+                self.open_ended = True
+        if not text:
+            return
+        if not self.whitespace:
+            data = " "
+            self.column += len(data)
+            if self.encoding:
+                data = data.encode(self.encoding)
+            self.stream.write(data)
+        self.whitespace = False
+        self.indention = False
+        spaces = False
+        breaks = False
+        start = end = 0
+        while end <= len(text):
+            ch = text[end] if end < len(text) else None
+            if spaces:
+                if ch != " ":
+                    if start + 1 == end and self.column > self.best_width and split:
+                        self.write_indent()
+                        self.whitespace = False
+                        self.indention = False
+                    else:
+                        data = text[start:end]
+                        self.column += len(data)
+                        if self.encoding:
+                            data = data.encode(self.encoding)
+                        self.stream.write(data)
+                    start = end
+            elif breaks:
+                if ch not in "\n\x85\u2028\u2029":
+                    if text[start] == "\n":
+                        self.write_line_break()
+                    for br in text[start:end]:
+                        self.write_line_break(None if br == "\n" else br)
+                    self.write_indent()
+                    self.whitespace = False
+                    self.indention = False
+                    start = end
+            elif ch is None or ch in " \n\x85\u2028\u2029":
+                data = text[start:end]
+                self.column += len(data)
+                if self.encoding:
+                    data = data.encode(self.encoding)
+                self.stream.write(data)
+                start = end
+            if ch is not None:
+                spaces = ch == " "
+                breaks = ch in "\n\x85\u2028\u2029"
+            end += 1
+
+
 _yaml = YAML()
+_yaml.Emitter = _ManifestEmitter
 # ruamel preserves some formatting (such as comments and blank lines) but
 # not the indentation of the source file. These settings match the style
 # recommended at <https://github.com/flathub/flathub/wiki/YAML-Style-Guide>.
@@ -665,9 +727,10 @@ def dump_manifest(
     else:
         json_indent = _detect_json_flatpak_manifest_indent(original_manifest) or 4
 
+    yaml_width = None
     if yaml_max_line_length := conf.get("max_line_length"):
         try:
-            _yaml.width = int(yaml_max_line_length)
+            yaml_width = int(yaml_max_line_length)
         except ValueError:
             log.warning("Ignoring invalid max_line_length %r", yaml_max_line_length)
 
@@ -681,6 +744,7 @@ def dump_manifest(
 
     with manifest_path.open("w", encoding="utf-8") as fp:
         if manifest_path.suffix in (".yaml", ".yml"):
+            _yaml.width = yaml_width
             _yaml.explicit_start = has_yaml_header
             _yaml.dump(contents, fp)
         else:

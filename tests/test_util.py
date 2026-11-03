@@ -26,6 +26,7 @@ import time
 import unittest
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
@@ -33,6 +34,7 @@ from time import perf_counter
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
+from ruamel.yaml import YAML
 
 from src.lib import utils
 from src.lib.errors import CheckerFetchError, CheckerQueryError, CheckerRemoteError
@@ -833,6 +835,48 @@ class TestDumpManifest(unittest.TestCase):
         )
         p.write_text("app-id: com.example.App\n")
         dump_manifest({"app-id": "com.example.App"}, p, has_yaml_header=False)
+
+    def test_yaml_long_url_stays_on_same_line(self):
+        url = "https://github.com/libgme/game-music-emu/releases/download/0.6.5/libgme-0.6.5-src.tar.gz"
+        path = Path(self.tmpdir.name) / "test.yaml"
+        path.write_text("{}\n")
+        dump_manifest({"url": url}, path)
+        self.assertEqual(path.read_text(), f"url: {url}\n")
+
+    def test_yaml_width_is_per_manifest(self):
+        contents = {"description": " ".join(["word"] * 12)}
+        default_output = "description: " + contents["description"] + "\n"
+        yaml = YAML()
+        yaml.width = 30
+        stream = StringIO()
+        yaml.dump(contents, stream)
+        narrow_output = stream.getvalue()
+        self.assertNotEqual(narrow_output, default_output)
+        for suffix in (".yaml", ".yml", ".json"):
+            for setting in (None, "notanumber", "unset", "30", "80"):
+                for reverse in (False, True):
+                    with self.subTest(suffix=suffix, setting=setting, reverse=reverse):
+                        root = Path(self.tmpdir.name)
+                        first = root / f"first{suffix}"
+                        second = root / "second.yaml"
+                        config = (
+                            f"root = true\n\n[{first.name}]\nmax_line_length = 30\n"
+                        )
+                        if setting is not None:
+                            config += f"\n[second.yaml]\nmax_line_length = {setting}\n"
+                        (root / ".editorconfig").write_text(config)
+                        paths = [first, second]
+                        if reverse:
+                            paths.reverse()
+                        for path in paths:
+                            path.write_text("{}\n")
+                            dump_manifest(contents, path)
+                        self.assertEqual(
+                            second.read_text(),
+                            narrow_output if setting == "30" else default_output,
+                        )
+                        if suffix != ".json":
+                            self.assertEqual(first.read_text(), narrow_output)
 
 
 class TestReadJsonManifest(unittest.TestCase):
