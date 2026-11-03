@@ -6,8 +6,9 @@ from unittest import mock
 import aiohttp
 
 from src.checkers.gitchecker import GitChecker, TagWithSemver, TagWithVersion
-from src.lib.errors import CheckerQueryError
+from src.lib.errors import CheckerFetchError, CheckerQueryError
 from src.lib.externaldata import ExternalGitRef, ExternalGitRepo
+from src.lib.sourceupdates import SourceUpdate
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
 
@@ -15,6 +16,69 @@ TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.virustotal.Uploader
 
 
 class TestGitChecker(unittest.IsolatedAsyncioTestCase):
+    async def test_github_tag_release_notes(self):
+        repo = "https://github.com/NoRiskClient/noriskclient-launcher"
+        tag = "v0.6.30-beta.4"
+        link = f"{repo}/releases/tag/{tag}"
+        data = ExternalGitRepo.from_source_impl(
+            source_path="test.yml",
+            source={
+                "type": "git",
+                "url": repo,
+                "tag": "v0.6.30-beta.2",
+                "commit": "old",
+                "x-checker-data": {
+                    "type": "git",
+                    "tag-pattern": r"^v(\d+\.\d+\.\d+-beta\.\d+)$",
+                    "version-scheme": "semantic",
+                },
+            },
+        )
+        with (
+            mock.patch(
+                "src.checkers.gitchecker.git_ls_remote",
+                return_value={f"refs/tags/{tag}": "new"},
+            ),
+            mock.patch.object(
+                GitChecker,
+                "_get_json",
+                return_value={"tag_name": tag, "html_url": link},
+            ),
+        ):
+            async with aiohttp.ClientSession() as session:
+                await GitChecker(session).check(data)
+        self.assertEqual(SourceUpdate.from_source(data).release_url, link)
+
+        for response in (
+            {"message": "Not Found"},
+            {"tag_name": "v0.6.30-beta.3", "html_url": link},
+            {
+                "tag_name": tag,
+                "html_url": "https://github.com/other/repo/releases/tag/x",
+            },
+            CheckerQueryError("Rate limited"),
+            CheckerFetchError("Blocked by robots.txt"),
+        ):
+            with self.subTest(response=response):
+                with (
+                    mock.patch(
+                        "src.checkers.gitchecker.git_ls_remote",
+                        return_value={f"refs/tags/{tag}": "new"},
+                    ),
+                    mock.patch.object(
+                        GitChecker,
+                        "_get_json",
+                        side_effect=response
+                        if isinstance(response, Exception)
+                        else None,
+                        return_value=response,
+                    ),
+                ):
+                    async with aiohttp.ClientSession() as session:
+                        await GitChecker(session).check(data)
+                self.assertIsNone(SourceUpdate.from_source(data).release_url)
+                self.assertEqual(data.new_version.tag, tag)
+
     def setUp(self):
         init_logging()
         self.robots_patcher = mock.patch(
