@@ -151,6 +151,9 @@ class TestManifest(unittest.IsolatedAsyncioTestCase):
         checker._update_manifest(self.mf_path, [data], changes)
 
         self.assertIn("mod: Update my-file.txt", changes)
+        self.assertEqual(len(checker.source_updates), 1)
+        self.assertEqual(checker.source_updates[0].source, "mod: my-file.txt")
+        self.assertEqual(checker.source_updates[0].old_version, "unknown")
 
     def test_update_appdata_not_found(self):
         with open(self.mf_path, "w") as f:
@@ -158,6 +161,41 @@ class TestManifest(unittest.IsolatedAsyncioTestCase):
         checker = manifest.ManifestChecker(self.mf_path)
         with self.assertRaises(manifest.AppdataNotFound):
             checker._update_appdata()
+
+    def test_source_updates_keep_each_architecture_and_respect_gate(self):
+        with open(self.mf_path, "w") as f:
+            json.dump(
+                {
+                    "name": "mod",
+                    "sources": [
+                        {
+                            "type": "archive",
+                            "url": "https://example.org/app.tar.gz",
+                            "sha256": "abc",
+                            "only-arches": [arch],
+                        }
+                        for arch in ("x86_64", "aarch64")
+                    ],
+                },
+                f,
+            )
+        checker = manifest.ManifestChecker(self.mf_path)
+        for data in checker.get_external_data():
+            data.new_version = data.current_version._replace(
+                url="https://example.org/new.tar.gz", version="2.0"
+            )
+        changes = checker.update_manifests()
+        self.assertEqual(len(changes), 1)
+        self.assertEqual(len(checker.source_updates), 2)
+        self.assertIn("(x86_64)", checker.source_updates[0].source)
+        self.assertIn("(aarch64)", checker.source_updates[1].source)
+
+        checker.opts = manifest.CheckerOptions(require_important_update=True)
+        data = checker.get_external_data()[0]
+        data.checker_data["is-important"] = True
+        data.current_version = data.new_version
+        self.assertEqual(checker.update_manifests(), [])
+        self.assertEqual(checker.source_updates, [])
 
     def test_update_appdata_no_main_source(self):
         with open(self.mf_path, "w") as f:
@@ -244,6 +282,7 @@ class TestManifest(unittest.IsolatedAsyncioTestCase):
             changes = checker.update_manifests()
 
         self.assertEqual(len(changes), 1)
+        self.assertEqual(len(checker.source_updates), 1)
         self.assertIsInstance(checker.get_errors()[0], AppdataError)
 
 

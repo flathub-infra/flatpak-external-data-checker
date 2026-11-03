@@ -40,6 +40,7 @@ from github import Github, GithubException
 from . import manifest
 from .lib.errors import ManifestLoadError
 from .lib.externaldata import ExternalData
+from .lib.sourceupdates import format_source_updates
 from .lib.utils import init_logging, parse_github_url
 from .lint import ManifestLinter
 
@@ -372,7 +373,14 @@ def open_pr(
     base = change.base_branch or origin_repo.default_branch
 
     head = f"{repo.owner.login}:{change.branch}"
-    pr_message = ((change.body or "") + "\n\n" + DISCLAIMER).strip()
+    source_details = (
+        format_source_updates(manifest_checker.source_updates)
+        if manifest_checker is not None
+        else ""
+    )
+    pr_message = "\n\n".join(
+        part for part in (change.body, source_details, DISCLAIMER) if part
+    )
 
     try:
         with open("flathub.json") as f:

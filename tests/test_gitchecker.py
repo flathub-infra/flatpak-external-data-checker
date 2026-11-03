@@ -169,6 +169,8 @@ class TestGitChecker(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(external_data.new_version.tag, "v3.0.0")
         self.assertEqual(external_data.new_version.version, "3.0.0")
         self.assertEqual(external_data.new_version.commit, "commit5")
+        self.assertEqual(external_data.current_version.version, "1.0.0")
+        self.assertEqual(external_data.current_version.commit, "commit1")
 
     async def test_default_tag_pattern(self):
         mock_refs = {

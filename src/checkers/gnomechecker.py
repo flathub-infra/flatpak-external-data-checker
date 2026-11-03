@@ -160,3 +160,10 @@ class GNOMEChecker(Checker):
         )
 
         external_data.set_new_version(new_version)
+        external_data.new_release_url = None
+        if external_data.new_version:
+            for key in ("news", "changes"):
+                path = proj_files.get(key)
+                if isinstance(path, str) and path:
+                    external_data.new_release_url = str(proj_url / path)
+                    break

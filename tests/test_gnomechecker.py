@@ -26,6 +26,7 @@ from aiohttp import ClientError
 from src.checkers.gnomechecker import GNOMEChecker, VersionScheme, _is_stable
 from src.lib.checksums import MultiDigest
 from src.lib.errors import CheckerQueryError
+from src.lib.externaldata import ExternalBase
 from src.lib.utils import init_logging
 from src.lib.version import LooseVersion
 from src.manifest import ManifestChecker
@@ -176,6 +177,55 @@ class TestGNOMECheckerMocked(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(CheckerQueryError):
             await checker.check(external_data)
+
+    async def test_release_notes_follow_selected_version(self):
+        for links, expected in (
+            (
+                {"news": "1.0/proj-1.0.news", "changes": "1.0/proj-1.0.changes"},
+                "1.0/proj-1.0.news",
+            ),
+            ({"changes": "1.0/proj-1.0.changes"}, "1.0/proj-1.0.changes"),
+            ({}, None),
+        ):
+            with self.subTest(links=links):
+                source = ExternalBase.from_source(
+                    "app.json",
+                    {
+                        "type": "archive",
+                        "url": "https://example.org/proj-0.tar.xz",
+                        "sha256": "old",
+                        "x-checker-data": {
+                            "type": "gnome",
+                            "name": "proj",
+                            "versions": {"<": "2"},
+                        },
+                    },
+                )
+                cache = [
+                    4,
+                    {
+                        "proj": {
+                            "1.0": {"tar.xz": "1.0/proj-1.0.tar.xz", **links},
+                            "2.0": {
+                                "tar.xz": "2.0/proj-2.0.tar.xz",
+                                "news": "2.0/proj-2.0.news",
+                            },
+                        }
+                    },
+                    {"proj": ["1.0", "2.0"]},
+                    {},
+                ]
+                checker = self._make_checker()
+                checker.session = self._make_session(cache)
+                await checker.check(source)
+                self.assertEqual(source.new_version.version, "1.0")
+                self.assertEqual(
+                    source.new_release_url,
+                    f"https://download.gnome.org/sources/proj/{expected}"
+                    if expected
+                    else None,
+                )
+                self.assertEqual(checker.session.get.call_count, 2)
 
     async def test_no_stable_version_falls_back_to_latest(self):
         proj = "baobab"
