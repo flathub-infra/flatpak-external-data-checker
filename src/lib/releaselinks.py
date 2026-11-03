@@ -1,5 +1,5 @@
 import re
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 
 def http_url(value: object) -> str | None:
@@ -12,6 +12,18 @@ def http_url(value: object) -> str | None:
     except ValueError:
         pass
     return None
+
+
+def github_release_api_url(repository_url: str, tag: str) -> str | None:
+    if not http_url(repository_url):
+        return None
+    parsed = urlsplit(repository_url)
+    if parsed.netloc.lower() != "github.com":
+        return None
+    project = parsed.path.rstrip("/").removesuffix(".git")
+    if not re.fullmatch(r"/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", project):
+        return None
+    return f"https://api.github.com/repos{project}/releases/tags/{quote(tag, safe='')}"
 
 
 def download_release_url(url: str) -> str | None:

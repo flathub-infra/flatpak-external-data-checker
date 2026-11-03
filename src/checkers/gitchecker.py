@@ -7,6 +7,7 @@ import semver
 from ..lib import OPERATORS_SCHEMA
 from ..lib.errors import CheckerFetchError, CheckerQueryError
 from ..lib.externaldata import ExternalBase, ExternalGitRef, ExternalGitRepo
+from ..lib.releaselinks import api_release_url, github_release_api_url
 from ..lib.utils import (
     FallbackVersion,
     expand_version_constraints,
@@ -93,9 +94,28 @@ class GitChecker(Checker):
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
         assert isinstance(external_data, ExternalGitRepo)
+        external_data.new_release_url = None
         if external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE:
-            return await self._check_has_new(external_data)
+            await self._check_has_new(external_data)
+            await self._set_release_url(external_data)
+            return None
         return await self._check_still_valid(external_data)
+
+    async def _set_release_url(self, external_data: ExternalGitRepo):
+        new = external_data.new_version
+        if not new or not new.tag:
+            return
+        api_url = github_release_api_url(new.url, new.tag)
+        if not api_url:
+            return
+        try:
+            payload = await self._get_json(api_url)
+        except (CheckerQueryError, CheckerFetchError) as err:
+            log.debug("Could not look up release for %s: %s", new.tag, err)
+            return
+        external_data.new_release_url = api_release_url(
+            api_url, payload, tag=new.tag, asset_url=None, repository_url=new.url
+        )
 
     @classmethod
     async def _check_has_new(cls, external_data: ExternalGitRepo):

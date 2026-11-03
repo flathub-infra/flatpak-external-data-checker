@@ -3,10 +3,31 @@ import unittest
 from src.lib.releaselinks import (
     api_release_url,
     download_release_url,
+    github_release_api_url,
 )
 
 
 class TestReleaseLinks(unittest.TestCase):
+    def test_github_release_api_url(self):
+        for repo in (
+            "https://github.com/Owner/App",
+            "https://GitHub.COM/Owner/App.git",
+            "https://github.com/Owner/App.git/",
+        ):
+            self.assertEqual(
+                github_release_api_url(repo, "release/2%beta"),
+                "https://api.github.com/repos/Owner/App/releases/tags/release%2F2%25beta",
+            )
+        for repo in (
+            "https://example.org/Owner/App",
+            "https://github.com.evil.test/Owner/App",
+            "https://github.com@evil.test/Owner/App",
+            "https://github.com/Owner/App/tree/main",
+            "git@github.com:Owner/App.git",
+            "https://[invalid",
+        ):
+            self.assertIsNone(github_release_api_url(repo, "v2"))
+
     def test_download_provider_hostnames_are_case_insensitive(self):
         for host, path, expected_path in (
             (
