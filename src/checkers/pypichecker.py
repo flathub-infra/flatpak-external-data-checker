@@ -3,8 +3,11 @@ import re
 import typing as t
 from datetime import datetime
 
+from packaging.tags import Tag
+from packaging.utils import InvalidWheelFilename, parse_wheel_filename
 from packaging.version import InvalidVersion
 from packaging.version import Version as PackagingVersion
+from yarl import URL
 
 from ..lib import OPERATORS_SCHEMA
 from ..lib.checksums import MultiDigest
@@ -16,7 +19,6 @@ from . import Checker
 log = logging.getLogger(__name__)
 
 PYPI_INDEX = "https://pypi.org/pypi"
-BDIST_RE = re.compile(r"^(\S+)-(\d[\d\.\w]*\d)-(\S+)-(\S+)-(\S+).whl$")
 
 
 # We want to keep the original version string on parsed version object
@@ -26,12 +28,34 @@ class Version(PackagingVersion):
         self.orig_str = version
 
 
+def _manylinux_baselines(
+    tags: frozenset[Tag],
+) -> dict[tuple[str, str, str], tuple[int, int]]:
+    baselines: dict[tuple[str, str, str], tuple[int, int]] = {}
+    legacy = {"manylinux1": (2, 5), "manylinux2010": (2, 12), "manylinux2014": (2, 17)}
+    for tag in tags:
+        prefix, _, arch = tag.platform.partition("_")
+        if prefix in legacy:
+            version = legacy[prefix]
+        else:
+            match = re.fullmatch(r"manylinux_(\d+)_(\d+)_(\w+)", tag.platform)
+            if not match:
+                continue
+            version = (int(match[1]), int(match[2]))
+            arch = match[3]
+        key = (tag.interpreter, tag.abi, arch)
+        baselines[key] = min(baselines.get(key, version), version)
+    return baselines
+
+
 def _filter_downloads(
     pypy_releases: dict[str, list[dict]],
     constraints: list[tuple[str, Version]],
     packagetype: str,
     stable_only: bool = False,
+    wheel_tags: frozenset[Tag] = frozenset({Tag("py3", "none", "any")}),
 ) -> t.Generator[tuple[Version, dict, datetime], None, None]:
+    source_baselines = _manylinux_baselines(wheel_tags)
     parsed_releases = []
     for version, downloads in pypy_releases.items():
         try:
@@ -55,12 +79,26 @@ def _filter_downloads(
                 continue
             if download["packagetype"] != packagetype:
                 continue
-            if download["python_version"] not in ["source", "py3", "py2.py3"]:
-                continue
             if download["packagetype"] == "bdist_wheel":
-                # Make sure we get only noarch wheels
-                if not download["filename"].endswith("-any.whl"):
+                try:
+                    tags = parse_wheel_filename(download["filename"])[3]
+                except InvalidWheelFilename:
+                    log.debug(
+                        "Skipping invalid wheel filename %r", download["filename"]
+                    )
                     continue
+                if source_baselines:
+                    # A shared tag can hide a higher minimum glibc version.
+                    baselines = _manylinux_baselines(tags)
+                    if any(
+                        key not in baselines or baselines[key] > version
+                        for key, version in source_baselines.items()
+                    ):
+                        continue
+                elif not tags.intersection(wheel_tags):
+                    continue
+            elif download["python_version"] not in ["source", "py3", "py2.py3"]:
+                continue
             date = datetime.fromisoformat(download["upload_time_iso_8601"].rstrip("Z"))
             yield (pypi_version, download, date)
 
@@ -99,6 +137,19 @@ class PyPIChecker(Checker):
             )
         ]
         stable_only = external_data.checker_data.get("stable-only", True)
+        wheel_tags = frozenset({Tag("py3", "none", "any")})
+        if package_type == "bdist_wheel" and isinstance(
+            external_data.current_version, ExternalFile
+        ):
+            try:
+                source_tags = parse_wheel_filename(
+                    URL(external_data.current_version.url).name
+                )[3]
+                wheel_tags = frozenset(
+                    tag for tag in source_tags if tag.interpreter != "py2"
+                )
+            except InvalidWheelFilename:
+                pass
 
         async with self.session.get(f"{PYPI_INDEX}/{package_name}/json") as response:
             pypi_data = await response.json()
@@ -107,21 +158,26 @@ class PyPIChecker(Checker):
         if stable_only and not constraints:
             releases = {pypi_data["info"]["version"]: pypi_data["urls"]}
             downloads = list(
-                _filter_downloads(releases, constraints, package_type, stable_only)
+                _filter_downloads(
+                    releases, constraints, package_type, stable_only, wheel_tags
+                )
             )
         if not downloads:
             downloads = list(
                 _filter_downloads(
-                    pypi_data["releases"], constraints, package_type, stable_only
+                    pypi_data["releases"],
+                    constraints,
+                    package_type,
+                    stable_only,
+                    wheel_tags,
                 )
             )
 
-        try:
-            pypi_version, pypi_download, pypi_date = downloads[-1]
-        except IndexError as err:
+        if not downloads:
             raise CheckerQueryError(
                 f"Couldn't find {package_type} for package {package_name}"
-            ) from err
+            )
+        pypi_version, pypi_download, pypi_date = downloads[-1]
 
         checksum = MultiDigest.from_source(pypi_download["digests"])
 

@@ -7,6 +7,7 @@ from packaging.version import Version
 from src.checkers.pypichecker import PyPIChecker
 from src.lib.checksums import MultiDigest
 from src.lib.errors import CheckerQueryError
+from src.lib.externaldata import ExternalFile
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
 
@@ -136,7 +137,7 @@ class TestPyPIReleaseEligibility(unittest.IsolatedAsyncioTestCase):
         download.update(overrides)
         return download
 
-    async def check_releases(self, releases, latest, **options):
+    async def check_releases(self, releases, latest, filename=None, **options):
         response = mock.AsyncMock()
         response.__aenter__.return_value = response
         response.json.return_value = {
@@ -147,6 +148,14 @@ class TestPyPIReleaseEligibility(unittest.IsolatedAsyncioTestCase):
         session = mock.MagicMock()
         session.get.return_value = response
         data = mock.MagicMock()
+        data.filename = "renamed-download"
+        data.current_version = ExternalFile(
+            url=f"https://example.org/{filename or 'example.tar.gz'}",
+            checksum=MultiDigest(),
+            size=None,
+            version=None,
+            timestamp=None,
+        )
         data.checker_data = {"name": "example", **options}
         await PyPIChecker(session).check(data)
         data.set_new_version.assert_called_once()
@@ -239,7 +248,7 @@ class TestPyPIReleaseEligibility(unittest.IsolatedAsyncioTestCase):
     async def test_remaining_artifacts_must_be_compatible(self):
         for overrides in (
             {"packagetype": "sdist"},
-            {"python_version": "py2"},
+            {"filename": "example-2.0-py2-none-any.whl"},
             {"filename": "example-2.0-cp311-cp311-linux_x86_64.whl"},
         ):
             with self.subTest(overrides=overrides):
@@ -258,6 +267,153 @@ class TestPyPIReleaseEligibility(unittest.IsolatedAsyncioTestCase):
                     releases, "2.0", packagetype="bdist_wheel"
                 )
                 self.assertEqual(result.version, "1.0")
+
+    async def test_wheel_tags_override_legacy_python_version(self):
+        for tags, python_version in (
+            ("py2.py3-none-any", "3.8"),
+            ("py3-none-any", "3.7"),
+        ):
+            with self.subTest(tags=tags):
+                wheel = self.download(
+                    "1.0",
+                    filename=f"example-1.0-{tags}.whl",
+                    packagetype="bdist_wheel",
+                    python_version=python_version,
+                )
+                result = await self.check_releases(
+                    {"1.0": [wheel]}, "1.0", packagetype="bdist_wheel"
+                )
+                self.assertEqual(result.url, wheel["url"])
+
+    async def test_platform_wheel_compatibility(self):
+        cases = (
+            [
+                (f"cp39-abi3-manylinux_2_34_{arch}", f"cp39-abi3-manylinux_2_34_{arch}")
+                for arch in ("aarch64", "x86_64")
+            ]
+            + [
+                (
+                    f"cp314-cp314-manylinux_2_27_{arch}.manylinux_2_28_{arch}",
+                    f"cp314-cp314-manylinux_2_27_{arch}",
+                )
+                for arch in ("aarch64", "x86_64")
+            ]
+            + [
+                (
+                    "cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64",
+                    "cp313-cp313-manylinux_2_28_x86_64.manylinux2014_x86_64",
+                ),
+                (
+                    "cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64",
+                    "cp36-abi3-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64",
+                ),
+            ]
+        )
+        for current, candidate in cases:
+            with self.subTest(current=current):
+                eligible = self.download(
+                    "2.0",
+                    filename=f"example-2.0-{candidate}.whl",
+                    packagetype="bdist_wheel",
+                    python_version="cp313",
+                    url="https://example.org/eligible.whl",
+                )
+                interpreter, abi, platform = candidate.split("-")
+                incompatible = [
+                    {**eligible, "filename": f"example-3.0-{tags}.whl"}
+                    for tags in (
+                        f"{interpreter}-cp999-{platform}",
+                        f"cp999-{abi}-{platform}",
+                        candidate.replace("x86_64", "s390x").replace(
+                            "aarch64", "s390x"
+                        ),
+                        "cp315-cp315-manylinux_2_28_x86_64",
+                        "cp313-cp313t-manylinux_2_28_x86_64",
+                        "cp39-abi3-win_amd64",
+                        "cp36-abi3-manylinux_2_12_s390x",
+                        "cp39-abi3-manylinux_2_99_x86_64",
+                    )
+                ]
+                for options in ({}, {"versions": {"<": "3.0"}}):
+                    result = await self.check_releases(
+                        {
+                            "2.0": [eligible],
+                            "3.0": incompatible + [{**eligible, "yanked": True}],
+                        },
+                        "3.0",
+                        filename=f"example-1.0-{current}.whl",
+                        packagetype="bdist_wheel",
+                        **options,
+                    )
+                    self.assertEqual(result.version, "2.0")
+                    self.assertEqual(result.url, eligible["url"])
+
+    async def test_manylinux_baseline_is_preserved(self):
+        cases = (
+            ("manylinux_2_12.manylinux_2_28", "manylinux_2_28", False),
+            ("manylinux2010.manylinux_2_28", "manylinux_2_28", False),
+            ("manylinux_2_27.manylinux_2_28", "manylinux_2_28", False),
+            ("manylinux2014.manylinux_2_28", "manylinux_2_28", False),
+            ("manylinux_2_12", "manylinux2010", True),
+            ("manylinux2010", "manylinux_2_12", True),
+            ("manylinux1", "manylinux_2_5", True),
+            ("manylinux_2_5", "manylinux1", True),
+            ("manylinux2014", "manylinux_2_17", True),
+            ("manylinux_2_17", "manylinux2014", True),
+            ("manylinux_2_28", "manylinux_2_17", True),
+            ("manylinux_2_12.manylinux_2_28", "manylinux_2_28.manylinux2010", True),
+        )
+        for arch in ("x86_64", "aarch64"):
+            for current, candidate, compatible in cases:
+                with self.subTest(arch=arch, current=current, candidate=candidate):
+                    current_platform = ".".join(
+                        f"{tag}_{arch}" for tag in current.split(".")
+                    )
+                    candidate_platform = ".".join(
+                        f"{tag}_{arch}" for tag in candidate.split(".")
+                    )
+                    filename = f"example-1.0-cp39-abi3-{current_platform}.whl"
+                    original = self.download(
+                        "1.0",
+                        filename=filename,
+                        packagetype="bdist_wheel",
+                        python_version="cp39",
+                    )
+                    updated = self.download(
+                        "2.0",
+                        filename=f"example-2.0-cp39-abi3-{candidate_platform}.whl",
+                        packagetype="bdist_wheel",
+                        python_version="cp39",
+                    )
+                    for options in ({}, {"versions": {"<": "3.0"}}):
+                        result = await self.check_releases(
+                            {"1.0": [original], "2.0": [updated]},
+                            "2.0",
+                            filename=filename,
+                            packagetype="bdist_wheel",
+                            **options,
+                        )
+                        self.assertEqual(result.version, "2.0" if compatible else "1.0")
+
+    async def test_compressed_python_tags_do_not_allow_python2_only(self):
+        eligible = self.download(
+            "1.0",
+            filename="example-1.0-py3-none-any.whl",
+            packagetype="bdist_wheel",
+            python_version="3.7",
+        )
+        releases = {
+            "1.0": [eligible],
+            "2.0": [{**eligible, "filename": "example-2.0-py2-none-any.whl"}],
+            "3.0": [{**eligible, "filename": "broken.whl"}],
+        }
+        result = await self.check_releases(
+            releases,
+            "3.0",
+            filename="example-0.1-py2.py3-none-any.whl",
+            packagetype="bdist_wheel",
+        )
+        self.assertEqual(result.version, "1.0")
 
     async def test_no_eligible_candidates(self):
         cases = [
