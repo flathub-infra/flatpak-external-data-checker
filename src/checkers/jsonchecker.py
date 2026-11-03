@@ -16,6 +16,7 @@ from ..lib.externaldata import (
     ExternalGitRef,
     ExternalGitRepo,
 )
+from ..lib.releaselinks import api_release_url, http_url
 from . import Checker, JSONType
 
 log = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ class JSONChecker(Checker):
             "url-data-url": {"type": "string"},
             "timestamp-query": {"type": "string"},
             "timestamp-data-url": {"type": "string"},
+            "release-url-query": {"type": "string"},
         },
     }
     SUPPORTED_DATA_CLASSES = [ExternalData, ExternalGitRepo]
@@ -115,6 +117,7 @@ class JSONChecker(Checker):
         queries: t.Iterable[_Query],
         json_vars: dict[str, JSONType],
         init_json_data: JSONType = None,
+        responses: list[tuple[str, JSONType]] | None = None,
     ) -> dict[str, str]:
         results: dict[str, str] = {}
         for query in queries:
@@ -122,9 +125,16 @@ class JSONChecker(Checker):
             if query.url_expr:
                 url = await _jq(query.url_expr, init_json_data, _vars)
                 json_data = await self._get_json(url)
+                if responses is not None:
+                    responses.append((url, json_data))
             else:
                 json_data = init_json_data
-            results[query.name] = await _jq(query.value_expr, json_data, _vars)
+            try:
+                results[query.name] = await _jq(query.value_expr, json_data, _vars)
+            except CheckerQueryError:
+                if query.name != "release-url":
+                    raise
+                log.warning("Could not read optional release URL")
         return results
 
     @staticmethod
@@ -149,7 +159,11 @@ class JSONChecker(Checker):
         if not isinstance(external_data, ExternalGitRepo):
             sequence.append("url")
         sequence.append("timestamp")
-        return cls._read_q_seq(external_data.checker_data, sequence)
+        yield from cls._read_q_seq(external_data.checker_data, sequence)
+        if "release-url-query" in external_data.checker_data:
+            yield _Query(
+                "release-url", external_data.checker_data["release-url-query"], None
+            )
 
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
@@ -182,10 +196,12 @@ class JSONChecker(Checker):
         json_vars: dict[str, JSONType],
         external_data: ExternalData,
     ):
+        responses = [(external_data.checker_data.get("url", ""), json_data)]
         results = await self._query_sequence(
             self.get_queries(external_data),
             json_vars,
             json_data,
+            responses,
         )
         latest_version = results["version"]
         latest_url = results["url"]
@@ -198,6 +214,7 @@ class JSONChecker(Checker):
             follow_redirects=False,
             timestamp=latest_timestamp,
         )
+        self._set_release_url(external_data, responses, results)
 
     async def _check_git(
         self,
@@ -205,10 +222,12 @@ class JSONChecker(Checker):
         json_vars: dict[str, JSONType],
         external_data: ExternalGitRepo,
     ):
+        responses = [(external_data.checker_data.get("url", ""), json_data)]
         results = await self._query_sequence(
             self.get_queries(external_data),
             json_vars,
             json_data,
+            responses,
         )
         new_version = ExternalGitRef(
             url=external_data.current_version.url,
@@ -223,3 +242,33 @@ class JSONChecker(Checker):
             new_version = await new_version.fetch_remote()
 
         external_data.set_new_version(new_version)
+        self._set_release_url(external_data, responses, results)
+
+    @staticmethod
+    def _set_release_url(
+        data: ExternalBase,
+        responses: list[tuple[str, JSONType]],
+        results: dict[str, str],
+    ) -> None:
+        data.new_release_url = None
+        if data.new_version is None:
+            return
+        if "release-url-query" in data.checker_data:
+            data.new_release_url = http_url(results.get("release-url"))
+            return
+        repository_url = (
+            data.current_version.url if isinstance(data, ExternalGitRepo) else None
+        )
+        links = set()
+        for url, payload in responses:
+            link = api_release_url(
+                url,
+                payload,
+                tag=results.get("tag"),
+                asset_url=results.get("url"),
+                repository_url=repository_url,
+            )
+            if link:
+                links.add(link)
+        if len(links) == 1:
+            data.new_release_url = links.pop()

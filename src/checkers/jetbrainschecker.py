@@ -3,6 +3,7 @@ import logging
 
 from ..lib.checksums import MultiDigest
 from ..lib.externaldata import ExternalBase, ExternalFile
+from ..lib.releaselinks import http_url
 from . import Checker
 
 log = logging.getLogger(__name__)
@@ -61,3 +62,6 @@ class JetBrainsChecker(Checker):
         )
 
         external_data.set_new_version(new_version)
+        external_data.new_release_url = (
+            http_url(data.get("notesLink")) if external_data.new_version else None
+        )

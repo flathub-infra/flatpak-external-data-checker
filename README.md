@@ -377,6 +377,11 @@ for git type sources, specify tag query and, optionally, commit and version quer
 
 `timestamp-query` is optional, but if provided - must return a string with timestamp in ISO format.
 
+`release-url-query` extracts an optional HTTP or HTTPS release-notes link from
+the same response, for example `"release-url-query": ".html_url // empty"`.
+It can use `$version` and `$tag` from earlier queries. Missing or invalid results
+do not block updates.
+
 See the [jq manual](https://stedolan.github.io/jq/manual/) for complete information about writing queries.
 
 #### Inheriting parent source check results
@@ -555,6 +560,23 @@ like below a `<url type="details"></url>` tag will also be added.
 
 The `$version` in `release-url-template` will be replaced by the release
 version.
+
+New pull requests list each source's old and new versions or Git revisions.
+Missing versions appear as `unknown`. Set `release-url-template` on any source
+to add an HTTP or HTTPS release-notes link. It overrides `release-url-query`
+and automatic links. Templates containing `$version` need a known new version.
+
+Automatic links use existing download URLs and checker responses:
+
+- GitHub, Codeberg, and gitlab.com release downloads.
+- GitHub, GitLab, and Forgejo/Gitea release API responses, including secondary
+  JSON query responses and self-hosted GitLab and Forgejo/Gitea instances.
+  Matches require the exact asset URL or Git tag. Git release pages must also
+  belong to the source's HTTP or HTTPS repository.
+- JetBrains `notesLink` and GNOME `.news` files, falling back to `.changes`.
+
+Discovery makes no extra requests. Use a template or `release-url-query` for
+other URL formats or release notes hosted by another project.
 
 ```yaml
 x-checker-data:

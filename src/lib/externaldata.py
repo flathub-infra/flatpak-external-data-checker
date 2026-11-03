@@ -234,6 +234,7 @@ class ExternalBase(BuilderSource):
 
     current_version: ExternalState
     new_version: ExternalState | None
+    new_release_url: str | None = dataclasses.field(init=False, default=None)
 
     @staticmethod
     def _name_from_url(url: str | URL) -> str:

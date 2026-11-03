@@ -144,6 +144,10 @@ class GitChecker(Checker):
                 continue
 
             matching_tags.append(tag_cls(commit, tag, annotated, version))
+            if tag == external_data.current_version.tag:
+                external_data.current_version = external_data.current_version._replace(
+                    version=version
+                )
 
         if constraints:
             sorted_tags = filter_versioned_items(

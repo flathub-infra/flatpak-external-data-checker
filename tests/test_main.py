@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from src import main
 from src.lib.errors import AppdataLoadError, CheckerFetchError, SourceLoadError
 from src.lib.externaldata import ExternalData
+from src.lib.sourceupdates import SourceUpdate
 
 TEST_MANIFEST = os.path.join(
     os.path.dirname(__file__), "net.invisible_island.xterm.yml"
@@ -495,6 +496,36 @@ class TestOpenPR(unittest.TestCase):
         )
         self.push = push.start()
         self.addCleanup(push.stop)
+
+    @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
+    @patch("src.main.check_call")
+    @patch("src.main.Github")
+    def test_source_details_preserve_body(self, mock_github, mock_call, mock_output):
+        _, _, repo = self._setup_mocks(mock_github)
+        checker = MagicMock()
+        checker.source_updates = [SourceUpdate("foo", "1", "2", None)]
+        checker.get_outdated_external_data.return_value = []
+        for body in (None, "Existing useful description"):
+            with (
+                self.subTest(body=body),
+                patch.dict(
+                    os.environ,
+                    {
+                        "GITHUB_TOKEN": "fake-token",
+                        "GITHUB_RUN_ID": "123",
+                        "GITHUB_REPOSITORY": "owner/repo",
+                    },
+                ),
+                patch("builtins.open", side_effect=FileNotFoundError),
+            ):
+                main.open_pr(self._make_change()._replace(body=body), checker)
+                text = repo.create_pull.call_args.kwargs["body"]
+                self.assertIn("### Source updates", text)
+                self.assertIn("| foo | 1 | 2 | Unavailable |", text)
+                self.assertIn(main.DISCLAIMER, text)
+                self.assertIn("https://github.com/owner/repo/actions/runs/123", text)
+                if body:
+                    self.assertTrue(text.startswith(body + "\n\n"))
 
     def _make_change(self):
         return main.CommittedChanges(

@@ -48,6 +48,7 @@ from .lib.externaldata import (
     ExternalBase,
 )
 from .lib.robots import RobotsCache
+from .lib.sourceupdates import SourceUpdate
 from .lib.utils import asyncio_gather_failfast, dump_manifest, read_manifest
 
 MAIN_SRC_PROP = "is-main-source"
@@ -114,6 +115,7 @@ class ManifestChecker:
 
         self._errors: list[Exception]
         self._errors = []
+        self.source_updates: list[SourceUpdate] = []
 
         # Initialize checkers
         self._checkers: list[type[Checker]]
@@ -487,7 +489,9 @@ class ManifestChecker:
 
             data_new_ver_version = data.new_version.version
 
+            source_update = SourceUpdate.from_source(data)
             data.update()
+            self.source_updates.append(source_update)
             if data_new_ver_version is not None:
                 message = (
                     f"{data.module}: Update {data.filename} to {data_new_ver_version}"
@@ -572,6 +576,7 @@ class ManifestChecker:
         # insertion-order-preserving dictionary so we use that.
         changes: dict[str, t.Any]
         changes = OrderedDict()
+        self.source_updates = []
 
         found_important_update = None
 
