@@ -462,9 +462,9 @@ Check for Python package updates on PyPI.
 }
 ```
 
-By default it will check for source package (`sdist` package type).
-To check for binary package instead, set `packagetype` to `bdist_wheel`
-(only noarch wheels are supported currently).
+The checker selects source packages by default. Set `packagetype` to
+`bdist_wheel` to select wheels compatible with the current source wheel.
+If the source URL is not a wheel filename, only `py3-none-any` wheels qualify.
 
 The [`versions`](#version-constraining) property is supported.
 
