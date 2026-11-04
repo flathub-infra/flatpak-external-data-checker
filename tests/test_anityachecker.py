@@ -1,4 +1,6 @@
+import json
 import os
+import tempfile
 import unittest
 from datetime import datetime, timezone
 from unittest import mock
@@ -276,7 +278,7 @@ class TestAnityaCheckerMocked(unittest.IsolatedAsyncioTestCase):
 
         self.checker._check_data.assert_awaited_once_with(ed, "2.0.0", None)
 
-    async def test_filter_no_match_raises(self):
+    async def test_filter_no_match_is_no_update(self):
 
         payload = {
             "latest_version": "3.0.0",
@@ -294,8 +296,113 @@ class TestAnityaCheckerMocked(unittest.IsolatedAsyncioTestCase):
             }
         )
 
-        with self.assertRaises(CheckerQueryError):
+        self.checker._check_data = mock.AsyncMock()
+        with self.assertLogs("src.checkers.anityachecker", level="INFO") as logs:
             await self.checker.check(ed)
+        self.assertIn("No eligible version", logs.output[0])
+        self.checker._check_data.assert_not_awaited()
+        ed.set_new_version.assert_not_called()
+
+    async def test_zlib_exclusion_and_future_release(self):
+        for stable_only in (False, True):
+            for git in (False, True):
+                for future in (False, True):
+                    with self.subTest(stable_only=stable_only, git=git, future=future):
+                        versions = ["1.3.2", "1.3.1"]
+                        if future:
+                            versions.insert(0, "1.3.3")
+                        self._mock_session_response(
+                            {
+                                "latest_version": versions[0],
+                                "stable_versions": versions,
+                                "versions": versions,
+                            }
+                        )
+                        settings = {
+                            "project-id": 5303,
+                            "stable-only": stable_only,
+                            "versions": {">": "1.3.2"},
+                        }
+                        if git:
+                            data = self._make_external_git_repo(
+                                settings | {"tag-template": "v$version"}
+                            )
+                        else:
+                            data = self._make_external_data(
+                                settings
+                                | {
+                                    "url-template": "https://zlib.net/zlib-$version.tar.gz"
+                                }
+                            )
+                        self.checker._check_data = mock.AsyncMock()
+                        self.checker._check_git = mock.AsyncMock()
+                        await self.checker.check(data)
+                        selected = (
+                            self.checker._check_git if git else self.checker._check_data
+                        )
+                        other = (
+                            self.checker._check_data if git else self.checker._check_git
+                        )
+                        if future:
+                            selected.assert_awaited_once_with(data, "1.3.3", None)
+                        else:
+                            selected.assert_not_awaited()
+                        other.assert_not_awaited()
+                        data.set_new_version.assert_not_called()
+
+    async def test_empty_upstream_remains_error(self):
+        for constraints in ({}, {">": "1.3.2"}):
+            with self.subTest(constraints=constraints):
+                self._mock_session_response(
+                    {"latest_version": None, "stable_versions": [], "versions": []}
+                )
+                data = self._make_external_data(
+                    {
+                        "project-id": 5303,
+                        "versions": constraints,
+                        "url-template": "https://zlib.net/zlib-$version.tar.gz",
+                    }
+                )
+                with self.assertRaises(CheckerQueryError):
+                    await self.checker.check(data)
+                data.set_new_version.assert_not_called()
+
+    async def test_filtered_manifest_completes_without_errors(self):
+        source = {
+            "type": "archive",
+            "url": "https://zlib.net/fossils/zlib-1.3.1.tar.gz",
+            "sha256": (
+                "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"
+            ),
+            "x-checker-data": {
+                "type": "anitya",
+                "project-id": 5303,
+                "versions": {">": "1.3.2"},
+                "url-template": "https://zlib.net/zlib-$version.tar.gz",
+            },
+        }
+        response = mock.AsyncMock()
+        response.json.return_value = {
+            "latest_version": "1.3.2",
+            "stable_versions": ["1.3.2", "1.3.1"],
+            "versions": ["1.3.2", "1.3.1"],
+        }
+        response.__aenter__.return_value = response
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as manifest:
+            json.dump({"name": "minizip", "sources": [source]}, manifest)
+            manifest.flush()
+            checker = ManifestChecker(manifest.name)
+            with mock.patch("aiohttp.ClientSession.get", return_value=response) as get:
+                data = await checker.check()
+        self.assertEqual(checker.get_errors(), [])
+        self.assertEqual(len(data), 1)
+        self.assertIsNone(data[0].new_version)
+        self.assertTrue(data[0].checked.is_set())
+        get.assert_called_once()
+        self.assertEqual(
+            str(get.call_args.args[0]),
+            "https://release-monitoring.org/api/v2/versions/?project_id=5303",
+        )
 
     async def test_external_git_repo_dispatches_to_check_git(self):
         payload = {
