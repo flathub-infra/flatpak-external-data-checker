@@ -54,8 +54,12 @@ class TestSourceUpdates(unittest.TestCase):
                     f"{repo}/{route}/release%2F1...release%2F2",
                 )
                 text = format_source_updates([update])
-                self.assertIn(f"[tag release/1]({update.comparison_url})", text)
-                self.assertIn(f"[tag release/2]({update.comparison_url})", text)
+                self.assertIn(
+                    f"[<code>tag release/1</code>]({update.comparison_url})", text
+                )
+                self.assertIn(
+                    f"[<code>tag release/2</code>]({update.comparison_url})", text
+                )
                 self.assertNotIn("| Changes |", text)
                 data.current_version = data.current_version._replace(commit="a" * 40)
                 data.new_version = data.current_version._replace(commit="b" * 40)
@@ -116,6 +120,8 @@ class TestSourceUpdates(unittest.TestCase):
         self.assertEqual(update.old_version, "1.0")
         self.assertEqual(update.new_version, "2.0")
         self.assertEqual(update.release_url, "https://example.org/notes/2.0")
+        self.assertEqual(update.source_url, "https://example.org/app-2.0.tar.gz")
+        self.assertIn(f"]({update.source_url})", format_source_updates([update]))
 
     def test_unknown_and_unresolved_links(self):
         data = self.file_source()
@@ -232,7 +238,8 @@ class TestSourceUpdates(unittest.TestCase):
         data.new_version = data.current_version._replace(commit=new_commit)
         update = SourceUpdate.from_source(data)
         text = format_source_updates([update])
-        self.assertIn("| Source | Previous | Updated | Release notes |", text)
+        self.assertIn("| Source | Change | Release notes |", text)
+        self.assertIn("<code>commit 1234567890ab</code> →", text)
         self.assertEqual(update.old_version, "commit 1234567890ab")
         self.assertEqual(update.new_version, "commit abcdef123456")
         self.assertEqual(data.current_version.commit, old_commit)
@@ -273,7 +280,7 @@ class TestSourceUpdates(unittest.TestCase):
         )
         text = format_source_updates([update, update])
         self.assertIn(r"a\|b &lt;script&gt;", text)
-        self.assertIn(r"\[old\]", text)
+        self.assertIn(r"<code>\[old\]</code> → <code>\*new\*</code>", text)
         self.assertIn("https://example.org/notes/%282%29%7Cx%20y", text)
         self.assertEqual(text.count("[Release notes]"), 2)
         self.assertEqual(format_source_updates([]), "")

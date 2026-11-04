@@ -40,6 +40,7 @@ class SourceUpdate:
     new_version: str
     release_url: str | None
     comparison_url: str | None = None
+    source_url: str | None = None
 
     @classmethod
     def from_source(cls, data: ExternalBase) -> "SourceUpdate":
@@ -80,6 +81,7 @@ class SourceUpdate:
             _version(data, new),
             release_url,
             compare,
+            http_url(new.url),
         )
 
 
@@ -88,25 +90,38 @@ def _escape(text: str) -> str:
     return re.sub(r"([\\`*_{}\[\]()#+.!|~-])", r"\\\1", text)
 
 
+def _url(url: str) -> str:
+    return quote(url, safe=":/?#@!$&'*+,;=%~.-_")
+
+
+def _code(text: str) -> str:
+    escaped = _escape(text)
+    return f"<code>{escaped}</code>"
+
+
 def format_source_updates(updates: list[SourceUpdate]) -> str:
     if not updates:
         return ""
     lines = [
         "### Source updates",
         "",
-        "| Source | Previous | Updated | Release notes |",
-        "| --- | --- | --- | --- |",
+        "| Source | Change | Release notes |",
+        "| --- | --- | --- |",
     ]
     for update in updates:
-        link = "Unavailable"
-        if update.release_url:
-            url = quote(update.release_url, safe=":/?#@!$&'*+,;=%~.-_")
-            link = f"[Release notes]({url})"
-        previous = _escape(update.old_version)
-        updated = _escape(update.new_version)
+        previous = _code(update.old_version)
+        updated = _code(update.new_version)
         if update.comparison_url:
-            url = quote(update.comparison_url, safe=":/?#@!$&'*+,;=%~.-_")
+            url = _url(update.comparison_url)
             previous = f"[{previous}]({url})"
             updated = f"[{updated}]({url})"
-        lines.append(f"| {_escape(update.source)} | {previous} | {updated} | {link} |")
+        source = _escape(update.source)
+        if update.source_url:
+            source = f"[{source}]({_url(update.source_url)})"
+        release = (
+            f"[Release notes]({_url(update.release_url)})"
+            if update.release_url
+            else "Unavailable"
+        )
+        lines.append(f"| {source} | {previous} → {updated} | {release} |")
     return "\n".join(lines)
