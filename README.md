@@ -82,7 +82,7 @@ flatpak run --filesystem=MANIFEST_DIR org.flathub.flatpak-external-data-checker 
 #### Running in a container
 
 **flatpak-external-data-checker** is also available as an
-[OCI image](https://github.com/orgs/flathub/packages/container/package/flatpak-external-data-checker)
+[OCI image](https://github.com/orgs/flathub-infra/packages/container/package/flatpak-external-data-checker)
 from GitHub Container Registry.
 
 You can use the `run-in-container.sh` helper script to set up needed CLI
@@ -104,9 +104,11 @@ To stop Flathub's tool from checking your repo, add `"disable-external-data-chec
 
 ### Custom workflow
 
-Alternatively, you can use own workflow. This can be useful if e.g. wanting to update non-default branches.
+Alternatively, you can use your own workflow, for example to update non-default branches.
 
-Put this yaml file under `.github/workflows`, e.g. put it in `.github/workflows/update.yaml`. Ensure to put the correct path to the manifest in the last line.
+Put this YAML file in `.github/workflows/update.yaml` on the default branch.
+Replace `master` with the branches to check and `com.example.App.json` with the
+path to your manifest relative to the repository root.
 
 ```yaml
 name: Check for updates
@@ -118,34 +120,54 @@ on:
 jobs:
   flatpak-external-data-checker:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # push update branches in this repository
+      pull-requests: write # open update pull requests
 
     strategy:
       matrix:
         branch: [ master ] # list all branches to check
 
     steps:
-      - uses: actions/checkout@v3
+        # 7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ matrix.branch }}
+          persist-credentials: false
 
-      - uses: docker://ghcr.io/flathub/flatpak-external-data-checker:latest
+      - uses: docker://ghcr.io/flathub-infra/flatpak-external-data-checker:latest
         env:
           GIT_AUTHOR_NAME: Flatpak External Data Checker
           GIT_COMMITTER_NAME: Flatpak External Data Checker
-          # email sets "github-actions[bot]" as commit author, see https://github.community/t/github-actions-bot-email-address/17204/6
+          # Attribute commits to github-actions[bot].
           GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
           GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: --update --never-fork $PATH_TO_MANIFEST # e.g. com.organization.myapp.json
+          args: --update --never-fork com.example.App.json
 ```
+
+In Settings, Actions, General, enable "Allow GitHub Actions to create and approve
+pull requests" under Workflow permissions. `--never-fork` keeps update branches
+in this repository. Only check trusted branches with a write token.
+Organization policies and branch protection still apply. See GitHub's
+[Actions settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository).
+
+`GITHUB_TOKEN` does not trigger `push` workflows. GitHub currently requires a user
+with write access to approve workflow runs for the resulting `pull_request`
+events of type `opened`, `synchronize`, and `reopened`.
+See [GitHub's trigger restrictions](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs).
+For unattended CI, replace `${{ secrets.GITHUB_TOKEN }}`
+with a secret containing a GitHub App installation token or personal access
+token with the required repository permissions. The `permissions` block controls
+only the built-in token. The checker does not dispatch CI itself.
 
 ### Automatically submitting PRs
 
-When run with the `--update` flag, this tool can commit any necessary changes
-to Git and open a GitHub pull request. In order to do this, it requires
-a [GitHub access token](https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line),
-specified in the `GITHUB_TOKEN` environment variable.
+`--update` commits changes and opens a GitHub pull request. It requires a token in
+`GITHUB_TOKEN`, either the Actions token above or a
+[personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
+with access to the target repository.
 
 ### Selectively submitting PRs
 
