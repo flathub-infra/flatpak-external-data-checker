@@ -454,9 +454,9 @@ See the [jq manual](https://stedolan.github.io/jq/manual/) for complete informat
 
 If a parent source is specified, its check results will be accessible in the `$parent` variable.
 The `$parent` object has `current` and `new` properties with objects representing current and new
-parent source data, respectively. The later can be `null` if parent check didn't get a new version.
-JSON schema for these objects can be found [here](data/source-state.schema.json).
-
+parent source data, respectively. The latter is `null` if the parent check didn't get a new version.
+The [source-state schema](data/source-state.schema.json) describes each non-null state,
+not the enclosing `$parent` object.
 
 ### Debian repo checker
 

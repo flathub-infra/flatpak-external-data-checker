@@ -1,4 +1,6 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Exported current or new source state (not the enclosing parent object).",
   "$defs": {
     "source-state": {
       "file": {
@@ -8,33 +10,42 @@
           "checksum": {
             "type": "object",
             "properties": {
-              "md5": { "type": "string" },
-              "sha1": { "type": "string" },
-              "sha256": { "type": "string" },
-              "sha512": { "type": "string" }
-            }
+              "md5": { "type": [ "string", "null" ] },
+              "sha1": { "type": [ "string", "null" ] },
+              "sha256": { "type": [ "string", "null" ] },
+              "sha512": { "type": [ "string", "null" ] }
+            },
+            "required": [ "md5", "sha1", "sha256", "sha512" ],
+            "additionalProperties": false
           },
-          "version": { "type": "string" },
-          "timestamp": { "type": "string" }
+          "size": { "type": [ "integer", "null" ] },
+          "version": { "type": [ "string", "null" ] },
+          "timestamp": { "$ref": "#/$defs/timestamp" }
         },
-        "required": [ "url", "checksum" ]
+        "required": [ "url", "checksum", "size", "version", "timestamp" ],
+        "additionalProperties": false
       },
       "git": {
         "type": "object",
         "properties": {
           "url": { "type": "string" },
-          "commit": { "type": "string" },
-          "tag": { "type": "string" },
-          "branch": { "type": "string" },
-          "version": { "type": "string" },
-          "timestamp": { "type": "string" }
+          "commit": { "type": [ "string", "null" ] },
+          "tag": { "type": [ "string", "null" ] },
+          "branch": { "type": [ "string", "null" ] },
+          "version": { "type": [ "string", "null" ] },
+          "timestamp": { "$ref": "#/$defs/timestamp" }
         },
-        "required": [ "url" ]
+        "required": [ "url", "commit", "tag", "branch", "version", "timestamp" ],
+        "additionalProperties": false
       }
+    },
+    "timestamp": {
+      "type": [ "string", "null" ],
+      "description": "Python datetime.isoformat() output, possibly without a timezone or with fractional seconds; null when unknown. Not restricted to RFC 3339 date-time."
     }
   },
   "type": "object",
-  "anyOf": [
+  "oneOf": [
     { "$ref": "#/$defs/source-state/file" },
     { "$ref": "#/$defs/source-state/git" }
   ]
