@@ -1,11 +1,40 @@
 import unittest
 
 from src.lib.checksums import MultiDigest
-from src.lib.externaldata import ExternalBase
+from src.lib.externaldata import BuilderModule, ExternalBase
 from src.lib.sourceupdates import SourceUpdate, format_source_updates
 
 
 class TestSourceUpdates(unittest.TestCase):
+    def test_source_names(self):
+        for module_name, filename, expected in (
+            ("ostree", "ostree", "ostree"),
+            ("appstream", "appstream.git", "appstream"),
+            ("app", "dependency.git", "app: dependency.git"),
+            (None, "app.git", "app.git"),
+        ):
+            with self.subTest(module=module_name, filename=filename):
+                module = (
+                    BuilderModule.from_manifest("manifest.json", {"name": module_name})
+                    if module_name
+                    else None
+                )
+                data = ExternalBase.from_source(
+                    "manifest.json",
+                    {
+                        "type": "git",
+                        "url": f"https://example.org/{filename}",
+                        "tag": "v1",
+                    },
+                    module,
+                )
+                data.new_version = data.current_version._replace(tag="v2")
+                self.assertEqual(SourceUpdate.from_source(data).source, expected)
+                data.source["only-arches"] = ["aarch64"]
+                self.assertEqual(
+                    SourceUpdate.from_source(data).source, f"{expected} (aarch64)"
+                )
+
     def file_source(self, checker_data=None):
         data = ExternalBase.from_source(
             "manifest.json",

@@ -500,12 +500,12 @@ class TestOpenPR(unittest.TestCase):
     @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
     @patch("src.main.check_call")
     @patch("src.main.Github")
-    def test_source_details_preserve_body(self, mock_github, mock_call, mock_output):
+    def test_source_details_replace_body(self, mock_github, mock_call, mock_output):
         _, _, repo = self._setup_mocks(mock_github)
         checker = MagicMock()
         checker.source_updates = [SourceUpdate("foo", "1", "2", None)]
         checker.get_outdated_external_data.return_value = []
-        for body in (None, "Existing useful description"):
+        for body in (None, "foo: Update foo to 2"):
             with (
                 self.subTest(body=body),
                 patch.dict(
@@ -525,7 +525,28 @@ class TestOpenPR(unittest.TestCase):
                 self.assertIn(main.DISCLAIMER, text)
                 self.assertIn("https://github.com/owner/repo/actions/runs/123", text)
                 if body:
-                    self.assertTrue(text.startswith(body + "\n\n"))
+                    self.assertNotIn(body, text)
+
+    @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
+    @patch("src.main.check_call")
+    @patch("src.main.Github")
+    def test_body_without_source_details(self, mock_github, mock_call, mock_output):
+        _, _, repo = self._setup_mocks(mock_github)
+        checker = MagicMock()
+        checker.source_updates = []
+        checker.get_outdated_external_data.return_value = []
+        change = self._make_change()
+        for manifest_checker in (None, checker):
+            with (
+                self.subTest(manifest_checker=manifest_checker),
+                patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}),
+                patch("builtins.open", side_effect=FileNotFoundError),
+            ):
+                main.open_pr(change, manifest_checker)
+                text = repo.create_pull.call_args.kwargs["body"]
+                self.assertTrue(text.startswith(change.body + "\n\n"))
+                self.assertNotIn("### Source updates", text)
+                self.assertIn(main.DISCLAIMER, text)
 
     def _make_change(self):
         return main.CommittedChanges(
