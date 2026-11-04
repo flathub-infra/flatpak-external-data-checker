@@ -4,6 +4,7 @@ import datetime
 import importlib
 import json
 import logging
+import os
 import pkgutil
 import re
 import typing as t
@@ -121,8 +122,14 @@ class Checker:
     ) -> JSONType:
         url = URL(url)
         log.debug("Loading JSON from %s", url)
-        if headers is None:
-            headers = {}
+        headers = headers.copy() if headers else {}
+        if (
+            url.scheme == "https"
+            and url.host == "api.github.com"
+            and url.port == 443
+            and (token := os.environ.get("GITHUB_TOKEN"))
+        ):
+            headers["Authorization"] = f"token {token}"
 
         if self.robots_cache:
             await self.robots_cache.ensure_allowed(url)

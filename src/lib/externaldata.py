@@ -43,7 +43,7 @@ _BM = t.TypeVar("_BM", bound="BuilderModule")
 _BS = t.TypeVar("_BS", bound="BuilderSource")
 _ES = t.TypeVar("_ES", bound="ExternalState")
 
-CHECKER_DATA_SCHEMA_COMMON = {
+CHECKER_DATA_SCHEMA_COMMON: dict[str, t.Any] = {
     "type": "object",
     "properties": {
         "type": {"type": "string"},

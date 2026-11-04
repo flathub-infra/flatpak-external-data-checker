@@ -204,6 +204,8 @@ class ManifestLinter:
             self._version_template(path, location, metadata, field)
         elif metadata["type"] == "html" and "pattern" not in metadata:
             self._version_template(path, location, metadata, "url-template")
+        elif metadata["type"] == "github" and "asset-name" in metadata:
+            self._version_template(path, location, metadata, "asset-name")
 
     def _version_template(self, path: Path, location: str, metadata: dict, field: str):
         template = Template(metadata[field])
@@ -220,6 +222,8 @@ class ManifestLinter:
             if (name := match.group("named") or match.group("braced")) is not None
         )
         for name in names:
+            if name == "tag" and metadata["type"] == "github":
+                continue
             if name in {"version", "major", "minor", "patch"} or re.fullmatch(
                 r"version(?:0|[1-9][0-9]*)", name
             ):

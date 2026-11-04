@@ -1,12 +1,9 @@
 import json
 import logging
-import os
 import re
 import subprocess
 import typing as t
 from datetime import datetime
-
-from yarl import URL
 
 from ..lib import utils
 from ..lib.errors import CheckerQueryError
@@ -96,21 +93,6 @@ class JSONChecker(Checker):
                 "url-query",
             ]
         return schema
-
-    async def _get_json(
-        self,
-        url: str | URL,
-        headers: dict[str, str] | None = None,
-    ) -> JSONType:
-        url = URL(url)
-
-        headers = headers.copy() if headers else {}
-        if url.host == "api.github.com":
-            github_token = os.environ.get("GITHUB_TOKEN")
-            if github_token:
-                headers["Authorization"] = f"token {github_token}"
-
-        return await super()._get_json(url, headers)
 
     async def _query_sequence(
         self,
