@@ -39,7 +39,12 @@ class SourceUpdate:
     def from_source(cls, data: ExternalBase) -> "SourceUpdate":
         new = data.new_version
         assert new is not None
-        source = f"{data.module}: {data.filename}" if data.module else data.filename
+        source = data.filename
+        if data.module:
+            if data.module.name == data.filename.removesuffix(".git"):
+                source = data.module.name
+            else:
+                source = f"{data.module}: {data.filename}"
         # data.arches defaults to x86_64 even for unrestricted sources.
         arches = data.checker_data.get("arches") or data.source.get("only-arches")
         if arches:

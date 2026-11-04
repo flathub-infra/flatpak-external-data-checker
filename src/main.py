@@ -379,7 +379,7 @@ def open_pr(
         else ""
     )
     pr_message = "\n\n".join(
-        part for part in (change.body, source_details, DISCLAIMER) if part
+        part for part in (source_details or change.body, DISCLAIMER) if part
     )
 
     try:
