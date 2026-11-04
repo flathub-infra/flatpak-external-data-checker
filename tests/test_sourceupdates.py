@@ -120,8 +120,9 @@ class TestSourceUpdates(unittest.TestCase):
         self.assertEqual(update.old_version, "1.0")
         self.assertEqual(update.new_version, "2.0")
         self.assertEqual(update.release_url, "https://example.org/notes/2.0")
-        self.assertEqual(update.source_url, "https://example.org/app-2.0.tar.gz")
-        self.assertIn(f"]({update.source_url})", format_source_updates([update]))
+        text = format_source_updates([update])
+        self.assertIn(r"| app\-1\.0\.tar\.gz |", text)
+        self.assertNotIn(data.new_version.url, text)
 
     def test_unknown_and_unresolved_links(self):
         data = self.file_source()
