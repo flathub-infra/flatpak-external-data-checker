@@ -60,6 +60,7 @@ CHECKER_DATA_SCHEMA_COMMON: dict[str, t.Any] = {
         },
         "source-id": {"type": "string", "minLength": 1},
         "parent-id": {"type": "string"},
+        "update-group": {"type": "string", "pattern": "\\S"},
     },
     "required": ["type"],
 }
@@ -243,6 +244,9 @@ class ExternalBase(BuilderSource):
     current_version: ExternalState
     new_version: ExternalState | None
     new_release_url: str | None = dataclasses.field(init=False, default=None)
+    # Keep the selected version even when new_version is None.
+    selected_version: str | None = dataclasses.field(init=False, default=None)
+    check_failed: bool = dataclasses.field(init=False, default=False)
 
     @staticmethod
     def _name_from_url(url: str | URL) -> str:
@@ -279,6 +283,8 @@ class ExternalBase(BuilderSource):
         self, new_version: ExternalState, is_update: bool = True
     ) -> None:
         assert isinstance(new_version, type(self.current_version))
+        if is_update:
+            self.selected_version = new_version.version
 
         if self.current_version.matches(new_version):
             if is_update:

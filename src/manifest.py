@@ -42,6 +42,7 @@ from .lib.errors import (
     ManifestLoadError,
     SourceLoadError,
     SourceUnsupported,
+    UpdateGroupError,
 )
 from .lib.externaldata import (
     BuilderModule,
@@ -117,6 +118,7 @@ class ManifestChecker:
         self._errors = []
         self.source_updates: list[SourceUpdate] = []
         self._allowed_updates: set[int] | None = None
+        self._blocked_update_sources: set[int] = set()
 
         # Initialize checkers
         self._checkers: list[type[Checker]]
@@ -130,6 +132,7 @@ class ManifestChecker:
         self._manifest_contents = {}
 
         self._manifest_headers: dict[str, bool] = {}
+        self._incomplete_manifests: list[ManifestLoadError] = []
 
         # Top-level manifest contents
         self._root_manifest = self._read_manifest(self._root_manifest_path)
@@ -137,6 +140,20 @@ class ManifestChecker:
 
         # Map from manifest path to [ExternalBase]
         self._collect_external_data()
+        self._update_groups: dict[str, list[ExternalBase]] = {}
+        for data in self.get_external_data():
+            group = data.checker_data.get("update-group")
+            if group is not None:
+                self._update_groups.setdefault(group, []).append(data)
+        if self._update_groups and self._incomplete_manifests:
+            raise ManifestLoadError(
+                "Cannot validate update groups in an incomplete manifest"
+            ) from self._incomplete_manifests[0]
+        for group, members in self._update_groups.items():
+            if len(members) < 2:
+                raise ManifestLoadError(
+                    f"Update group {group!r} must contain at least two sources"
+                )
 
     def _load_root_manifest(self):
         if isinstance(self._root_manifest, list):
@@ -255,6 +272,7 @@ class ManifestChecker:
             try:
                 ext_module = self._read_manifest(ext_module_path)
             except ManifestFileOpenError as err:
+                self._incomplete_manifests.append(err)
                 log.warning(err)
                 return None
 
@@ -302,6 +320,7 @@ class ManifestChecker:
             try:
                 ext_source = self._read_manifest(ext_source_path)
             except ManifestFileTooLarge as err:
+                self._incomplete_manifests.append(err)
                 log.warning(err)
             else:
                 self._collect_source_data(
@@ -329,8 +348,18 @@ class ManifestChecker:
         try:
             data = ExternalBase.from_source(source_path, source, module)
         except SourceUnsupported as err:
+            metadata = source.get("x-checker-data", {})
+            if isinstance(metadata, dict) and "update-group" in metadata:
+                raise ManifestLoadError(
+                    f"Cannot load update-group member in {source_path}: {err}"
+                ) from err
             log.debug(err)
         except SourceLoadError as err:
+            metadata = source.get("x-checker-data", {})
+            if isinstance(metadata, dict) and "update-group" in metadata:
+                raise ManifestLoadError(
+                    f"Cannot load update-group member in {source_path}: {err}"
+                ) from err
             self._errors.append(err)
             log.error(err)
         else:
@@ -387,6 +416,7 @@ class ManifestChecker:
                 await checker.validate_checker_data(data)
                 await checker.check(data)
             except CheckerError as err:
+                data.check_failed = True
                 self._errors.append(err)
                 counter.failed += 1
                 log.error(
@@ -472,7 +502,51 @@ class ManifestChecker:
             log.info("Checking %s external data items", counter.total)
             ext_data_checked = await asyncio_gather_failfast(check_tasks)
 
+        self._validate_update_groups()
         return ext_data_checked
+
+    def _validate_update_groups(self, allowed: list[ExternalBase] | None = None):
+        """Check all groups before changing sources or writing files."""
+        self._blocked_update_sources.clear()
+        self._errors = [e for e in self._errors if not isinstance(e, UpdateGroupError)]
+        allowed_ids = None if allowed is None else {id(data) for data in allowed}
+        for group, members in self._update_groups.items():
+            group_selected = allowed_ids is not None and any(
+                data.new_version is not None and id(data) in allowed_ids
+                for data in members
+            )
+            versions = []
+            details = []
+            for data in members:
+                version = (
+                    data.new_version.version
+                    if data.new_version is not None
+                    else data.selected_version
+                )
+                if data.check_failed:
+                    status = "check failed"
+                elif (
+                    group_selected
+                    and allowed_ids is not None
+                    and data.new_version is not None
+                    and id(data) not in allowed_ids
+                ):
+                    status = "update excluded by selection"
+                elif not version or not version.strip():
+                    status = "no selected version (unchecked, skipped or no candidate)"
+                else:
+                    status = repr(version)
+                    versions.append(version)
+                details.append(f"{data} ({data.source_path}): {status}")
+            if len(versions) == len(members) and len(set(versions)) == 1:
+                continue
+            self._blocked_update_sources.update(id(data) for data in members)
+            error = UpdateGroupError(
+                f"Update group {group!r} blocked: all members must successfully "
+                "select the same nonempty version; " + "; ".join(details)
+            )
+            self._errors.append(error)
+            log.error(error)
 
     def get_external_data(self, only_type=None) -> list[ExternalBase]:
         """Returns the list of the external data found in the manifest
@@ -497,21 +571,27 @@ class ManifestChecker:
             e for e in self._errors if only_type is None or isinstance(e, only_type)
         ]
 
-    def get_outdated_external_data(self) -> list[ExternalBase]:
+    def get_outdated_external_data(
+        self, *, include_blocked: bool = True
+    ) -> list[ExternalBase]:
         """Returns a list of the outdated external data
 
         Outdated external data are the ones that either are broken
         (unreachable URL) or have a new version.
+        Pass include_blocked=False to exclude rejected groups from automerge.
         """
         return [
             data
             for data in self.get_external_data()
-            if data.State.BROKEN in data.state or data.new_version
+            if (data.State.BROKEN in data.state or data.new_version)
+            and (include_blocked or self._can_update(data))
         ]
 
     def _can_update(self, data: ExternalBase) -> bool:
-        return data.new_version is not None and (
-            self._allowed_updates is None or id(data) in self._allowed_updates
+        return (
+            data.new_version is not None
+            and id(data) not in self._blocked_update_sources
+            and (self._allowed_updates is None or id(data) in self._allowed_updates)
         )
 
     def get_applied_external_data(self) -> list[ExternalBase]:
@@ -521,12 +601,14 @@ class ManifestChecker:
         self, allowed: list[ExternalBase] | None = None
     ) -> list[ExternalBase]:
         """Select writes without mutating sources or requiring GitHub access."""
+        self._validate_update_groups(allowed)
         sources = self.get_external_data()
         allowed_ids = None if allowed is None else {id(data) for data in allowed}
         updates = [
             data
             for data in sources
             if data.new_version is not None
+            and id(data) not in self._blocked_update_sources
             and (allowed_ids is None or id(data) in allowed_ids)
         ]
         if self.opts.require_important_update:
@@ -607,6 +689,12 @@ class ManifestChecker:
                 )
                 return
 
+        if id(selected_data) in self._blocked_update_sources:
+            log.info(
+                "Main source belongs to a blocked update group; not updating appdata"
+            )
+            return
+
         release_url_template = selected_data.checker_data.get(RELEASE_URL_TEMPLATE_PROP)
         last_update = selected_data.new_version
 
@@ -644,7 +732,6 @@ class ManifestChecker:
         changes: dict[str, t.Any]
         changes = OrderedDict()
         self.source_updates = []
-
         self._allowed_updates = {id(data) for data in self.get_planned_updates(allowed)}
         if not self._allowed_updates:
             log.info("No eligible source updates, not updating manifest")

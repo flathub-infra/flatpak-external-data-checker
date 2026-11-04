@@ -396,7 +396,9 @@ def open_pr(
             data.type == data.Type.EXTRA_DATA
             and data.State.BROKEN in data.state
             and data.new_version
-            for data in manifest_checker.get_outdated_external_data()
+            for data in manifest_checker.get_outdated_external_data(
+                include_blocked=False
+            )
         )
     )
 
@@ -719,7 +721,7 @@ async def run_with_args(args: argparse.Namespace) -> tuple[int, int, bool]:
                         pr_labels=args.pr_labels,
                     ):
                         return (-1, -1, False)
-        did_update = True
+        did_update = bool(changes)
 
     errors_num = print_errors(manifest_checker)
 
