@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import logging
 import os
 import unittest
@@ -17,13 +18,28 @@ from src.lib.externaldata import (
     ExternalGitRepo,
 )
 from src.lib.utils import init_logging
-from src.lib.version import LooseVersion
 from src.manifest import ManifestChecker
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.chromium.Chromium.yaml")
 
 
 class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
+    CHROMIUM_VERSION = "148.0.7778.178"
+    CLANG_REV = "llvmorg-23-init-5669-g8a0be0bc"
+    CHROMIUM_URL = (
+        "https://commondatastorage.googleapis.com/chromium-browser-official/"
+        f"chromium-{CHROMIUM_VERSION}.tar.xz"
+    )
+    GENTOO_URL = (
+        "https://chromium-tarballs.distfiles.gentoo.org/"
+        f"chromium-{CHROMIUM_VERSION}-linux.tar.xz"
+    )
+    CLANG_URL = (
+        "https://commondatastorage.googleapis.com/chromium-browser-clang/"
+        f"Linux_x64/clang-{CLANG_REV}-4.tar.xz"
+    )
+    ARCHIVE_BODY = b"test archive contents"
+
     def setUp(self):
         init_logging(logging.INFO)
         self.robots_patcher = mock.patch(
@@ -32,27 +48,85 @@ class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
         self.robots_patcher.start()
         self.addCleanup(self.robots_patcher.stop)
 
-    async def test_check(self):
-        checker = ManifestChecker(TEST_MANIFEST)
-        ext_data = await checker.check()
+    async def check_manifest(self, primary_status=200, fallback_status=200):
+        def get(url, **kwargs):
+            response = MagicMock()
+            response.__aenter__ = AsyncMock(return_value=response)
+            response.__aexit__ = AsyncMock(return_value=None)
+            response.url = url
+            response.headers = {"Last-Modified": "Wed, 01 Jul 2026 00:00:00 GMT"}
+            if url == "https://chromiumdash.appspot.com/fetch_releases":
+                self.assertEqual(
+                    kwargs["params"],
+                    {"platform": "Linux", "channel": "Stable", "num": "1"},
+                )
+                response.json = AsyncMock(
+                    return_value=[{"version": self.CHROMIUM_VERSION}]
+                )
+            elif url == (
+                "https://chromium.googlesource.com/chromium/src/+/"
+                f"{self.CHROMIUM_VERSION}/tools/clang/scripts/update.py"
+            ):
+                self.assertEqual(kwargs["params"], {"format": "TEXT"})
+                response.text = AsyncMock(
+                    return_value=base64.b64encode(
+                        (
+                            f"CLANG_REVISION = '{self.CLANG_REV}'\n"
+                            "CLANG_SUB_REVISION = 4\n"
+                        ).encode()
+                    ).decode()
+                )
+            else:
+                self.assertIn(url, (self.CHROMIUM_URL, self.GENTOO_URL, self.CLANG_URL))
+                status = {
+                    self.CHROMIUM_URL: primary_status,
+                    self.GENTOO_URL: fallback_status,
+                    self.CLANG_URL: 200,
+                }[url]
+                if status != 200:
+                    # ClientSession(raise_for_status=True) raises on entry.
+                    response.__aenter__.side_effect = aiohttp.ClientResponseError(
+                        request_info=MagicMock(),
+                        history=(),
+                        status=status,
+                        message="Not Found",
+                    )
 
+                async def chunks():
+                    yield self.ARCHIVE_BODY
+
+                response.content.iter_chunked.return_value = chunks()
+            return response
+
+        checker = ManifestChecker(TEST_MANIFEST)
+        with mock.patch("aiohttp.ClientSession.get", side_effect=get) as request:
+            ext_data = await checker.check()
+        urls = [call.args[0] for call in request.call_args_list]
+        self.assertEqual(urls.count(self.CHROMIUM_URL), 1)
+        self.assertEqual(urls.count(self.GENTOO_URL), int(primary_status == 404))
+        return ext_data
+
+    def assert_updates(self, ext_data, chromium_url):
         self.assertEqual(len(ext_data), 3)
         for data in ext_data:
+            if data.filename.startswith("chromium-") and chromium_url is None:
+                self.assertIsNone(data.new_version)
+                continue
+
             self.assertIsNotNone(data.new_version)
-            self.assertIsNotNone(data.new_version.version)
-            self.assertGreater(
-                LooseVersion(data.new_version.version), LooseVersion("100.0.4845.0")
-            )
+            self.assertEqual(data.new_version.version, self.CHROMIUM_VERSION)
 
             if isinstance(data, ExternalData):
                 self.assertIsInstance(data.new_version, ExternalFile)
                 self.assertIsNotNone(data.new_version.checksum)
                 self.assertIsInstance(data.new_version.checksum, MultiDigest)
+                self.assertEqual(
+                    data.new_version.checksum.sha256,
+                    hashlib.sha256(self.ARCHIVE_BODY).hexdigest(),
+                )
+                self.assertEqual(data.new_version.size, len(self.ARCHIVE_BODY))
                 if data.filename.startswith("chromium-"):
-                    self.assertRegex(
-                        data.new_version.url,
-                        r"^https://(commondatastorage.googleapis.com/chromium-browser-official|chromium-tarballs.distfiles.gentoo.org)/chromium-[\d.]+\.tar\.xz$",
-                    )
+                    self.assertEqual(data.new_version.url, chromium_url)
                     self.assertNotEqual(
                         data.new_version.checksum,
                         MultiDigest(
@@ -60,10 +134,7 @@ class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
                         ),
                     )
                 elif data.filename.startswith("clang-"):
-                    self.assertRegex(
-                        data.new_version.url,
-                        r"^https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-.*\.tar\.xz$",
-                    )
+                    self.assertEqual(data.new_version.url, self.CLANG_URL)
                     self.assertNotEqual(
                         data.new_version.checksum,
                         MultiDigest(
@@ -75,12 +146,30 @@ class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
             elif isinstance(data, ExternalGitRepo):
                 self.assertEqual(data.filename, "llvm-project")
                 self.assertIsInstance(data.new_version, ExternalGitRef)
-                self.assertIsNotNone(data.new_version.commit)
+                self.assertEqual(data.new_version.commit, self.CLANG_REV)
                 self.assertNotEqual(
                     data.new_version.commit, data.current_version.commit
                 )
             else:
                 self.fail(repr(type(data)))
+
+    async def test_check(self):
+        self.assert_updates(await self.check_manifest(), self.CHROMIUM_URL)
+
+    async def test_check_gentoo_fallback(self):
+        self.assert_updates(
+            await self.check_manifest(primary_status=404), self.GENTOO_URL
+        )
+
+    async def test_check_both_mirrors_missing(self):
+        with self.assertLogs("src.manifest", level="ERROR") as logs:
+            ext_data = await self.check_manifest(
+                primary_status=404, fallback_status=404
+            )
+        self.assertTrue(
+            any("Failed to check archive chromium/" in log for log in logs.output)
+        )
+        self.assert_updates(ext_data, None)
 
 
 class TestLLVMComponent(unittest.IsolatedAsyncioTestCase):
