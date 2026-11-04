@@ -20,10 +20,31 @@
 import unittest
 from io import BytesIO
 
+from lxml import etree
+
 from src.lib.appdata import add_release
 
 
 class TestAddRelease(unittest.TestCase):
+    def test_discovered_release_url_and_template_override(self):
+        discovered = "https://example.org/releases/$version"
+        for template, expected in (
+            (None, discovered),
+            ("https://example.org/notes/$version", "https://example.org/notes/4.5.6"),
+        ):
+            with self.subTest(template=template):
+                out = BytesIO()
+                add_release(
+                    BytesIO(b"<component/>"),
+                    out,
+                    "4.5.6",
+                    "2020-02-02",
+                    template,
+                    release_url=discovered,
+                )
+                root = etree.fromstring(out.getvalue())
+                self.assertEqual(root.findtext("releases/release/url"), expected)
+
     def _do_test(self, before, expected):
         in_ = BytesIO(before.encode())
         out = BytesIO()

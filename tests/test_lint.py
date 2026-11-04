@@ -79,6 +79,59 @@ class TestLint(unittest.TestCase):
         metadata["version-query"] = ".["
         self.assertIn("syntax error", "\n".join(self.lint(metadata)))
 
+    def test_github_selectors_and_policy_validation(self):
+        base = {"type": "github", "repo": "pulsar-edit/pulsar"}
+        for extra in (
+            {},
+            {"asset-name": "app.deb", "source-archive": "tarball"},
+            {"source-archive": "tar.gz"},
+            {"asset-name": "app.deb", "versions": {"<": "2"}},
+            {"asset-name": "app.deb", "stable-only": False},
+            {"asset-name": "app.deb", "repo": "https://github.com/o/r"},
+            {"asset-name": "app.deb", "repo": "o/r/extra"},
+            {"asset-name": "app.deb", "asset-pattern": ".*"},
+        ):
+            with self.subTest(extra=extra):
+                self.assertTrue(self.lint(base | extra))
+        for extra in (
+            {
+                "asset-name": "Linux.pulsar_${version}_amd64.deb",
+                "tag-pattern": r"^v([\d.]+)$",
+            },
+            {"asset-name": "app-${tag}-${minor}-$$.tar.gz"},
+            {"source-archive": "tarball"},
+            {"source-archive": "zipball"},
+        ):
+            with self.subTest(extra=extra):
+                self.assertEqual(self.lint(base | extra), [])
+
+    def test_github_templates_and_patterns(self):
+        base = {"type": "github", "repo": "o/r", "asset-name": "app.deb"}
+        for extra, expected in (
+            ({"tag-pattern": "["}, "unterminated"),
+            ({"tag-pattern": "v.*"}, "capture group"),
+            ({"tag-pattern": "(v)(.*)"}, "capture group"),
+            ({"asset-name": "$version_amd64.deb"}, "version_amd64"),
+            ({"asset-name": "${tag"}, "Invalid template placeholder"),
+            ({"asset-name": "$arch.deb"}, "Unknown template variable"),
+        ):
+            with self.subTest(extra=extra):
+                self.assertIn(expected, "\n".join(self.lint(base | extra)))
+
+    def test_github_git_has_no_artifact_selector(self):
+        source = {
+            "type": "git",
+            "url": "https://github.com/o/r.git",
+            "tag": "v1",
+            "x-checker-data": {"type": "github", "repo": "o/r"},
+        }
+        path = self.write("git.json", source)
+        self.assertEqual(ManifestLinter(1024 * 1024).lint(path), [])
+        for extra in ({"asset-name": "app.tar.gz"}, {"source-archive": "tarball"}):
+            source["x-checker-data"] = {"type": "github", "repo": "o/r", **extra}
+            self.write("git.json", source)
+            self.assertTrue(ManifestLinter(1024 * 1024).lint(path))
+
     def test_version_templates(self):
         for template, expected in [
             ("redeclipse_$version_nix.tar.gz", "'version_nix'"),

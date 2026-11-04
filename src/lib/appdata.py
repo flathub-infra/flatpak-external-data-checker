@@ -60,6 +60,7 @@ def add_release(
     version: str,
     date: str,
     release_url_template: str | None,
+    release_url: str | None = None,
 ):
     parser = ElementTree.XMLParser(load_dtd=False, resolve_entities=False)
     tree = ElementTree.parse(src, parser=parser)
@@ -82,8 +83,10 @@ def add_release(
         release.text = "\n" + ((releases.text[1::2]) * 3)
 
     if release_url_template:
+        release_url = release_url_template.replace("$version", version)
+    if release_url:
         rel_url_elem = ElementTree.SubElement(release, "url", type="details")
-        rel_url_elem.text = release_url_template.replace("$version", version)
+        rel_url_elem.text = release_url
         rel_url_elem.tail = release.text
 
     description = ElementTree.Element("description")
@@ -109,10 +112,14 @@ def add_release(
 
 
 def add_release_to_file(
-    appdata_path: str, version: str, date: str, release_url_template: str | None
+    appdata_path: str,
+    version: str,
+    date: str,
+    release_url_template: str | None,
+    release_url: str | None = None,
 ):
     with io.BytesIO() as buf:
-        add_release(appdata_path, buf, version, date, release_url_template)
+        add_release(appdata_path, buf, version, date, release_url_template, release_url)
 
         with open(appdata_path, "wb") as f:
             f.write(buf.getvalue())

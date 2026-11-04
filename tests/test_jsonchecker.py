@@ -405,50 +405,33 @@ class TestJSONCheckerMocked(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_github_token_injected(self):
-        checker = await self._make_checker()
-        captured_headers: dict = {}
-
-        async def fake_parent_get_json(self, url, headers=None):
-            captured_headers.update(headers or {})
-            return {"data": "ok"}
-
-        with mock.patch.dict("os.environ", {"GITHUB_TOKEN": "ghp_TESTTOKEN123"}):
-            with mock.patch.object(
-                JSONChecker.__bases__[0], "_get_json", new=fake_parent_get_json
-            ):
-                await checker._get_json("https://api.github.com/repos/foo/bar")
-        self.assertIn("Authorization", captured_headers)
-        self.assertEqual(captured_headers["Authorization"], "token ghp_TESTTOKEN123")
-
-    async def test_github_token_not_injected(self):
-        checker = await self._make_checker()
-        captured_headers: dict = {}
-
-        async def fake_parent_get_json(self, url, headers=None):
-            captured_headers.update(headers or {})
-            return {}
-
-        with mock.patch.dict("os.environ", {"GITHUB_TOKEN": "ghp_TESTTOKEN123"}):
-            with mock.patch.object(
-                JSONChecker.__bases__[0], "_get_json", new=fake_parent_get_json
-            ):
-                await checker._get_json("https://example.com/api/releases")
-        self.assertNotIn("Authorization", captured_headers)
-
-    async def test_no_github_token_env_var(self):
-        checker = await self._make_checker()
-        captured_headers: dict = {}
-
-        async def fake_parent_get_json(self, url, headers=None):
-            captured_headers.update(headers or {})
-            return {}
-
-        with mock.patch.dict("os.environ", {}, clear=True):
-            with mock.patch.object(
-                JSONChecker.__bases__[0], "_get_json", new=fake_parent_get_json
-            ):
-                await checker._get_json("https://api.github.com/repos/foo/bar")
-        self.assertNotIn("Authorization", captured_headers)
+        for url, token, expected in (
+            ("https://api.github.com/repos/foo/bar", "test-token", "token test-token"),
+            (
+                "https://api.github.com:443/repos/foo/bar",
+                "test-token",
+                "token test-token",
+            ),
+            ("http://api.github.com/repos/foo/bar", "test-token", None),
+            ("http://api.github.com:443/repos/foo/bar", "test-token", None),
+            ("https://api.github.com:8443/repos/foo/bar", "test-token", None),
+            ("https://api.github.com.example.org/repos/foo/bar", "test-token", None),
+            ("https://example.com/api/releases", "test-token", None),
+            ("https://api.github.com/repos/foo/bar", "", None),
+        ):
+            with self.subTest(url=url, token=token):
+                session = mock.MagicMock()
+                response = session.get.return_value.__aenter__.return_value
+                response.url.name = "releases"
+                response.json = mock.AsyncMock(return_value={})
+                checker = JSONChecker(session)
+                headers = {"Accept": "application/json"}
+                with mock.patch.dict(os.environ, {"GITHUB_TOKEN": token}):
+                    await checker._get_json(url, headers)
+                sent_headers = session.get.call_args.kwargs["headers"]
+                self.assertEqual(sent_headers.get("Authorization"), expected)
+                self.assertEqual(sent_headers["Accept"], "application/json")
+                self.assertEqual(headers, {"Accept": "application/json"})
 
 
 if __name__ == "__main__":

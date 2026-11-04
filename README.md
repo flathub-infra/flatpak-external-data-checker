@@ -348,6 +348,46 @@ In this case, make sure that `tag-pattern` extracts only valid semver strings.
 
 The [`versions`](#version-constraining) property is supported.
 
+### GitHub releases checker
+
+Use `github` to follow a repository's latest published stable GitHub release.
+Unlike the Git checker, it selects a **release**, not the highest Git tag.
+The `repo` property is the repository's `owner/name`.
+
+For an uploaded release asset, specify its exact name using `asset-name`:
+
+```yaml
+x-checker-data:
+  type: github
+  repo: example/project
+  tag-pattern: '^v([0-9.]+)$'
+  asset-name: 'project_${version}_amd64.deb'
+```
+
+`tag-pattern` is optional. It must match the entire release tag and contain
+exactly one capture group for the version. Without it, the version is the raw
+tag, including any prefix. `asset-name` supports `$tag` (the unmodified tag),
+`$version`, and the [version-component template variables](#url-templates).
+Names are matched exactly, not as globs or regular expressions. Keep separate
+sources with `only-arches` for different architectures. For example, an ARM64
+source could use `project_${version}_arm64.deb`.
+
+For GitHub's generated source archive, use `source-archive` instead of
+`asset-name`:
+
+```yaml
+x-checker-data:
+  type: github
+  repo: example/project
+  source-archive: tarball  # or zipball
+```
+
+For a `type: git` source, omit both artifact selectors. The checker updates its
+tag and commit to the release's tag. The source must use an HTTP(S) GitHub URL
+for the same repository as `repo` (an optional `.git` suffix is supported).
+
+Use the JSON checker if you need prereleases or custom release selection.
+
 ### JSON checker
 
 The JSON checker allows using [jq](https://stedolan.github.io/jq/) to query
