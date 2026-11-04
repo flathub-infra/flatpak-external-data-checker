@@ -9,6 +9,7 @@ from src.lib.errors import CheckerMetadataError
 from src.lib.externaldata import ExternalData
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
+from tests.support import upstream_test
 
 
 def _make_version(url, version=None):
@@ -27,6 +28,7 @@ class TestURLChecker(unittest.IsolatedAsyncioTestCase):
         self.robots_patcher.start()
         self.addCleanup(self.robots_patcher.stop)
 
+    @upstream_test
     async def test_check_appimage(self):
         checker = ManifestChecker(
             os.path.join(os.path.dirname(__file__), "com.heroicgameslauncher.hgl.yaml")
@@ -51,6 +53,7 @@ class TestURLChecker(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIsNotNone(data.new_version.version)
 
+    @upstream_test
     async def test_check_deb(self):
         checker = ManifestChecker(
             os.path.join(os.path.dirname(__file__), "com.google.Chrome.yaml")

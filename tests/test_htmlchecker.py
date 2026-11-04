@@ -20,7 +20,6 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import base64
 import os
 import unittest
 from unittest import mock
@@ -35,6 +34,7 @@ from src.lib.externaldata import ExternalData
 from src.lib.utils import init_logging
 from src.lib.version import LooseVersion
 from src.manifest import ManifestChecker
+from tests.support import LocalHTTPTestCase, upstream_test
 
 
 class TestHTMLStreamDecoding(unittest.IsolatedAsyncioTestCase):
@@ -77,28 +77,23 @@ class TestHTMLStreamDecoding(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self._get_text([b"hello +AKM"], "utf-7"), "hello £")
 
 
-class TestHTMLTools(unittest.IsolatedAsyncioTestCase):
+class TestHTMLTools(LocalHTTPTestCase):
     SAMPLES = {
-        "utf-8": "🙋, 🌍!\n…"
-        # TODO we want to test other encodings, but httbin(go)/base64/ supports only
-        # utf-8
+        "utf-8": "🙋, 🌍!\n…",
+        "iso-8859-1": "Bonjour, café!",
     }
 
     async def asyncSetUp(self):
-        self.session = aiohttp.ClientSession(
-            raise_for_status=True, timeout=aiohttp.ClientTimeout(total=5)
-        )
+        await super().asyncSetUp()
+        self.session = self.http
         self.robots_patcher = mock.patch(
             "src.lib.robots.RobotsCache.ensure_allowed", new_callable=mock.AsyncMock
         )
         self.robots_patcher.start()
-
-    async def asyncTearDown(self):
-        await self.session.close()
-        self.robots_patcher.stop()
+        self.addCleanup(self.robots_patcher.stop)
 
     def _encoded_url(self, data: bytes):
-        return "https://httpbingo.org/base64/decode/" + base64.b64encode(data).decode()
+        return self.serve(data)
 
     def test_semantic_version_parses(self):
         self.assertEqual(_semantic_version("1.2.3"), semver.VersionInfo(1, 2, 3))
@@ -144,17 +139,23 @@ class TestHTMLTools(unittest.IsolatedAsyncioTestCase):
 
         for charset, sample in self.SAMPLES.items():
             self.assertEqual(
-                await checker._get_text(self._encoded_url(sample.encode(charset))),
+                await checker._get_text(
+                    self.serve(
+                        sample.encode(charset),
+                        content_type="text/html",
+                        charset=charset,
+                    )
+                ),
                 sample,
             )
 
         with self.assertRaises(CheckerError):
-            await checker._get_text("https://httpbingo.org/image/jpeg")
+            await checker._get_text(self._encoded_url(b"\xff\xd8\xffinvalid utf-8"))
 
     async def test_get_text_unicode_decode_error_raises(self):
         checker = HTMLChecker(self.session)
         with self.assertRaises(CheckerError):
-            await checker._get_text("https://httpbingo.org/image/jpeg")
+            await checker._get_text(self._encoded_url(b"\xff\xd8\xffinvalid utf-8"))
 
     async def test_get_text_returns_decoded_body(self):
         checker = HTMLChecker(self.session)
@@ -174,6 +175,7 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         self.robots_patcher.start()
         self.addCleanup(self.robots_patcher.stop)
 
+    @upstream_test
     async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = await checker.check()

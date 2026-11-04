@@ -11,6 +11,7 @@ from src.lib.externaldata import ExternalGitRef, ExternalGitRepo
 from src.lib.sourceupdates import SourceUpdate
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
+from tests.support import upstream_test
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.virustotal.Uploader.yml")
 
@@ -114,6 +115,7 @@ class TestGitChecker(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sorted(shaked_tags_sem), sorted_tags_sem)
         self.assertEqual(sorted(shaked_tags_sem, reverse=True), sorted_tags_sem[::-1])
 
+    @upstream_test
     async def test_check_and_update(self):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = await checker.check()

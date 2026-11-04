@@ -5,6 +5,7 @@ from unittest import mock
 from src.lib.checksums import MultiDigest
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
+from tests.support import upstream_test
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.visualstudio.code.yaml")
 
@@ -18,6 +19,7 @@ class TestRPMRepoChecker(unittest.IsolatedAsyncioTestCase):
         self.robots_patcher.start()
         self.addCleanup(self.robots_patcher.stop)
 
+    @upstream_test
     async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = await checker.check()

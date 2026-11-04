@@ -57,6 +57,7 @@ from src.lib.utils import (
     strip_query,
     wrap_in_bwrap,
 )
+from tests.support import LocalHTTPTestCase
 
 
 class TestParseGitHubUrl(unittest.TestCase):
@@ -433,16 +434,9 @@ class TestParseHTTPDate(unittest.TestCase):
             utils._extract_timestamp(headers)
 
 
-class TestDownload(unittest.IsolatedAsyncioTestCase):
+class TestDownload(LocalHTTPTestCase):
     _CONTENT_TYPE = "application/x-fedc-test"
     http: aiohttp.ClientSession
-
-    async def asyncSetUp(self):
-        self.http = aiohttp.ClientSession(raise_for_status=True)
-        await self.http.__aenter__()
-
-    async def asyncTearDown(self):
-        await self.http.close()
 
     async def test_correct_content_type(self):
         url = "https://ftpmirror.gnu.org/gnu/gzip/gzip-1.12.tar.gz"
@@ -533,7 +527,9 @@ class TestDownload(unittest.IsolatedAsyncioTestCase):
         # 2. As a result it is rejected
         with self.assertRaises(CheckerFetchError):
             await get_extra_data_info_from_url(
-                url="https://httpbingo.org/response-headers?Content-Type=application/gzip",
+                url=self.serve(
+                    b'{"version": "1.0.0"}\n', content_type="application/gzip"
+                ),
                 session=self.http,
                 content_type_deny=[re.compile(r"^application/json$")],
             )
