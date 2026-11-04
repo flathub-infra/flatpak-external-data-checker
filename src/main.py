@@ -63,7 +63,7 @@ def indir(path: Path):
         os.chdir(old)
 
 
-def print_outdated_external_data(manifest_checker: manifest.ManifestChecker):
+def print_outdated_external_data(manifest_checker: manifest.ManifestChecker) -> int:
     ext_data = manifest_checker.get_outdated_external_data()
     for data in ext_data:
         state_txt = data.state.name or str(data.state)

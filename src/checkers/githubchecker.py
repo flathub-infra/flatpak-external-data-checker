@@ -1,3 +1,5 @@
+from typing import Any
+
 from ..lib.errors import CheckerMetadataError, CheckerQueryError
 from ..lib.externaldata import (
     CHECKER_DATA_SCHEMA_COMMON,
@@ -33,7 +35,7 @@ class GitHubChecker(Checker):
     SUPPORTED_DATA_CLASSES = [ExternalData, ExternalGitRepo]
 
     @classmethod
-    def get_json_schema(cls, data_class: type[ExternalBase]):
+    def get_json_schema(cls, data_class: type[ExternalBase]) -> dict[str, Any]:
         schema = cls.CHECKER_DATA_SCHEMA.copy()
         selectors = [{"required": [name]} for name in ("asset-name", "source-archive")]
         if issubclass(data_class, ExternalGitRepo):
@@ -42,7 +44,7 @@ class GitHubChecker(Checker):
             schema["oneOf"] = selectors
         return schema
 
-    async def check(self, external_data: ExternalBase):
+    async def check(self, external_data: ExternalBase) -> None:
         assert self.should_check(external_data)
         external_data.new_release_url = None
         metadata = external_data.checker_data

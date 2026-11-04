@@ -80,7 +80,7 @@ class JSONChecker(Checker):
     SUPPORTED_DATA_CLASSES = [ExternalData, ExternalGitRepo]
 
     @classmethod
-    def get_json_schema(cls, data_class: type[ExternalBase]):
+    def get_json_schema(cls, data_class: type[ExternalBase]) -> dict[str, t.Any]:
         schema = super().get_json_schema(data_class).copy()
         if issubclass(data_class, ExternalGitRepo):
             schema["anyOf"] = schema.get("anyOf", []) + [
@@ -121,7 +121,7 @@ class JSONChecker(Checker):
 
     @staticmethod
     def _read_q_seq(
-        checker_data: t.Mapping,
+        checker_data: t.Mapping[str, t.Any],
         sequence: list[str],
     ) -> t.Iterable[_Query]:
         for query_name in sequence:
@@ -147,7 +147,7 @@ class JSONChecker(Checker):
                 "release-url", external_data.checker_data["release-url-query"], None
             )
 
-    async def check(self, external_data: ExternalBase):
+    async def check(self, external_data: ExternalBase) -> None:
         assert self.should_check(external_data)
 
         json_url = external_data.checker_data.get("url")
@@ -157,7 +157,6 @@ class JSONChecker(Checker):
 
         if external_data.parent:
             assert isinstance(external_data.parent, ExternalBase)
-            # XXX This seemingly redundant extra variable is needed to make Mypy happy
             parent_data: dict[str, dict[str, JSONType] | None]
             parent_data = {
                 "current": external_data.parent.current_version.json,
@@ -177,7 +176,7 @@ class JSONChecker(Checker):
         json_data: JSONType,
         json_vars: dict[str, JSONType],
         external_data: ExternalData,
-    ):
+    ) -> None:
         responses = [(external_data.checker_data.get("url", ""), json_data)]
         results = await self._query_sequence(
             self.get_queries(external_data),
@@ -203,7 +202,7 @@ class JSONChecker(Checker):
         json_data: JSONType,
         json_vars: dict[str, JSONType],
         external_data: ExternalGitRepo,
-    ):
+    ) -> None:
         responses = [(external_data.checker_data.get("url", ""), json_data)]
         results = await self._query_sequence(
             self.get_queries(external_data),

@@ -1,6 +1,8 @@
 import base64
 import logging
+from collections.abc import Mapping
 from datetime import datetime
+from typing import Any
 
 import ruamel.yaml
 from yarl import URL
@@ -30,14 +32,14 @@ class ElectronChecker(Checker):
     }
 
     @staticmethod
-    def _read_digests(obj: dict) -> MultiDigest:
+    def _read_digests(obj: Mapping[str, Any]) -> MultiDigest:
         digests: dict[str, str] = {}
         for _k in MultiDigest._fields:
             if _k in obj:
                 digests[_k] = base64.b64decode(obj[_k]).hex()
         return MultiDigest(**digests)
 
-    async def check(self, external_data: ExternalBase):
+    async def check(self, external_data: ExternalBase) -> None:
         assert isinstance(external_data, ExternalData)
 
         if "url" in external_data.checker_data:

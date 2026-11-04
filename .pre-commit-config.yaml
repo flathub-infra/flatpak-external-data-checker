@@ -37,10 +37,10 @@ repos:
         entry: uv run -q ruff check --fix --exit-non-zero-on-fix
         language: system
         pass_filenames: false
-      - id: mypy-check
-        name: mypy
-        description: Check types with mypy
-        entry: uv run -q mypy .
+      - id: ty-check
+        name: ty
+        description: Check types with ty
+        entry: uv run -q ty check
         language: system
         pass_filenames: false
-        files: \.py$
+        files: (\.pyi?$|^(pyproject\.toml|uv\.lock)$)

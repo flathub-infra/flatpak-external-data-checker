@@ -54,7 +54,7 @@ from .robots import RobotsCache
 from .version import LooseVersion
 
 gi.require_version("Json", "1.0")
-from gi.repository import (  # type: ignore[attr-defined] # noqa: E402 # noqa: I001 # type: ignore[attr-defined]
+from gi.repository import (  # noqa: E402
     GLib,
     Json,
 )
@@ -287,7 +287,7 @@ class FallbackVersion(t.NamedTuple):  # noqa: PLW1641
             except TypeError as err:
                 raise VersionComparisonError(self.s, other.s) from err
 
-    def __lt__(self, other):
+    def __lt__(self, other) -> bool:
         return self.__compare(operator.lt, other)
 
     def __le__(self, other):
@@ -307,7 +307,7 @@ class FallbackVersion(t.NamedTuple):  # noqa: PLW1641
 
 
 class _SupportsComparison(t.Protocol):
-    def __lt__(self, other: t.Any) -> bool: ...
+    def __lt__(self, other: t.Any, /) -> bool: ...
 
 
 _VersionedObj = t.TypeVar("_VersionedObj")

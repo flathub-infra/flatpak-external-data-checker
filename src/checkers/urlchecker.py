@@ -34,6 +34,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import logging
 import tempfile
+from typing import Any
 
 from ..lib import (
     HTTP_CLIENT_HEADERS,
@@ -49,7 +50,7 @@ from . import Checker
 log = logging.getLogger(__name__)
 
 
-def extract_version(checker_data, url):
+def extract_version(checker_data: dict[str, Any], url: str) -> str | None:
     """
     If checker_data contains a "pattern", matches 'url' against it and returns the
     first capture group (which is assumed to be the version number).
@@ -62,7 +63,8 @@ def extract_version(checker_data, url):
     if m is None:
         return None
 
-    return m.group(1)
+    version: str | None = m.group(1)
+    return version
 
 
 def is_same_version(checker_data, current_url, new_version):

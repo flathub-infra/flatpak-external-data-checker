@@ -76,7 +76,7 @@ jobs:
         run: uv run ruff check --output-format=github
 
       - name: Check Python types
-        run: uv run mypy .
+        run: uv run ty check
 
   build-and-test-container:
     name: Build and test container

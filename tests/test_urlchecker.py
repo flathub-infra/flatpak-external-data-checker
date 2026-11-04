@@ -114,6 +114,9 @@ class TestExtractVersion(unittest.TestCase):
             extract_version(CHECKER_DATA_WITH_PATTERN, "https://example.com/other")
         )
 
+    def test_unmatched_optional_capture(self):
+        self.assertIsNone(extract_version({"pattern": r"(?:version-(\d+))?"}, ""))
+
 
 class TestURLCheckerPatterns(unittest.IsolatedAsyncioTestCase):
     def setUp(self):

@@ -73,7 +73,7 @@ LOG = logging.getLogger(__name__)
 def read_deb_hashes(deb_hashes: apt_pkg.HashStringList) -> MultiDigest:
     digests: dict[str, str] = {}
     deb_hash: apt_pkg.HashString
-    for deb_hash in deb_hashes:  # type: ignore
+    for deb_hash in deb_hashes:
         hash_type = DEB_HASH_MAP.get(deb_hash.hashtype)
         if hash_type:
             digests[hash_type] = deb_hash.hashvalue
