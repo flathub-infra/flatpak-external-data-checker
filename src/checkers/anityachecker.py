@@ -86,8 +86,16 @@ class AnityaChecker(Checker):
                 versions = result["stable_versions"]
             else:
                 versions = result["versions"]
-            if constraints:
+            if constraints and versions:
                 versions = filter_versions(versions, constraints, sort=False)
+                if not versions:
+                    log.info(
+                        "No eligible version for Anitya project %s matching %s",
+                        query["project_id"],
+                        constraints,
+                    )
+                    external_data.state |= external_data.State.LATEST
+                    return
             try:
                 latest_version = versions[0]
             except IndexError as err:
