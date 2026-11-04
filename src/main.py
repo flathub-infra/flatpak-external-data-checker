@@ -400,26 +400,24 @@ def open_pr(
         )
     )
 
-    policy = ""
+    configuration = ""
     if automerge is True:
-        policy = (
+        configuration = (
+            "### Configuration\n\n"
             "Automerge is enabled because `automerge-flathubbot-prs` is `true` "
-            "in `flathub.json`."
+            "in `flathub.json`. "
+            "A later checker run that finds this PR can attempt to merge it "
+            "only if its combined commit status is successful and GitHub reports "
+            "it mergeable. Repository rules and token permissions still apply."
         )
     elif automerge is False:
-        policy = (
+        configuration = (
+            "### Configuration\n\n"
             "Automerge is disabled because `automerge-flathubbot-prs` is `false` "
             "in `flathub.json`. This also disables automerge for broken "
             "extra-data sources."
         )
-    if automerge is True:
-        policy += (
-            " A later checker run that finds this PR can attempt to merge it "
-            "only if its combined commit status is successful and GitHub reports "
-            "it mergeable. Repository rules and token permissions still apply."
-        )
 
-    configuration = "### Configuration\n\n" + policy if policy else ""
     build_guidance = ""
     if origin_repo.full_name.split("/")[0].lower() == "flathub":
         build_guidance = (
@@ -432,12 +430,13 @@ def open_pr(
         part
         for part in (
             source_details or change.body,
+            "---" if configuration and (source_details or change.body) else "",
             configuration,
             build_guidance,
-            DISCLAIMER,
         )
         if part
     )
+    pr_message = "\n\n---\n\n".join(part for part in (pr_message, DISCLAIMER) if part)
 
     prs = origin_repo.get_pulls(state="all", base=base, head=head)
 
