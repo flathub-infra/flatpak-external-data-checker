@@ -55,11 +55,11 @@ class TestSourceUpdates(unittest.TestCase):
                 )
                 text = format_source_updates([update])
                 self.assertIn(
-                    f"[<code>tag release/1</code>]({update.comparison_url})", text
+                    "[<code>tag release/1</code> → <code>tag release/2</code>]"
+                    f"({update.comparison_url})",
+                    text,
                 )
-                self.assertIn(
-                    f"[<code>tag release/2</code>]({update.comparison_url})", text
-                )
+                self.assertEqual(text.count(update.comparison_url), 1)
                 self.assertNotIn("| Changes |", text)
                 data.current_version = data.current_version._replace(commit="a" * 40)
                 data.new_version = data.current_version._replace(commit="b" * 40)
