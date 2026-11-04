@@ -105,6 +105,26 @@ class TestLint(unittest.TestCase):
             with self.subTest(extra=extra):
                 self.assertEqual(self.lint(base | extra), [])
 
+    def test_forgejo_metadata_and_templates(self):
+        base = {
+            "type": "forgejo",
+            "instance": "https://codeberg.org",
+            "repo": "example/app",
+            "asset-name": "app-${tag}-${version}.tar.gz",
+        }
+        self.assertEqual(self.lint(base), [])
+        self.assertEqual(self.lint(base | {"repo": "example.org/app"}), [])
+        for extra in (
+            {"asset-name": "$arch.tar.gz"},
+            {"asset-name": "${tag"},
+            {"tag-pattern": "v.*"},
+            {"source-archive": "tarball"},
+            {"instance": "https://codeberg.org:invalid"},
+            {"repo": "example/.."},
+        ):
+            with self.subTest(extra=extra):
+                self.assertTrue(self.lint(base | extra))
+
     def test_github_templates_and_patterns(self):
         base = {"type": "github", "repo": "o/r", "asset-name": "app.deb"}
         for extra, expected in (

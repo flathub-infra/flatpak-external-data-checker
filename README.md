@@ -388,6 +388,32 @@ for the same repository as `repo` (an optional `.git` suffix is supported).
 
 Use the JSON checker if you need prereleases or custom release selection.
 
+### Forgejo releases checker
+
+Use `forgejo` to follow a repository's latest published stable release on
+Codeberg or another Forgejo instance:
+
+```yaml
+x-checker-data:
+  type: forgejo
+  instance: https://codeberg.org
+  repo: example/project
+  tag-pattern: '^v([0-9.]+)$'
+  asset-name: 'project_${version}_amd64.deb'
+```
+
+Set `instance` to the installation's HTTP or HTTPS base URL, including any
+deployment subpath. This field is required.
+
+`repo`, `asset-name` and `tag-pattern` work as described for the
+[GitHub checker](#github-releases-checker). For a generated source archive,
+replace `asset-name` with `source-archive: tarball` or `source-archive: zipball`.
+
+Git sources omit `asset-name` and `source-archive`. Their HTTP or HTTPS URL must
+point to the same instance and repository. The URL may end in `.git`.
+
+Use the JSON checker if you need prereleases or custom release selection.
+
 ### JSON checker
 
 The JSON checker allows using [jq](https://stedolan.github.io/jq/) to query

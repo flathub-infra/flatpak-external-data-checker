@@ -274,7 +274,12 @@ class TestReleaseLinks(unittest.TestCase):
                 (base + "/o/r.git", link),
                 (base + "/o/r/", link),
                 (base.upper() + "/o/r.git", link),
-                (base + "/O/R.git", link if "github.com" in base else None),
+                (
+                    base + "/O/R.git",
+                    link
+                    if base in {"https://github.com", "https://codeberg.org"}
+                    else None,
+                ),
                 (base + "/o/other.git", None),
                 ("https://other.example.org/o/r.git", None),
                 ("git@codeberg.org:o/r.git", None),
@@ -286,6 +291,21 @@ class TestReleaseLinks(unittest.TestCase):
                         ),
                         expected,
                     )
+
+    def test_release_tag_containing_slashes(self):
+        self.assertEqual(
+            api_release_url(
+                "https://api.github.com/repos/owner/app/releases",
+                {
+                    "tag_name": "Release/v2",
+                    "html_url": "https://github.com/Owner/App/releases/tag/Release/v2",
+                },
+                tag="Release/v2",
+                asset_url=None,
+                repository_url="https://github.com/owner/app.git",
+            ),
+            "https://github.com/Owner/App/releases/tag/Release/v2",
+        )
 
     def test_github_release_repository_casing(self):
         link = "https://GitHub.COM/Owner/App/releases/tag/v2"
