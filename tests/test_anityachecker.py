@@ -200,12 +200,14 @@ class TestAnityaCheckerMocked(unittest.IsolatedAsyncioTestCase):
 
     def _make_external_data(self, checker_data):
         ed = mock.MagicMock(spec=ExternalData)
+        ed.state = ExternalData.State.UNKNOWN
         ed.checker_data = checker_data
         ed.checker_data["type"] = "anitya"
         return ed
 
     def _make_external_git_repo(self, checker_data):
         eg = mock.MagicMock(spec=ExternalGitRepo)
+        eg.state = ExternalGitRepo.State.UNKNOWN
         eg.checker_data = checker_data
         eg.checker_data["type"] = "anitya"
         eg.current_version = mock.MagicMock()
@@ -403,6 +405,43 @@ class TestAnityaCheckerMocked(unittest.IsolatedAsyncioTestCase):
             str(get.call_args.args[0]),
             "https://release-monitoring.org/api/v2/versions/?project_id=5303",
         )
+
+    async def test_filtered_git_manifest_does_not_check_remote_ref(self):
+        source = {
+            "type": "git",
+            "url": "https://github.com/osmocom/gr-iqbal.git",
+            "tag": "v0.38.2",
+            "commit": "fbee239a6fb36dd2fb564f6e6a0d393c4bc844db",
+            "x-checker-data": {
+                "type": "anitya",
+                "project-id": 14456,
+                "versions": {">": "0.38.2", "<": "0.38.1"},
+                "tag-template": "v$version",
+            },
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as manifest:
+            json.dump({"name": "gnuradio-iqbal", "sources": [source]}, manifest)
+            manifest.flush()
+            checker = ManifestChecker(manifest.name)
+            with mock.patch.object(
+                ExternalGitRef,
+                "fetch_remote",
+                return_value=ExternalGitRef(
+                    url=source["url"],
+                    tag=source["tag"],
+                    commit="f56d917c83074ed93e9b47071b8f3a695796f0d8",
+                    branch=None,
+                    version=None,
+                    timestamp=None,
+                ),
+            ) as fetch:
+                data = await checker.check()
+        self.assertEqual(checker.get_errors(), [])
+        self.assertEqual(len(data), 1)
+        self.assertIsNone(data[0].new_version)
+        self.assertTrue(data[0].checked.is_set())
+        self.assertEqual(data[0].state, ExternalGitRepo.State.LATEST)
+        fetch.assert_not_awaited()
 
     async def test_external_git_repo_dispatches_to_check_git(self):
         payload = {

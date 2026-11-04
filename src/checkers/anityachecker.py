@@ -94,6 +94,7 @@ class AnityaChecker(Checker):
                         query["project_id"],
                         constraints,
                     )
+                    external_data.state |= external_data.State.LATEST
                     return
             try:
                 latest_version = versions[0]
