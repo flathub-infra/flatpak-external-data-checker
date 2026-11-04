@@ -196,6 +196,55 @@ Set `is-main-source` to `true` in the app's upstream source checker metadata
 to add new versions to the metainfo release list, if the checker provides a
 version number.
 
+### Synchronized update groups
+
+Set the same nonempty `update-group` in each related source's `x-checker-data`.
+A group must contain at least two distinct sources and can span referenced files
+and modules. Architectures and `parent-id` do not create groups automatically.
+
+For binaries released separately for each architecture:
+
+```yaml
+sources:
+  - type: archive
+    url: https://example.org/app-1.0-amd64.tar.gz
+    sha256: ...
+    only-arches: [x86_64]
+    x-checker-data:
+      type: json
+      url: https://example.org/releases/amd64.json
+      version-query: .version
+      url-query: .url
+      update-group: app-binaries
+  - type: archive
+    url: https://example.org/app-1.0-arm64.tar.gz
+    sha256: ...
+    only-arches: [aarch64]
+    x-checker-data:
+      type: json
+      url: https://example.org/releases/arm64.json
+      version-query: .version
+      url-query: .url
+      update-group: app-binaries
+```
+
+For an application and matching patches in separate modules, set
+`update-group: app-and-patches` on both sources. Members can use different checker
+types, but every member must report the same nonempty version string. Comparison
+is exact, so `2`, `2.0` and `v2` differ. Use version queries or patterns to
+normalize them if needed. The checker does not search for an older common release.
+
+An unchanged member counts if its check confirms the selected version. The checker
+downloads grouped files to verify their checksums even when their URLs have not
+changed. A missing candidate, unknown version, skipped or filtered-out check, or
+failed check blocks the whole group and reports an error, even in check-only mode.
+All referenced files must load. `--lint` checks metadata and membership offline.
+
+Blocked sources keep their existing fields. Other sources can still update,
+even in a shared file. Blocked sources cannot add AppStream releases or satisfy
+`--require-important-update`. A broken source in a blocked group cannot trigger
+automerge.
+
 ### Version constraining
 
 Use `versions` to limit updates, for example to a particular major version.

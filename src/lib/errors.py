@@ -43,6 +43,10 @@ class SourceUpdateError(ManifestUpdateError):
     """Error updating flatpak-builder source"""
 
 
+class UpdateGroupError(ManifestUpdateError):
+    """Synchronized update group cannot be applied"""
+
+
 class AppdataError(ManifestError):
     """Error processing metainfo.xml"""
 

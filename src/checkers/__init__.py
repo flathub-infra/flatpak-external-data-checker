@@ -287,7 +287,9 @@ class Checker:
         if (
             latest_url == external_data.current_version.url
             and external_data.type != external_data.Type.EXTRA_DATA
+            and "update-group" not in external_data.checker_data
         ):
+            external_data.selected_version = latest_version
             external_data.state |= external_data.State.LATEST
             return
 

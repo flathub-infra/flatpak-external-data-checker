@@ -189,6 +189,8 @@ class URLChecker(Checker):
         same_version = is_same_version(
             external_data.checker_data, external_data.current_version.url, new_version
         )
+        if is_rotating:
+            external_data.selected_version = new_version.version
         external_data.set_new_version(
             new_version,
             is_update=is_rotating and not same_version,
