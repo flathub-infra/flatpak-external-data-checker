@@ -1,4 +1,5 @@
 import io
+import json
 import logging
 import os
 import shutil
@@ -496,6 +497,115 @@ class TestOpenPR(unittest.TestCase):
         )
         self.push = push.start()
         self.addCleanup(push.stop)
+
+    @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
+    @patch("src.main.Github")
+    def test_configuration_matches_merge_policy(self, mock_github, mock_output):
+        for setting in (None, True, False):
+            for kind, broken, updated in (
+                (ExternalData.Type.EXTRA_DATA, True, True),
+                (ExternalData.Type.EXTRA_DATA, False, True),
+                (ExternalData.Type.EXTRA_DATA, True, False),
+                (ExternalData.Type.ARCHIVE, True, True),
+            ):
+                enabled = setting is True or (
+                    setting is None
+                    and kind == ExternalData.Type.EXTRA_DATA
+                    and broken
+                    and updated
+                )
+                with (
+                    self.subTest(
+                        setting=setting, kind=kind, broken=broken, updated=updated
+                    ),
+                    patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}),
+                    patch(
+                        "builtins.open",
+                        unittest.mock.mock_open(
+                            read_data=json.dumps(
+                                {}
+                                if setting is None
+                                else {"automerge-flathubbot-prs": setting}
+                            )
+                        ),
+                    ),
+                ):
+                    _, _, repo = self._setup_mocks(mock_github)
+                    data = MagicMock()
+                    data.Type = ExternalData.Type
+                    data.State = ExternalData.State
+                    data.type = kind
+                    data.state = [ExternalData.State.BROKEN] if broken else []
+                    data.new_version = MagicMock() if updated else None
+                    checker = MagicMock()
+                    checker.source_updates = []
+                    checker.get_outdated_external_data.return_value = [data]
+                    main.open_pr(self._make_change(), checker)
+                    text = repo.create_pull.call_args.kwargs["body"]
+                    if setting is not None:
+                        self.assertIn("### Configuration", text)
+                        self.assertIn(
+                            f"Automerge is {'enabled' if enabled else 'disabled'}", text
+                        )
+                        self.assertIn(f"is `{str(setting).lower()}`", text)
+                    else:
+                        self.assertNotIn("### Configuration", text)
+                        self.assertNotIn("Automerge", text)
+                        self.assertNotIn("automerge-flathubbot-prs", text)
+                    if setting is True:
+                        self.assertIn("A later checker run", text)
+                        self.assertIn("Repository rules and token permissions", text)
+
+                    pr = MagicMock(state="open", mergeable=True)
+                    commit = pr.head.repo.get_commit.return_value
+                    commit.get_combined_status.return_value.state = "success"
+                    repo.get_pulls.return_value = [pr]
+                    main.open_pr(self._make_change(), checker)
+                    self.assertEqual(pr.merge.called, enabled)
+                    pr.edit.assert_not_called()
+
+    @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
+    @patch("src.main.Github")
+    def test_test_build_guidance_is_flathub_only(self, mock_github, mock_output):
+        for name in ("flathub/org.example.App", "owner/repo", "flathub-other/repo"):
+            with (
+                self.subTest(name=name),
+                patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}),
+                patch("builtins.open", side_effect=FileNotFoundError),
+            ):
+                _, _, repo = self._setup_mocks(mock_github)
+                repo.full_name = name
+                main.open_pr(self._make_change())
+                text = repo.create_pull.call_args.kwargs["body"]
+                self.assertNotIn("### Configuration", text)
+                self.assertNotIn("Automerge", text)
+                self.assertEqual("`bot, build`" in text, name.startswith("flathub/"))
+
+    @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
+    @patch("src.main.Github")
+    def test_automerge_requires_status_and_mergeability(self, mock_github, mock_output):
+        for status, mergeable in (
+            ("pending", True),
+            ("failure", True),
+            ("success", False),
+            ("success", None),
+        ):
+            with (
+                self.subTest(status=status, mergeable=mergeable),
+                patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}),
+                patch(
+                    "builtins.open",
+                    unittest.mock.mock_open(
+                        read_data='{"automerge-flathubbot-prs": true}'
+                    ),
+                ),
+            ):
+                pr = MagicMock(state="open", mergeable=mergeable)
+                commit = pr.head.repo.get_commit.return_value
+                commit.get_combined_status.return_value.state = status
+                self._setup_mocks(mock_github, open_prs=[pr])
+                main.open_pr(self._make_change())
+                pr.merge.assert_not_called()
 
     @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
     @patch("src.main.check_call")
