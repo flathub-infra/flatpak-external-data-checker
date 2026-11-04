@@ -31,7 +31,7 @@ from lxml.etree import XMLSyntaxError
 
 from .checkers import ALL_CHECKERS, Checker
 from .lib import HTTP_CLIENT_HEADERS, TIMEOUT_CONNECT, TIMEOUT_SOCK_READ, TIMEOUT_TOTAL
-from .lib.appdata import add_release_to_file
+from .lib.appdata import add_release_to_file, read_current_version
 from .lib.errors import (
     AppdataError,
     AppdataLoadError,
@@ -157,6 +157,44 @@ class ManifestChecker:
                 raise ManifestLoadError(
                     f"Update group {group!r} must contain at least two sources"
                 )
+        self._discover_current_versions()
+
+    def _main_sources(self) -> list[ExternalBase]:
+        sources = self.get_external_data()
+        selected = [data for data in sources if data.checker_data.get(MAIN_SRC_PROP)]
+        if selected:
+            return selected
+        root_sources = [
+            data for data in sources if data.source_path == self._root_manifest_path
+        ]
+        if root_sources:
+            log.warning("Guessed last source as main source: %s", root_sources[-1])
+            return root_sources[-1:]
+        return []
+
+    def _discover_current_versions(self):
+        sources = self.get_external_data()
+        for data in sources:
+            data.discover_current_version()
+        if not self.app_id or not sources:
+            return
+        appdata = find_appdata_file(self._root_manifest_dir, self.app_id)
+        if appdata is None:
+            return
+        selected = [
+            data for data in self._main_sources() if not data.current_version.version
+        ]
+        if not selected:
+            return
+        try:
+            version = read_current_version(appdata, self.app_id)
+        except (OSError, XMLSyntaxError) as err:
+            log.warning("Cannot read current version from %s: %s", appdata, err)
+            return
+        if version:
+            for data in selected:
+                data.current_version = data.current_version._replace(version=version)
+                log.info("Source %s: using metainfo version %s", data, version)
 
     def _load_root_manifest(self):
         if isinstance(self._root_manifest, list):
@@ -712,7 +750,16 @@ class ManifestChecker:
                 )
             }
             if important and not any(
-                id(data) in important and data.has_version_changed for data in updates
+                id(data) in important
+                and (
+                    data.has_version_changed
+                    or (
+                        data.new_version is not None
+                        and data.State.BROKEN in data.state
+                        and not data.current_version.matches(data.new_version)
+                    )
+                )
+                for data in updates
             ):
                 return []
         return updates
@@ -756,28 +803,16 @@ class ManifestChecker:
 
         log.info("Preparing to update appdata %s", appdata)
 
-        selected_data = None
-        for data in self.get_external_data():
-            if data.checker_data.get(MAIN_SRC_PROP):
-                selected_data = data
-                log.info("Selected upstream source: %s", selected_data)
-                break
-            if data.source_path == self._root_manifest_path:
-                selected_data = data
-        else:
-            if selected_data is not None:
-                # Guess that the last external source in the root manifest is the one
-                # corresponding to the main application bundle.
-                log.warning("Guessed last source as main source: %s", selected_data)
-            else:
-                log.error(
-                    (
-                        "No main source configured and no external source in "
-                        "%s. Not updating appdata"
-                    ),
-                    self._root_manifest_path,
-                )
-                return
+        selected = self._main_sources()
+        if not selected:
+            log.error(
+                "No main source configured and no external source in %s. "
+                "Not updating appdata",
+                self._root_manifest_path,
+            )
+            return
+        selected_data = selected[0]
+        log.info("Selected upstream source: %s", selected_data)
 
         if id(selected_data) in self._blocked_update_sources:
             log.info(

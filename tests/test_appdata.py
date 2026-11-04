@@ -28,6 +28,67 @@ from src.lib.appdata import add_release
 
 
 class TestAddRelease(unittest.TestCase):
+    def test_unsafe_history_is_not_changed(self):
+        for history in (
+            '<release version="4.5.6" date="2019-01-01"/>',
+            '<release version="9.0" date="2019-01-01"/>',
+            '<release version="1.0" date="2021-01-01"/>',
+            '<release version="1.0" date="not-a-date"/>',
+            '<release version="1.0" timestamp="not-a-timestamp"/>',
+            '<release version="1.0" timestamp="999999999999999999999"/>',
+            '<release date="2019-01-01"/>',
+        ):
+            with self.subTest(history=history):
+                out = BytesIO()
+                self.assertFalse(
+                    add_release(
+                        BytesIO(
+                            f"<component><releases>{history}</releases></component>".encode()
+                        ),
+                        out,
+                        "4.5.6",
+                        "2020-02-02",
+                        None,
+                    )
+                )
+                self.assertEqual(out.getvalue(), b"")
+
+    def test_invalid_candidate_date_is_not_added(self):
+        out = BytesIO()
+        self.assertFalse(
+            add_release(BytesIO(b"<component/>"), out, "4.5.6", "not-a-date", None)
+        )
+        self.assertEqual(out.getvalue(), b"")
+
+    def test_appstream_equivalent_version_is_not_added(self):
+        out = BytesIO()
+        self.assertFalse(
+            add_release(
+                BytesIO(
+                    b'<component><releases><release version="1.0rc"/>'
+                    b"</releases></component>"
+                ),
+                out,
+                "1.0rc0a",
+                "2020-02-02",
+                None,
+            )
+        )
+        self.assertEqual(out.getvalue(), b"")
+
+    def test_external_history_is_not_replaced(self):
+        out = BytesIO()
+        self.assertFalse(
+            add_release(
+                BytesIO(b'<component><releases type="external"/></component>'),
+                out,
+                "4.5.6",
+                "2020-02-02",
+                None,
+            )
+        )
+        self.assertEqual(out.getvalue(), b"")
+
     def test_discovered_release_url_and_template_override(self):
         discovered = "https://example.org/releases/$version"
         for template, expected in (

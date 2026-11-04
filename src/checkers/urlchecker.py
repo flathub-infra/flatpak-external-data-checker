@@ -190,9 +190,20 @@ class URLChecker(Checker):
         if not is_rotating:
             new_version = new_version._replace(url=url)
 
-        same_version = is_same_version(
-            external_data.checker_data, external_data.current_version.url, new_version
-        )
+        external_data.discover_current_version()
+        if external_data.current_version.version and new_version.version:
+            same_version = (
+                external_data.compare_versions(
+                    new_version.version, external_data.current_version.version
+                )
+                == 0
+            )
+        else:
+            same_version = is_same_version(
+                external_data.checker_data,
+                external_data.current_version.url,
+                new_version,
+            )
         if is_rotating:
             external_data.selected_version = new_version.version
         external_data.set_new_version(

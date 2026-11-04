@@ -245,6 +245,26 @@ even in a shared file. Blocked sources cannot add AppStream releases or satisfy
 `--require-important-update`. A broken source in a blocked group cannot trigger
 automerge.
 
+### Update safety
+
+The checker reads the packaged version from source URL patterns, templates, or
+Git tags. For the main source, it falls back to local metainfo. It rejects older
+candidates even if version constraints select them.
+Git sources with `sort-tags: false` keep their configured selection order.
+
+If the current version is unknown, updates continue with a warning. Otherwise,
+it skips candidates with no version or versions it cannot compare. Same-version
+checksum repairs still work.
+
+For an intentional rollback, set `allow-downgrade: true` in the source's
+`x-checker-data`. If the checker relies on metainfo, keep this setting until it
+can read the source version or the app passes its pre-rollback version. Review
+these updates for further downgrades. This does not override a failed version
+comparison.
+
+The checker preserves metainfo history. It skips duplicate or out-of-order
+releases, invalid dates, and external release histories.
+
 ### Version constraining
 
 Use `versions` to limit updates, for example to a particular major version.
