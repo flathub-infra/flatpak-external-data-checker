@@ -19,7 +19,6 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import asyncio
-import base64
 import datetime as dt
 import hashlib
 import importlib
@@ -46,6 +45,7 @@ from src.lib.errors import (
 )
 from src.lib.externaldata import ExternalData, ExternalGitRepo
 from src.lib.utils import init_logging
+from tests.support import LocalHTTPTestCase, upstream_test
 
 TEST_MANIFEST = os.path.join(
     os.path.dirname(__file__),
@@ -457,6 +457,7 @@ size: {UpdateEverythingChecker.SIZE}
             new_release=False,
         )
 
+    @upstream_test
     async def test_check(self):
         checker = manifest.ManifestChecker(TEST_MANIFEST)
 
@@ -582,7 +583,7 @@ class TestVersionTemplates(unittest.TestCase):
                 self.assertEqual(Checker._version_parts(version), expected)
 
 
-class TestCheckerHelpers(unittest.IsolatedAsyncioTestCase):
+class TestCheckerHelpers(LocalHTTPTestCase):
     def setUp(self):
         init_logging()
         self.robots_patcher = mock.patch(
@@ -591,55 +592,33 @@ class TestCheckerHelpers(unittest.IsolatedAsyncioTestCase):
         self.robots_patcher.start()
         self.addCleanup(self.robots_patcher.stop)
 
-    async def asyncSetUp(self):
-        self.http = aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=10), raise_for_status=True
-        )
-
-    async def asyncTearDown(self):
-        await self.http.close()
-
-    @staticmethod
-    def _b64_pad(data: bytes) -> bytes:
-        # XXX httpbingo.org will return extra \0's at the end of data
-        # if the data sent requred padding, causing mismatch.
-        # this helpers adds trailing null bytes in advance.
-        return data + b"\0" * ((3 - len(data) % 3) % 3)
-
-    @staticmethod
-    def _get_b64_url(data: bytes):
-        return (
-            "https://httpbingo.org/base64/decode/"
-            + base64.urlsafe_b64encode(data).decode()
-        )
-
     async def test_complete_digests(self):
-        CORRECT = self._b64_pad(b"Correct")
-        WRONG = self._b64_pad(b"Wrong")
+        CORRECT = b"Correct"
+        WRONG = b"Wrong"
 
         checker = DummyChecker(self.http)
         sha256 = hashlib.sha256(CORRECT).hexdigest()
         sha512 = hashlib.sha512(CORRECT).hexdigest()
 
         checksum = await checker._complete_digests(
-            self._get_b64_url(CORRECT), MultiDigest(sha512=sha512)
+            self.serve(CORRECT), MultiDigest(sha512=sha512)
         )
         self.assertEqual(checksum.sha256, sha256)
         self.assertEqual(checksum.sha512, sha512)
 
         with self.assertRaises(CheckerFetchError):
             await checker._complete_digests(
-                self._get_b64_url(WRONG), MultiDigest(sha512=sha512)
+                self.serve(WRONG), MultiDigest(sha512=sha512)
             )
 
         with self.assertRaises(CheckerFetchError):
             await checker._complete_digests(
-                "https://httpbingo.org/status/404", MultiDigest(sha512=sha512)
+                str(self.server.make_url("/missing")), MultiDigest(sha512=sha512)
             )
 
     async def test_get_json(self):
         expected = {"key": 123}
-        url = self._get_b64_url(json.dumps(expected).encode())
+        url = self.serve(json.dumps(expected).encode(), content_type="application/json")
 
         checker = DummyChecker(self.http)
 
@@ -647,7 +626,9 @@ class TestCheckerHelpers(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response, expected)
 
         with self.assertRaises(CheckerQueryError):
-            await checker._get_json("https://httpbingo.org/bytes/10")
+            await checker._get_json(
+                self.serve(b"not json", content_type="application/json")
+            )
 
 
 class GitDummyChecker(GitChecker, register=False):

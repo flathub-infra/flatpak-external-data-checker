@@ -10,6 +10,7 @@ from src.lib.errors import CheckerQueryError
 from src.lib.externaldata import ExternalFile
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
+from tests.support import upstream_test
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.valvesoftware.Steam.yml")
 
@@ -23,6 +24,7 @@ class TestPyPIChecker(unittest.IsolatedAsyncioTestCase):
         self.robots_patcher.start()
         self.addCleanup(self.robots_patcher.stop)
 
+    @upstream_test
     async def test_check(self):
         checker = ManifestChecker(TEST_MANIFEST)
         ext_data = await checker.check()

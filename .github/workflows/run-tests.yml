@@ -24,6 +24,11 @@ on:
       - 'LICENSE'
       - 'README.md'
   workflow_dispatch:
+    inputs:
+      upstream-tests:
+        description: Also run live upstream smoke tests (requires external services)
+        type: boolean
+        default: false
 
 env:
   DOCKER_REGISTRY: ghcr.io
@@ -101,10 +106,28 @@ jobs:
           cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:latest
           cache-to: type=inline
 
-      - name: Run tests in container
+      - name: Install test dependencies
         run: |
-          docker run -v $PWD:$PWD -w $PWD --entrypoint bash "$DOCKER_IMAGE":build -c \
-          "apt-get install python3-coverage && python3 -m coverage run -m unittest discover --verbose --buffer"
+          docker build --build-arg BASE_IMAGE="$DOCKER_IMAGE":build -t "$DOCKER_IMAGE":test - <<'EOF'
+          ARG BASE_IMAGE
+          FROM ${BASE_IMAGE}
+          RUN apt-get install -y python3-coverage
+          EOF
+
+      - name: Run offline tests in container
+        timeout-minutes: 5
+        run: |
+          docker run --network=none -e FEDC_TEST_UPSTREAM=0 -v $PWD:$PWD -w $PWD \
+            --entrypoint python3 "$DOCKER_IMAGE":test \
+            -m coverage run -m unittest discover --verbose --buffer
+
+      - name: Run upstream smoke tests (opt-in)
+        if: github.event_name == 'workflow_dispatch' && inputs.upstream-tests
+        timeout-minutes: 20
+        run: |
+          docker run -e FEDC_TEST_UPSTREAM=1 -v $PWD:$PWD -w $PWD \
+            --entrypoint python3 "$DOCKER_IMAGE":test \
+            -m unittest discover --verbose --buffer
 
       - name: Cache pip downloads
         # 5.0.5

@@ -6,12 +6,14 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from src import main
+from src.lib.checksums import MultiDigest
 from src.lib.errors import AppdataLoadError, CheckerFetchError, SourceLoadError
-from src.lib.externaldata import ExternalData
+from src.lib.externaldata import ExternalData, ExternalFile
 from src.lib.sourceupdates import SourceUpdate
 
 TEST_MANIFEST = os.path.join(
@@ -26,6 +28,38 @@ TEST_APPDATA = os.path.join(
 class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self._clear_environment()
+
+        # Exercise the real checkers/manifest/commit path, not changing upstreams.
+        def get(url, **kwargs):
+            version = {"5272": "365", "1766": "1.0.99"}[url.query["project_id"]]
+            response = AsyncMock()
+            response.json.return_value = {
+                "latest_version": version,
+                "stable_versions": [version],
+            }
+            response.__aenter__.return_value = response
+            return response
+
+        async def fetch(url, **kwargs):
+            return ExternalFile(
+                url=str(url),
+                checksum=MultiDigest(sha256="a" * 64),
+                size=123,
+                version=None,
+                timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            )
+
+        for patcher in (
+            patch("aiohttp.ClientSession.get", side_effect=get),
+            patch("src.lib.utils.get_extra_data_info_from_url", side_effect=fetch),
+            patch(
+                "src.lib.utils.git_ls_remote",
+                new_callable=AsyncMock,
+                return_value={"refs/tags/xterm-365": "b" * 40},
+            ),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
         self.test_dir = tempfile.TemporaryDirectory()
         self.manifest_filename = os.path.basename(TEST_MANIFEST)
         self.appdata_filename = os.path.basename(TEST_APPDATA)

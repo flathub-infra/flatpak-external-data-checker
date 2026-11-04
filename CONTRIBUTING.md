@@ -10,19 +10,28 @@ uv run mypy .
 
 # Running tests
 
-Currently the test suite requires, network connection and may take a
-while to run. All new tests should try to work in a non-networked
-setup where possible or only depend on external URLs from GitHub.
-
-The tests can be run in the Docker image:
+The default suite needs no upstream services. Run it in the container:
 
 ```bash
-# Run all the tests
 ./run-in-container.sh python3 -m unittest discover
 
-# Run one of the tests test_htmlchecker
+# Run one test module
 ./run-in-container.sh python3 -m unittest tests.test_htmlchecker
-
-# Run a particular test class
-./run-in-container.sh python3 -m unittest -vvv tests.test_anityachecker.TestParseTimestamp
 ```
+
+For a native run, use `python3 -m unittest discover`. Install the runtime
+dependencies first, including Python APT bindings. The uv tooling alone is not enough.
+
+Live upstream tests require `FEDC_TEST_UPSTREAM=1` inside the container:
+
+```bash
+./run-in-container.sh env FEDC_TEST_UPSTREAM=1 python3 -m unittest discover
+```
+
+Live tests can fail when upstream services change or go down. Each has a
+60-second async timeout, which cannot interrupt blocking native calls.
+CI runs the default suite with `--network=none` and a five-minute limit.
+To run live tests in CI, enable `upstream-tests` in the manual Tests workflow.
+
+Keep new tests offline. Use local servers, local Git repositories, or mocks.
+`tests/support.py` has a local HTTP fixture with a five-second request timeout.
