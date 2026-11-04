@@ -22,7 +22,8 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "mypy>=1.11.2,<2",
+    "ty>=0.0.97,<0.1",
+    "typing-extensions>=4.6,<5",
     "PyGObject-stubs>=2.11.0,<3",
     "ruff>=0.6.7,<1",
     "types-jsonschema>=4.23.0.20240813,<5",
@@ -43,6 +44,7 @@ quote-style = "double"
 [tool.ruff.lint]
 select = [
     "A",
+    "ANN",
     "B",
     "C4",
     "DTZ",
@@ -62,6 +64,7 @@ select = [
 ]
 ignore = [
     "B015",
+    "ANN401",
     "C400",
     "C416",
     "ERA001",
@@ -87,6 +90,8 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+# Require annotations only in these files.
+"!{src/lib/{checksums,externaldata,releaselinks}.py,src/checkers/{__init__,electronchecker,forgejochecker,githubchecker,htmlchecker,jsonchecker}.py,typing_tests/**}" = ["ANN"]
 "tests/*" = [
     "B017",
     "PLR1714",
@@ -97,41 +102,42 @@ ignore = [
     "S318"
 ]
 
-[tool.mypy]
-show_error_codes = true
-strict = true
-extra_checks = true
-warn_redundant_casts = true
-warn_return_any = true
-warn_unused_configs = true
-warn_unused_ignores = true
-cache_dir = "~/.cache/mypy"
-exclude = '^tests/'
-disable_error_code = [
-    "no-untyped-def",
-    "no-untyped-call",
-    "type-arg",
-]
+[tool.ty.environment]
+# Match .python-version.
+python-version = "3.11"
 
-[[tool.mypy.overrides]]
-module = [
-    "apt",
-    "apt_inst",
-    "apt_pkg",
-    "editorconfig",
-    "elftools.*",
-    "semver",
-]
-ignore_missing_imports = true
+[tool.ty.src]
+exclude = ["tests/"]
 
-[[tool.mypy.overrides]]
-module = ["src.checkers.debianrepochecker"]
-ignore_errors = true
+[tool.ty.analysis]
+# The uv environment lacks stubs for these system bindings.
+allowed-unresolved-imports = ["apt", "apt_inst", "apt_pkg", "gi.repository.Json"]
 
-[[tool.mypy.overrides]]
-module = ["src.lib.externaldata"]
-disable_error_code = [
-    "valid-type",
-    "attr-defined",
-    "override",
+[tool.ty.rules]
+dynamic-function-decorator-return = "error"
+redundant-cast = "error"
+unsound-return-statement = "error"
+unused-ignore-comment = "error"
+unused-type-ignore-comment = "error"
+
+[[tool.ty.overrides]]
+include = [
+    "src/lib/externaldata.py",
+    "src/lib/checksums.py",
+    "src/lib/releaselinks.py",
+    "src/checkers/__init__.py",
+    "src/checkers/electronchecker.py",
+    "src/checkers/forgejochecker.py",
+    "src/checkers/githubchecker.py",
+    "src/checkers/htmlchecker.py",
+    "src/checkers/jsonchecker.py",
+    "typing_tests/**",
 ]
+[tool.ty.overrides.rules]
+missing-type-argument = "error"
+
+[[tool.ty.overrides]]
+include = ["src/lib/externaldata.py"]
+[tool.ty.overrides.rules]
+# File and Git dataclasses narrow the mutable state fields.
+invalid-mutable-override = "ignore"

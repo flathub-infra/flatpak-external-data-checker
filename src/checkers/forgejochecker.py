@@ -1,3 +1,4 @@
+from typing import Any
 from urllib.parse import urlsplit
 
 from ..lib.errors import CheckerMetadataError, CheckerQueryError
@@ -36,7 +37,7 @@ class ForgejoChecker(Checker):
     SUPPORTED_DATA_CLASSES = [ExternalData, ExternalGitRepo]
 
     @classmethod
-    def get_json_schema(cls, data_class: type[ExternalBase]):
+    def get_json_schema(cls, data_class: type[ExternalBase]) -> dict[str, Any]:
         schema = cls.CHECKER_DATA_SCHEMA.copy()
         selectors = [{"required": [name]} for name in ("asset-name", "source-archive")]
         if issubclass(data_class, ExternalGitRepo):
@@ -64,11 +65,11 @@ class ForgejoChecker(Checker):
             raise CheckerMetadataError("instance must be an HTTP(S) base URL") from err
         return value.rstrip("/")
 
-    async def validate_checker_data(self, external_data: ExternalBase):
+    async def validate_checker_data(self, external_data: ExternalBase) -> None:
         await super().validate_checker_data(external_data)
         self.validate_instance(external_data.checker_data["instance"])
 
-    async def check(self, external_data: ExternalBase):
+    async def check(self, external_data: ExternalBase) -> None:
         assert self.should_check(external_data)
         external_data.new_release_url = None
         metadata = external_data.checker_data

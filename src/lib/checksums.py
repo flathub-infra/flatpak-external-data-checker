@@ -6,6 +6,9 @@ import typing as t
 
 from .errors import SourceUpdateError
 
+if t.TYPE_CHECKING:
+    from _typeshed import ReadableBuffer
+
 log = logging.getLogger(__name__)
 
 
@@ -16,7 +19,7 @@ class MultiDigest(t.NamedTuple):  # noqa: PLW1641
     sha512: str | None = None
 
     @classmethod
-    def from_source(cls, source: dict) -> MultiDigest:
+    def from_source(cls, source: dict[str, t.Any]) -> MultiDigest:
 
         digests = {k: source[k] for k in cls._fields if k in source}
         assert digests, source
@@ -27,22 +30,22 @@ class MultiDigest(t.NamedTuple):  # noqa: PLW1641
 
         return {k for k in self._fields if getattr(self, k) is not None}
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         assert isinstance(other, type(self)), other
         # Iterate digest types from strongest to weakest,
         # if both sides have a type in common - compare it and return result
         for kind in reversed(self._fields):
-            self_digest = getattr(self, kind)
-            other_digest = getattr(other, kind)
+            self_digest: str | None = getattr(self, kind)
+            other_digest: str | None = getattr(other, kind)
             if self_digest is not None and other_digest is not None:
                 return self_digest == other_digest
         # If no common digest type found, we can't compare, raise an error
         raise ValueError(f"No common digest type for {self} and {other}")
 
-    def __ne__(self, other):
+    def __ne__(self, other: object) -> bool:
         return not self == other
 
-    def update_source(self, source: dict):
+    def update_source(self, source: dict[str, t.Any]) -> None:
         # Find digest types that are both not null in self and set in the source
         to_update = {
             kind: digest
@@ -59,13 +62,14 @@ class MultiDigest(t.NamedTuple):  # noqa: PLW1641
 class MultiHash:
     __slots__ = ("md5", "sha1", "sha256", "sha512")
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: ReadableBuffer, **kwargs: t.Any) -> None:
+        # Hashlib's accepted input keywords vary by Python version.
         self.md5 = hashlib.md5(*args, **kwargs)  # nosec
         self.sha1 = hashlib.sha1(*args, **kwargs)  # nosec
         self.sha256 = hashlib.sha256(*args, **kwargs)
         self.sha512 = hashlib.sha512(*args, **kwargs)
 
-    def update(self, data):
+    def update(self, data: ReadableBuffer) -> None:
         self.md5.update(data)
         self.sha1.update(data)
         self.sha256.update(data)

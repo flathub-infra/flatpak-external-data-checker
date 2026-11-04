@@ -10,6 +10,7 @@ import urllib.robotparser
 from pathlib import Path
 
 import aiohttp
+from aiohttp.typedefs import StrOrURL
 
 from . import NETWORK_ERRORS, USER_AGENT
 from .errors import CheckerFetchError
@@ -150,7 +151,7 @@ class RobotsCache:
 
     async def _is_allowed(
         self,
-        url: "str | urllib.parse.ParseResult | aiohttp.typedefs.StrOrURL",
+        url: "str | urllib.parse.ParseResult | StrOrURL",
     ) -> bool:
         if isinstance(url, urllib.parse.ParseResult):
             url = urllib.parse.urlunparse(url)
@@ -190,8 +191,6 @@ class RobotsCache:
 
         return allowed
 
-    async def ensure_allowed(
-        self, url: "str | urllib.parse.ParseResult | aiohttp.typedefs.StrOrURL"
-    ):
+    async def ensure_allowed(self, url: "str | urllib.parse.ParseResult | StrOrURL"):
         if not await self._is_allowed(url):
             raise CheckerFetchError(f"Blocked by robots.txt: {url}")

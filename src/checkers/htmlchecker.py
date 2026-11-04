@@ -126,7 +126,7 @@ class HTMLChecker(Checker):
         except NETWORK_ERRORS as err:
             raise CheckerQueryError from err
 
-    async def check(self, external_data: ExternalBase):
+    async def check(self, external_data: ExternalBase) -> None:
         assert self.should_check(external_data)
         assert isinstance(external_data, ExternalData)
 
@@ -167,7 +167,7 @@ class HTMLChecker(Checker):
 
         html = await self._get_text(url)
 
-        def _get_latest(pattern: re.Pattern, ver_group: int) -> re.Match:
+        def _get_latest(pattern: re.Pattern[str], ver_group: int) -> re.Match[str]:
             matches = filter_versioned_items(
                 items=pattern.finditer(html),
                 constraints=constraints,

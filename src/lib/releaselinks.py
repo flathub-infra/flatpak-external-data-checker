@@ -1,4 +1,5 @@
 import re
+from collections.abc import Mapping
 from urllib.parse import quote, unquote, urlsplit
 
 
@@ -142,7 +143,7 @@ def api_release_url(
     return next(iter(links)) if len(links) == 1 else None
 
 
-def _asset_urls(release: dict) -> list[object]:
+def _asset_urls(release: Mapping[str, object]) -> list[object]:
     urls = [release.get("tarball_url"), release.get("zipball_url")]
     assets = release.get("assets")
     if isinstance(assets, list):

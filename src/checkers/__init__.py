@@ -16,6 +16,7 @@ import aiohttp
 import jsonschema
 import lxml.etree as ElementTree
 import ruamel.yaml
+import ruamel.yaml.error
 from yarl import URL
 
 from ..lib import (
@@ -66,7 +67,9 @@ class Checker:
     session: aiohttp.ClientSession
 
     @classmethod
-    def __init_subclass__(cls, *args, register: bool = True, **kwargs):
+    def __init_subclass__(
+        cls, *args: object, register: bool = True, **kwargs: object
+    ) -> None:
         super().__init_subclass__(*args, **kwargs)
         if register and cls not in ALL_CHECKERS:
             ALL_CHECKERS.append(cls)
@@ -76,7 +79,7 @@ class Checker:
         self,
         session: aiohttp.ClientSession,
         robots_cache: RobotsCache | None = None,
-    ):
+    ) -> None:
         self.session = session
         self.robots_cache = robots_cache
 
@@ -94,13 +97,13 @@ class Checker:
         supported = any(
             isinstance(external_data, c) for c in cls.SUPPORTED_DATA_CLASSES
         )
+        checker_type: str | None = external_data.checker_data.get("type")
         applicable = (
-            cls.CHECKER_DATA_TYPE is not None
-            and external_data.checker_data.get("type") == cls.CHECKER_DATA_TYPE
+            cls.CHECKER_DATA_TYPE is not None and checker_type == cls.CHECKER_DATA_TYPE
         )
         return applicable and supported
 
-    async def validate_checker_data(self, external_data: ExternalBase):
+    async def validate_checker_data(self, external_data: ExternalBase) -> None:
         assert any(isinstance(external_data, c) for c in self.SUPPORTED_DATA_CLASSES)
         schema = self.get_json_schema(type(external_data))
         if not schema:
@@ -110,7 +113,7 @@ class Checker:
         except jsonschema.ValidationError as err:
             raise CheckerMetadataError("Invalid metadata schema") from err
 
-    async def check(self, external_data: ExternalBase):
+    async def check(self, external_data: ExternalBase) -> None:
         raise NotImplementedError
 
     # Various helplers for checkers; assumed to be safely usable only from subclasses
@@ -192,12 +195,12 @@ class Checker:
     @classmethod
     def _get_pattern(
         cls,
-        checker_data: dict,
+        checker_data: dict[str, t.Any],
         pattern_name: str,
         expected_groups: int = 1,
-    ) -> re.Pattern | None:
+    ) -> re.Pattern[str] | None:
         try:
-            pattern_str = checker_data[pattern_name]
+            pattern_str: str = checker_data[pattern_name]
         except KeyError:
             return None
 
@@ -235,7 +238,9 @@ class Checker:
             )
         return new_digests
 
-    async def _set_new_version(self, source: ExternalBase, new_version: ExternalState):
+    async def _set_new_version(
+        self, source: ExternalBase, new_version: ExternalState
+    ) -> None:
         """
         Set the `new_version` for `source`, ensuring common digest types are set.
         """
@@ -265,7 +270,7 @@ class Checker:
         latest_url: str,
         follow_redirects: bool = False,
         timestamp: datetime.datetime | None = None,
-    ):
+    ) -> None:
         assert latest_version is not None
         assert latest_url is not None
 
@@ -302,7 +307,7 @@ class Checker:
         external_data.set_new_version(new_version)
 
 
-def load_checkers():
+def load_checkers() -> None:
     for plugin_info in pkgutil.iter_modules(__path__):
         try:
             importlib.import_module(f".{plugin_info.name}", package=__name__)

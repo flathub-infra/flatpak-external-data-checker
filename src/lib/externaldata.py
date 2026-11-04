@@ -21,12 +21,12 @@ from __future__ import annotations
 
 import abc
 import asyncio
+import builtins
 import dataclasses
 import datetime
 import logging
 import typing as t
 from enum import Enum, IntFlag
-from typing import cast
 
 import jsonschema
 from yarl import URL
@@ -39,9 +39,12 @@ from .errors import (
     SourceUnsupported,
 )
 
-_BM = t.TypeVar("_BM", bound="BuilderModule")
-_BS = t.TypeVar("_BS", bound="BuilderSource")
-_ES = t.TypeVar("_ES", bound="ExternalState")
+_BuilderModuleT = t.TypeVar("_BuilderModuleT", bound="BuilderModule")
+_BuilderSourceT = t.TypeVar("_BuilderSourceT", bound="BuilderSource")
+_ExternalBaseT = t.TypeVar("_ExternalBaseT", bound="ExternalBase")
+_ExternalStateT = t.TypeVar("_ExternalStateT", bound="ExternalState")
+_ExternalDataT = t.TypeVar("_ExternalDataT", bound="ExternalData")
+_ExternalGitRepoT = t.TypeVar("_ExternalGitRepoT", bound="ExternalGitRepo")
 
 CHECKER_DATA_SCHEMA_COMMON: dict[str, t.Any] = {
     "type": "object",
@@ -73,11 +76,11 @@ class BuilderModule:
 
     @classmethod
     def from_manifest(
-        cls: type[_BM],
+        cls: type[_BuilderModuleT],
         module_path: str,
-        module: dict,
+        module: dict[str, t.Any],
         parent: BuilderModule | None = None,
-    ) -> _BM:
+    ) -> _BuilderModuleT:
         return cls(
             name=module["name"],
             module=module,
@@ -85,7 +88,7 @@ class BuilderModule:
             parent=parent,
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
@@ -108,7 +111,7 @@ class BuilderSource(abc.ABC):
         ARCHIVE = "archive"
         GIT = "git"
 
-        def __str__(self):
+        def __str__(self) -> str:
             return self.value
 
     class State(IntFlag):
@@ -137,14 +140,17 @@ class BuilderSource(abc.ABC):
     )
 
     @classmethod
-    def __init_subclass__(cls, *args, **kwargs):
+    def __init_subclass__(cls, *args: object, **kwargs: object) -> None:
         super().__init_subclass__(*args, **kwargs)
         validator_cls = jsonschema.validators.validator_for(cls.SOURCE_SCHEMA)
         validator_cls.check_schema(cls.SOURCE_SCHEMA)
         cls.source_validator = validator_cls(cls.SOURCE_SCHEMA)
 
     @classmethod
-    def data_classes(cls: type[_BS]) -> dict[Type, type[_BS]]:
+    def data_classes(
+        cls: builtins.type[_BuilderSourceT],
+    ) -> dict[BuilderSource.Type, builtins.type[_BuilderSourceT]]:
+        # The source's type field shadows builtins.type.
         classes = {}
         if hasattr(cls, "type"):
             classes[cls.type] = cls
@@ -154,11 +160,11 @@ class BuilderSource(abc.ABC):
 
     @classmethod
     def from_source(
-        cls: type[_BS],
+        cls: builtins.type[_BuilderSourceT],
         source_path: str,
-        source: dict,
+        source: dict[str, t.Any],
         module: BuilderModule | None = None,
-    ) -> _BS:
+    ) -> _BuilderSourceT:
         try:
             cls.source_validator.validate(source)
         except jsonschema.ValidationError as err:
@@ -171,15 +177,15 @@ class BuilderSource(abc.ABC):
 
         data_cls = cls.data_classes()[data_type]
 
-        return cast(_BS, data_cls.from_source_impl(source_path, source, module))
+        return data_cls.from_source_impl(source_path, source, module)
 
     @classmethod
     def from_source_impl(
-        cls: type[_BS],
+        cls: builtins.type[_BuilderSourceT],
         source_path: str,
-        source: dict,
+        source: dict[str, t.Any],
         module: BuilderModule | None = None,
-    ) -> _BS:
+    ) -> _BuilderSourceT:
         raise NotImplementedError
 
     @property
@@ -191,13 +197,13 @@ class BuilderSource(abc.ABC):
             return f"{self.module.name}-{self.type.value}-{index}"
         raise SourceLoadError("Can't get source id")
 
-    def __str__(self):
+    def __str__(self) -> str:
         name = self.filename
         if self.module:
             name = f"{self.module.name}/{name}"
         return f"{self.type.value} {name}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{type(self).__name__} {self}>"
 
 
@@ -207,7 +213,8 @@ class ExternalState(abc.ABC):
     version: str | None
     timestamp: datetime.datetime | None
 
-    def _replace(self: _ES, **kwargs) -> _ES:
+    # Subclasses can add fields, so _replace must accept their names.
+    def _replace(self: _ExternalStateT, **kwargs: t.Any) -> _ExternalStateT:
         return dataclasses.replace(self, **kwargs)
 
     def _asdict(self) -> dict[str, t.Any]:
@@ -219,10 +226,10 @@ class ExternalState(abc.ABC):
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
         }
 
-    def matches(self: _ES, other: _ES) -> bool:
+    def matches(self: _ExternalStateT, other: _ExternalStateT) -> bool:
         raise NotImplementedError
 
-    def is_same_version(self: _ES, other: _ES) -> bool:
+    def is_same_version(self: _ExternalStateT, other: _ExternalStateT) -> bool:
         raise NotImplementedError
 
 
@@ -244,11 +251,11 @@ class ExternalBase(BuilderSource):
 
     @classmethod
     def from_source(
-        cls: type[_BS],
+        cls: builtins.type[_ExternalBaseT],
         source_path: str,
-        source: dict,
+        source: dict[str, t.Any],
         module: BuilderModule | None = None,
-    ) -> _BS:
+    ) -> _ExternalBaseT:
         if not source.get("url"):
             raise SourceUnsupported('Data is not external: no "url" property')
 
@@ -267,7 +274,9 @@ class ExternalBase(BuilderSource):
 
         return super().from_source(source_path, source, module)
 
-    def set_new_version(self, new_version: ExternalState, is_update: bool = True):
+    def set_new_version(
+        self, new_version: ExternalState, is_update: bool = True
+    ) -> None:
         assert isinstance(new_version, type(self.current_version))
 
         if self.current_version.matches(new_version):
@@ -301,7 +310,7 @@ class ExternalBase(BuilderSource):
             and not self.current_version.is_same_version(self.new_version)
         )
 
-    def update(self):
+    def update(self) -> None:
         """If self.new_version is not None, writes back the necessary changes to the
         original element from the manifest."""
         raise NotImplementedError
@@ -318,14 +327,14 @@ class ExternalFile(ExternalState):
             "checksum": self.checksum._asdict(),
         }
 
-    def matches(self, other: ExternalFile):
+    def matches(self, other: ExternalFile) -> bool:
         for i in (self, other):
             assert i.checksum is None or isinstance(i.checksum, MultiDigest), i.checksum
         return self.checksum == other.checksum and (
             self.size is None or other.size is None or self.size == other.size
         )
 
-    def is_same_version(self, other: ExternalFile):
+    def is_same_version(self, other: ExternalFile) -> bool:
         assert isinstance(other, type(self))
         return self.url == other.url
 
@@ -337,11 +346,11 @@ class ExternalData(ExternalBase):
 
     @classmethod
     def from_source_impl(
-        cls,
+        cls: builtins.type[_ExternalDataT],
         source_path: str,
-        source: dict,
+        source: dict[str, t.Any],
         module: BuilderModule | None = None,
-    ) -> ExternalData:
+    ) -> _ExternalDataT:
         data_type = cls.Type(source["type"])
         assert data_type == cls.type, data_type
         url_str = source["url"]
@@ -380,7 +389,7 @@ class ExternalData(ExternalBase):
         )
         return obj
 
-    def update(self):
+    def update(self) -> None:
         if self.new_version is not None:
             self.source["url"] = self.new_version.url
             self.new_version.checksum.update_source(self.source)
@@ -467,7 +476,7 @@ class ExternalGitRef(ExternalState):
 
         return self._replace(commit=got_commit)
 
-    def matches(self, other: ExternalGitRef):
+    def matches(self, other: ExternalGitRef) -> bool:
         return self.url == other.url and (
             # fmt: off
             (
@@ -482,7 +491,7 @@ class ExternalGitRef(ExternalState):
             # fmt: on
         )
 
-    def is_same_version(self, other: ExternalGitRef):
+    def is_same_version(self, other: ExternalGitRef) -> bool:
         assert isinstance(other, type(self))
         # If only commit is set on both sides, compare it as a version indicator
         if all(p is None for p in [self.tag, self.branch, other.tag, other.branch]):
@@ -504,11 +513,11 @@ class ExternalGitRepo(ExternalBase):
 
     @classmethod
     def from_source_impl(
-        cls,
+        cls: builtins.type[_ExternalGitRepoT],
         source_path: str,
-        source: dict,
+        source: dict[str, t.Any],
         module: BuilderModule | None = None,
-    ) -> ExternalGitRepo:
+    ) -> _ExternalGitRepoT:
         data_type = cls.Type(source["type"])
         assert data_type == cls.type, data_type
         url = source["url"]
@@ -539,7 +548,7 @@ class ExternalGitRepo(ExternalBase):
         )
         return obj
 
-    def update(self):
+    def update(self) -> None:
         if self.new_version is not None:
             self.source["url"] = self.new_version.url
             self.source["commit"] = self.new_version.commit
