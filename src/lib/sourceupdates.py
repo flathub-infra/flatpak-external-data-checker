@@ -111,10 +111,10 @@ def format_source_updates(updates: list[SourceUpdate]) -> str:
     for update in updates:
         previous = _code(update.old_version)
         updated = _code(update.new_version)
+        change = f"{previous} → {updated}"
         if update.comparison_url:
             url = _url(update.comparison_url)
-            previous = f"[{previous}]({url})"
-            updated = f"[{updated}]({url})"
+            change = f"[{change}]({url})"
         source = _escape(update.source)
         if update.source_url:
             source = f"[{source}]({_url(update.source_url)})"
@@ -123,5 +123,5 @@ def format_source_updates(updates: list[SourceUpdate]) -> str:
             if update.release_url
             else "Unavailable"
         )
-        lines.append(f"| {source} | {previous} → {updated} | {release} |")
+        lines.append(f"| {source} | {change} | {release} |")
     return "\n".join(lines)
