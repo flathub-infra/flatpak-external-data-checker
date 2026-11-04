@@ -378,10 +378,6 @@ def open_pr(
         if manifest_checker is not None
         else ""
     )
-    pr_message = "\n\n".join(
-        part for part in (source_details or change.body, DISCLAIMER) if part
-    )
-
     try:
         with open("flathub.json") as f:
             repocfg = json.load(f)
@@ -402,6 +398,45 @@ def open_pr(
             and data.new_version
             for data in manifest_checker.get_outdated_external_data()
         )
+    )
+
+    policy = ""
+    if automerge is True:
+        policy = (
+            "Automerge is enabled because `automerge-flathubbot-prs` is `true` "
+            "in `flathub.json`."
+        )
+    elif automerge is False:
+        policy = (
+            "Automerge is disabled because `automerge-flathubbot-prs` is `false` "
+            "in `flathub.json`. This also disables automerge for broken "
+            "extra-data sources."
+        )
+    if automerge is True:
+        policy += (
+            " A later checker run that finds this PR can attempt to merge it "
+            "only if its combined commit status is successful and GitHub reports "
+            "it mergeable. Repository rules and token permissions still apply."
+        )
+
+    configuration = "### Configuration\n\n" + policy if policy else ""
+    build_guidance = ""
+    if origin_repo.full_name.split("/")[0].lower() == "flathub":
+        build_guidance = (
+            "Comment `bot, build` on this PR to "
+            "[start another Flathub test build]"
+            "(https://docs.flathub.org/docs/for-app-authors/maintenance#test-builds). "
+            "This does not rerun the external data checker or rebase the PR."
+        )
+    pr_message = "\n\n".join(
+        part
+        for part in (
+            source_details or change.body,
+            configuration,
+            build_guidance,
+            DISCLAIMER,
+        )
+        if part
     )
 
     prs = origin_repo.get_pulls(state="all", base=base, head=head)
