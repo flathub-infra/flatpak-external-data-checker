@@ -8,8 +8,9 @@ from gi.repository import GLib
 from ruamel.yaml.error import YAMLError
 
 from .checkers import ALL_CHECKERS
+from .checkers.forgejochecker import ForgejoChecker
 from .checkers.jsonchecker import JSONChecker
-from .lib.errors import ManifestLoadError, SourceLoadError
+from .lib.errors import CheckerMetadataError, ManifestLoadError, SourceLoadError
 from .lib.externaldata import CHECKER_DATA_SCHEMA_COMMON, ExternalBase, ExternalGitRepo
 from .lib.utils import read_manifest
 from .manifest import CheckerOptions, ManifestChecker
@@ -177,6 +178,11 @@ class ManifestLinter:
             path, location, metadata, checker.get_json_schema(type(data))
         ):
             return
+        if metadata["type"] == "forgejo":
+            try:
+                ForgejoChecker.validate_instance(metadata["instance"])
+            except CheckerMetadataError as err:
+                self._error(path, location + ".instance", str(err))
         for field, groups in (
             ("pattern", 2 if metadata["type"] == "html" else 1),
             ("version-pattern", 1),
@@ -204,7 +210,7 @@ class ManifestLinter:
             self._version_template(path, location, metadata, field)
         elif metadata["type"] == "html" and "pattern" not in metadata:
             self._version_template(path, location, metadata, "url-template")
-        elif metadata["type"] == "github" and "asset-name" in metadata:
+        elif metadata["type"] in {"github", "forgejo"} and "asset-name" in metadata:
             self._version_template(path, location, metadata, "asset-name")
 
     def _version_template(self, path: Path, location: str, metadata: dict, field: str):
@@ -222,7 +228,7 @@ class ManifestLinter:
             if (name := match.group("named") or match.group("braced")) is not None
         )
         for name in names:
-            if name == "tag" and metadata["type"] == "github":
+            if name == "tag" and metadata["type"] in {"github", "forgejo"}:
                 continue
             if name in {"version", "major", "minor", "patch"} or re.fullmatch(
                 r"version(?:0|[1-9][0-9]*)", name

@@ -135,7 +135,8 @@ def api_release_url(
         else:
             link = http_url(release.get("html_url"))
         if link and (
-            not repository_url or _belongs_to_repository(link, repository_url)
+            not repository_url
+            or _belongs_to_repository(link, repository_url, forgejo=bool(forgejo))
         ):
             links.add(link)
     return next(iter(links)) if len(links) == 1 else None
@@ -161,17 +162,43 @@ def _asset_urls(release: dict) -> list[object]:
     return urls
 
 
-def _belongs_to_repository(link: str, repository_url: str) -> bool:
+def forgejo_repository_path(path: str) -> str:
+    """Normalize owner/repository casing without changing the deployment path."""
+    parts = path.rsplit("/", 2)
+    if len(parts) != 3:
+        return path
+    prefix, owner, repo = parts
+    return f"{prefix}/{owner.lower()}/{repo.lower()}"
+
+
+def _belongs_to_repository(
+    link: str, repository_url: str, *, forgejo: bool = False
+) -> bool:
     if not http_url(repository_url):
         return False
     repository = urlsplit(repository_url)
     release = urlsplit(link)
     project = repository.path.rstrip("/").removesuffix(".git")
-    release_path = release.path
-    if repository.hostname == release.hostname == "github.com":
+    # Separate the repository from the release route, which may contain tag slashes.
+    depth = project.count("/") + 1
+    parts = release.path.split("/", depth)
+    if len(parts) != depth + 1:
+        return False
+    release_project = "/".join(parts[:-1])
+    route = parts[-1]
+    if forgejo:
+        if depth < 3:
+            return False
+        project = forgejo_repository_path(project)
+        release_project = forgejo_repository_path(release_project)
+    elif repository.hostname == release.hostname == "github.com":
         project = project.lower()
-        release_path = release_path.lower()
-    return repository.netloc.lower() == release.netloc.lower() and any(
-        release_path.startswith(project + suffix)
-        for suffix in ("/releases/tag/", "/-/releases/")
+        release_project = release_project.lower()
+    return (
+        repository.netloc.lower() == release.netloc.lower()
+        and release_project == project
+        and (
+            route.startswith("releases/tag/")
+            or (not forgejo and route.startswith("-/releases/"))
+        )
     )
