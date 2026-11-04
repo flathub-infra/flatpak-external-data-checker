@@ -2,12 +2,33 @@ import unittest
 
 from src.lib.releaselinks import (
     api_release_url,
+    download_comparison_url,
     download_release_url,
     github_release_api_url,
 )
 
 
 class TestReleaseLinks(unittest.TestCase):
+    def test_download_comparison_with_release_route_in_namespace(self):
+        for repo, download, suffix, compare in (
+            (
+                "https://gitlab.com/group/releases/tag/app",
+                "-/releases",
+                "/downloads",
+                "-/compare",
+            ),
+            ("https://github.com/releases/tag", "releases/download", "", "compare"),
+            ("https://codeberg.org/releases/tag", "releases/download", "", "compare"),
+        ):
+            with self.subTest(repo=repo):
+                self.assertEqual(
+                    download_comparison_url(
+                        f"{repo}/{download}/release%2F1{suffix}/app.zip",
+                        f"{repo}/{download}/release%2F2{suffix}/app.zip",
+                    ),
+                    f"{repo}/{compare}/release%2F1...release%2F2",
+                )
+
     def test_github_release_api_url(self):
         for repo in (
             "https://github.com/Owner/App",

@@ -5,7 +5,12 @@ from urllib.parse import quote, unquote
 
 from ..checkers.urlchecker import URLChecker, extract_version
 from .externaldata import ExternalBase, ExternalGitRef, ExternalState
-from .releaselinks import download_release_url, http_url
+from .releaselinks import (
+    comparison_url,
+    download_comparison_url,
+    download_release_url,
+    http_url,
+)
 
 
 def _version(data: ExternalBase, state: ExternalState) -> str:
@@ -34,6 +39,7 @@ class SourceUpdate:
     old_version: str
     new_version: str
     release_url: str | None
+    comparison_url: str | None = None
 
     @classmethod
     def from_source(cls, data: ExternalBase) -> "SourceUpdate":
@@ -58,11 +64,22 @@ class SourceUpdate:
             release_url = http_url(data.new_release_url) or download_release_url(
                 new.url
             )
+        old = data.current_version
+        compare = None
+        if isinstance(old, ExternalGitRef) and isinstance(new, ExternalGitRef):
+            if old.url == new.url:
+                if old.tag and new.tag and old.tag != new.tag:
+                    compare = comparison_url(old.url, old.tag, new.tag)
+                elif old.commit and new.commit:
+                    compare = comparison_url(old.url, old.commit, new.commit)
+        else:
+            compare = download_comparison_url(old.url, new.url)
         return cls(
             source,
             _version(data, data.current_version),
             _version(data, new),
             release_url,
+            compare,
         )
 
 
@@ -85,8 +102,11 @@ def format_source_updates(updates: list[SourceUpdate]) -> str:
         if update.release_url:
             url = quote(update.release_url, safe=":/?#@!$&'*+,;=%~.-_")
             link = f"[Release notes]({url})"
-        lines.append(
-            f"| {_escape(update.source)} | {_escape(update.old_version)} "
-            f"| {_escape(update.new_version)} | {link} |"
-        )
+        previous = _escape(update.old_version)
+        updated = _escape(update.new_version)
+        if update.comparison_url:
+            url = quote(update.comparison_url, safe=":/?#@!$&'*+,;=%~.-_")
+            previous = f"[{previous}]({url})"
+            updated = f"[{updated}]({url})"
+        lines.append(f"| {_escape(update.source)} | {previous} | {updated} | {link} |")
     return "\n".join(lines)
