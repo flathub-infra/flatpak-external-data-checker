@@ -40,7 +40,6 @@ class SourceUpdate:
     new_version: str
     release_url: str | None
     comparison_url: str | None = None
-    source_url: str | None = None
 
     @classmethod
     def from_source(cls, data: ExternalBase) -> "SourceUpdate":
@@ -81,7 +80,6 @@ class SourceUpdate:
             _version(data, new),
             release_url,
             compare,
-            http_url(new.url),
         )
 
 
@@ -116,8 +114,6 @@ def format_source_updates(updates: list[SourceUpdate]) -> str:
             url = _url(update.comparison_url)
             change = f"[{change}]({url})"
         source = _escape(update.source)
-        if update.source_url:
-            source = f"[{source}]({_url(update.source_url)})"
         release = (
             f"[Release notes]({_url(update.release_url)})"
             if update.release_url
