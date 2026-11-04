@@ -26,8 +26,10 @@ import dataclasses
 import datetime
 import logging
 import math
+import re
 import typing as t
 from enum import Enum, IntFlag
+from urllib.parse import urljoin
 
 import jsonschema
 from yarl import URL
@@ -54,6 +56,7 @@ CHECKER_DATA_SCHEMA_COMMON: dict[str, t.Any] = {
         "is-main-source": {"type": "boolean"},
         "is-important": {"type": "boolean"},
         "release-url-template": {"type": "string"},
+        "allow-downgrade": {"type": "boolean"},
         "arches": {
             "type": "array",
             "items": {"type": "string"},
@@ -280,6 +283,40 @@ class ExternalBase(BuilderSource):
     ) -> None:
         assert isinstance(new_version, type(self.current_version))
 
+        self.discover_current_version()
+        current = self.current_version.version
+        candidate = new_version.version
+        comparison = self.compare_versions(candidate, current)
+        if current and comparison is None:
+            log.warning(
+                "Source %s: cannot compare candidate version %r with current %r; "
+                "not updating",
+                self.filename,
+                candidate,
+                current,
+            )
+            return
+        if comparison is not None and comparison < 0:
+            if not self.checker_data.get("allow-downgrade", False):
+                log.warning(
+                    "Source %s: ignoring downgrade from %s to %s",
+                    self.filename,
+                    current,
+                    candidate,
+                )
+                return
+            log.warning("Source %s: allowing downgrade to %s", self.filename, candidate)
+        elif not current and is_update:
+            log.warning(
+                "Source %s: current version unknown; cannot prevent downgrades",
+                self.filename,
+            )
+
+        same_version = (
+            comparison == 0
+            if comparison is not None
+            else self.current_version.is_same_version(new_version)
+        )
         if self.current_version.matches(new_version):
             if is_update:
                 log.debug("Source %s: no update found", self.filename)
@@ -288,7 +325,7 @@ class ExternalBase(BuilderSource):
                 log.debug("Source %s: no remote data change", self.filename)
             self.state |= self.State.VALID
         else:
-            if self.current_version.is_same_version(new_version):
+            if same_version:
                 log.warning("Source %s: remote data changed", self.filename)
                 if is_update:
                     self.state |= self.State.LATEST
@@ -306,6 +343,11 @@ class ExternalBase(BuilderSource):
         """Detect if some external data had a version change"""
         if self.new_version is None:
             return False
+        if self.current_version.version:
+            comparison = self.compare_versions(
+                self.new_version.version, self.current_version.version
+            )
+            return comparison is not None and comparison != 0
         return (
             self.new_version.version is not None
             and not self.current_version.is_same_version(self.new_version)
@@ -315,6 +357,75 @@ class ExternalBase(BuilderSource):
         """If self.new_version is not None, writes back the necessary changes to the
         original element from the manifest."""
         raise NotImplementedError
+
+    def compare_versions(
+        self, candidate: str | None, current: str | None
+    ) -> int | None:
+        scheme = self.checker_data.get("version-scheme", "loose")
+        if self.checker_data.get("type") == "debian-repo":
+            scheme = "debian"
+        return utils.compare_versions(candidate, current, scheme)
+
+    def discover_current_version(self) -> None:
+        if self.current_version.version:
+            return
+        metadata = self.checker_data
+        kind = metadata.get("type")
+        state = self.current_version
+        version = None
+        if (
+            isinstance(state, ExternalGitRef)
+            and isinstance(state.tag, str)
+            and state.tag
+        ):
+            if kind == "anitya":
+                version = utils.version_from_template(
+                    metadata.get("tag-template"), state.tag
+                )
+            elif kind in ("git", "github", "forgejo"):
+                pattern = metadata.get("tag-pattern")
+                if kind == "git" and pattern is None:
+                    pattern = r"^(?:[vV])?((?:\d+\.)+\d+)$"
+                if pattern is None:
+                    version = state.tag
+                else:
+                    version = self._version_from_pattern(
+                        pattern, state.tag, fullmatch=kind != "git"
+                    )
+        elif isinstance(state, ExternalFile):
+            if kind == "rotating-url":
+                version = self._version_from_pattern(metadata.get("pattern"), state.url)
+            if not version and (
+                kind == "anitya" or (kind == "html" and not metadata.get("pattern"))
+            ):
+                template = metadata.get("url-template")
+                base_url = metadata.get("url")
+                if (
+                    kind == "html"
+                    and isinstance(template, str)
+                    and isinstance(base_url, str)
+                ):
+                    template = urljoin(base_url, template)
+                version = utils.version_from_template(template, state.url)
+        if version:
+            self.current_version = state._replace(version=version)
+
+    @staticmethod
+    def _version_from_pattern(
+        pattern: str | None, value: str, *, fullmatch: bool = False
+    ) -> str | None:
+        if not isinstance(pattern, str) or not pattern:
+            return None
+        try:
+            match = (
+                re.fullmatch(pattern, value) if fullmatch else re.match(pattern, value)
+            )
+        except re.error:
+            return None
+        if match is None or match.re.groups not in (0, 1):
+            return None
+        version = match.group(1 if match.re.groups else 0)
+        return version if isinstance(version, str) else None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -417,8 +528,8 @@ class ExternalData(ExternalBase):
             # downloaded by the checker with the manifest's checksum first.
             if self.current_version.checksum == self.new_version.checksum:
                 return False
-            if self.current_version.version is not None:
-                return self.current_version.version != self.new_version.version
+            if self.current_version.version:
+                return super().has_version_changed
             # The manifest normally has no version string; changed content is
             # the best available indication of a new AppImage version.
             return True

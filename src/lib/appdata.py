@@ -23,16 +23,35 @@ preserving as much formatting as is feasible and inserting that element if it is
 missing.
 """
 
+import datetime
 import io
+import logging
 import typing as t
 from pathlib import Path
 from typing import TypeAlias
 
 import lxml.etree as ElementTree
 
+from .version import compare_appstream_versions
+
+log = logging.getLogger(__name__)
 XMLElement: TypeAlias = ElementTree._Element
 
 DEFAULT_INDENT = "  "
+
+
+def read_current_version(src: t.IO | str, app_id: str) -> str | None:
+    parser = ElementTree.XMLParser(load_dtd=False, resolve_entities=False)
+    root = ElementTree.parse(src, parser=parser).getroot()
+    if root.findtext("id") not in (None, app_id):
+        return None
+    releases = root.find("releases")
+    if releases is None or releases.get("type") == "external":
+        return None
+    release = releases.find("release")
+    if release is None:
+        return None
+    return release.get("version") or None
 
 
 def _fill_padding(ele: XMLElement, indent: str = DEFAULT_INDENT):
@@ -75,7 +94,7 @@ def add_release(
     date: str,
     release_url_template: str | None,
     release_url: str | None = None,
-):
+) -> bool:
     data = Path(src).read_bytes() if isinstance(src, str) else src.read()
 
     parser = ElementTree.XMLParser(load_dtd=False, resolve_entities=False)
@@ -85,6 +104,45 @@ def add_release(
     root = tree.getroot()
 
     releases = root.find("releases")
+
+    if not version or (releases is not None and releases.get("type") == "external"):
+        log.warning(
+            "Not adding release %r: missing version or external history", version
+        )
+        return False
+    try:
+        release_date = datetime.date.fromisoformat(date)
+    except ValueError:
+        log.warning("Not adding release %s: invalid date %r", version, date)
+        return False
+    if releases is not None:
+        for existing in releases.findall("release"):
+            existing_version = existing.get("version")
+            comparison = compare_appstream_versions(version, existing_version)
+            if comparison is None or comparison <= 0:
+                log.warning(
+                    "Not adding release %s: existing version %r is not older",
+                    version,
+                    existing.get("version"),
+                )
+                return False
+            existing_date = existing.get("date")
+            existing_timestamp = existing.get("timestamp")
+            try:
+                if existing_date:
+                    previous_date = datetime.date.fromisoformat(existing_date)
+                elif existing_timestamp:
+                    previous_date = datetime.datetime.fromtimestamp(
+                        int(existing_timestamp), tz=datetime.timezone.utc
+                    ).date()
+                else:
+                    continue
+            except (ValueError, OverflowError, OSError):
+                log.warning("Not adding release %s: invalid date in history", version)
+                return False
+            if release_date < previous_date:
+                log.warning("Not adding release %s: date precedes history", version)
+                return False
 
     if releases is None:
         releases = ElementTree.Element("releases")
@@ -140,6 +198,7 @@ def add_release(
         Path(dst).write_bytes(output)
     else:
         dst.write(output)
+    return True
 
 
 def add_release_to_file(
@@ -150,7 +209,10 @@ def add_release_to_file(
     release_url: str | None = None,
 ):
     with io.BytesIO() as buf:
-        add_release(appdata_path, buf, version, date, release_url_template, release_url)
+        if not add_release(
+            appdata_path, buf, version, date, release_url_template, release_url
+        ):
+            return
 
         with open(appdata_path, "wb") as f:
             f.write(buf.getvalue())
