@@ -35,6 +35,59 @@ class TestSourceUpdates(unittest.TestCase):
                     SourceUpdate.from_source(data).source, f"{expected} (aarch64)"
                 )
 
+    def test_comparison_links(self):
+        for host, project, route in (
+            ("github.com", "owner/app", "compare"),
+            ("codeberg.org", "owner/app", "compare"),
+            ("gitlab.com", "group/subgroup/app", "-/compare"),
+        ):
+            with self.subTest(host=host):
+                repo = f"https://{host}/{project}"
+                data = ExternalBase.from_source(
+                    "manifest.json",
+                    {"type": "git", "url": repo + ".git", "tag": "release/1"},
+                )
+                data.new_version = data.current_version._replace(tag="release/2")
+                update = SourceUpdate.from_source(data)
+                self.assertEqual(
+                    update.comparison_url,
+                    f"{repo}/{route}/release%2F1...release%2F2",
+                )
+                text = format_source_updates([update])
+                self.assertIn(f"[tag release/1]({update.comparison_url})", text)
+                self.assertIn(f"[tag release/2]({update.comparison_url})", text)
+                self.assertNotIn("| Changes |", text)
+                data.current_version = data.current_version._replace(commit="a" * 40)
+                data.new_version = data.current_version._replace(commit="b" * 40)
+                self.assertEqual(
+                    SourceUpdate.from_source(data).comparison_url,
+                    f"{repo}/{route}/{'a' * 40}...{'b' * 40}",
+                )
+                data.new_version = data.current_version
+                self.assertIsNone(SourceUpdate.from_source(data).comparison_url)
+                data.new_version = data.current_version._replace(
+                    url="https://github.com/other/app.git", tag="v3"
+                )
+                self.assertIsNone(SourceUpdate.from_source(data).comparison_url)
+
+    def test_download_comparison_links(self):
+        data = self.file_source()
+        base = "https://github.com/owner/app"
+        data.current_version = data.current_version._replace(
+            url=f"{base}/releases/download/release%2F1/app.zip"
+        )
+        data.new_version = data.new_version._replace(
+            url=f"{base}/releases/download/release%2F2/app.zip"
+        )
+        self.assertEqual(
+            SourceUpdate.from_source(data).comparison_url,
+            f"{base}/compare/release%2F1...release%2F2",
+        )
+        data.new_version = data.new_version._replace(
+            url="https://github.com/other/app/releases/download/v2/app.zip"
+        )
+        self.assertIsNone(SourceUpdate.from_source(data).comparison_url)
+
     def file_source(self, checker_data=None):
         data = ExternalBase.from_source(
             "manifest.json",

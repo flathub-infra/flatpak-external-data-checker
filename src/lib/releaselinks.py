@@ -1,5 +1,5 @@
 import re
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 
 def http_url(value: object) -> str | None:
@@ -48,6 +48,49 @@ def download_release_url(url: str) -> str | None:
             project, tag = match.groups()
             return f"https://gitlab.com/{project}/-/releases/{tag}"
     return None
+
+
+def comparison_url(repository_url: str, old: str, new: str) -> str | None:
+    if not old or not new or old == new or not http_url(repository_url):
+        return None
+    parsed = urlsplit(repository_url)
+    host = parsed.netloc.lower()
+    project = parsed.path.rstrip("/").removesuffix(".git")
+    if host in ("github.com", "codeberg.org"):
+        pattern = r"/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
+        route = "/compare/"
+    elif host == "gitlab.com":
+        pattern = r"/(?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+"
+        route = "/-/compare/"
+    else:
+        return None
+    if not re.fullmatch(pattern, project):
+        return None
+    return (
+        f"https://{host}{project}{route}{quote(old, safe='')}...{quote(new, safe='')}"
+    )
+
+
+def download_comparison_url(old_url: str, new_url: str) -> str | None:
+    old_release = download_release_url(old_url)
+    new_release = download_release_url(new_url)
+    if not old_release or not new_release:
+        return None
+    separator = (
+        "/-/releases/"
+        if urlsplit(old_release).hostname == "gitlab.com"
+        else "/releases/tag/"
+    )
+    old_repo, old_tag = old_release.rsplit(separator, 1)
+    separator = (
+        "/-/releases/"
+        if urlsplit(new_release).hostname == "gitlab.com"
+        else "/releases/tag/"
+    )
+    new_repo, new_tag = new_release.rsplit(separator, 1)
+    if old_repo != new_repo:
+        return None
+    return comparison_url(old_repo, unquote(old_tag), unquote(new_tag))
 
 
 def api_release_url(
