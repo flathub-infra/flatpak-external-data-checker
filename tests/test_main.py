@@ -521,7 +521,9 @@ class TestOpenPR(unittest.TestCase):
                 main.open_pr(self._make_change()._replace(body=body), checker)
                 text = repo.create_pull.call_args.kwargs["body"]
                 self.assertIn("### Source updates", text)
-                self.assertIn("| foo | 1 | 2 | Unavailable |", text)
+                self.assertIn(
+                    "| foo | <code>1</code> → <code>2</code> | Unavailable |", text
+                )
                 self.assertIn(main.DISCLAIMER, text)
                 self.assertIn("https://github.com/owner/repo/actions/runs/123", text)
                 if body:
