@@ -35,6 +35,7 @@ import urllib.request
 import zoneinfo
 from collections import OrderedDict
 from pathlib import Path
+from string import Template
 
 import aiohttp
 import apt_inst
@@ -42,6 +43,7 @@ import apt_pkg
 import editorconfig
 import gi
 import magic
+import semver
 from elftools.elf.elffile import ELFFile
 from packaging.version import Version
 from ruamel.yaml import YAML
@@ -304,6 +306,51 @@ class FallbackVersion(t.NamedTuple):  # noqa: PLW1641
 
     def __ne__(self, other):
         return self.__compare(operator.ne, other)
+
+
+def version_from_template(template: str | None, value: str) -> str | None:
+    """Read a version only when substituting it reproduces the existing value."""
+    if not isinstance(template, str) or not template:
+        return None
+    parts = []
+    start = 0
+    found_version = False
+    for match in Template.pattern.finditer(template):
+        parts.append(re.escape(template[start : match.start()]))
+        name = match.group("named") or match.group("braced")
+        if name == "version":
+            parts.append(r"(?P=version)" if found_version else r"(?P<version>.+?)")
+            found_version = True
+        elif match.group("escaped"):
+            parts.append(r"\$")
+        else:
+            return None
+        start = match.end()
+    parts.append(re.escape(template[start:]))
+    result = re.fullmatch("".join(parts), value)
+    if not found_version or result is None:
+        return None
+    version = result.group("version")
+    return version if isinstance(version, str) else None
+
+
+def compare_versions(
+    candidate: str | None, current: str | None, scheme: str = "loose"
+) -> int | None:
+    """Return the version order, or None for missing versions or a failed comparison."""
+    if not candidate or not current:
+        return None
+    try:
+        if scheme == "debian":
+            apt_pkg.init_system()
+            result = apt_pkg.version_compare(candidate, current)
+            return int(result > 0) - int(result < 0)
+        if scheme == "semantic":
+            return int(semver.VersionInfo.parse(candidate).compare(current))
+        left, right = FallbackVersion(candidate), FallbackVersion(current)
+        return int(left > right) - int(left < right)
+    except (ValueError, TypeError, VersionComparisonError):
+        return None
 
 
 class _SupportsComparison(t.Protocol):
