@@ -4,9 +4,11 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
+import aiohttp
 from lxml.etree import XMLSyntaxError
 
 from src import manifest
+from src.checkers.gitchecker import GitChecker
 from src.lib.checksums import MultiDigest
 from src.lib.errors import AppdataError
 from src.lib.externaldata import ExternalFile
@@ -154,6 +156,69 @@ class TestManifest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(checker.source_updates), 1)
         self.assertEqual(checker.source_updates[0].source, "mod: my-file.txt")
         self.assertEqual(checker.source_updates[0].old_version, "unknown")
+
+    async def test_yaml_numeric_git_tag_updates(self):
+        repo = "https://github.com/keshavbhatt/pixelbatch-svgo-offline"
+        commit = "47501d2037b61a1cd2cc5c01b2a2d8c12fd36675"
+        path = os.path.join(self.test_dir.name, "test.yml")
+        for yaml_tag, old_tag, new_tag in (
+            ("1.0", "1.0", "1.0"),
+            ("1.0", "1.0", "2.0"),
+            ("1", "1", "1"),
+            ("1", "1", "2"),
+            ("0", "0", "0"),
+            ('"1.0"', "1.0", "1.0"),
+            ('"1.0"', "1.0", "2.0"),
+        ):
+            with self.subTest(yaml_tag=yaml_tag, new_tag=new_tag):
+                contents = (
+                    "name: pixelbatch-svgo-offline\nsources:\n"
+                    f"  - type: git\n    url: {repo}.git\n"
+                    f"    tag: {yaml_tag}\n    commit: {commit}\n"
+                    "    x-checker-data:\n      type: git\n"
+                    "      tag-pattern: ^(.+)$\n"
+                )
+                with open(path, "w") as f:
+                    f.write(contents)
+                checker = manifest.ManifestChecker(path)
+                data = checker.get_external_data()[0]
+                # Exercise YAML parsing, GitChecker's update decision and the
+                # source-update metadata generated before the manifest write.
+                with (
+                    patch(
+                        "src.checkers.gitchecker.git_ls_remote",
+                        return_value={f"refs/tags/{new_tag}": commit},
+                    ),
+                    patch.object(GitChecker, "_get_json", return_value={}),
+                ):
+                    async with aiohttp.ClientSession() as session:
+                        await GitChecker(session).check(data)
+                changes = checker.update_manifests()
+                if old_tag == new_tag:
+                    self.assertEqual(changes, [])
+                    self.assertEqual(checker.source_updates, [])
+                    self.assertIsNone(data.new_version)
+                    self.assertFalse(data.has_version_changed)
+                    self.assertEqual(data.state, data.State.VALID | data.State.LATEST)
+                    self.assertEqual(data.current_version.version, old_tag)
+                    with open(path) as f:
+                        self.assertEqual(f.read(), contents)
+                else:
+                    self.assertEqual(len(changes), 1)
+                    self.assertEqual(len(checker.source_updates), 1)
+                    update = checker.source_updates[0]
+                    self.assertEqual(
+                        update.old_version, f"tag {old_tag}, commit {commit[:12]}"
+                    )
+                    self.assertEqual(
+                        update.new_version, f"{new_tag}, commit {commit[:12]}"
+                    )
+                    self.assertEqual(
+                        update.comparison_url, f"{repo}/compare/{old_tag}...{new_tag}"
+                    )
+                    reloaded = manifest.ManifestChecker(path).get_external_data()[0]
+                    self.assertEqual(reloaded.current_version.tag, new_tag)
+                    self.assertEqual(reloaded.current_version.commit, commit)
 
     def test_update_appdata_not_found(self):
         with open(self.mf_path, "w") as f:
