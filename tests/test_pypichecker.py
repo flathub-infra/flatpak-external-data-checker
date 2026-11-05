@@ -1,3 +1,5 @@
+import hashlib
+import json
 import os
 import unittest
 from unittest import mock
@@ -6,11 +8,11 @@ from packaging.version import Version
 
 from src.checkers.pypichecker import PyPIChecker
 from src.lib.checksums import MultiDigest
-from src.lib.errors import CheckerQueryError
-from src.lib.externaldata import ExternalFile
+from src.lib.errors import CheckerFetchError, CheckerQueryError
+from src.lib.externaldata import ExternalData, ExternalFile
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
-from tests.support import upstream_test
+from tests.support import LocalHTTPTestCase, upstream_test
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.valvesoftware.Steam.yml")
 
@@ -121,6 +123,104 @@ class TestPyPIChecker(unittest.IsolatedAsyncioTestCase):
             call_args.url,
             "https://files.pythonhosted.org/packages/xx/cryptography-1.0.0-py3-none-any.whl",
         )
+
+
+class TestPyPIChecksums(LocalHTTPTestCase):
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.content = b"example release 2.0\n"
+        self.digests = {
+            kind: hashlib.new(kind, self.content).hexdigest()
+            for kind in ("md5", "sha256", "sha512")
+        }
+        self.artifact_url = self.serve(self.content)
+        download = {
+            "filename": "example-2.0.tar.gz",
+            "packagetype": "sdist",
+            "python_version": "source",
+            "upload_time_iso_8601": "2026-01-01T00:00:00Z",
+            "url": self.artifact_url,
+            "digests": {kind: self.digests[kind] for kind in ("md5", "sha256")},
+            "size": len(self.content),
+        }
+        self.responses["/pypi/example/json"] = {
+            "body": json.dumps(
+                {
+                    "info": {"version": "2.0"},
+                    "urls": [download],
+                    "releases": {"2.0": [download]},
+                }
+            ).encode(),
+            "content_type": "application/json",
+        }
+        patcher = mock.patch(
+            "src.checkers.pypichecker.PYPI_INDEX",
+            str(self.server.make_url("/pypi")),
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.checker = PyPIChecker(self.http)
+
+    def make_data(self, kinds, *, current=False):
+        return ExternalData.from_source(
+            "source.json",
+            {
+                "type": "archive",
+                "url": self.artifact_url
+                if current
+                else "https://example.org/old.tar.gz",
+                **{kind: self.digests[kind] if current else "0" for kind in kinds},
+                "x-checker-data": {"type": "pypi", "name": "example"},
+            },
+        )
+
+    async def test_updates_all_declared_checksums(self):
+        for kinds in (("sha512",), ("sha256", "sha512")):
+            with self.subTest(kinds=kinds):
+                self.requests.clear()
+                data = self.make_data(kinds)
+                await self.checker.check(data)
+
+                self.assertIsNotNone(data.new_version)
+                self.assertEqual(data.new_version.version, "2.0")
+                self.assertEqual(data.new_version.size, len(self.content))
+                self.assertTrue(data.state & data.State.OUTDATED)
+                data.update()
+                self.assertEqual(data.source["url"], self.artifact_url)
+                for kind in kinds:
+                    self.assertEqual(data.source[kind], self.digests[kind])
+                self.assertEqual(
+                    MultiDigest.from_source(data.source).digests, set(kinds)
+                )
+                self.assertEqual(
+                    self.requests,
+                    [("GET", "/pypi/example/json"), ("GET", "/response-0")],
+                )
+
+    async def test_metadata_digests_need_no_download(self):
+        data = self.make_data(("sha256",))
+        await self.checker.check(data)
+        data.update()
+        self.assertEqual(data.source["sha256"], self.digests["sha256"])
+        self.assertEqual(self.requests, [("GET", "/pypi/example/json")])
+
+    async def test_completed_digests_detect_unchanged_content(self):
+        data = self.make_data(("sha512",), current=True)
+        await self.checker.check(data)
+        self.assertIsNone(data.new_version)
+        self.assertTrue(data.state & data.State.LATEST)
+        self.assertTrue(data.state & data.State.VALID)
+
+    async def test_completion_rejects_checksum_mismatch(self):
+        self.responses["/response-0"]["body"] = b"wrong artifact"
+        for kinds in (("sha512",), ("sha256", "sha512")):
+            with self.subTest(kinds=kinds):
+                data = self.make_data(kinds)
+                original = data.source.copy()
+                with self.assertRaisesRegex(CheckerFetchError, "Checksum mismatch"):
+                    await self.checker.check(data)
+                self.assertIsNone(data.new_version)
+                self.assertEqual(data.source, original)
 
 
 class TestPyPIReleaseEligibility(unittest.IsolatedAsyncioTestCase):

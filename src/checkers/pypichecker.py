@@ -180,6 +180,12 @@ class PyPIChecker(Checker):
         pypi_version, pypi_download, pypi_date = downloads[-1]
 
         checksum = MultiDigest.from_source(pypi_download["digests"])
+        if isinstance(external_data.current_version, ExternalFile) and (
+            external_data.current_version.checksum.digests - checksum.digests
+        ):
+            # Complete every declared digest, not just one for comparison, so
+            # updating a mixed-checksum source cannot leave stale checksums.
+            checksum = await self._complete_digests(pypi_download["url"], checksum)
 
         new_version = ExternalFile(
             url=pypi_download["url"],
