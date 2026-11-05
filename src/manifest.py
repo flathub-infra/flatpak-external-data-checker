@@ -202,7 +202,6 @@ class ManifestChecker:
             self._collect_source_data(self._root_manifest_path, self._root_manifest)
 
         # Establish parent-child relation between sources
-        # FIXME Expensive O(n^2) algorithm; perhaps we can do better?
         collected_data = self.get_external_data()
         source_ids: set[str] = set()
         for data in collected_data:
@@ -213,19 +212,27 @@ class ManifestChecker:
                         f"Empty or duplicate source-id: {source_id!r}"
                     )
                 source_ids.add(source_id)
+        sources_by_id: dict[str, ExternalBase] = {}
+        unindexed_sources = iter(collected_data)
         for data in collected_data:
             if "parent-id" not in data.checker_data:
                 continue
-            # Assign parent source object
             assert data.parent is None
             parent_id = data.checker_data["parent-id"]
+            # Unused IDs may raise; index only through the first match.
+            if parent_id not in sources_by_id:
+                for candidate in unindexed_sources:
+                    candidate_id = candidate.ident
+                    sources_by_id.setdefault(candidate_id, candidate)
+                    if candidate_id == parent_id:
+                        break
             try:
-                data.parent = next(d for d in collected_data if d.ident == parent_id)
-            except StopIteration as err:
+                data.parent = sources_by_id[parent_id]
+            except KeyError as err:
                 raise ManifestLoadError(
                     f'Source {data}: parent source with ID "{parent_id}" not found'
                 ) from err
-            # Check for inheritance loops
+            # Check each new link to preserve error order. Long chains remain O(n²).
             parent: ExternalBase | None = data.parent
             while parent is not None:
                 if parent is data:
