@@ -9,6 +9,7 @@ from src.lib.errors import CheckerMetadataError, CheckerQueryError
 from src.lib.externaldata import ExternalBase, ExternalFile
 from src.lib.sourceupdates import SourceUpdate
 from src.manifest import ManifestChecker
+from tests.support import TAG_PATTERN_CASES
 
 
 class TestForgejoChecker(unittest.IsolatedAsyncioTestCase):
@@ -238,6 +239,16 @@ class TestForgejoChecker(unittest.IsolatedAsyncioTestCase):
                     await self.checker.check(source)
                 self.assertIsNone(source.new_version)
         self.download.assert_not_awaited()
+
+    async def test_tag_pattern_extraction(self):
+        for pattern, tag, version in TAG_PATTERN_CASES:
+            with self.subTest(pattern=pattern, tag=tag):
+                self.release["tag_name"] = tag
+                source = self.source(
+                    {"tag-pattern": pattern, "source-archive": "tarball"}
+                )
+                await self.checker.check(source)
+                self.assertEqual(source.new_version.version, version)
 
     async def test_pattern_mismatch_and_version_template(self):
         source = self.source({"source-archive": "tarball", "tag-pattern": r"v(2.*)"})

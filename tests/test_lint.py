@@ -13,6 +13,7 @@ from src import main
 from src.checkers.anityachecker import AnityaChecker
 from src.lib.externaldata import ArchiveSource, ExternalGitRepo
 from src.lint import ManifestLinter
+from tests.support import TAG_PATTERN_CASES
 
 
 class TestLint(unittest.TestCase):
@@ -117,7 +118,7 @@ class TestLint(unittest.TestCase):
         for extra in (
             {"asset-name": "$arch.tar.gz"},
             {"asset-name": "${tag"},
-            {"tag-pattern": "v.*"},
+            {"tag-pattern": "(v)(.*)"},
             {"source-archive": "tarball"},
             {"instance": "https://codeberg.org:invalid"},
             {"repo": "example/.."},
@@ -129,7 +130,6 @@ class TestLint(unittest.TestCase):
         base = {"type": "github", "repo": "o/r", "asset-name": "app.deb"}
         for extra, expected in (
             ({"tag-pattern": "["}, "unterminated"),
-            ({"tag-pattern": "v.*"}, "capture group"),
             ({"tag-pattern": "(v)(.*)"}, "capture group"),
             ({"asset-name": "$version_amd64.deb"}, "version_amd64"),
             ({"asset-name": "${tag"}, "Invalid template placeholder"),
@@ -137,6 +137,66 @@ class TestLint(unittest.TestCase):
         ):
             with self.subTest(extra=extra):
                 self.assertIn(expected, "\n".join(self.lint(base | extra)))
+
+    def test_tag_patterns(self):
+        for checker in ("git", "github", "forgejo"):
+            for pattern, _, _ in (*TAG_PATTERN_CASES, ("(v)(.*)", "", "")):
+                with self.subTest(checker=checker, pattern=pattern):
+                    metadata = {"type": checker, "tag-pattern": pattern}
+                    if checker != "git":
+                        metadata["repo"] = "o/r"
+                    if checker == "forgejo":
+                        metadata["instance"] = "https://codeberg.org"
+                    path = self.write(
+                        "git.json",
+                        {
+                            "type": "git",
+                            "url": "https://codeberg.org/o/r.git",
+                            "tag": "v1",
+                            "x-checker-data": metadata,
+                        },
+                    )
+                    errors = ManifestLinter(1024 * 1024).lint(path)
+                    if pattern == "(v)(.*)":
+                        self.assertIn("0 or 1 capture group", "\n".join(errors))
+                    else:
+                        self.assertEqual(errors, [])
+
+    def test_html_pattern_group_error_explains_captures(self):
+        for pattern in (".*", "(.*)", "(a)(b)(c)"):
+            with self.subTest(pattern=pattern):
+                errors = self.lint(
+                    {
+                        "type": "html",
+                        "url": "https://example.org/downloads",
+                        "pattern": pattern,
+                    }
+                )
+                message = "\n".join(errors)
+                self.assertIn("Group 1 must capture the download URL", message)
+                self.assertIn("group 2 the version", message)
+                self.assertIn("non-capturing groups (?:...)", message)
+
+    def test_single_version_patterns(self):
+        for metadata, field in (
+            ({"type": "rotating-url", "url": "https://example.org/latest"}, "pattern"),
+            (
+                {
+                    "type": "html",
+                    "url": "https://example.org/releases",
+                    "url-template": "https://example.org/app-$version.tar.gz",
+                },
+                "version-pattern",
+            ),
+        ):
+            for pattern in (r"\d+(?:\.\d+)+", r"(\d+(?:\.\d+)+)", r"(\d+)(\.\d+)"):
+                with self.subTest(field=field, pattern=pattern):
+                    errors = self.lint(metadata | {field: pattern})
+                    if pattern == r"(\d+)(\.\d+)":
+                        self.assertIn("0 or 1 capture group", "\n".join(errors))
+                        self.assertIn("non-capturing groups (?:...)", "\n".join(errors))
+                    else:
+                        self.assertEqual(errors, [])
 
     def test_github_git_has_no_artifact_selector(self):
         source = {

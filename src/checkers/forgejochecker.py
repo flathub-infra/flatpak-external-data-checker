@@ -106,11 +106,12 @@ class ForgejoChecker(Checker):
         pattern = self._get_pattern(metadata, "tag-pattern")
         if pattern is not None:
             match = pattern.fullmatch(tag)
-            if match is None or not match.group(1):
+            group = 1 if pattern.groups else 0
+            if match is None or not match.group(group):
                 raise CheckerQueryError(
                     f"{repo}: latest release tag {tag!r} does not match"
                 )
-            version = match.group(1)
+            version = match.group(group)
         published_at = release.get("published_at")
         if published_at is not None and not isinstance(published_at, str):
             raise CheckerQueryError(f"{repo}: invalid release publication date")

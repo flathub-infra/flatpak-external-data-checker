@@ -9,6 +9,7 @@ from src.lib.errors import CheckerMetadataError, CheckerQueryError
 from src.lib.externaldata import ExternalBase, ExternalFile, ExternalGitRepo
 from src.lib.sourceupdates import SourceUpdate
 from src.manifest import ManifestChecker
+from tests.support import TAG_PATTERN_CASES
 
 REPO = "pulsar-edit/pulsar"
 API = f"https://api.github.com/repos/{REPO}/releases/latest"
@@ -119,6 +120,20 @@ class TestGitHubChecker(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(source.new_version.version, TAG)
         self.assertTrue(source.new_version.url.endswith(f"source-{TAG}.tar.gz"))
 
+    async def test_tag_pattern_extraction(self):
+        for pattern, tag, version in TAG_PATTERN_CASES:
+            with self.subTest(pattern=pattern, tag=tag):
+                self.release["tag_name"] = tag
+                self.release["assets"] = [asset(f"app-{version}.tar.gz")]
+                source = self.source(
+                    {"tag-pattern": pattern, "asset-name": "app-${version}.tar.gz"}
+                )
+                await self.checker.check(source)
+                self.assertEqual(source.new_version.version, version)
+                self.assertTrue(
+                    source.new_version.url.endswith(f"app-{version}.tar.gz")
+                )
+
     async def test_release_link_reaches_metainfo(self):
         source = self.source({"source-archive": "tarball"})
         await self.checker.check(source)
@@ -214,7 +229,7 @@ class TestGitHubChecker(unittest.IsolatedAsyncioTestCase):
         self.download.assert_not_awaited()
 
     async def test_tag_pattern_must_match_latest_release(self):
-        for pattern in (r"v(2\..+)", r"v(1)", r"v(.*)?1.02.3"):
+        for pattern in (r"v(2\..+)", r"v(1)", r"v(.*)?1.02.3", r"v2.*", r"v1"):
             with self.subTest(pattern=pattern):
                 source = self.source(
                     {"tag-pattern": pattern, "source-archive": "tarball"}

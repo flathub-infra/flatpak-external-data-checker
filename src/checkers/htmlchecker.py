@@ -196,7 +196,8 @@ class HTMLChecker(Checker):
             latest_url, latest_version = _get_latest(combo_pattern, 2).group(1, 2)
         else:
             assert version_pattern and url_template
-            latest_version = _get_latest(version_pattern, 1).group(1)
+            group = 1 if version_pattern.groups else 0
+            latest_version = _get_latest(version_pattern, group).group(group)
             latest_url = self._substitute_template(
                 url_template, self._version_parts(latest_version)
             )

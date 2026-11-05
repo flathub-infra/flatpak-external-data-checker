@@ -195,11 +195,23 @@ class ManifestLinter:
             except (re.error, TypeError) as err:
                 self._error(path, location + "." + field, str(err))
             else:
-                if pattern.groups != groups:
+                allowed_groups = (0, 1) if groups == 1 else (groups,)
+                if pattern.groups not in allowed_groups:
+                    expected = " or ".join(str(count) for count in allowed_groups)
+                    hint = (
+                        ". Group 1 must capture the download URL "
+                        "and group 2 the version. "
+                        "Use non-capturing groups (?:...) for additional grouping."
+                        if field == "pattern" and groups == 2
+                        else ". Use one capture group for the version, or no "
+                        "capture groups to use the whole match. Use non-capturing "
+                        "groups (?:...) for additional grouping."
+                    )
                     self._error(
                         path,
                         location + "." + field,
-                        f"Expected {groups} capture group(s), got {pattern.groups}",
+                        f"Expected {expected} capture group(s), "
+                        f"got {pattern.groups}{hint}",
                     )
         if metadata["type"] == "json":
             self._queries(path, location, data)
