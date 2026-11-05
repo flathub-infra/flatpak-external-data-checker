@@ -11,12 +11,35 @@ from src.lib.externaldata import ExternalGitRef, ExternalGitRepo
 from src.lib.sourceupdates import SourceUpdate
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
-from tests.support import upstream_test
+from tests.support import TAG_PATTERN_CASES, upstream_test
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.virustotal.Uploader.yml")
 
 
 class TestGitChecker(unittest.IsolatedAsyncioTestCase):
+    async def test_tag_pattern_extraction(self):
+        for pattern, tag, version in (
+            *TAG_PATTERN_CASES,
+            (r"^[0-9.]+", "1.2.3-suffix", "1.2.3"),
+        ):
+            with self.subTest(pattern=pattern, tag=tag):
+                data = ExternalGitRepo.from_source_impl(
+                    source_path="test.yml",
+                    source={
+                        "type": "git",
+                        "url": "https://example.org/app.git",
+                        "tag": "0.1.0",
+                        "x-checker-data": {"type": "git", "tag-pattern": pattern},
+                    },
+                )
+                with mock.patch(
+                    "src.checkers.gitchecker.git_ls_remote",
+                    return_value={f"refs/tags/{tag}": "new"},
+                ):
+                    await GitChecker._check_has_new(data)
+                self.assertEqual(data.new_version.version, version)
+                self.assertEqual(data.new_version.tag, tag)
+
     async def test_github_tag_release_notes(self):
         repo = "https://github.com/NoRiskClient/noriskclient-launcher"
         tag = "v0.6.30-beta.4"

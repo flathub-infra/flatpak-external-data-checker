@@ -225,9 +225,10 @@ The version number for the latest version can be detected in two ways:
 * If the filename ends with `.AppImage`, the version number is extracted
   from the AppImage.
 * Otherwise, if `"pattern"` is specified in `"x-checker-data"`, the given
-  regular expression is matched against the full
-  URL for the latest version, and the first match group is taken to be the
-  version.
+  regular expression matches the URL for the latest version. A single capture
+  group extracts the version number. Without a capture group, the version is
+  the whole match, including any URL prefix. Use `(?:...)` for additional
+  grouping. Multiple capture groups are not allowed.
 * If downloads come from load-balanced URLs, the `"pattern"` regex must
   match all URL variants otherwise identical versions may be treated as
   updates. Eg.
@@ -258,8 +259,13 @@ Use `html` to find a version and download URL on a static web page:
 }
 ```
 
-If the HTML page contains multiple versions with download links,
-set single pattern containing two nested match groups for both url and version:
+`version-pattern` uses its capture group as the version, or the whole match if
+there is no capture group. For example, `\b[0-9]+(?:\.[0-9]+)+\b` matches version
+numbers directly. Use `(?:...)` for additional grouping. The checker rejects
+multiple capture groups.
+
+To extract both the download URL and version, use `pattern` with two capture
+groups. The first captures the URL and the second captures the version:
 
 ```json
 "x-checker-data": {
@@ -320,8 +326,8 @@ If the placeholder is immediately followed by an underscore, you need to add bra
 ### Git checker
 
 Use `git` to follow the latest tag in a Git source repository.
-Set `tag-pattern` to a regular expression with exactly one capture group
-for the version:
+`tag-pattern` uses its capture group as the version, or the whole match if
+there is no capture group:
 
 ```json
 "x-checker-data": {
@@ -335,6 +341,13 @@ To disable sorting and keep order from `git ls-remote`, set `sort-tags` to `fals
 
 If the tags are just the version without anything else e.g. `1.0`, you don't need to
 specify a `tag-pattern`.
+
+For a tag such as `v1.2.3`, `^v[0-9.]+$` uses `v1.2.3` as the version.
+Add a capture group, `^v([0-9.]+)$`, to use `1.2.3` instead.
+
+Use `(?:...)` for additional grouping. Multiple capture groups are not allowed.
+To remove a prefix, place it outside the capture group. Patterns match from the
+start of the tag. End the pattern with `$` to match the entire tag.
 
 Set `version-scheme` to `semantic` to sort tags by [semantic version](https://semver.org/).
 The `tag-pattern` must extract valid semantic versions.
@@ -357,9 +370,10 @@ x-checker-data:
   asset-name: 'project_${version}_amd64.deb'
 ```
 
-`tag-pattern` is optional. It must match the entire release tag and contain
-exactly one capture group for the version. Without it, the version is the raw
-tag, including any prefix. `asset-name` supports `$tag` for the unmodified tag,
+`tag-pattern` is optional and must match the entire release tag. It uses the
+same extraction rules as the [Git checker](#git-checker). Without a capture
+group or a `tag-pattern`, the version is the raw tag, including any prefix.
+`asset-name` supports `$tag` for the unmodified tag,
 `$version`, and the [version-component template variables](#url-templates).
 Names are matched exactly, not as globs or regular expressions. Keep separate
 sources with `only-arches` for different architectures. For example, an ARM64

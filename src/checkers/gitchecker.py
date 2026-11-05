@@ -148,7 +148,7 @@ class GitChecker(Checker):
             tag_match = tag_re.match(tag)
             if not tag_match:
                 continue
-            version = tag_match.group(1)
+            version = tag_match.group(1 if tag_re.groups else 0)
 
             try:
                 tag_cls.parse_version(version)

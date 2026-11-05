@@ -208,10 +208,20 @@ class Checker:
             pattern = re.compile(pattern_str)
         except re.error as err:
             raise CheckerMetadataError(f"Invalid regex '{pattern_str}'") from err
-        if pattern.groups != expected_groups:
+        allowed_groups = (0, 1) if expected_groups == 1 else (expected_groups,)
+        if pattern.groups not in allowed_groups:
+            expected = " or ".join(str(groups) for groups in allowed_groups)
+            hint = (
+                ". Group 1 must capture the download URL and group 2 the version. "
+                "Use non-capturing groups (?:...) for additional grouping."
+                if pattern_name == "pattern" and expected_groups == 2
+                else ". Use one capture group for the version, or no capture groups "
+                "to use the whole match. Use non-capturing groups (?:...) "
+                "for additional grouping."
+            )
             raise CheckerMetadataError(
                 f"Pattern '{pattern.pattern}' contains {pattern.groups} group(s) "
-                f"instead of {expected_groups}"
+                f"instead of {expected}{hint}"
             )
         return pattern
 

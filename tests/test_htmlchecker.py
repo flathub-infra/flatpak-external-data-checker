@@ -38,6 +38,31 @@ from tests.support import LocalHTTPTestCase, upstream_test
 
 
 class TestHTMLStreamDecoding(unittest.IsolatedAsyncioTestCase):
+    async def test_version_pattern_extraction_and_sorting(self):
+        for pattern in (r"\b[0-9]+(?:\.[0-9]+)+\b", r"version ([0-9.]+)"):
+            with self.subTest(pattern=pattern):
+                data = mock.MagicMock(spec=ExternalData)
+                data.parent = None
+                data.checker_data = {
+                    "url": "https://example.org/releases",
+                    "version-pattern": pattern,
+                    "url-template": "https://example.org/app-$version.tar.gz",
+                }
+                checker = HTMLChecker(mock.MagicMock())
+                with (
+                    mock.patch.object(checker, "should_check", return_value=True),
+                    mock.patch.object(
+                        checker,
+                        "_get_text",
+                        return_value="version 1.10.0 version 1.2.0",
+                    ),
+                    mock.patch.object(checker, "_update_version") as update,
+                ):
+                    await checker.check(data)
+                update.assert_awaited_once_with(
+                    data, "1.10.0", "https://example.org/app-1.10.0.tar.gz"
+                )
+
     async def _get_text(self, chunks, charset="utf-8"):
         response = mock.MagicMock(spec=aiohttp.ClientResponse)
         response.headers = {aiohttp.hdrs.CONTENT_TYPE: f"text/html; charset={charset}"}

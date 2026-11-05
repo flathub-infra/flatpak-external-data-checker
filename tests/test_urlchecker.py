@@ -91,8 +91,7 @@ CURRENT_URL = "https://example.com/prog_1.2.3.tar.gz"
 class TestExtractVersion(unittest.TestCase):
     def test_invalid_patterns(self):
         for pattern, message in (
-            (r".*\.AppImage$", r"contains 0 group\(s\) instead of 1"),
-            (r"(.*)(\.AppImage)$", r"contains 2 group\(s\) instead of 1"),
+            (r"(.*)(\.AppImage)$", r"contains 2 group\(s\) instead of 0 or 1"),
             ("[", "Invalid regex"),
         ):
             with self.subTest(pattern=pattern):
@@ -104,6 +103,21 @@ class TestExtractVersion(unittest.TestCase):
     def test_valid_pattern(self):
         self.assertEqual(
             extract_version(CHECKER_DATA_WITH_PATTERN, CURRENT_URL), "1.2.3"
+        )
+
+    def test_pattern_without_capture_uses_only_matched_text(self):
+        self.assertEqual(
+            extract_version(
+                {"pattern": r"https://example\.com/prog_\d+(?:\.\d+)+"}, CURRENT_URL
+            ),
+            "https://example.com/prog_1.2.3",
+        )
+        self.assertEqual(
+            extract_version({"pattern": r"https://example\.com/.*"}, CURRENT_URL),
+            CURRENT_URL,
+        )
+        self.assertIsNone(
+            extract_version({"pattern": r"https://other\.com/.*"}, CURRENT_URL)
         )
 
     def test_no_pattern(self):
@@ -138,7 +152,7 @@ class TestURLCheckerPatterns(unittest.IsolatedAsyncioTestCase):
 
     async def test_validate_invalid_patterns(self):
         for checker_type in ("rotating-url", "html"):
-            for pattern in (r".*\.AppImage$", r"(.*)(\.AppImage)$", "["):
+            for pattern in (r"(.*)(\.AppImage)$", "["):
                 with self.subTest(checker_type=checker_type, pattern=pattern):
                     data = self._make_data(
                         {
@@ -156,6 +170,7 @@ class TestURLCheckerPatterns(unittest.IsolatedAsyncioTestCase):
             {},
             {"type": "html", **CHECKER_DATA_WITH_PATTERN},
             {"type": "rotating-url", "url": CURRENT_URL},
+            {"type": "rotating-url", "url": CURRENT_URL, "pattern": r".*\.AppImage$"},
             {
                 "type": "rotating-url",
                 "url": CURRENT_URL,
@@ -203,7 +218,7 @@ class TestIsSameVersion(unittest.TestCase):
         url = "https://example.com/prog.AppImage"
         nv = _make_version(url=url, version="1.2.3")
         with self.assertRaises(CheckerMetadataError):
-            is_same_version({"pattern": r".*\.AppImage$"}, url, nv)
+            is_same_version({"pattern": r"(.*)(\.AppImage)$"}, url, nv)
 
     def test_no_pattern_with_inferred_version_falls_back_to_url(self):
         for url, expected in (

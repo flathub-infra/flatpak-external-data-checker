@@ -1332,10 +1332,26 @@ class TestCheckerBaseHelpers(unittest.IsolatedAsyncioTestCase):
             self.checker._get_pattern({"pattern": "["}, "pattern")
 
     def test_get_pattern_wrong_group_count(self):
-        with self.assertRaises(CheckerMetadataError):
-            self.checker._get_pattern(
-                {"pattern": "(a)(b)"}, "pattern", expected_groups=1
-            )
+        for field, pattern in (
+            ("pattern", "(a)(b)"),
+            ("version-pattern", "(a)(b)"),
+            ("tag-pattern", "(a)(b)"),
+        ):
+            with self.subTest(field=field, pattern=pattern):
+                with self.assertRaises(CheckerMetadataError):
+                    self.checker._get_pattern({field: pattern}, field)
+
+    def test_html_pattern_group_error_explains_captures(self):
+        for pattern in (".*", "(.*)", "(a)(b)(c)"):
+            with self.subTest(pattern=pattern):
+                with self.assertRaises(CheckerMetadataError) as caught:
+                    self.checker._get_pattern(
+                        {"pattern": pattern}, "pattern", expected_groups=2
+                    )
+                message = str(caught.exception)
+                self.assertIn("Group 1 must capture the download URL", message)
+                self.assertIn("group 2 the version", message)
+                self.assertIn("non-capturing groups (?:...)", message)
 
     async def test_update_version_invalid_url_scheme(self):
         data = self._make_external_data("https://example.com/file-1.0.tar.gz", "html")

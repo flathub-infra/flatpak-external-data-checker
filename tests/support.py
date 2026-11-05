@@ -11,6 +11,16 @@ from aiohttp.test_utils import TestServer
 
 UPSTREAM_TESTS = os.environ.get("FEDC_TEST_UPSTREAM") == "1"
 
+TAG_PATTERN_CASES = (
+    (r"^[0-9]+(?:\.[0-9]+)+$", "1.2.3", "1.2.3"),
+    (r"^v[0-9]+(?:\.[0-9]+)+$", "v1.2.3", "v1.2.3"),
+    (r"^v?([0-9]+(?:\.[0-9]+)+)$", "v1.2.3", "1.2.3"),
+    (r"^v?([0-9]+(?:\.[0-9]+)+)$", "1.2.3", "1.2.3"),
+    (r"^release-([0-9]+(?:\.[0-9]+)+)$", "release-1.2.3", "1.2.3"),
+    (r"^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$", "1.2.3-rc.1", "1.2.3-rc.1"),
+    (r"^(?P<version>[0-9.]+)$", "1.2.3", "1.2.3"),
+)
+
 
 def upstream_test(test):
     """Retain live coverage, explicitly opted in and bounded per test."""

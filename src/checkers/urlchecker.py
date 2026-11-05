@@ -52,8 +52,7 @@ log = logging.getLogger(__name__)
 
 def extract_version(checker_data: dict[str, Any], url: str) -> str | None:
     """
-    If checker_data contains a "pattern", matches 'url' against it and returns the
-    first capture group (which is assumed to be the version number).
+    Extract the version from the pattern's capture group, or its whole match.
     """
     pattern = Checker._get_pattern(checker_data, "pattern")
     if pattern is None:
@@ -63,7 +62,7 @@ def extract_version(checker_data: dict[str, Any], url: str) -> str | None:
     if m is None:
         return None
 
-    version: str | None = m.group(1)
+    version: str | None = m.group(1 if pattern.groups else 0)
     return version
 
 
