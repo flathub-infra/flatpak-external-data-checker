@@ -103,7 +103,7 @@ jobs:
           docker build --build-arg BASE_IMAGE="$DOCKER_IMAGE":build -t "$DOCKER_IMAGE":test - <<'EOF'
           ARG BASE_IMAGE
           FROM ${BASE_IMAGE}
-          RUN apt-get install -y python3-coverage
+          RUN apt-get update && apt-get install -y python3-coverage
           # Collect Python CLI subprocesses as well as the unittest process.
           RUN echo 'import coverage; coverage.process_startup()' > /usr/lib/python3/dist-packages/fedc_coverage.pth
           EOF

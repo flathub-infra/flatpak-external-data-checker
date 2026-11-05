@@ -2,7 +2,7 @@
 name = "flatpak_external_data_checker"
 version = "0.0.0"
 requires-python = "<4.0,>=3.10"
-# Sync with docker image
+# Keep dependencies in sync with dependencies.apt.txt; Debian versions may differ.
 dependencies = [
     "aiohttp==3.14.5",
     "editorconfig==0.17.1",

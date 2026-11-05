@@ -2,6 +2,19 @@
 
 CI uses Debian trixie. From the repository root, install its runtime packages:
 
+On Debian trixie, install the PyGObject and pycairo build dependencies before
+running `uv sync`, as CI does:
+
+```sh
+sudo apt-get update
+sudo apt-get install -y build-essential pkg-config libcairo2-dev \
+    libgirepository-2.0-dev python3-dev
+```
+
+Older distributions with only `libgirepository1.0-dev` cannot build the pinned
+PyGObject. The Docker image uses Debian packages from `dependencies.apt.txt`,
+not the versions in `uv.lock`.
+
 ```sh
 sudo apt-get update
 sudo xargs -a dependencies.apt.txt apt-get install --no-install-recommends -y
@@ -41,8 +54,16 @@ The default suite runs offline:
 ./run-in-container.sh python3 -m unittest tests.test_htmlchecker
 ```
 
-For a native run, install the runtime dependencies, including Python APT bindings,
-then run `python3 -m unittest discover`. The uv environment alone is not enough.
+For native tests on Debian trixie, install all packages in `dependencies.apt.txt`
+and run `/usr/bin/python3 -m unittest discover`. The list includes `python3-apt`
+for Debian metadata, GI bindings and GLib/JSON-GLib typelibs for manifest parsing,
+and `python3-magic` for content detection. Debian installs their native libraries
+and the libmagic database as dependencies.
+
+`uv sync` does not install python-apt. Its compiled modules must match the
+distribution's Python ABI, so a uv-managed Python is not a substitute. Use the
+container if your distribution lacks these packages. The helper uses the
+published image; rebuild locally when testing Dockerfile or package-list changes.
 
 To test against live upstream services:
 
