@@ -66,3 +66,72 @@ class TestSourceFactories(unittest.TestCase):
         self.assertEqual(original.version, "1")
         with self.assertRaises(TypeError):
             original._replace(unknown="field")
+
+
+class TestGitSourceUpdates(unittest.TestCase):
+    def test_ref_transitions(self):
+        refs = ({}, {"tag": "v1"}, {"branch": "stable"})
+        new_refs = ({}, {"tag": "v2"}, {"branch": "main"})
+        for old_ref in refs:
+            for new_ref in new_refs:
+                with self.subTest(old=old_ref, new=new_ref):
+                    source = {
+                        "type": "git",
+                        "url": "https://example.org/old.git",
+                        "commit": "a" * 40,
+                        "dest": "dependency",
+                        "disable-submodules": True,
+                        "x-checker-data": {"type": "git"},
+                        **old_ref,
+                    }
+                    original = source.copy()
+                    data = ExternalGitRepo.from_source("source.json", source)
+                    current = data.current_version
+                    data.new_version = current._replace(
+                        url="https://example.org/new.git",
+                        commit="b" * 40,
+                        tag=new_ref.get("tag"),
+                        branch=new_ref.get("branch"),
+                    )
+                    data.update()
+                    expected = {
+                        key: value
+                        for key, value in original.items()
+                        if key not in ("tag", "branch")
+                    }
+                    expected.update(
+                        url=data.new_version.url, commit="b" * 40, **new_ref
+                    )
+                    self.assertEqual(source, expected)
+                    self.assertIs(data.current_version, current)
+                    reloaded = ExternalGitRepo.from_source("source.json", source)
+                    self.assertTrue(reloaded.current_version.matches(data.new_version))
+                    data.update()
+                    self.assertEqual(source, expected)
+
+    def test_no_new_version_leaves_source_unchanged(self):
+        source = {
+            "type": "git",
+            "url": "https://example.org/app.git",
+            "tag": "v1",
+            "commit": "a" * 40,
+        }
+        original = source.copy()
+        data = ExternalGitRepo.from_source("source.json", source)
+        data.update()
+        self.assertEqual(source, original)
+
+    def test_commit_refresh_preserves_selected_ref(self):
+        for ref in ({"tag": "v1"}, {"branch": "stable"}):
+            with self.subTest(ref=ref):
+                source = {
+                    "type": "git",
+                    "url": "https://example.org/app.git",
+                    "commit": "a" * 40,
+                    **ref,
+                }
+                data = ExternalGitRepo.from_source("source.json", source)
+                expected = source | {"commit": "b" * 40}
+                data.new_version = data.current_version._replace(commit="b" * 40)
+                data.update()
+                self.assertEqual(source, expected)

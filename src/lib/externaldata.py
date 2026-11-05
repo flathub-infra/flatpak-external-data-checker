@@ -554,5 +554,9 @@ class ExternalGitRepo(ExternalBase):
             self.source["commit"] = self.new_version.commit
             if self.new_version.tag is not None:
                 self.source["tag"] = self.new_version.tag
+            else:
+                self.source.pop("tag", None)
             if self.new_version.branch is not None:
                 self.source["branch"] = self.new_version.branch
+            else:
+                self.source.pop("branch", None)

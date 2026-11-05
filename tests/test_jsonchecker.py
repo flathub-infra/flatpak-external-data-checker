@@ -255,6 +255,46 @@ class TestJSONCheckerMocked(unittest.IsolatedAsyncioTestCase):
     async def _make_checker(self):
         return JSONChecker.__new__(JSONChecker)
 
+    async def test_git_update_replaces_obsolete_refs(self):
+        checker = await self._make_checker()
+        for old_ref in ({"tag": "v1"}, {"branch": "stable"}):
+            for new_ref in ({}, {"tag": "v2"}):
+                with self.subTest(old=old_ref, new=new_ref):
+                    checker_data = {
+                        "type": "json",
+                        "commit-query": json.dumps("b" * 40),
+                    }
+                    if "tag" in new_ref:
+                        checker_data["tag-query"] = json.dumps(new_ref["tag"])
+                    source = {
+                        "type": "git",
+                        "url": "https://example.org/app.git",
+                        "commit": "a" * 40,
+                        "x-checker-data": checker_data,
+                        **old_ref,
+                    }
+                    data = ExternalBase.from_source("git.json", source)
+                    with mock.patch(
+                        "src.lib.utils.git_ls_remote", new_callable=mock.AsyncMock
+                    ) as remote:
+                        await checker.check(data)
+                        remote.assert_not_awaited()
+                    self.assertIsNotNone(data.new_version)
+                    self.assertEqual(data.new_version.commit, "b" * 40)
+                    self.assertEqual(data.new_version.tag, new_ref.get("tag"))
+                    self.assertIsNone(data.new_version.branch)
+                    data.update()
+                    self.assertEqual(
+                        source,
+                        {
+                            "type": "git",
+                            "url": "https://example.org/app.git",
+                            "commit": "b" * 40,
+                            "x-checker-data": checker_data,
+                            **new_ref,
+                        },
+                    )
+
     async def test_release_url_query_is_optional(self):
         checker = await self._make_checker()
         data = ExternalBase.from_source(
