@@ -3,39 +3,21 @@
 ![Tests](https://github.com/flathub-infra/flatpak-external-data-checker/workflows/Tests/badge.svg)
 [![Coverage Status](https://coveralls.io/repos/github/flathub/flatpak-external-data-checker/badge.svg)](https://coveralls.io/github/flathub/flatpak-external-data-checker?branch=master)
 
-This is a tool for checking for outdated or broken links of external
-data in Flatpak manifests.
+Check Flatpak manifests for broken source URLs and new upstream releases.
+The tool can update manifests and open GitHub pull requests.
 
----
-
-## Motivation
-
-Flatpak apps are built using external data (git checkouts, tarballs,
-simple files, etc.). A very specific case of this is the use of *extra
-data*, which works as a way to download third party binaries at
-installation time.
-
-Of course, the links pointing to external data can become obsolete, so
-it is very important to account for and correct such issues.
-This is especially critical for the *extra data*, in which a broken link
-impedes the installation of the application.
-
-This project offers ways to easily check or monitor the state of such
-links, as well as the suggestion of new versions.
-
-It works by extracting all the external data of a Flatpak manifest and
-giving it to a collection of *checkers*, which will set up the right
-state and, possibly, new versions of each external data.
+Broken `extra-data` URLs prevent users from installing an app. Other broken
+source URLs prevent builds.
 
 ## Use
 
-The simplest use of this tool is by calling:
+Check a manifest:
 
 ```
 flatpak-external-data-checker MANIFEST_FILE
 ```
 
-it should display messages about any broken or outdated external data.
+The command reports broken or outdated sources.
 
 ### Offline linting
 
@@ -45,11 +27,9 @@ Check a manifest's `x-checker-data` offline:
 flatpak-external-data-checker --lint MANIFEST_FILE
 ```
 
-`--lint` reads JSON and YAML manifests, including referenced module and source
-files. For each source with `x-checker-data`, it checks required fields and value
-types. It rejects unknown or incompatible checkers and checks regex syntax,
-capture groups, jq syntax, and version-template syntax and variable names.
-It also checks parent references for missing sources and inheritance cycles.
+`--lint` checks `x-checker-data` in JSON and YAML manifests, including referenced
+module and source files. It reports invalid checker settings, regular
+expressions, jq queries, templates, and parent references.
 
 Errors include the filename and field location. The command exits with status 0
 on success or 1 on lint errors. It makes no network requests and changes no files.
@@ -61,19 +41,19 @@ Flatpak manifest validator. You cannot combine `--lint` with update options or
 
 ### Installation
 
-This tool itself is available in Flatpak format from Flathub. Install with
+Install from Flathub:
 
 ```bash
 flatpak install --from https://dl.flathub.org/repo/appstream/org.flathub.flatpak-external-data-checker.flatpakref
 ```
 
-And run with
+Run it:
 
 ```bash
 flatpak run org.flathub.flatpak-external-data-checker MANIFEST_DIR/MANIFEST_FILE
 ```
 
-If the manifest is not in your home directory, you need to punch a sandbox hole for it:
+If the manifest is outside your home directory, grant access to its directory:
 
 ```bash
 flatpak run --filesystem=MANIFEST_DIR org.flathub.flatpak-external-data-checker MANIFEST_DIR/MANIFEST_FILE
@@ -81,24 +61,23 @@ flatpak run --filesystem=MANIFEST_DIR org.flathub.flatpak-external-data-checker 
 
 #### Running in a container
 
-**flatpak-external-data-checker** is also available as an
+The tool is also available as an
 [OCI image](https://github.com/orgs/flathub-infra/packages/container/package/flatpak-external-data-checker)
 from GitHub Container Registry.
 
-You can use the `run-in-container.sh` helper script to set up needed CLI
-options for you and run the image using `podman`:
+Use `run-in-container.sh` to run the image with `podman`:
 
 ```bash
 ./run-in-container.sh \
-    [ARGS …] \
+    [ARGS ...] \
     ~/src/flathub/com.example.App/com.example.App.json
 ```
 
 ### On Flathub
 
 Flathub [runs this tool periodically](https://github.com/flathub/flathub/blob/master/.github/workflows/external-data-checker.yml) for all Flatpak repos under [github.com/flathub](https://github.com/flathub).
-So, for those repos to receive update PRs, add `x-checker-data` [as needed to sources](#changes-to-flatpak-manifests).
-Note Flathub's hosted tool only checks the default branch.
+To receive update PRs, add `x-checker-data` [to your sources](#changes-to-flatpak-manifests).
+Flathub only checks the default branch.
 
 To stop Flathub's tool from checking your repo, add `"disable-external-data-checker": true` to `flathub.json` in the default branch.
 
@@ -160,7 +139,7 @@ See [GitHub's trigger restrictions](https://docs.github.com/en/actions/concepts/
 For unattended CI, replace `${{ secrets.GITHUB_TOKEN }}`
 with a secret containing a GitHub App installation token or personal access
 token with the required repository permissions. The `permissions` block controls
-only the built-in token. The checker does not dispatch CI itself.
+only the built-in token.
 
 ### Automatically submitting PRs
 
@@ -171,20 +150,23 @@ with access to the target repository.
 
 ### Selectively submitting PRs
 
-The tool will by default open PRs if at least one source is updated. Alternatively, the tool can be configured to only open PRs if at least one "important" source is updated. This can avoid unwanted PRs, e.g. PRs that only update a single library.
+By default, the tool opens a PR whenever a source has an update. To avoid PRs
+that only update dependencies, you can require an update to an important source.
 
-To only open PRs when at least one important source is updated, first set `require-important-update` to `true` in `flathub.json`. If using a custom workflow, instead pass `--require-important-update` to the tool. Then, set property `is-important` to `true` in the checker metadata for any important source(s). Sources with `is-main-source` in their checker metadata are also considered important.
+Set `require-important-update` to `true` in `flathub.json`, or pass
+`--require-important-update` in a custom workflow. Mark important sources with
+`is-important: true` in their checker metadata. Sources marked with
+`is-main-source: true` also count as important.
 
 ### Automatically merging PRs
 
-The tool will also automatically merge previously opened pull request for
-unavailable (`BROKEN`) sources if the change has successfully passed CI checks
-and the token has sufficient privileges.
+The tool automatically merges its existing PRs for broken source URLs after
+CI passes, if the token has permission to merge.
 
-Under limited circumstances, automatically merging all submitted PRs, not just unavailable sources,
-from the tool can be forcefully enabled by setting
-`automerge-flathubbot-prs` to `true` in `flathub.json`,
-or it can be completely disabled by setting `automerge-flathubbot-prs` to `false`. Use of this option without requesting an exception will cause the build to fail in the linting stage; see the [FlatHub docs](https://docs.flathub.org/blog/linter-restricting-automatic-merge/) for more info.
+Set `automerge-flathubbot-prs` to `false` in `flathub.json` to disable automatic
+merging. Setting it to `true` enables automatic merging for all of the tool's
+PRs, but requires a Flathub exception. Without an exception, linting fails.
+See the [Flathub docs](https://docs.flathub.org/blog/linter-restricting-automatic-merge/).
 
 ### Formatting manifests
 
@@ -200,39 +182,35 @@ indent_size = 2
 insert_final_newline = true
 ```
 
-Unfortunately, it is not feasible to preserve JSON-GLib's non-standard `/* */` syntax for comments. As an alternative, dictionary keys beginning with `//` are ignored by `flatpak-builder` and can be used for comments in many cases.
+The tool does not preserve `/* */` comments in JSON. You can use keys beginning
+with `//` for comments instead. `flatpak-builder` ignores these keys.
 
 For YAML files, this tool attempts to preserve existing formatting and comments automatically. `.editorconfig` is not used. We recommend you follow the [Flathub YAML Style Guide](https://github.com/flathub/flathub/wiki/YAML-Style-Guide).
 
 ## Changes to Flatpak manifests
 
-For simple checks to see if a URL is broken, no changes are needed.  However,
-you can add additional metadata to the manifest to allow the checker to
-discover new versions.
+Checking for broken URLs needs no manifest changes. To find new versions,
+add `x-checker-data` to each source you want to update.
 
-Some of the following checkers are able to determine upstream version number,
-and automatically add it to releases list in metainfo. To specify which source
-is the app upstream source, set property `is-main-source` to `true` in the
-checker metadata for that source.
+Set `is-main-source` to `true` in the app's upstream source checker metadata
+to add new versions to the metainfo release list, if the checker provides a
+version number.
 
 ### Version constraining
 
-The checkers can support version constraining, making it possible to e.g. limit
-version checking to a certain major version. The property is `versions`. It
-should contain key-value pairs where the key is the comparison operator (one of
-`<`, `>`, `<=`, `>=`, `==`, `!=`), and the value is the version to compare with.
-So, `{"<": "3.38.0", "!=": "3.37.1"}` means *"any version less than 3.38.0
-except 3.37.1"*. All constraints must match simultaneously, i.e. if one doesn't
-match -> version is rejected.
+Use `versions` to limit updates, for example to a particular major version.
+Each key is a comparison operator, one of `<`, `>`, `<=`, `>=`, `==`, or `!=`.
+Each value is a version to compare against.
+For example, `{"<": "3.38.0", "!=": "3.37.1"}` accepts versions below 3.38.0
+except 3.37.1. A version must satisfy every constraint.
 
 The `!=` operator accepts either a single version string or a list of
 versions to exclude.
 
 ### URL checker
 
-If the upstream vendor has an URL that redirects to the latest version of the
-application, you can add something like the following to check and update the URL for
-the latest version:
+Use `rotating-url` when upstream provides a URL that redirects to the latest
+release:
 
 ```json
 "x-checker-data": {
@@ -245,12 +223,11 @@ the latest version:
 The version number for the latest version can be detected in two ways:
 
 * If the filename ends with `.AppImage`, the version number is extracted
-  from the AppImage. (It is run in a `bwrap` sandbox.)
+  from the AppImage.
 * Otherwise, if `"pattern"` is specified in `"x-checker-data"`, the given
   regular expression is matched against the full
   URL for the latest version, and the first match group is taken to be the
-  version. (This follows the convention used by
-  [`debian/watch`](https://wiki.debian.org/debian/watch) files.)
+  version.
 * If downloads come from load-balanced URLs, the `"pattern"` regex must
   match all URL variants otherwise identical versions may be treated as
   updates. Eg.
@@ -270,15 +247,14 @@ To remove GET query parameters, set `strip-query` property to `true`.
 
 ### HTML checker
 
-Both the version number and the download URL will be gathered from a static
-HTML page which contains this information:
+Use `html` to find a version and download URL on a static web page:
 
 ```json
 "x-checker-data": {
     "type": "html",
     "url": "https://www.example.com/download.html",
     "version-pattern": "The latest version is ([\\d\\.-]+)",
-    "url-template": "https://www.example.com/pub/foo-v$version.tar.gz)"
+    "url-template": "https://www.example.com/pub/foo-v$version.tar.gz"
 }
 ```
 
@@ -299,20 +275,16 @@ The [`versions`](#version-constraining) property is supported.
 
 #### URL templates
 
-The HTML checker also supports building the download URL using
-the retrieved version string, its components according to our
-LooseVersion implementation (see `src/lib/version.py` based on
-distutils' implementation before it was removed from Python stdlib in
-3.12). `$version` is the complete version string; `$version0`, `$version1`,
-and so on are its components. `$major`, `$minor`, and `$patch` are aliases
-for the first three components, when present.
+Use `url-template` to build a download URL from the version.
+`$version` is the complete version string. `$version0`, `$version1`, and so on
+are its components. `$major`, `$minor`, and `$patch` are aliases for the first
+three components, when present.
 
 Components retain their original spelling, including leading zeroes: for
 `2021.06.28`, `$minor` and `$version1` are both `06`. Dots are discarded,
-but mixed-format versions keep LooseVersion's component boundaries. For
+and letters and numbers form separate components. For
 example, `1.02b03` has components `1`, `02`, `b`, `03`, so `$patch` is `b`
-and `$version3` is `03`. These template values do not change numeric version
-comparison. The same rules apply to Anitya URL and tag templates.
+and `$version3` is `03`. The same rules apply to Anitya URL and tag templates.
 
 For example:
 
@@ -347,9 +319,9 @@ If the placeholder is immediately followed by an underscore, you need to add bra
 
 ### Git checker
 
-To check for latest git tag in corresponding git source repo, add checker
-metadata with type `git` and set `tag-pattern` to a regular expression with
-exactly one match group (the pattern will be used to extract version from tag):
+Use `git` to follow the latest tag in a Git source repository.
+Set `tag-pattern` to a regular expression with exactly one capture group
+for the version:
 
 ```json
 "x-checker-data": {
@@ -364,16 +336,15 @@ To disable sorting and keep order from `git ls-remote`, set `sort-tags` to `fals
 If the tags are just the version without anything else e.g. `1.0`, you don't need to
 specify a `tag-pattern`.
 
-If the project follows [semver](https://semver.org/) specification, you can set
-`version-scheme` property to `semantic` in order to use semantic version scheme for sorting.
-In this case, make sure that `tag-pattern` extracts only valid semver strings.
+Set `version-scheme` to `semantic` to sort tags by [semantic version](https://semver.org/).
+The `tag-pattern` must extract valid semantic versions.
 
 The [`versions`](#version-constraining) property is supported.
 
 ### GitHub releases checker
 
 Use `github` to follow a repository's latest published stable GitHub release.
-Unlike the Git checker, it selects a **release**, not the highest Git tag.
+Unlike the Git checker, it selects a release, not the highest Git tag.
 The `repo` property is the repository's `owner/name`.
 
 For an uploaded release asset, specify its exact name using `asset-name`:
@@ -388,7 +359,7 @@ x-checker-data:
 
 `tag-pattern` is optional. It must match the entire release tag and contain
 exactly one capture group for the version. Without it, the version is the raw
-tag, including any prefix. `asset-name` supports `$tag` (the unmodified tag),
+tag, including any prefix. `asset-name` supports `$tag` for the unmodified tag,
 `$version`, and the [version-component template variables](#url-templates).
 Names are matched exactly, not as globs or regular expressions. Keep separate
 sources with `only-arches` for different architectures. For example, an ARM64
@@ -405,8 +376,8 @@ x-checker-data:
 ```
 
 For a `type: git` source, omit both artifact selectors. The checker updates its
-tag and commit to the release's tag. The source must use an HTTP(S) GitHub URL
-for the same repository as `repo` (an optional `.git` suffix is supported).
+tag and commit to the release's tag. The source must use an HTTP or HTTPS GitHub
+URL for the same repository as `repo`. The URL may end in `.git`.
 
 Use the JSON checker if you need prereleases or custom release selection.
 
@@ -438,11 +409,9 @@ Use the JSON checker if you need prereleases or custom release selection.
 
 ### JSON checker
 
-The JSON checker allows using [jq](https://stedolan.github.io/jq/) to query
-JSON data with arbitrary schema to get version and download url.
-
-To use the **JSONChecker**, specify JSON data URL, version query and url query
-(you can use `$version` variable got from the version query in url query):
+Use `json` to extract a version and download URL from a JSON response with
+[jq](https://stedolan.github.io/jq/). Set the response URL and both queries.
+The URL query can use `$version` from the version query:
 
 ```json
 "x-checker-data": {
@@ -452,7 +421,7 @@ To use the **JSONChecker**, specify JSON data URL, version query and url query
     "url-query": ".assets[] | select(.name==\"jq-\" + $version + \".tar.gz\") | .browser_download_url"
 }
 ```
-for git type sources, specify tag query and, optionally, commit and version queries:
+For Git sources, specify a tag query and optional commit and version queries:
 ```json
 "x-checker-data": {
     "type": "json",
@@ -463,7 +432,7 @@ for git type sources, specify tag query and, optionally, commit and version quer
 }
 ```
 
-`timestamp-query` is optional, but if provided - must return a string with timestamp in ISO format.
+The optional `timestamp-query` must return an ISO timestamp string.
 
 `release-url-query` extracts an optional HTTP or HTTPS release-notes link from
 the same response, for example `"release-url-query": ".html_url // empty"`.
@@ -477,14 +446,12 @@ See the [jq manual](https://stedolan.github.io/jq/manual/) for complete informat
 If a parent source is specified, its check results will be accessible in the `$parent` variable.
 The `$parent` object has `current` and `new` properties with objects representing current and new
 parent source data, respectively. The latter is `null` if the parent check didn't get a new version.
-The [source-state schema](data/source-state.schema.json) describes each non-null state,
-not the enclosing `$parent` object.
+See the [source-state schema](data/source-state.schema.json) for the available fields.
 
 ### Debian repo checker
 
-For the **DebianRepoChecker**, which deals only with deb packages, it
-can read the following metadata (add it to manifest element it refers
-to, e.g. where "type": "extra-data" is declared):
+Use `debian-repo` to check for Debian package updates. Add this metadata to the
+source, such as an `extra-data` source:
 
 ```json
 "x-checker-data": {
@@ -496,17 +463,11 @@ to, e.g. where "type": "extra-data" is declared):
 }
 ```
 
-For Debian and Ubuntu binary packages, the checker automatically uses changelogs
-for release dates when available. Otherwise, it falls back to HTTP timestamps.
+### Anitya checker
 
-### Anitya (release-monitoring) checker
-
-[Anitya](https://github.com/fedora-infra/anitya) is an upstream release monitoring
-project by Fedora. It supports multiple backends for retrieving version information
-from different services, including GitHub, GitLab, Sourceforge, etc.
-To use the **AnityaChecker**, specify numeric project ID on release-monitoring.org
-and add a template for source download URL.
-[Template syntax](#URL-templates) is the same as for the **HTMLChecker**:
+[Anitya](https://release-monitoring.org/) tracks upstream releases.
+Set `project-id` to the project's numeric ID on release-monitoring.org and
+provide a download URL using the [URL template syntax](#url-templates):
 
 ```json
 "x-checker-data": {
@@ -518,7 +479,7 @@ and add a template for source download URL.
 }
 ```
 
-Set `stable-only` to `false` to include unstable releases (as recognized by Anitya).
+Set `stable-only` to `false` to include releases that Anitya marks as unstable.
 
 The [`versions`](#version-constraining) property is supported.
 
@@ -564,10 +525,10 @@ If the source URL is not a wheel filename, only `py3-none-any` wheels qualify.
 
 The [`versions`](#version-constraining) property is supported.
 
-### Electron Auto Update checker
+### Electron auto-update checker
 
-Electron [auto update](https://www.electron.build/auto-update.html) mechanism uses remotely stored
-metadata files to check for updates. This metadata can be tracked for Flatpak manifest updates.
+Use `electron-updater` for apps that publish
+[Electron update metadata](https://www.electron.build/auto-update.html):
 
 ```yaml
 x-checker-data:
@@ -575,15 +536,14 @@ x-checker-data:
   url: https://example.com/download/latest-linux.yml
 ```
 
-The `url`, if set, must link to a Electron Auto Update metadata file (usually `latest-linux.yml`).
-If `url` is omitted, the checker will try to guess it based on the current source url.
+Set `url` to an Electron update metadata file, usually `latest-linux.yml`.
+If you omit it, the checker tries to find it using the current source URL.
 
-Make sure to use `sha512` checksum for the source, unless it's an `extra-data` (which supports `sha256` only).
+Use a `sha512` checksum for the source. For `extra-data`, use `sha256` instead.
 
 ### JetBrains checker
 
-Special checker that will check for available updates
-for [JetBrains](https://www.jetbrains.com/) products:
+Check for [JetBrains](https://www.jetbrains.com/) product updates:
 
 ```json
 "x-checker-data": {
@@ -593,17 +553,12 @@ for [JetBrains](https://www.jetbrains.com/) products:
 }
 ```
 
-`release-type` is optional and defaults to `release`. The
-[JetBrains product API](https://data.services.jetbrains.com/products) returns
-four release types: `release`, `eap`, `rc`, and `preview`.
-The checker accepts these values and sends the selected value as the `type` filter to the
-[releases endpoint](https://data.services.jetbrains.com/products/releases?code=IIU&latest=true&type=rc).
-Not every product has releases of every type.
+`release-type` accepts `release`, `eap`, `rc`, or `preview` and defaults to
+`release`. Not every product offers every release type.
 
 ### Snapcraft checker
 
-Special checker that will check for available updates
-for [Snapcraft](https://snapcraft.io/) packages:
+Check for [Snapcraft](https://snapcraft.io/) package updates:
 
 ```json
 "x-checker-data": {
@@ -615,8 +570,7 @@ for [Snapcraft](https://snapcraft.io/) packages:
 
 ### Rust checker
 
-Special checker that will check for available updates
-for [Rust](https://www.rust-lang.org/):
+Check for [Rust](https://www.rust-lang.org/) updates:
 
 ```json
 "x-checker-data": {
@@ -629,9 +583,7 @@ for [Rust](https://www.rust-lang.org/):
 
 ### Chromium checker
 
-Special checker that will check for available updates to the
-[Chromium](https://www.chromium.org/) tarballs, as well as the toolchain
-binaries or sources used to build it.
+Check for [Chromium](https://www.chromium.org/) source or LLVM toolchain updates:
 
 ```json
 "x-checker-data": {
@@ -642,8 +594,8 @@ binaries or sources used to build it.
 
 The following components are supported:
 
-- `chromium`: updates the Chromium tarball itself, used on URL-based sources
-  (e.g. `type: archive`).
+- `chromium`: updates the Chromium tarball for URL-based sources such as
+  `type: archive`.
 - `llvm-prebuilt`: updates a tarball pointing to the official LLVM prebuilt
   toolchain archive matching the latest Chromium version. Used on URL-based
   sources.
@@ -652,29 +604,14 @@ The following components are supported:
 
 ### Release URL template
 
-When updating the metainfo file with the release information of the main
-source if a `release-url-template` is provided in the `x-checker-data`
-like below a `<url type="details"></url>` tag will also be added.
+Set `release-url-template` to add a release-notes link to update PRs.
+For the main source, the tool also adds the link to the metainfo release entry.
+`$version` expands to the new version, which must be known if the template uses it.
 
-The `$version` in `release-url-template` will be replaced by the release
-version.
-
-New pull requests list each source's old and new versions or Git revisions.
-Missing versions appear as `unknown`. Set `release-url-template` on any source
-to add an HTTP or HTTPS release-notes link. It overrides `release-url-query`
-and automatic links. Templates containing `$version` need a known new version.
-
-Automatic links use existing download URLs and checker responses:
-
-- GitHub, Codeberg, and gitlab.com release downloads.
-- GitHub, GitLab, and Forgejo/Gitea release API responses, including secondary
-  JSON query responses and self-hosted GitLab and Forgejo/Gitea instances.
-  Matches require the exact asset URL or Git tag. Git release pages must also
-  belong to the source's HTTP or HTTPS repository.
-- JetBrains `notesLink` and GNOME `.news` files, falling back to `.changes`.
-
-Discovery makes no extra requests. Use a template or `release-url-query` for
-other URL formats or release notes hosted by another project.
+The tool finds release-notes links automatically for supported GitHub, GitLab,
+Forgejo/Gitea, JetBrains, and GNOME sources. Use a template or the JSON checker's
+`release-url-query` when the automatic link is missing or points to the wrong
+page. A template overrides both queried and automatic links.
 
 ```yaml
 x-checker-data:
@@ -688,19 +625,13 @@ x-checker-data:
 
 ## robots.txt
 
-robots.txt is respected when the `--enable-robots-txt` commandline
-argument is passed, or when enabled in a source's checker metadata
-using `enable-robots-txt: true`. The CLI argument overrides the
-per-source metadata.
+Pass `--enable-robots-txt` to respect robots.txt rules, or set
+`enable-robots-txt: true` in a source's checker metadata. The command-line
+option overrides per-source settings.
 
-When enabled, the robots.txt files are cached upto 24 hours in
-`$XDG_CACHE_HOME/fedc/robots`.
+The Chromium, PyPI, Rust, and Snapcraft checkers do not support this option.
 
-The Chromium, PyPI, Rust and SnapCraft checkers disables robots.txt
-handling entirely as the checkers itself rely on some paths being
-accesible.
-
-## License and Copyright
+## License and copyright
 
 License: GPLv2
 
