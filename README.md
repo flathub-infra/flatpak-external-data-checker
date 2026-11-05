@@ -586,9 +586,16 @@ for [JetBrains](https://www.jetbrains.com/) products:
 "x-checker-data": {
     "type": "jetbrains",
     "code": "PRODUCT-CODE",
-    "release-type": "release or eap (defaults to release)"
+    "release-type": "release"
 }
 ```
+
+`release-type` is optional and defaults to `release`. The
+[JetBrains product API](https://data.services.jetbrains.com/products) returns
+four release types: `release`, `eap`, `rc`, and `preview`.
+The checker accepts these values and sends the selected value as the `type` filter to the
+[releases endpoint](https://data.services.jetbrains.com/products/releases?code=IIU&latest=true&type=rc).
+Not every product has releases of every type.
 
 ### Snapcraft checker
 
