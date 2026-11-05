@@ -7,3 +7,22 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      # Keep in sync with [dependency-groups].dev in pyproject.toml.
+      python-development:
+        patterns:
+          - "ty"
+          - "typing-extensions"
+          - "pygobject-stubs"
+          - "ruff"
+          - "types-*"
+          - "pre-commit"
+        update-types: ["minor", "patch"]
+      # First matching group wins; major updates get individual PRs.
+      python-runtime:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
