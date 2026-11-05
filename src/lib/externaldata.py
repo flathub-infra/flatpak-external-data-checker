@@ -407,13 +407,19 @@ class ExternalData(ExternalBase):
 
     @property
     def has_version_changed(self) -> bool:
-        # TODO We can't reliably tell if the appimage version stayed the same
-        # without downloading it, so just assume it changed
         if (
             self.new_version is not None
             and self.new_version.version is not None
             and self.new_version.url.endswith(".AppImage")
         ):
+            # AppImages may use a stable URL. Compare the content already
+            # downloaded by the checker with the manifest's checksum first.
+            if self.current_version.checksum == self.new_version.checksum:
+                return False
+            if self.current_version.version is not None:
+                return self.current_version.version != self.new_version.version
+            # The manifest normally has no version string; changed content is
+            # the best available indication of a new AppImage version.
             return True
         return super().has_version_changed
 
