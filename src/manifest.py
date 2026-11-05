@@ -203,6 +203,15 @@ class ManifestChecker:
         # Establish parent-child relation between sources
         # FIXME Expensive O(n^2) algorithm; perhaps we can do better?
         collected_data = self.get_external_data()
+        source_ids: set[str] = set()
+        for data in collected_data:
+            source_id = data.checker_data.get("source-id")
+            if source_id is not None:
+                if not source_id or source_id in source_ids:
+                    raise ManifestLoadError(
+                        f"Empty or duplicate source-id: {source_id!r}"
+                    )
+                source_ids.add(source_id)
         for data in collected_data:
             if "parent-id" not in data.checker_data:
                 continue
