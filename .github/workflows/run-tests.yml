@@ -15,14 +15,6 @@ on:
   pull_request:
     branches:
       - master
-    paths-ignore:
-      - '.github/dependabot.yml'
-      - '.gitattributes'
-      - '.gitignore'
-      - '.pre-commit-config.yaml'
-      - 'CONTRIBUTING.md'
-      - 'LICENSE'
-      - 'README.md'
   workflow_dispatch:
     inputs:
       upstream-tests:
