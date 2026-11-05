@@ -64,7 +64,7 @@ T = t.TypeVar("T")
 log = logging.getLogger(__name__)
 
 
-def _extract_timestamp(info):
+def _extract_timestamp(info: t.Mapping[str, str]) -> dt.datetime:
     date_str = info.get("Last-Modified") or info.get("Date")
     return parse_date_header(date_str)
 
@@ -183,7 +183,7 @@ async def get_timestamp_from_url(
     url: str,
     session: aiohttp.ClientSession,
     robots_cache: RobotsCache | None = None,
-):
+) -> dt.datetime:
     if robots_cache:
         await robots_cache.ensure_allowed(url)
 

@@ -11,13 +11,17 @@ import aiohttp
 import apt
 import apt_pkg
 
-from src.checkers.debianrepochecker import DebianRepoChecker, LoggerAcquireProgress
+from src.checkers.debianrepochecker import (
+    DebianRepoChecker,
+    LoggerAcquireProgress,
+    _changelog_url,
+)
 from src.lib.checksums import MultiDigest
 from src.lib.errors import CheckerFetchError, CheckerQueryError
 from src.lib.externaldata import ExternalBase
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
-from tests.support import upstream_test
+from tests.support import LocalHTTPTestCase, upstream_test
 
 TEST_MANIFEST = os.path.join(
     os.path.dirname(__file__), "org.debian.tracker.pkg.apt.yml"
@@ -336,6 +340,7 @@ class TestDebianRepoCheckerTimestamps(unittest.IsolatedAsyncioTestCase):
         candidate.version = "2.0"
         candidate.size = 123
         candidate.record = {"SHA256": "1" * 64}
+        candidate.origins = []
         self.source_record = mock.MagicMock()
         self.source_record.version = "2.0"
         self.source_record.files = [
@@ -463,6 +468,187 @@ class TestDebianRepoCheckerTimestamps(unittest.IsolatedAsyncioTestCase):
                     await self.checker.check(data)
                 self.assertIs(caught.exception, error)
                 self.assertIsNone(data.new_version)
+
+
+class TestDebianChangelogs(LocalHTTPTestCase):
+    date = dt.datetime(2026, 10, 20, 10, tzinfo=dt.timezone.utc)
+    http_date = dt.datetime(2026, 10, 29, 12, tzinfo=dt.timezone.utc)
+
+    @staticmethod
+    def changelog(version="2.0", date="Tue, 20 Oct 2026 12:00:00 +0200"):
+        return (
+            f"source-package ({version}) stable; urgency=medium\n\n"
+            f"  * Release.\n\n -- Maintainer <m@example.com>  {date}\n\n"
+        ).encode()
+
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.package_url = self.serve(
+            b"package must not be downloaded",
+            headers={"Last-Modified": "Thu, 29 Oct 2026 12:00:00 GMT"},
+        )
+        self.candidate = mock.Mock(
+            uri=self.package_url,
+            version="2.0+b1",
+            source_version="2.0",
+            source_name="source-package",
+            origins=[],
+        )
+        self.checker = DebianRepoChecker(self.http)
+
+    async def timestamp(self, body):
+        url = self.serve(body)
+        with mock.patch(
+            "src.checkers.debianrepochecker._changelog_url", return_value=url
+        ):
+            return await self.checker._get_timestamp_for_candidate(self.candidate)
+
+    def test_known_changelog_endpoints(self):
+        for origin, root in (
+            ("Debian", "https://metadata.ftp-master.debian.org/changelogs"),
+            ("Ubuntu", "https://changelogs.ubuntu.com/changelogs/pool"),
+        ):
+            with self.subTest(origin=origin):
+                self.candidate.origins = [mock.Mock(origin=origin, component="main")]
+                self.candidate.source_name = "libexample"
+                self.candidate.source_version = "1:2.0-1"
+                self.assertEqual(
+                    _changelog_url(self.candidate),
+                    f"{root}/main/libe/libexample/libexample_2.0-1/changelog",
+                )
+                self.candidate.source_name = "example"
+                self.candidate.origins[0].component = "universe"
+                self.assertEqual(
+                    _changelog_url(self.candidate),
+                    f"{root}/universe/e/example/example_2.0-1/changelog",
+                )
+
+    async def test_matching_source_version_without_package_download(self):
+        body = self.changelog("3.0") + self.changelog()
+        self.assertEqual(await self.timestamp(body), self.date)
+        self.assertEqual(self.requests, [("GET", "/response-1")])
+
+    async def test_check_uses_changelog_date_without_release_link(self):
+        data = next(
+            data
+            for data in ManifestChecker(TEST_MANIFEST).get_external_data()
+            if not data.checker_data.get("source")
+        )
+        cache = mock.MagicMock()
+        cache.__getitem__.return_value.candidate = self.candidate
+        self.candidate.size = 123
+        self.candidate.record = {"SHA256": "1" * 64}
+        changelog_url = self.serve(self.changelog())
+        with (
+            mock.patch.object(
+                self.checker,
+                "_load_repo",
+                side_effect=lambda *a: contextlib.nullcontext(cache),
+            ),
+            mock.patch(
+                "src.checkers.debianrepochecker._changelog_url",
+                return_value=changelog_url,
+            ),
+        ):
+            await self.checker.check(data)
+            self.assertIsNone(data.new_release_url)
+            self.assertEqual(data.new_version.timestamp, self.date)
+            self.assertEqual(self.requests, [("GET", "/response-1")])
+
+            self.responses["/response-1"] = {"status": 404}
+            await self.checker.check(data)
+            self.assertIsNone(data.new_release_url)
+            self.assertEqual(data.new_version.timestamp, self.http_date)
+
+    async def test_epoch_is_preserved_when_matching(self):
+        self.candidate.source_version = "1:2.0"
+        self.assertEqual(await self.timestamp(self.changelog("1:2.0")), self.date)
+
+    async def test_unavailable_changelogs_use_http_timestamp(self):
+        for body in (
+            b"",
+            b"upstream release notes",
+            self.changelog("1.0"),
+            self.changelog().replace(b"source-package", b"other-package"),
+            self.changelog(date="not a date") + self.changelog("1.0"),
+            self.changelog(date="Tue, 20 Oct 2026 12:00:00"),
+            b"x" * (1024 * 1024 + 1),
+        ):
+            with self.subTest(body_length=len(body)):
+                self.requests.clear()
+                self.assertEqual(await self.timestamp(body), self.http_date)
+                self.assertEqual(
+                    [method for method, _ in self.requests], ["GET", "HEAD"]
+                )
+
+    async def test_unknown_repository_only_uses_package_head(self):
+        for origins in ([], [mock.Mock(origin="Vendor", component="main")]):
+            with self.subTest(origins=origins):
+                self.requests.clear()
+                self.candidate.origins = origins
+                self.assertEqual(
+                    await self.checker._get_timestamp_for_candidate(self.candidate),
+                    self.http_date,
+                )
+                self.assertEqual(self.requests, [("HEAD", "/response-0")])
+
+    async def test_download_errors_fall_back_but_cancellation_propagates(self):
+        for error in (
+            aiohttp.ClientConnectionError(),
+            asyncio.TimeoutError(),
+            asyncio.CancelledError(),
+        ):
+            with self.subTest(error=error):
+                self.requests.clear()
+                with mock.patch.object(self.http, "get", side_effect=error):
+                    if isinstance(error, asyncio.CancelledError):
+                        with self.assertRaises(asyncio.CancelledError):
+                            await self.timestamp(b"deb")
+                        self.assertEqual(self.requests, [])
+                    else:
+                        self.assertEqual(await self.timestamp(b"deb"), self.http_date)
+                        self.assertEqual(
+                            [method for method, _ in self.requests], ["HEAD"]
+                        )
+
+    async def test_chunked_download_stops_at_limit(self):
+        async def chunks(size):
+            yield b"x" * 100
+            yield b"x"
+            self.fail("Download continued beyond the limit")
+
+        response = mock.Mock(content_length=None)
+        response.content.iter_chunked = chunks
+        request = mock.MagicMock()
+        request.__aenter__.return_value = response
+        with (
+            mock.patch.object(self.http, "get", return_value=request),
+            mock.patch("src.checkers.debianrepochecker.MAX_CHANGELOG_SIZE", 100),
+        ):
+            self.assertEqual(await self.timestamp(b"deb"), self.http_date)
+
+    async def test_missing_changelog_uses_package_head(self):
+        url = str(self.server.make_url("/missing-changelog"))
+        with mock.patch(
+            "src.checkers.debianrepochecker._changelog_url", return_value=url
+        ):
+            self.assertEqual(
+                await self.checker._get_timestamp_for_candidate(self.candidate),
+                self.http_date,
+            )
+        self.assertEqual(
+            self.requests, [("GET", "/missing-changelog"), ("HEAD", "/response-0")]
+        )
+
+    async def test_robots_blocked_changelog_uses_package_head(self):
+        robots = mock.Mock()
+        robots.ensure_allowed = mock.AsyncMock(
+            side_effect=[CheckerFetchError("Blocked by robots.txt"), None]
+        )
+        self.checker.robots_cache = robots
+        self.assertEqual(await self.timestamp(self.changelog()), self.http_date)
+        self.assertEqual(self.requests, [("HEAD", "/response-0")])
+        self.assertEqual(robots.ensure_allowed.await_count, 2)
 
 
 if __name__ == "__main__":
