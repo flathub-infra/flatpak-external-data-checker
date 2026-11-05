@@ -25,6 +25,7 @@ import builtins
 import dataclasses
 import datetime
 import logging
+import math
 import typing as t
 from enum import Enum, IntFlag
 
@@ -528,9 +529,9 @@ class ExternalGitRepo(ExternalBase):
         assert data_type == cls.type, data_type
         url = source["url"]
         repo_name = cls._name_from_url(url)
-        commit = source.get("commit")
-        tag = source.get("tag")
-        branch = source.get("branch")
+        commit = _git_revision(source.get("commit"))
+        tag = _git_revision(source.get("tag"))
+        branch = _git_revision(source.get("branch"))
         checker_data = source.get("x-checker-data", {})
         arches = checker_data.get("arches") or source.get("only-arches") or ["x86_64"]
 
@@ -566,3 +567,15 @@ class ExternalGitRepo(ExternalBase):
                 self.source["branch"] = self.new_version.branch
             else:
                 self.source.pop("branch", None)
+
+
+def _git_revision(value: object) -> str | None:
+    # Unquoted YAML revisions can be numeric. Normalize the state, not the
+    # manifest, so an unchanged revision does not produce a formatting update.
+    if value is None or isinstance(value, str):
+        return value
+    if not isinstance(value, bool) and (
+        isinstance(value, int) or (isinstance(value, float) and math.isfinite(value))
+    ):
+        return str(value)
+    raise SourceLoadError("Git revisions must be strings or finite numbers")

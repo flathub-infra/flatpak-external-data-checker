@@ -2,6 +2,7 @@ import unittest
 
 from src.lib.releaselinks import (
     api_release_url,
+    comparison_url,
     download_comparison_url,
     download_release_url,
     github_release_api_url,
@@ -9,6 +10,32 @@ from src.lib.releaselinks import (
 
 
 class TestReleaseLinks(unittest.TestCase):
+    def test_comparison_revisions(self):
+        repo = "https://github.com/owner/app.git"
+        for old, new, expected in (
+            ("1.0", "1.0", None),
+            ("1.0", "2.0", "1.0...2.0"),
+            ("abc", "def", "abc...def"),
+            ("release/1", "release/2", "release%2F1...release%2F2"),
+            (1.0, "1.0", None),
+            (1.0, "2.0", None),
+            ("1.0", 2.0, None),
+        ):
+            with self.subTest(old=old, new=new):
+                self.assertEqual(
+                    comparison_url(repo, old, new),
+                    f"https://github.com/owner/app/compare/{expected}"
+                    if expected
+                    else None,
+                )
+        for revision in (None, "", False, 0, 1.0, [], {}, b"v1", object()):
+            with self.subTest(revision=revision):
+                self.assertIsNone(comparison_url(repo, revision, "v2"))
+                self.assertIsNone(comparison_url(repo, "v1", revision))
+                self.assertIsNone(github_release_api_url(repo, revision))
+        for repo in ("https://example.org/owner/app", "https://[invalid", ""):
+            self.assertIsNone(comparison_url(repo, "v1", "v2"))
+
     def test_download_comparison_with_release_route_in_namespace(self):
         for repo, download, suffix, compare in (
             (

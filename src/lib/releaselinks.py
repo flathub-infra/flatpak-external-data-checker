@@ -15,8 +15,8 @@ def http_url(value: object) -> str | None:
     return None
 
 
-def github_release_api_url(repository_url: str, tag: str) -> str | None:
-    if not http_url(repository_url):
+def github_release_api_url(repository_url: str, tag: object) -> str | None:
+    if not isinstance(tag, str) or not tag or not http_url(repository_url):
         return None
     parsed = urlsplit(repository_url)
     if parsed.netloc.lower() != "github.com":
@@ -51,7 +51,9 @@ def download_release_url(url: str) -> str | None:
     return None
 
 
-def comparison_url(repository_url: str, old: str, new: str) -> str | None:
+def comparison_url(repository_url: str, old: object, new: object) -> str | None:
+    if not isinstance(old, str) or not isinstance(new, str):
+        return None
     if not old or not new or old == new or not http_url(repository_url):
         return None
     parsed = urlsplit(repository_url)

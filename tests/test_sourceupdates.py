@@ -1,11 +1,84 @@
 import unittest
 
 from src.lib.checksums import MultiDigest
+from src.lib.errors import SourceLoadError
 from src.lib.externaldata import BuilderModule, ExternalBase
 from src.lib.sourceupdates import SourceUpdate, format_source_updates
 
 
 class TestSourceUpdates(unittest.TestCase):
+    def test_numeric_git_revisions(self):
+        for field in ("tag", "commit", "branch"):
+            for value in (0, 123, 1.0):
+                with self.subTest(field=field, value=value):
+                    source = {
+                        "type": "git",
+                        "url": "https://github.com/owner/app.git",
+                        field: value,
+                    }
+                    data = ExternalBase.from_source("test.yml", source)
+                    self.assertEqual(getattr(data.current_version, field), str(value))
+                    self.assertEqual(source[field], value)
+                    new = data.current_version._replace(**{field: str(value)})
+                    data.set_new_version(new)
+                    self.assertIsNone(data.new_version)
+                    self.assertTrue(data.current_version.is_same_version(new))
+                    data.new_version = new._replace(**{field: "456"})
+                    update = SourceUpdate.from_source(data)
+                    self.assertEqual(
+                        update.comparison_url,
+                        f"https://github.com/owner/app/compare/{value}...456"
+                        if field in ("tag", "commit")
+                        else None,
+                    )
+                    data.update()
+                    self.assertEqual(source[field], "456")
+
+    def test_unsupported_git_revisions(self):
+        for field in ("tag", "commit", "branch"):
+            for value in (True, False, [], {}, float("inf"), float("nan")):
+                with self.subTest(field=field, value=value):
+                    with self.assertRaises(SourceLoadError):
+                        ExternalBase.from_source(
+                            "test.yml",
+                            {
+                                "type": "git",
+                                "url": "https://github.com/o/r",
+                                field: value,
+                            },
+                        )
+
+    def test_git_missing_revisions_and_same_numeric_tag(self):
+        for repo in ("https://github.com/owner/app.git", "https://example.org/app.git"):
+            with self.subTest(repo=repo):
+                data = ExternalBase.from_source(
+                    "test.yml", {"type": "git", "url": repo}
+                )
+                data.new_version = data.current_version._replace(tag="v2")
+                update = SourceUpdate.from_source(data)
+                self.assertEqual(update.old_version, "unknown")
+                self.assertIsNone(update.comparison_url)
+                self.assertIsNone(update.release_url)
+
+                data = ExternalBase.from_source(
+                    "test.yml",
+                    {"type": "git", "url": repo, "tag": 1.0, "commit": "abc"},
+                )
+                data.set_new_version(
+                    data.current_version._replace(
+                        tag="1.0", commit="def", version="1.0"
+                    )
+                )
+                self.assertTrue(data.state & data.State.BROKEN)
+                self.assertFalse(data.state & data.State.OUTDATED)
+                self.assertFalse(data.has_version_changed)
+                self.assertEqual(
+                    SourceUpdate.from_source(data).comparison_url,
+                    "https://github.com/owner/app/compare/abc...def"
+                    if "github.com" in repo
+                    else None,
+                )
+
     def test_source_names(self):
         for module_name, filename, expected in (
             ("ostree", "ostree", "ostree"),
