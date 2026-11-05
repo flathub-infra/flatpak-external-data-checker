@@ -54,7 +54,7 @@ CHECKER_DATA_SCHEMA_COMMON: dict[str, t.Any] = {
             "type": "array",
             "items": {"type": "string"},
         },
-        "source-id": {"type": "string"},
+        "source-id": {"type": "string", "minLength": 1},
         "parent-id": {"type": "string"},
     },
     "required": ["type"],
