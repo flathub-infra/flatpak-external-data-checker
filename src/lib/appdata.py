@@ -25,6 +25,7 @@ missing.
 
 import io
 import typing as t
+from pathlib import Path
 from typing import TypeAlias
 
 import lxml.etree as ElementTree
@@ -54,6 +55,19 @@ def _fill_padding(ele: XMLElement, indent: str = DEFAULT_INDENT):
         ele.tail = "\n" + indent * (level - 1)
 
 
+def _trailing_whitespace(data: bytes | str, encoding: str) -> bytes:
+    if isinstance(data, str):
+        text = data
+    else:
+        # Without an XML declaration, docinfo may report UTF-8 despite a BOM.
+        if data.startswith((b"\xff\xfe\x00\x00", b"\x00\x00\xfe\xff")):
+            encoding = "utf-32"
+        elif data.startswith((b"\xff\xfe", b"\xfe\xff")):
+            encoding = "utf-16"
+        text = data.decode(encoding)
+    return text[len(text.rstrip(" \t\r\n")) :].encode("utf-8")
+
+
 def add_release(
     src: t.IO | str,
     dst: t.IO | str,
@@ -62,8 +76,12 @@ def add_release(
     release_url_template: str | None,
     release_url: str | None = None,
 ):
+    data = Path(src).read_bytes() if isinstance(src, str) else src.read()
+
     parser = ElementTree.XMLParser(load_dtd=False, resolve_entities=False)
-    tree = ElementTree.parse(src, parser=parser)
+    source = io.StringIO(data) if isinstance(data, str) else io.BytesIO(data)
+    tree = ElementTree.parse(source, parser=parser)
+    trailing_whitespace = _trailing_whitespace(data, tree.docinfo.encoding)
     root = tree.getroot()
 
     releases = root.find("releases")
@@ -108,14 +126,20 @@ def add_release(
     description.tail = releases.text
     release.append(description)
 
-    tree.write(
-        dst,
+    output = ElementTree.tostring(
+        tree,
         # XXX: lxml uses single quotes for doctype line if generated with
         # xml_declaration=True,
         doctype='<?xml version="1.0" encoding="UTF-8"?>',
         encoding="utf-8",
         pretty_print=True,
     )
+    # Parsing discards document-level whitespace; restore it after pretty printing.
+    output = output.rstrip(b" \t\r\n") + trailing_whitespace
+    if isinstance(dst, str):
+        Path(dst).write_bytes(output)
+    else:
+        dst.write(output)
 
 
 def add_release_to_file(

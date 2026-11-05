@@ -19,6 +19,8 @@
 
 import unittest
 from io import BytesIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from lxml import etree
 
@@ -49,8 +51,37 @@ class TestAddRelease(unittest.TestCase):
         in_ = BytesIO(before.encode())
         out = BytesIO()
         add_release(in_, out, "4.5.6", "2020-02-02", None)
-        # FIXME lxml pretty print always adds trailing newline
-        self.assertMultiLineEqual(expected + "\n", out.getvalue().decode())
+        self.assertMultiLineEqual(expected, out.getvalue().decode())
+
+    def test_trailing_whitespace(self):
+        before = "<component/>"
+        expected = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            "<component>\n"
+            "  <releases>\n"
+            '    <release version="4.5.6" date="2020-02-02">\n'
+            "      <description></description>\n"
+            "    </release>\n"
+            "  </releases>\n"
+            "</component>"
+        )
+        for suffix in ("", "\n", "\n\n", "\r\n", " \t\n"):
+            with self.subTest(suffix=suffix):
+                self._do_test(before + suffix, expected + suffix)
+                out = BytesIO()
+                add_release(
+                    BytesIO((before + suffix).encode("utf-16")),
+                    out,
+                    "4.5.6",
+                    "2020-02-02",
+                    None,
+                )
+                self.assertEqual(out.getvalue(), (expected + suffix).encode())
+                with TemporaryDirectory() as directory:
+                    path = Path(directory) / "appdata.xml"
+                    path.write_bytes((before + suffix).encode())
+                    add_release(str(path), str(path), "4.5.6", "2020-02-02", None)
+                    self.assertEqual(path.read_bytes(), (expected + suffix).encode())
 
     def test_simple(self):
         self._do_test(
@@ -403,7 +434,7 @@ SentUpstream: 2014-05-22
             "2020-02-02",
             "https://example.org/changelog.html#version_$version",
         )
-        self.assertMultiLineEqual(expected + "\n", out.getvalue().decode())
+        self.assertMultiLineEqual(expected, out.getvalue().decode())
 
 
 if __name__ == "__main__":
