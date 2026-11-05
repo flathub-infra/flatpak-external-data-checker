@@ -75,11 +75,7 @@ class TestAddRelease(unittest.TestCase):
             """.strip(),
         )
 
-    @unittest.expectedFailure
     def test_four_space_no_releases_element(self):
-        # FIXME: This ends up indenting <releases> correctly, but
-        # <release> and <description> incorrectly get the default 2-space
-        # indent.
         self._do_test(
             """
 <?xml version="1.0" encoding="UTF-8"?>

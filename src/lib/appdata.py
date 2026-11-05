@@ -34,7 +34,7 @@ XMLElement: TypeAlias = ElementTree._Element
 DEFAULT_INDENT = "  "
 
 
-def _fill_padding(ele: XMLElement):
+def _fill_padding(ele: XMLElement, indent: str = DEFAULT_INDENT):
     parent = ele.getparent()
     assert parent is not None
     index = parent.index(ele)
@@ -45,13 +45,13 @@ def _fill_padding(ele: XMLElement):
                 ele.tail = parent[index - 1].tail
                 parent[index - 1].tail = parent[index - 2].tail
             else:
-                ele.tail = "\n" + DEFAULT_INDENT * (level - 1)
+                ele.tail = "\n" + indent * (level - 1)
                 parent[index - 1].tail = parent.text
         else:
             ele.tail = parent.text
     else:
-        parent.text = "\n" + DEFAULT_INDENT * level
-        ele.tail = "\n" + DEFAULT_INDENT * (level - 1)
+        parent.text = "\n" + indent * level
+        ele.tail = "\n" + indent * (level - 1)
 
 
 def add_release(
@@ -73,9 +73,16 @@ def add_release(
         root.append(releases)
         _fill_padding(releases)
 
+    # Use the indentation before <releases> when it has no children to copy.
+    previous = releases.getprevious()
+    padding = previous.tail if previous is not None else root.text
+    indent = DEFAULT_INDENT
+    if padding and padding.isspace():
+        indent = padding.rsplit("\n", 1)[-1] or DEFAULT_INDENT
+
     release = ElementTree.Element("release", version=version, date=date)
     releases.insert(0, release)
-    _fill_padding(release)
+    _fill_padding(release, indent)
 
     # Indent the opening <description> tag one level
     # deeper than the <release> tag.
