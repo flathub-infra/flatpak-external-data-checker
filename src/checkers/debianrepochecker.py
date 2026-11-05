@@ -30,7 +30,9 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import asyncio
 import contextlib
+import datetime as dt
 import logging
 import os
 import re
@@ -41,6 +43,7 @@ import urllib.parse
 import apt
 import apt_pkg
 
+from ..lib import HTTP_CHUNK_SIZE, NETWORK_ERRORS
 from ..lib.checksums import MultiDigest
 from ..lib.errors import CheckerFetchError, CheckerQueryError
 from ..lib.externaldata import ExternalBase, ExternalFile
@@ -68,6 +71,51 @@ DEB_HASH_MAP = {
 }
 
 LOG = logging.getLogger(__name__)
+
+# Only fetch standalone changelogs, never packages just to obtain a date.
+MAX_CHANGELOG_SIZE = 1024 * 1024
+
+
+def _changelog_timestamp(
+    contents: bytes | bytearray, package_name: str, version: str
+) -> dt.datetime | None:
+    matching = False
+    for line in contents.decode("utf-8", errors="replace").splitlines():
+        header = re.match(r"^(\S+) \(([^)]+)\) ", line)
+        if header:
+            matching = header[1] == package_name and header[2] == version
+        elif matching and (trailer := re.match(r"^ -- .+?  (.+)$", line)):
+            try:
+                return dt.datetime.strptime(
+                    trailer[1], "%a, %d %b %Y %H:%M:%S %z"
+                ).astimezone(dt.timezone.utc)
+            except ValueError:
+                return None
+    return None
+
+
+def _changelog_url(candidate: apt.package.Version) -> str | None:
+    # python-apt's Package.get_changelog also recognizes Debian and Ubuntu,
+    # but uses blocking I/O and does not bound the response size. Use the same
+    # source-package layout with our shared HTTP session instead.
+    origin = next(iter(candidate.origins), None)
+    if origin is None:
+        return None
+    roots = {
+        "Debian": "https://metadata.ftp-master.debian.org/changelogs",
+        "Ubuntu": "https://changelogs.ubuntu.com/changelogs/pool",
+    }
+    root = roots.get(origin.origin)
+    if root is None or not origin.component:
+        return None
+    name = candidate.source_name
+    version = re.sub(r"^\d+:", "", candidate.source_version)
+    prefix = name[:4] if name.startswith("lib") else name[:1]
+    path = "/".join(
+        urllib.parse.quote(part, safe="")
+        for part in (origin.component, prefix, name, f"{name}_{version}", "changelog")
+    )
+    return f"{root}/{path}"
 
 
 def read_deb_hashes(deb_hashes: apt_pkg.HashStringList) -> MultiDigest:
@@ -206,17 +254,51 @@ class DebianRepoChecker(Checker):
         arches = {"x86_64": "amd64", "arm": "armel", "aarch64": "arm64"}
         return arches.get(arch, arch)
 
-    async def _get_timestamp_for_candidate(self, candidate: apt.Version):
-        # TODO: fetch package, parse changelog, get the date from there. python-apt can
-        # fetch changelogs from Debian and Ubuntu's changelog server, but most packages
-        # this checker will be used for are not from these repos. We'd have to open-code
-        # it.
-        # https://salsa.debian.org/apt-team/python-apt/blob/master/apt/package.py#L1245-1417
+    async def _get_timestamp_for_candidate(
+        self, candidate: apt.package.Version
+    ) -> dt.datetime:
         assert candidate.uri
+        changelog_url = _changelog_url(candidate)
+        if changelog_url is not None:
+            try:
+                timestamp = await self._get_changelog_timestamp(
+                    candidate, changelog_url
+                )
+                if timestamp is not None:
+                    return timestamp
+            except (
+                CheckerFetchError,
+                asyncio.TimeoutError,
+                *NETWORK_ERRORS,
+            ) as err:
+                LOG.debug("Changelog unavailable for %s: %s", candidate.uri, err)
         return await get_timestamp_from_url(
             candidate.uri,
             self.session,
             robots_cache=self.robots_cache,
+        )
+
+    async def _get_changelog_timestamp(
+        self, candidate: apt.package.Version, url: str
+    ) -> dt.datetime | None:
+        if self.robots_cache:
+            await self.robots_cache.ensure_allowed(url)
+        async with self.session.get(url) as response:
+            response.raise_for_status()
+            if self.robots_cache and str(response.url) != url:
+                await self.robots_cache.ensure_allowed(str(response.url))
+            if (
+                response.content_length is not None
+                and response.content_length > MAX_CHANGELOG_SIZE
+            ):
+                return None
+            contents = bytearray()
+            async for chunk in response.content.iter_chunked(HTTP_CHUNK_SIZE):
+                if len(contents) + len(chunk) > MAX_CHANGELOG_SIZE:
+                    return None
+                contents.extend(chunk)
+        return _changelog_timestamp(
+            contents, candidate.source_name, candidate.source_version
         )
 
     @contextlib.contextmanager

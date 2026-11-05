@@ -496,6 +496,9 @@ to, e.g. where "type": "extra-data" is declared):
 }
 ```
 
+For Debian and Ubuntu binary packages, the checker automatically uses changelogs
+for release dates when available. Otherwise, it falls back to HTTP timestamps.
+
 ### Anitya (release-monitoring) checker
 
 [Anitya](https://github.com/fedora-infra/anitya) is an upstream release monitoring
