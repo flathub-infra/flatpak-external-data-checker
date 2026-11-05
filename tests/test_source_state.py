@@ -68,6 +68,90 @@ class TestSourceFactories(unittest.TestCase):
             original._replace(unknown="field")
 
 
+class TestAppImageVersionChanges(unittest.TestCase):
+    def test_version_changes(self):
+        for source_type in ("file", "archive", "extra-data"):
+            for (
+                name,
+                filename,
+                changed_url,
+                changed_checksum,
+                current_version,
+                new_version,
+                expected,
+            ) in (
+                ("unchanged", "app.AppImage", False, False, None, "1", False),
+                ("mirror", "app.AppImage", True, False, None, "1", False),
+                ("stable URL", "app.AppImage", False, True, None, "2", True),
+                ("new URL", "app.AppImage", True, True, None, "2", True),
+                ("rebuild", "app.AppImage", False, True, "1", "1", False),
+                ("known version", "app.AppImage", False, True, "1", "2", True),
+                ("no version", "app.AppImage", True, True, None, None, False),
+                ("ordinary stable URL", "app.tar.gz", False, True, None, "2", False),
+                ("ordinary new URL", "app.tar.gz", True, True, None, "2", True),
+            ):
+                with self.subTest(source_type=source_type, case=name):
+                    data = ExternalData.from_source(
+                        "source.json",
+                        {
+                            "type": source_type,
+                            "url": f"https://example.org/{filename}",
+                            "sha256": "abc",
+                            "size": 123,
+                        },
+                    )
+                    self.assertFalse(data.has_version_changed)
+                    data.current_version = data.current_version._replace(
+                        version=current_version
+                    )
+                    data.new_version = data.current_version._replace(
+                        url=f"https://example.org/new/{filename}"
+                        if changed_url
+                        else data.current_version.url,
+                        checksum=MultiDigest(
+                            md5="extra digest",
+                            sha256="def" if changed_checksum else "abc",
+                        ),
+                        version=new_version,
+                    )
+                    self.assertEqual(data.has_version_changed, expected)
+
+    def test_strongest_common_checksum_determines_content_change(self):
+        data = ExternalData.from_source(
+            "source.json",
+            {
+                "type": "file",
+                "url": "https://example.org/app.AppImage",
+                "sha256": "abc",
+                "sha512": "strong",
+            },
+        )
+        for sha256, sha512, expected in (
+            ("different", "strong", False),
+            ("abc", "different", True),
+            ("abc", None, False),
+        ):
+            with self.subTest(sha256=sha256, sha512=sha512):
+                data.new_version = data.current_version._replace(
+                    checksum=MultiDigest(sha256=sha256, sha512=sha512), version="1"
+                )
+                self.assertEqual(data.has_version_changed, expected)
+
+    def test_unchanged_content_with_changed_size_is_not_a_new_version(self):
+        data = ExternalData.from_source(
+            "source.json",
+            {
+                "type": "extra-data",
+                "url": "https://example.org/app.AppImage",
+                "sha256": "abc",
+                "size": 123,
+            },
+        )
+        data.set_new_version(data.current_version._replace(size=124, version="1.0"))
+        self.assertIsNotNone(data.new_version)
+        self.assertFalse(data.has_version_changed)
+
+
 class TestGitSourceUpdates(unittest.TestCase):
     def test_ref_transitions(self):
         refs = ({}, {"tag": "v1"}, {"branch": "stable"})
