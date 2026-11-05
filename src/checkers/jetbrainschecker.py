@@ -20,8 +20,10 @@ class JetBrainsChecker(Checker):
         "type": "object",
         "properties": {
             "code": {"type": "string"},
-            # TODO: add enum here
-            "release-type": {"type": "string"},
+            "release-type": {
+                "type": "string",
+                "enum": ["release", "eap", "rc", "preview"],
+            },
         },
         "required": ["code"],
     }
