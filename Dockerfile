@@ -2,14 +2,13 @@ FROM debian:trixie
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-ADD dependencies.apt.txt ./
+COPY dependencies.apt.txt /
 
-RUN sed -i "s/Types: deb/Types: deb deb-src/" /etc/apt/sources.list.d/debian.sources && \
-    apt-get update && \
+RUN apt-get update && \
     xargs apt-get install --no-install-recommends -y < dependencies.apt.txt && \
-    apt-get --no-install-recommends -y build-dep python3-apt && \
     apt-get clean && \
-    rmdir /var/cache/apt/archives/partial
+    rmdir /var/cache/apt/archives/partial && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY src /app/src
 COPY flatpak-external-data-checker /app/
