@@ -116,6 +116,7 @@ class ManifestChecker:
         self._errors: list[Exception]
         self._errors = []
         self.source_updates: list[SourceUpdate] = []
+        self._allowed_updates: set[int] | None = None
 
         # Initialize checkers
         self._checkers: list[type[Checker]]
@@ -481,11 +482,49 @@ class ManifestChecker:
             if data.State.BROKEN in data.state or data.new_version
         ]
 
+    def _can_update(self, data: ExternalBase) -> bool:
+        return data.new_version is not None and (
+            self._allowed_updates is None or id(data) in self._allowed_updates
+        )
+
+    def get_applied_external_data(self) -> list[ExternalBase]:
+        return [data for data in self.get_external_data() if self._can_update(data)]
+
+    def get_planned_updates(
+        self, allowed: list[ExternalBase] | None = None
+    ) -> list[ExternalBase]:
+        """Select writes without mutating sources or requiring GitHub access."""
+        sources = self.get_external_data()
+        allowed_ids = None if allowed is None else {id(data) for data in allowed}
+        updates = [
+            data
+            for data in sources
+            if data.new_version is not None
+            and (allowed_ids is None or id(data) in allowed_ids)
+        ]
+        if self.opts.require_important_update:
+            important = {
+                id(data)
+                for data in sources
+                if data.checker_data.get(IMPORTANT_SRC_PROP)
+                or (
+                    data.checker_data.get(MAIN_SRC_PROP)
+                    and data.checker_data.get(IMPORTANT_SRC_PROP) is not False
+                )
+            }
+            if important and not any(
+                id(data) in important and data.has_version_changed for data in updates
+            ):
+                return []
+        return updates
+
     def _update_manifest(self, path, datas, changes):
         path_has_changes = False
         for data in datas:
-            if data.new_version is None:
+            if not self._can_update(data):
                 continue
+
+            assert data.new_version is not None
 
             data_new_ver_version = data.new_version.version
 
@@ -544,7 +583,7 @@ class ManifestChecker:
         release_url_template = selected_data.checker_data.get(RELEASE_URL_TEMPLATE_PROP)
         last_update = selected_data.new_version
 
-        if selected_data.has_version_changed:
+        if self._can_update(selected_data) and selected_data.has_version_changed:
             assert last_update is not None
             log.info("Version changed, adding release to %s", appdata)
             if last_update.timestamp is None:
@@ -567,7 +606,7 @@ class ManifestChecker:
         else:
             log.debug("Version didn't change, not adding release")
 
-    def update_manifests(self) -> list[str]:
+    def update_manifests(self, allowed: list[ExternalBase] | None = None) -> list[str]:
         """Updates references to external data in manifests.
 
         If require_important_update is True, only update the manifest if at least one
@@ -579,37 +618,20 @@ class ManifestChecker:
         changes = OrderedDict()
         self.source_updates = []
 
-        found_important_update = None
+        self._allowed_updates = {id(data) for data in self.get_planned_updates(allowed)}
+        if not self._allowed_updates:
+            log.info("No eligible source updates, not updating manifest")
+            return []
 
-        if self.opts.require_important_update:
-            for data in self.get_external_data():
-                important = data.checker_data.get(IMPORTANT_SRC_PROP)
-                main = data.checker_data.get(MAIN_SRC_PROP)
-                if important or (main and important is not False):
-                    log.debug("Found an important source: %s", data)
-
-                    found_important_update = data.has_version_changed
-
-                    if found_important_update:
-                        log.info(
-                            "Update found for important source: %s, updating manifest",
-                            data,
-                        )
-                        break
-
-        if found_important_update or found_important_update is None:
-            for path, datas in self._external_data.items():
-                self._update_manifest(path, datas, changes)
-            if changes:
-                try:
-                    self._update_appdata()
-                except AppdataNotFound as err:
-                    log.info("Not updating appdata: %s", err)
-                except AppdataError as err:
-                    self._errors.append(err)
-                    log.error(err)
-
-        else:
-            log.info("No important source had an update, not updating manifest")
+        for path, datas in self._external_data.items():
+            self._update_manifest(path, datas, changes)
+        if changes:
+            try:
+                self._update_appdata()
+            except AppdataNotFound as err:
+                log.info("Not updating appdata: %s", err)
+            except AppdataError as err:
+                self._errors.append(err)
+                log.error(err)
 
         return list(changes)
