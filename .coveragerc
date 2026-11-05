@@ -1,5 +1,7 @@
 [run]
 source = src
+# Keep CLI subprocess results separate until CI runs coverage combine.
+parallel = True
 
 [report]
 exclude_lines =
