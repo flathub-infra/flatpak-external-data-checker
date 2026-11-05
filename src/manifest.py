@@ -351,6 +351,7 @@ class ManifestChecker:
                 data,
                 src_rel_path,
             )
+            data.checked.set()
             return data
         log.info(
             "Started check [%d/%d] %s (from %s)",
@@ -416,6 +417,16 @@ class ManifestChecker:
         """
         external_data: list[ExternalBase]
         external_data = sum(self._external_data.values(), [])
+        # Prepare every dependency before starting tasks. Unscheduled sources
+        # already have their final data for this run; children must not wait for
+        # them. Clear scheduled sources here to avoid stale events on rechecks.
+        for data in external_data:
+            if data.state == data.State.UNKNOWN and (
+                filter_type is None or data.type == filter_type
+            ):
+                data.checked.clear()
+            else:
+                data.checked.set()
         if filter_type is not None:
             external_data = [d for d in external_data if d.type == filter_type]
 
