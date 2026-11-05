@@ -18,7 +18,6 @@ python3-magic
 python3-packaging
 python3-pip
 python3-pyelftools
-python3-requests
 python3-ruamel.yaml
 python3-semver
 python3-setuptools
