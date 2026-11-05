@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.10, <4.0"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -732,7 +732,7 @@ dev = [
     { name = "ty", specifier = ">=0.0.97,<0.1" },
     { name = "types-jsonschema", specifier = ">=4.23.0.20240813,<5" },
     { name = "types-lxml", specifier = ">=2024.9.16,<2027" },
-    { name = "types-toml", specifier = "<0.10,<1" },
+    { name = "types-toml", specifier = "<0.11,<1" },
     { name = "typing-extensions", specifier = ">=4.6,<5" },
 ]
 
@@ -2310,11 +2310,11 @@ wheels = [
 
 [[package]]
 name = "types-toml"
-version = "0.1.5"
+version = "0.10.8.20260518"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/31/51/2f969e13d7b770eb7f4005cb0ca019878788e5cdafe70eb18549e89396e1/types-toml-0.1.5.tar.gz", hash = "sha256:fc5e1df92c245404e4360c63568e9f0e732b0cabea7a220a4788d52b78f5dc59", size = 1710, upload-time = "2021-08-08T18:21:52.614Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4b/11/6ece999e91f2ccb848ab4420f3f4816e78ac0541f739e6864affdaaa5737/types_toml-0.10.8.20260518.tar.gz", hash = "sha256:80e10facd24fdeda9d5c672187d72be3ac284843788d67f5aae59e3e016db6fe", size = 9419, upload-time = "2026-05-18T06:02:16.719Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d8/d1/7cd08fd610c8cecffc391ee1729cd0e413d58573cd3b6c82e05b2d4b10d8/types_toml-0.1.5-py3-none-any.whl", hash = "sha256:dd00526680595aad0eade682bd8a9e9513e9b4b8932daed159925fe446fc90a9", size = 2071, upload-time = "2021-08-08T18:21:51.79Z" },
+    { url = "https://files.pythonhosted.org/packages/91/25/489751806bf5c95e4007f8e17409199c54d31e49ffbea07c5729b1286c8e/types_toml-0.10.8.20260518-py3-none-any.whl", hash = "sha256:0e564ab05f6fde62a315b3b5a9b6624fda569399795d30a37e64705a70459303", size = 9669, upload-time = "2026-05-18T06:02:15.86Z" },
 ]
 
 [[package]]
