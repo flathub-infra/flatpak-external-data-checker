@@ -4,6 +4,7 @@ import copy
 import datetime as dt
 import os
 import unittest
+from types import SimpleNamespace
 from unittest import mock
 
 import aiohttp
@@ -92,6 +93,60 @@ class TestDebianRepoCheckerMocked(unittest.IsolatedAsyncioTestCase):
         logger = mock.MagicMock()
         progress = LoggerAcquireProgress(logger)
         progress._file.flush()
+
+    async def test_binary_hashes_from_public_record(self):
+        hashes = {
+            "MD5sum": "1" * 32,
+            "SHA1": "2" * 40,
+            "SHA256": "3" * 64,
+            "SHA512": "4" * 128,
+        }
+        cases = [hashes, *({key: value} for key, value in hashes.items())]
+        cases.extend([{"SHA512": hashes["SHA512"], "SHA256": ""}, {}, {"SHA256": ""}])
+        for fields in cases:
+            with self.subTest(fields=fields):
+                # Use python-apt's real parser, including case-insensitive field
+                # names. The candidate deliberately has no private/hash properties.
+                record = apt.package.Record(
+                    "Package: apt\nSize: 123\nSHA224: ignored\n"
+                    + "".join(f"{key}: {value}\n" for key, value in fields.items())
+                )
+                candidate = SimpleNamespace(
+                    record=record,
+                    uri="https://example.com/apt.deb",
+                    size=123,
+                    version="2.0",
+                )
+                cache = {"apt": SimpleNamespace(candidate=candidate)}
+                checker = DebianRepoChecker(mock.AsyncMock())
+                data = self._make_external_data()
+                with (
+                    mock.patch.object(checker, "should_check", return_value=True),
+                    mock.patch.object(
+                        checker,
+                        "_load_repo",
+                        return_value=contextlib.nullcontext(cache),
+                    ),
+                    mock.patch.object(
+                        checker, "_get_timestamp_for_candidate", return_value=None
+                    ),
+                ):
+                    if not any(fields.values()):
+                        with self.assertRaises(AssertionError):
+                            await checker.check(data)
+                        data.set_new_version.assert_not_called()
+                        continue
+                    await checker.check(data)
+                checksum = data.set_new_version.call_args.args[0].checksum
+                self.assertEqual(
+                    checksum._asdict(),
+                    {
+                        "md5": fields.get("MD5sum") or None,
+                        "sha1": fields.get("SHA1") or None,
+                        "sha256": fields.get("SHA256") or None,
+                        "sha512": fields.get("SHA512") or None,
+                    },
+                )
 
     async def test_check_returns_early(self):
         checker = DebianRepoChecker.__new__(DebianRepoChecker)
@@ -241,6 +296,7 @@ class TestDebianRepoCheckerErrors(unittest.IsolatedAsyncioTestCase):
                 candidate.uri = "http://example.com/working-2.deb"
                 candidate.version = "2.0"
                 candidate.size = 123
+                candidate.record = {"SHA256": "1" * 64}
                 self.cache_factory.side_effect = [bad_cache, good_cache]
 
                 with (
@@ -279,6 +335,7 @@ class TestDebianRepoCheckerTimestamps(unittest.IsolatedAsyncioTestCase):
         candidate.uri = self.url
         candidate.version = "2.0"
         candidate.size = 123
+        candidate.record = {"SHA256": "1" * 64}
         self.source_record = mock.MagicMock()
         self.source_record.version = "2.0"
         self.source_record.files = [

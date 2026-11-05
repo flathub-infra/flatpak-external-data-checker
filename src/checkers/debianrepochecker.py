@@ -179,13 +179,21 @@ class DebianRepoChecker(Checker):
                         f"No URI for package {package_name} in {root} for {arch}"
                     )
 
+                # Version.record exposes all Packages fields, including SHA512.
+                # Unlike the individual hash properties, missing fields are safe
+                # to query. Skip empty values, as PackageRecords.hashes does.
+                # https://apt-team.pages.debian.net/python-apt/library/apt.package.html#apt.package.Version.record
+                record = candidate.record
+                checksum = MultiDigest.from_source(
+                    {
+                        hash_type: value
+                        for field, hash_type in DEB_HASH_MAP.items()
+                        if (value := record.get(field))
+                    }
+                )
                 new_version = ExternalFile(
                     url=candidate.uri,
-                    # FIXME: apt.package.Version.{md5,sha1,sha256} can raise an
-                    # exception if given hash isn't set, while sha512 isn't accessible
-                    # at all. Raw hashes are handy, but accessible only through
-                    # protected property.
-                    checksum=read_deb_hashes(candidate._records.hashes),
+                    checksum=checksum,
                     size=candidate.size,
                     version=candidate.version,
                     timestamp=await self._get_timestamp_for_candidate(candidate),
