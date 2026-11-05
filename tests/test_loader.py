@@ -4,7 +4,7 @@ import random
 import string
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from src.lib.checksums import MultiDigest
 from src.lib.errors import ManifestLoadError, SourceLoadError
@@ -239,6 +239,103 @@ class TestManifestLoader(unittest.IsolatedAsyncioTestCase):
             ExternalGitRef("http://example.com", None, None, "a", None, None),
             ExternalGitRef("http://example.com", None, None, "b", None, None),
         )
+
+    @staticmethod
+    def _parent_source(ident, parent=None):
+        metadata = {"type": "dummy"}
+        if ident is not None:
+            metadata["source-id"] = ident
+        if parent is not None:
+            metadata["parent-id"] = parent
+        return {
+            "type": "git",
+            "url": f"https://example.com/{ident}.git",
+            "x-checker-data": metadata,
+        }
+
+    def test_parent_lookup_first_duplicate_wins(self):
+        sources = [
+            self._parent_source("child", "duplicate-git-1"),
+            self._parent_source(None),
+            self._parent_source("duplicate-git-1", "other"),
+            self._parent_source("other"),
+            self._parent_source("later-child", "duplicate-git-1"),
+        ]
+        data = self._load_manifest(
+            {"name": "duplicate", "sources": sources}
+        ).get_external_data()
+        self.assertIs(data[0].parent, data[1])
+        self.assertIs(data[2].parent, data[3])
+        self.assertIs(data[4].parent, data[1])
+
+    def test_parent_lookup_does_not_evaluate_unused_ids(self):
+        for sources in (
+            [self._parent_source(None)],
+            [
+                self._parent_source("parent"),
+                self._parent_source(None, "parent"),
+                self._parent_source(None, "parent"),
+            ],
+        ):
+            with self.subTest(sources=sources):
+                data = self._load_manifest(sources).get_external_data()
+                self.assertEqual(len(data), len(sources))
+                for child in data[1:]:
+                    self.assertIs(child.parent, data[0])
+
+    def test_parent_lookup_preserves_id_errors(self):
+        with self.assertRaisesRegex(SourceLoadError, "Can't get source id"):
+            self._load_manifest(
+                [
+                    self._parent_source(None),
+                    self._parent_source("child", "parent"),
+                    self._parent_source("parent"),
+                ]
+            )
+
+    def test_parent_lookup_missing_id(self):
+        with self.assertRaisesRegex(
+            ManifestLoadError,
+            'Source git child.git: parent source with ID "missing" not found',
+        ):
+            self._load_manifest([self._parent_source("child", "missing")])
+
+    def test_parent_loops_and_error_order(self):
+        for edges, culprit in (
+            ([("self", "self")], "self"),
+            ([("a", "b"), ("b", "c"), ("c", "a")], "c"),
+            ([("tail", "a"), ("a", "b"), ("b", "a")], "b"),
+        ):
+            with self.subTest(edges=edges):
+                # A later missing parent must not mask an earlier loop.
+                sources = [self._parent_source(*edge) for edge in edges]
+                sources.append(self._parent_source("missing", "absent"))
+                with self.assertRaisesRegex(
+                    ManifestLoadError,
+                    f"Source git {culprit}.git: inheritance loop detected",
+                ):
+                    self._load_manifest(sources)
+
+    def test_parent_chains_in_both_orders(self):
+        sources = [self._parent_source("0")]
+        sources.extend(self._parent_source(str(i), str(i - 1)) for i in range(1, 150))
+        for ordered in (sources, sources[::-1]):
+            with self.subTest(first=ordered[0]):
+                data = self._load_manifest(ordered).get_external_data()
+                by_id = {source.ident: source for source in data}
+                self.assertIsNone(by_id["0"].parent)
+                for i in range(1, len(data)):
+                    self.assertIs(by_id[str(i)].parent, by_id[str(i - 1)])
+
+    def test_parent_lookup_evaluates_each_id_once(self):
+        sources = [self._parent_source(str(i), "parent") for i in range(100)]
+        sources.append(self._parent_source("parent"))
+        counted_ident = Mock(wraps=BuilderSource.ident.fget)
+        with patch.object(BuilderSource, "ident", property(counted_ident)):
+            data = self._load_manifest(sources).get_external_data()
+        self.assertEqual(counted_ident.call_count, len(sources))
+        for child in data[:-1]:
+            self.assertIs(child.parent, data[-1])
 
     def test_load(self):
         manifest = self._load_manifest(TEST_MANIFEST_DATA)
