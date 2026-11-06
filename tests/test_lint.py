@@ -489,8 +489,10 @@ class TestLint(unittest.TestCase):
         self.assertIn(
             "url-template", AnityaChecker.get_json_schema(ArchiveSource)["required"]
         )
-        self.assertIn(
-            "tag-template", AnityaChecker.get_json_schema(ExternalGitRepo)["required"]
+        git_schema = AnityaChecker.get_json_schema(ExternalGitRepo)
+        self.assertEqual(git_schema["required"], ["project-id"])
+        self.assertEqual(
+            git_schema["properties"]["tag-template"]["default"], "$original_version"
         )
 
     def test_named_source_is_not_a_module(self):
