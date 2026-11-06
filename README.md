@@ -546,7 +546,21 @@ Set `stable-only` to `false` to include releases that Anitya marks as unstable.
 
 The [`versions`](#version-constraining) property is supported.
 
-For git type sources, instead of `url-template`, set `tag-template` to derive git tag from version.
+For Git sources, the original Anitya version is used as the tag by default:
+
+```json
+"x-checker-data": {
+    "type": "anitya",
+    "project-id": 1353
+}
+```
+
+This preserves tag prefixes such as `v` when present. `stable-only` and
+`versions` still select the normalized version.
+
+Set `tag-template` to override the default. `$version` is the normalized version;
+`$original_version` is the original spelling, for example
+`"tag-template": "release-$original_version"`.
 
 ### GNOME checker
 
