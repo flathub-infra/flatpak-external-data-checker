@@ -220,6 +220,117 @@ class TestManifest(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(reloaded.current_version.tag, new_tag)
                     self.assertEqual(reloaded.current_version.commit, commit)
 
+    async def test_yaml_date_git_tag_updates(self):
+        repo = "https://github.com/google/re2"
+        commit = "a" * 40
+        path = os.path.join(self.test_dir.name, "test.yml")
+        for yaml_tag in ("2024-07-02", '"2024-07-02"'):
+            for new_tag in ("2024-07-02", "2024-07-03"):
+                with self.subTest(yaml_tag=yaml_tag, new_tag=new_tag):
+                    contents = (
+                        "name: re2\nsources:\n"
+                        f"  - type: git\n    url: {repo}.git\n"
+                        f"    tag: {yaml_tag}\n    commit: {commit}\n"
+                        "    x-checker-data:\n      type: git\n"
+                        "      tag-pattern: ^(.+)$\n"
+                    )
+                    with open(path, "w") as f:
+                        f.write(contents)
+                    checker = manifest.ManifestChecker(path)
+                    self.assertEqual(len(checker.get_external_data()), 1)
+                    data = checker.get_external_data()[0]
+                    self.assertEqual(data.current_version.tag, "2024-07-02")
+                    with (
+                        patch(
+                            "src.checkers.gitchecker.git_ls_remote",
+                            return_value={f"refs/tags/{new_tag}": commit},
+                        ),
+                        patch.object(GitChecker, "_get_json", return_value={}),
+                    ):
+                        async with aiohttp.ClientSession() as session:
+                            await GitChecker(session).check(data)
+                    changes = checker.update_manifests()
+                    if new_tag == "2024-07-02":
+                        self.assertEqual(changes, [])
+                        self.assertEqual(checker.source_updates, [])
+                        self.assertIsNone(data.new_version)
+                        self.assertFalse(data.has_version_changed)
+                        with open(path) as f:
+                            self.assertEqual(f.read(), contents)
+                    else:
+                        self.assertEqual(len(changes), 1)
+                        update = checker.source_updates[0]
+                        self.assertEqual(
+                            update.old_version,
+                            f"tag 2024-07-02, commit {commit[:12]}",
+                        )
+                        self.assertEqual(
+                            update.comparison_url,
+                            f"{repo}/compare/2024-07-02...2024-07-03",
+                        )
+                        reloaded = manifest.ManifestChecker(path).get_external_data()[0]
+                        self.assertEqual(reloaded.current_version.tag, new_tag)
+                        self.assertEqual(reloaded.current_version.commit, commit)
+
+    def test_yaml_git_revision_types(self):
+        path = os.path.join(self.test_dir.name, "test.yml")
+        for field in ("tag", "branch", "commit"):
+            for scalar, expected in (
+                ("2024-07-02", "2024-07-02"),
+                ("!!timestamp 2024-07-02", "2024-07-02"),
+                ("0001-01-01", "0001-01-01"),
+                ("9999-12-31", "9999-12-31"),
+                ('"2024-07-02T00:00:00Z"', "2024-07-02T00:00:00Z"),
+                ("null", None),
+                ("0", "0"),
+                ("1.0", "1.0"),
+            ):
+                with self.subTest(field=field, scalar=scalar):
+                    with open(path, "w") as f:
+                        f.write(
+                            "name: re2\nsources:\n  - type: git\n"
+                            "    url: https://github.com/google/re2.git\n"
+                            f"    {field}: {scalar}\n"
+                        )
+                    checker = manifest.ManifestChecker(path)
+                    self.assertEqual(len(checker.get_external_data()), 1)
+                    data = checker.get_external_data()[0]
+                    self.assertEqual(getattr(data.current_version, field), expected)
+
+    def test_yaml_unsupported_git_revision_types(self):
+        path = os.path.join(self.test_dir.name, "test.yml")
+        for field in ("tag", "branch", "commit"):
+            for scalar in (
+                "2024-07-02T00:00:00Z",
+                "2024-07-02 00:00:00",
+                "2024-07-02t01:02:03.123+02:30",
+                "!!timestamp 2024-7-2",
+                "!!timestamp 2024-07-2",
+                "!!timestamp 2024-7-02",
+                "true",
+                "false",
+                "[]",
+                "{}",
+                ".inf",
+                "-.inf",
+                ".nan",
+            ):
+                with self.subTest(field=field, scalar=scalar):
+                    contents = (
+                        "name: re2\nsources:\n  - type: git\n"
+                        "    url: https://github.com/google/re2.git\n"
+                        f"    {field}: {scalar}\n"
+                    )
+                    with open(path, "w") as f:
+                        f.write(contents)
+                    with self.assertLogs("src.manifest", level="ERROR") as logs:
+                        checker = manifest.ManifestChecker(path)
+                    self.assertIn("Git revisions must be", logs.output[0])
+                    self.assertEqual(checker.get_external_data(), [])
+                    self.assertEqual(checker.update_manifests(), [])
+                    with open(path) as f:
+                        self.assertEqual(f.read(), contents)
+
     def test_update_appdata_not_found(self):
         with open(self.mf_path, "w") as f:
             json.dump({"id": "org.test.App"}, f)

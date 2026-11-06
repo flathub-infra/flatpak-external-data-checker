@@ -839,6 +839,19 @@ class TestDumpManifest(unittest.TestCase):
         dump_manifest({"url": url}, path)
         self.assertEqual(path.read_text(), f"url: {url}\n")
 
+    def test_noncanonical_yaml_date_spelling_survives_write(self):
+        path = Path(self.tmpdir.name) / "test.yaml"
+        original = "date: !!timestamp 2024-7-2\n"
+        path.write_text(original)
+        contents, header = utils.read_manifest(path)
+        contents["name"] = "updated"
+        dump_manifest(contents, path, has_yaml_header=header)
+        self.assertEqual(
+            path.read_text(), "date: !!timestamp '2024-7-2'\nname: updated\n"
+        )
+        reloaded, _ = utils.read_manifest(path)
+        self.assertEqual(reloaded["date"].value, "2024-7-2")
+
     def test_yaml_width_is_per_manifest(self):
         contents = {"description": " ".join(["word"] * 12)}
         default_output = "description: " + contents["description"] + "\n"

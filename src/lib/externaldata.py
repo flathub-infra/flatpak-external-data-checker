@@ -570,12 +570,15 @@ class ExternalGitRepo(ExternalBase):
 
 
 def _git_revision(value: object) -> str | None:
-    # Unquoted YAML revisions can be numeric. Normalize the state, not the
-    # manifest, so an unchanged revision does not produce a formatting update.
+    # Keep normalization in source state so unchanged manifests are not rewritten.
     if value is None or isinstance(value, str):
         return value
+    # The manifest loader only constructs dates with YYYY-MM-DD spelling.
+    # Timestamps can lose their original spelling, so they must be quoted.
+    if isinstance(value, datetime.date) and not isinstance(value, datetime.datetime):
+        return value.isoformat()
     if not isinstance(value, bool) and (
         isinstance(value, int) or (isinstance(value, float) and math.isfinite(value))
     ):
         return str(value)
-    raise SourceLoadError("Git revisions must be strings or finite numbers")
+    raise SourceLoadError("Git revisions must be strings, dates or finite numbers")
