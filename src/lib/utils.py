@@ -45,6 +45,8 @@ import magic
 from elftools.elf.elffile import ELFFile
 from packaging.version import Version
 from ruamel.yaml import YAML
+from ruamel.yaml.comments import TaggedScalar
+from ruamel.yaml.constructor import RoundTripConstructor
 from ruamel.yaml.emitter import RoundTripEmitter
 
 from . import HTTP_CHUNK_SIZE, NETWORK_ERRORS, OPERATORS, TIMEOUT_CONNECT, externaldata
@@ -683,7 +685,26 @@ class _ManifestEmitter(RoundTripEmitter):
             end += 1
 
 
+class _ManifestConstructor(RoundTripConstructor):
+    def construct_yaml_timestamp(self, node, values=None):
+        value = super().construct_yaml_timestamp(node, values)
+        # Explicit timestamps can spell dates as 2024-7-2. Keep that spelling
+        # available so Git revision validation can reject it instead of guessing.
+        if (
+            isinstance(value, dt.date)
+            and not isinstance(value, dt.datetime)
+            and node.value != value.isoformat()
+        ):
+            return TaggedScalar(value=node.value, style=node.style, tag=node.tag)
+        return value
+
+
+_ManifestConstructor.add_constructor(
+    "tag:yaml.org,2002:timestamp", _ManifestConstructor.construct_yaml_timestamp
+)
+
 _yaml = YAML()
+_yaml.Constructor = _ManifestConstructor
 _yaml.Emitter = _ManifestEmitter
 # ruamel preserves some formatting (such as comments and blank lines) but
 # not the indentation of the source file. These settings match the style
