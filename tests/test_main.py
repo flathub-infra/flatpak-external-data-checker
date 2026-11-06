@@ -582,12 +582,22 @@ class TestOpenPR(unittest.TestCase):
                             f"Automerge is {'enabled' if enabled else 'disabled'}", text
                         )
                         self.assertIn(f"is `{str(setting).lower()}`", text)
+                    elif enabled:
+                        self.assertIn("### Configuration", text)
+                        self.assertIn(
+                            "Automerge is enabled for this broken-source update",
+                            text,
+                        )
+                        self.assertIn("does not disable automatic merging", text)
+                        self.assertIn("to `false` in `flathub.json`", text)
                     else:
                         self.assertNotIn("### Configuration", text)
                         self.assertNotIn("Automerge", text)
                         self.assertNotIn("automerge-flathubbot-prs", text)
-                    if setting is True:
-                        self.assertIn("A later checker run", text)
+                    if enabled:
+                        self.assertIn(
+                            "The checker can merge this PR on a later run", text
+                        )
                         self.assertIn("Repository rules and token permissions", text)
 
                     pr = MagicMock(state="open", mergeable=True)
@@ -690,9 +700,27 @@ class TestOpenPR(unittest.TestCase):
             ):
                 main.open_pr(change, manifest_checker)
                 text = repo.create_pull.call_args.kwargs["body"]
-                self.assertTrue(text.startswith(change.body + "\n\n"))
+                self.assertTrue(
+                    text.startswith("### Updates\n\n" + change.body + "\n\n")
+                )
                 self.assertNotIn("### Source updates", text)
                 self.assertIn(main.DISCLAIMER, text)
+
+    @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
+    @patch("src.main.Github")
+    def test_single_update_uses_subject_when_body_is_missing(
+        self, mock_github, mock_output
+    ):
+        _, _, repo = self._setup_mocks(mock_github)
+        with (
+            patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}),
+            patch("builtins.open", side_effect=FileNotFoundError),
+        ):
+            change = self._make_change()._replace(body=None)
+            main.open_pr(change)
+        text = repo.create_pull.call_args.kwargs["body"]
+        self.assertTrue(text.startswith(f"### Updates\n\n{change.subject}\n\n"))
+        self.assertIn(main.DISCLAIMER, text)
 
     def _make_change(self):
         return main.CommittedChanges(

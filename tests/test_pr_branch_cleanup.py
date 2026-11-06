@@ -1,6 +1,6 @@
 import unittest
 from contextlib import ExitStack
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, call, mock_open, patch
 
 from github import GithubException, UnknownObjectException
 
@@ -56,6 +56,39 @@ class TestPRBranchCleanup(unittest.TestCase):
     def test_successful_cleanup(self):
         self.open_pr()
         self.ref.delete.assert_called_once_with()
+        self.pr.assert_has_calls(
+            [
+                call.merge(merge_method="rebase"),
+                call.create_issue_comment(main.AUTOMERGE_DUE_TO_CONFIG),
+            ]
+        )
+
+    def test_comment_failure_does_not_prevent_cleanup(self):
+        self.pr.create_issue_comment.side_effect = GithubException(
+            403, {"message": "Forbidden"}, {}
+        )
+        with self.assertLogs("src.main", level="WARNING") as logs:
+            self.open_pr()
+        self.assertIn("could not post the merge confirmation", logs.output[0])
+        self.ref.delete.assert_called_once_with()
+
+    def test_failed_merge_retry_posts_only_one_confirmation(self):
+        self.pr.merge.return_value.merged = False
+        self.pr.merge.return_value.message = "Merge failed"
+        with self.assertRaisesRegex(RuntimeError, "Merge failed"):
+            main.open_pr(self.change, fork=False)
+        self.pr.create_issue_comment.assert_not_called()
+
+        self.pr.merge.return_value.merged = True
+        main.open_pr(self.change, fork=False)
+        self.pr.state = "closed"
+        self.pr.is_merged.return_value = True
+        main.open_pr(self.change, fork=False)
+
+        self.assertEqual(self.pr.merge.call_count, 2)
+        self.pr.create_issue_comment.assert_called_once_with(
+            main.AUTOMERGE_DUE_TO_CONFIG
+        )
 
     def test_branch_already_missing_at_lookup(self):
         self.repo.get_git_ref.side_effect = UnknownObjectException(
@@ -96,6 +129,7 @@ class TestPRBranchCleanup(unittest.TestCase):
                     main.open_pr(self.change, fork=False)
                 self.assertIs(raised.exception, error)
                 self.repo.get_git_ref.assert_not_called()
+                self.pr.create_issue_comment.assert_not_called()
 
     def test_unsuccessful_merge_response_does_not_clean_up(self):
         self.pr.merge.return_value.merged = False
@@ -103,3 +137,4 @@ class TestPRBranchCleanup(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Merge failed"):
             main.open_pr(self.change, fork=False)
         self.repo.get_git_ref.assert_not_called()
+        self.pr.create_issue_comment.assert_not_called()
