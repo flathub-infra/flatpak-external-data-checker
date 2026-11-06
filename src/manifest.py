@@ -119,6 +119,9 @@ class ManifestChecker:
         self.source_updates: list[SourceUpdate] = []
         self._allowed_updates: set[int] | None = None
         self._blocked_update_sources: set[int] = set()
+        self._source_checks: dict[int, list[str]] = {}
+        self._source_errors: dict[int, list[Exception]] = {}
+        self._filter_type = None
 
         # Initialize checkers
         self._checkers: list[type[Checker]]
@@ -407,6 +410,9 @@ class ManifestChecker:
             src_rel_path,
         )
         for checker in checkers:
+            self._source_checks.setdefault(id(data), []).append(
+                checker.__class__.__name__
+            )
             log.debug(
                 "Source %s: applying %s",
                 data,
@@ -417,6 +423,7 @@ class ManifestChecker:
                 await checker.check(data)
             except CheckerError as err:
                 data.check_failed = True
+                self._source_errors.setdefault(id(data), []).append(err)
                 self._errors.append(err)
                 counter.failed += 1
                 log.error(
@@ -462,6 +469,7 @@ class ManifestChecker:
         It initializes an internal list of all the external data objects
         found in the manifest.
         """
+        self._filter_type = filter_type
         external_data: list[ExternalBase]
         external_data = sum(self._external_data.values(), [])
         # Prepare every dependency before starting tasks. Unscheduled sources
@@ -561,6 +569,83 @@ class ManifestChecker:
             if only_type is None or data.type == only_type
         ]
 
+    def get_report_errors(self) -> list[Exception]:
+        """Include skipped manifest files so partial coverage is visible."""
+        return [*self.get_errors(), *self._incomplete_manifests]
+
+    def get_source_report(self) -> list[dict[str, t.Any]]:
+        """Snapshot detection results before update_manifests mutates sources."""
+        planned = {id(data) for data in self._select_updates()}
+
+        def find_pointer(node, target, pointer=""):
+            if node is target:
+                return pointer
+            items = (
+                node.items()
+                if isinstance(node, dict)
+                else (enumerate(node) if isinstance(node, list) else [])
+            )
+            for key, value in items:
+                escaped = str(key).replace("~", "~0").replace("/", "~1")
+                found = find_pointer(value, target, f"{pointer}/{escaped}")
+                if found is not None:
+                    return found
+            return None
+
+        results = []
+        for data in self.get_external_data():
+            attempted = self._source_checks.get(id(data), [])
+            reason = None
+            if data.check_failed:
+                status = "failed"
+            elif data.new_version is not None:
+                status = "update_available" if id(data) in planned else "blocked"
+                if status == "blocked":
+                    reason = (
+                        "update_group"
+                        if id(data) in self._blocked_update_sources
+                        else "update_policy"
+                    )
+            elif data.State.BROKEN in data.state:
+                status = "failed"
+                reason = "broken_url"
+            elif self._filter_type is not None and data.type != self._filter_type:
+                status, reason = "unchecked", "filtered"
+            elif not data.checker_data.get("type"):
+                status, reason = "unchecked", "no_update_checker"
+            elif not attempted:
+                status, reason = "unchecked", "no_applicable_checker"
+            elif data.State.LATEST in data.state:
+                status = "checked"
+            else:
+                status, reason = "unchecked", "no_candidate"
+            results.append(
+                {
+                    "manifest": os.path.relpath(
+                        data.source_path, self._root_manifest_dir
+                    ),
+                    "source_pointer": find_pointer(
+                        self._manifest_contents[data.source_path], data.source
+                    ),
+                    "module": str(data.module) if data.module else None,
+                    "type": data.type.value,
+                    "checker_type": data.checker_data.get("type"),
+                    "checkers_run": list(attempted),
+                    "status": status,
+                    "reason": reason,
+                    "state": data.state.name,
+                    "current": data.current_version.json,
+                    "candidate": data.new_version.json if data.new_version else None,
+                    "selected_version": data.selected_version,
+                    "update_group": data.checker_data.get("update-group"),
+                    "errors": [
+                        {"type": type(error).__name__, "message": str(error)}
+                        for error in self._source_errors.get(id(data), [])
+                    ],
+                }
+            )
+        return results
+
     def get_errors(
         self,
         only_type: type[Exception] | None = None,
@@ -602,6 +687,11 @@ class ManifestChecker:
     ) -> list[ExternalBase]:
         """Select writes without mutating sources or requiring GitHub access."""
         self._validate_update_groups(allowed)
+        return self._select_updates(allowed)
+
+    def _select_updates(
+        self, allowed: list[ExternalBase] | None = None
+    ) -> list[ExternalBase]:
         sources = self.get_external_data()
         allowed_ids = None if allowed is None else {id(data) for data in allowed}
         updates = [
