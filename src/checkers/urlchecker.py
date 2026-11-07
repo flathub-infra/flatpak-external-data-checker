@@ -119,6 +119,7 @@ class URLChecker(Checker):
             url = external_data.current_version.url
 
         strip_query = external_data.checker_data.get("strip-query", False)
+        no_extract_version = external_data.checker_data.get("no-extract-version", False)
 
         if external_data.type == ExternalData.Type.ARCHIVE:
             wrong_content_types = WRONG_CONTENT_TYPES_ARCHIVE
@@ -146,9 +147,10 @@ class URLChecker(Checker):
                         content_type_deny=wrong_content_types,
                         robots_cache=self.robots_cache,
                     )
-                    version_string = await utils.extract_appimage_version(
-                        tmpfile,
-                    )
+                    if not no_extract_version:
+                        version_string = await utils.extract_appimage_version(
+                            tmpfile,
+                        )
             elif url.endswith(".deb"):
                 with tempfile.NamedTemporaryFile("w+b") as tmpfile:
                     new_version = await utils.get_extra_data_info_from_url(
@@ -158,9 +160,10 @@ class URLChecker(Checker):
                         content_type_deny=wrong_content_types,
                         robots_cache=self.robots_cache,
                     )
-                    version_string = utils.extract_deb_version(
-                        tmpfile,
-                    )
+                    if not no_extract_version:
+                        version_string = utils.extract_deb_version(
+                            tmpfile,
+                        )
             else:
                 new_version = await utils.get_extra_data_info_from_url(
                     url,

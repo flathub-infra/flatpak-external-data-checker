@@ -212,6 +212,36 @@ class TestURLCheckerPatterns(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(data.new_version.version, "1.2.3")
                 self.assertEqual(data.new_version.url, data.current_version.url)
 
+    async def test_no_autodetect(self):
+        data = self._make_data(
+            {
+                "type": "rotating-url",
+                "url": "https://example.com/prog.AppImage",
+                "pattern": r".*prog-([\d.]+)\.AppImage$",
+                "no-extract-version": True,
+            }
+        )
+        new_version = data.current_version._replace(
+            checksum=MultiDigest(sha256="1" * 64)
+        )
+        with (
+            mock.patch(
+                "src.checkers.urlchecker.utils.get_extra_data_info_from_url",
+                return_value=new_version,
+            ),
+            mock.patch(
+                "src.checkers.urlchecker.extract_version",
+                return_value="1.2.3",
+            ),
+            mock.patch(
+                "src.checkers.urlchecker.utils.extract_appimage_version",
+            ) as extract,
+        ):
+            await self.checker.validate_checker_data(data)
+            await self.checker.check(data)
+        extract.assert_not_awaited()
+        self.assertEqual(data.new_version.version, "1.2.3")
+
 
 class TestIsSameVersion(unittest.TestCase):
     def test_invalid_pattern_with_inferred_version(self):
