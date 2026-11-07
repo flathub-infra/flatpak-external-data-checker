@@ -21,8 +21,9 @@ class TestReporting(LocalHTTPTestCase):
         self.report = self.root / "report.json"
 
     def source(self, version="2", *, same=False):
-        old_url = self.serve(b"old")
-        new_url = old_url if same else self.serve(b"new")
+        headers = {"Last-Modified": "Fri, 06 Nov 2026 12:00:00 GMT"}
+        old_url = self.serve(b"old", headers=headers)
+        new_url = old_url if same else self.serve(b"new", headers=headers)
         endpoint = self.serve(
             json.dumps({"version": version, "url": new_url}),
             content_type="application/json",
@@ -172,3 +173,4 @@ class TestReporting(LocalHTTPTestCase):
             outputs.append((result, stdout.getvalue(), logs.output))
         self.assertEqual(outputs[0], outputs[1])
         self.assertIn("OUTDATED", outputs[1][1])
+        self.assertIn("2026-11-06 12:00:00+00:00", outputs[1][1])
