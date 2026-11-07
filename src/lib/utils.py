@@ -23,6 +23,7 @@ import datetime as dt
 import io
 import json
 import logging
+import math
 import operator
 import os
 import re
@@ -48,6 +49,8 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import TaggedScalar
 from ruamel.yaml.constructor import RoundTripConstructor
 from ruamel.yaml.emitter import RoundTripEmitter
+from ruamel.yaml.error import YAMLError
+from ruamel.yaml.nodes import MappingNode, ScalarNode, SequenceNode
 
 from . import HTTP_CHUNK_SIZE, NETWORK_ERRORS, OPERATORS, TIMEOUT_CONNECT, externaldata
 from .checksums import MultiHash
@@ -703,13 +706,15 @@ _ManifestConstructor.add_constructor(
     "tag:yaml.org,2002:timestamp", _ManifestConstructor.construct_yaml_timestamp
 )
 
-_yaml = YAML()
-_yaml.Constructor = _ManifestConstructor
-_yaml.Emitter = _ManifestEmitter
-# ruamel preserves some formatting (such as comments and blank lines) but
-# not the indentation of the source file. These settings match the style
-# recommended at <https://github.com/flathub/flathub/wiki/YAML-Style-Guide>.
-_yaml.indent(mapping=2, sequence=4, offset=2)
+
+def _manifest_yaml():
+    yaml = YAML()
+    yaml.Constructor = _ManifestConstructor
+    yaml.Emitter = _ManifestEmitter
+    yaml.preserve_quotes = True
+    # Default formatting for structural changes and newly added content.
+    yaml.indent(mapping=2, sequence=4, offset=2)
+    return yaml
 
 
 def read_yaml_manifest(manifest_path: Path):
@@ -717,7 +722,7 @@ def read_yaml_manifest(manifest_path: Path):
     with manifest_path.open("r") as f:
         has_yaml_header = (_ := f.read(3)) == "---"
         f.seek(0)
-        data = _yaml.load(f)
+        data = _manifest_yaml().load(f)
     return data, has_yaml_header
 
 
@@ -727,6 +732,117 @@ def read_manifest(manifest_path: Path | str):
     if manifest_path.suffix in (".yaml", ".yml"):
         return read_yaml_manifest(manifest_path)
     return read_json_manifest(manifest_path)
+
+
+def _yaml_scalar_edits(original, rendered, *, reflow=False):
+    """Locate scalar-only changes, declining structural changes and aliases."""
+    before_yaml = _manifest_yaml()
+    after_yaml = _manifest_yaml()
+    before = before_yaml.compose(original)
+    after = after_yaml.compose(rendered)
+    edits = []
+    seen = set()
+
+    def scalar_equal(old, new):
+        if old.tag != new.tag:
+            return False
+        if old.value == new.value:
+            return True
+        if old.tag not in {
+            "tag:yaml.org,2002:bool",
+            "tag:yaml.org,2002:null",
+            "tag:yaml.org,2002:int",
+            "tag:yaml.org,2002:float",
+            "tag:yaml.org,2002:timestamp",
+        }:
+            return False
+        # Node values retain lexical spellings (e.g. True versus true).
+        # Construct with each document's resolver version, retaining tag checks
+        # so Python's True == 1 cannot hide an actual YAML type change.
+        old_value = before_yaml.constructor.construct_object(old)
+        new_value = after_yaml.constructor.construct_object(new)
+        return old_value == new_value or (
+            old.tag == "tag:yaml.org,2002:float"
+            and math.isnan(old_value)
+            and math.isnan(new_value)
+        )
+
+    def visit(old, new):
+        if old is None or new is None or id(old) in seen or old.anchor or new.anchor:
+            return False
+        seen.add(id(old))
+        if isinstance(old, ScalarNode) and isinstance(new, ScalarNode):
+            if scalar_equal(old, new):
+                if (
+                    reflow
+                    and old.style not in ("|", ">")
+                    and (
+                        old.start_mark.line != old.end_mark.line
+                        or new.start_mark.line != new.end_mark.line
+                    )
+                ):
+                    old_lines = original[old.start_mark.index : old.end_mark.index]
+                    new_lines = rendered[new.start_mark.index : new.end_mark.index]
+                    # Honor explicit width-induced wrapping, but don't normalize
+                    # local indentation when the wrapping itself is unchanged.
+                    if [line.strip() for line in old_lines.splitlines()] != [
+                        line.strip() for line in new_lines.splitlines()
+                    ]:
+                        return False
+                return True
+            # Multiline scalars need context-sensitive indentation and chomping.
+            if (
+                old.start_mark.line != old.end_mark.line
+                or new.start_mark.line != new.end_mark.line
+                or old.style in ("|", ">")
+                or new.style in ("|", ">")
+            ):
+                return False
+            edits.append(
+                (
+                    old.start_mark.index,
+                    old.end_mark.index,
+                    rendered[new.start_mark.index : new.end_mark.index],
+                )
+            )
+            return True
+        if old.tag != new.tag or len(old.value) != len(new.value):
+            return False
+        if isinstance(old, MappingNode) and isinstance(new, MappingNode):
+            for (old_key, old_value), (new_key, new_value) in zip(
+                old.value, new.value, strict=True
+            ):
+                if not (
+                    isinstance(old_key, ScalarNode)
+                    and isinstance(new_key, ScalarNode)
+                    and scalar_equal(old_key, new_key)
+                    and visit(old_value, new_value)
+                ):
+                    return False
+            return True
+        if isinstance(old, SequenceNode) and isinstance(new, SequenceNode):
+            return all(visit(a, b) for a, b in zip(old.value, new.value, strict=True))
+        return False
+
+    return edits if visit(before, after) else None
+
+
+def _preserve_yaml_scalars(original, rendered, *, reflow=False):
+    # A global ruamel indentation setting cannot reproduce local mixed layouts.
+    # Edit only parser-delimited scalar spans, then verify the entire document.
+    edits = _yaml_scalar_edits(original, rendered, reflow=reflow)
+    if edits is None:
+        return rendered
+    result = original
+    for start, end, replacement in sorted(edits, reverse=True):
+        result = result[:start] + replacement + result[end:]
+    try:
+        if _yaml_scalar_edits(result, rendered) == []:
+            return result
+    except YAMLError:
+        # A scalar emitted in block context may not be valid in flow context.
+        pass
+    return rendered
 
 
 def dump_manifest(
@@ -765,9 +881,20 @@ def dump_manifest(
 
     with manifest_path.open("w", encoding="utf-8") as fp:
         if manifest_path.suffix in (".yaml", ".yml"):
-            _yaml.width = yaml_width
-            _yaml.explicit_start = has_yaml_header
-            _yaml.dump(contents, fp)
+            yaml = _manifest_yaml()
+            # Retain this document's version directives without leaking them to
+            # another manifest read or write.
+            yaml.compose(original_manifest)
+            yaml.width = yaml_width
+            yaml.explicit_start = has_yaml_header
+            stream = io.StringIO()
+            yaml.dump(contents, stream)
+            rendered = stream.getvalue()
+            if has_yaml_header == original_manifest.startswith("---"):
+                rendered = _preserve_yaml_scalars(
+                    original_manifest, rendered, reflow=yaml_width is not None
+                )
+            fp.write(rendered)
         else:
             json.dump(obj=contents, fp=fp, indent=json_indent)
             if json_newline_pref:

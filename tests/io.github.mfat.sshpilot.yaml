@@ -1,0 +1,182 @@
+app-id: io.github.mfat.sshpilot
+runtime: org.gnome.Platform
+runtime-version: '51'
+sdk: org.gnome.Sdk
+command: sshpilot
+separate-locales: false
+# WebKit 6.0 is required for PyXterm.js backend and should be available in GNOME Platform 49
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --socket=ssh-auth
+  # Sound from RDP sessions shown in a tab (gtk4-frdp, FreeRDP rdpsnd).
+  - --socket=pulseaudio
+  - --filesystem=~/.ssh:create
+  - --talk-name=org.freedesktop.Flatpak
+  - --device=all
+
+cleanup:
+  - '/include'
+  - '/lib/pkgconfig'
+  - '/share/gtk-doc'
+  - '/share/man'
+  - '*.la'
+  - '*.a'
+
+modules:
+  - name: libcbor
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_SHARED_LIBS=ON
+      - -DWITH_EXAMPLES=OFF
+      - -DWITH_TESTS=OFF
+    sources:
+      - type: git
+        url: https://github.com/PJK/libcbor.git
+        tag: v0.13.0
+        commit: 9826a4315116a588f7416912db9da6fcecd8da11
+
+  - name: libfido2
+    buildsystem: simple
+    build-commands:
+      # GNOME 50's Flatpak toolchain already injects _FORTIFY_SOURCE=3.
+      # libfido2 1.17.0 adds _FORTIFY_SOURCE=2 for Release builds and uses
+      # -Werror, so remove only the duplicate definition.
+      - sed -i '/CMAKE_C_FLAGS_RELEASE.*D_FORTIFY_SOURCE=2/d' CMakeLists.txt
+      - >-
+        cmake -S . -B build -G Ninja
+        -DCMAKE_INSTALL_PREFIX=/app
+        -DCMAKE_INSTALL_LIBDIR=lib
+        -DCMAKE_BUILD_TYPE=Release
+        -DBUILD_TESTS=OFF
+        -DBUILD_EXAMPLES=OFF
+        -DBUILD_MANPAGES=OFF
+        -DBUILD_STATIC_LIBS=OFF
+        -DBUILD_TOOLS=ON
+        -DNFC_LINUX=OFF
+      - cmake --build build --parallel ${FLATPAK_BUILDER_N_JOBS:-2}
+      - cmake --install build
+      - test -f /app/lib/libfido2.so
+      - pkg-config --modversion libfido2
+    sources:
+      - type: git
+        url: https://github.com/Yubico/libfido2.git
+        tag: 1.17.0
+        commit: b974e7cf2ee7392134cc12c08b76a068cf250dd8
+
+  - name: openssh
+    buildsystem: simple
+    build-commands:
+      # The release tag ships a generated configure script. Refresh its mtime
+      # instead of regenerating release artifacts with autoreconf.
+      - touch configure
+      - >-
+        ./configure
+        --prefix=/app
+        --sysconfdir=/app/etc/ssh
+        --libexecdir=/app/libexec
+        --with-privsep-path=/app/var/empty
+        --without-pam
+        --with-kerberos5
+        --disable-strip
+      - make -j${FLATPAK_BUILDER_N_JOBS:-2}
+      - make install-nokeys
+      - test -x /app/bin/ssh
+      - test -x /app/bin/ssh-keygen
+      - test -x /app/bin/scp
+      - test -x /app/bin/sftp
+      - test -x /app/bin/ssh-agent
+      - test -x /app/bin/ssh-add
+      - test -x /app/libexec/ssh-sk-helper
+      - ldd /app/libexec/ssh-sk-helper | grep -q libfido2
+      - ldd /app/bin/ssh | grep -q libgssapi_krb5
+      - >-
+        /app/bin/ssh -G
+        -o GSSAPIAuthentication=yes
+        -o GSSAPIDelegateCredentials=yes
+        sshpilot-gssapi-build-check >/dev/null
+      - /app/bin/ssh -V
+    sources:
+      - type: git
+        url: https://github.com/openssh/openssh-portable.git
+        tag: V_10_4_P1
+        commit: e8dd756725e8800fcd0b3fd71ee6b4382d1e8fab
+
+  - name: ssh-copy-id
+    buildsystem: simple
+    build-commands:
+    - install -Dm755 ssh-copy-id /app/bin/ssh-copy-id
+    sources:
+    - type: file
+      url: https://raw.githubusercontent.com/openssh/openssh-portable/V_9_6_P1/contrib/ssh-copy-id
+      sha256: b625120eeff8b0e64e4e8c71e5ed3a7878fd69d318a88ce0a22e115725f6b815
+      dest-filename: ssh-copy-id
+
+  - name: libvte
+    buildsystem: meson
+    config-opts:
+      - '-Dvapi=false'
+      - '-Dgir=true'
+      - '-Ddocs=false'
+      - '-Dgnutls=true'
+      - '-Dgtk3=false'
+      - '-Dgtk4=true'
+    sources:
+      - type: archive
+        url: https://download.gnome.org/sources/vte/0.84/vte-0.84.1.tar.xz
+        sha256: aca1caa8478aebcdbb1d67897fb3511eb7601debae6810e16a15b6fa25f31ac8
+
+  # FreeRDP 3 libraries for the embedded RDP tab: sshPilot's own build compiles
+  # gtk4-frdp (subprojects/gtk4-frdp) against them into /app/lib/sshpilot. Only the
+  # libraries and channels are built: no client programs, no server.
+  - name: freerdp
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_LIBDIR=lib
+      - -DWITH_CLIENT=ON
+      - -DWITH_CLIENT_SDL=OFF
+      - -DWITH_X11=OFF
+      - -DWITH_WAYLAND=OFF
+      - -DWITH_SERVER=OFF
+      - -DWITH_SAMPLE=OFF
+      - -DWITH_MANPAGES=OFF
+      - -DWITH_OPENH264=OFF
+      - -DWITH_FFMPEG=ON
+      - -DWITH_SWSCALE=ON
+      - -DWITH_CUPS=OFF
+      - -DWITH_FUSE=OFF
+      - -DWITH_PCSC=OFF
+      - -DWITH_PULSE=ON
+      - -DCHANNEL_URBDRC=OFF
+      - -DWITH_WEBVIEW=OFF
+    cleanup:
+      - /bin
+      - /share/FreeRDP
+    sources:
+      - type: archive
+        url: https://pub.freerdp.com/releases/freerdp-3.32.1.tar.xz
+        sha256: 4dd5bf474deff7a2a82dff7edca4ea0a608da376a9698514901feab3637711e8
+        x-checker-data:
+          type: anitya
+          project-id: 10442
+          url-template: https://pub.freerdp.com/releases/freerdp-$version.tar.xz
+
+  - python3-deps.yml
+
+  - name: sshpilot
+    # Meson installs everything the hand-written build-commands used to: the
+    # launcher, the Python package, the compiled gresource, the desktop entry and
+    # metainfo (merged from the .in templates), the icon and sshpilot-agent.
+    # Runtime Python deps come from flatpak/python3-deps.yml above; the GNOME SDK
+    # provides meson and blueprint-compiler.
+    buildsystem: meson
+    sources:
+      - type: git
+        url: "https://github.com/mfat/sshpilot.git"
+        #tag: v6.3.9
+        commit: f07252c94f03d6885d855e8195598a59e5b32e6c
