@@ -28,7 +28,7 @@ class TestGitChecker(unittest.IsolatedAsyncioTestCase):
                     source={
                         "type": "git",
                         "url": "https://example.org/app.git",
-                        "tag": "0.1.0",
+                        "tag": tag.replace("1.2.3", "0.1.0"),
                         "x-checker-data": {"type": "git", "tag-pattern": pattern},
                     },
                 )
@@ -39,6 +39,163 @@ class TestGitChecker(unittest.IsolatedAsyncioTestCase):
                     await GitChecker._check_has_new(data)
                 self.assertEqual(data.new_version.version, version)
                 self.assertEqual(data.new_version.tag, tag)
+
+    async def test_sorted_tag_updates_require_newer_version(self):
+        cases = (
+            ("v2.1.0-pre1", "v2.0.0", {}, False),
+            ("v2.1.0-pre1", "v2.1.0", {}, True),
+            ("v1.0.0", "v2.0.0", {}, True),
+            ("unknown", "v2.0.0", {}, False),
+            ("v2.0.0", "v1.0.0", {"versions": {"<": "2.0.0"}}, False),
+            ("v1.0.0", "v2.0.0", {"versions": {"<": "2.0.0"}}, False),
+            ("v2.0.0", "v1.0.0", {"sort-tags": False}, True),
+            ("unknown", "v2.0.0", {"sort-tags": False}, True),
+            ("v2.0.0", "v2.0.0", {}, True),
+            (None, "v2.0.0", {}, True),
+        )
+        for scheme in ("loose", "semantic"):
+            for current, candidate, options, update in cases:
+                for current_present in (True, False):
+                    with self.subTest(
+                        scheme=scheme,
+                        current=current,
+                        candidate=candidate,
+                        options=options,
+                        current_present=current_present,
+                    ):
+                        data = ExternalGitRepo.from_source_impl(
+                            source_path="test.git",
+                            source={
+                                "type": "git",
+                                "url": "https://example.org/test.git",
+                                "tag": current,
+                                "commit": "old",
+                                "x-checker-data": {
+                                    "type": "git",
+                                    "tag-pattern": r"^v([\d.]+)$",
+                                    "version-scheme": scheme,
+                                    **options,
+                                },
+                            },
+                        )
+                        refs = {}
+                        if current_present and current:
+                            refs[f"refs/tags/{current}"] = "old"
+                        refs[f"refs/tags/{candidate}"] = "new"
+                        # The upper-bound case needs an eligible unchanged tag.
+                        if options.get("versions") == {"<": "2.0.0"}:
+                            refs.setdefault("refs/tags/v1.0.0", "old")
+                        with mock.patch(
+                            "src.checkers.gitchecker.git_ls_remote", return_value=refs
+                        ):
+                            await GitChecker._check_has_new(data)
+                        if update:
+                            self.assertIsNotNone(data.new_version)
+                            self.assertEqual(data.new_version.tag, candidate)
+                            self.assertEqual(data.new_version.commit, "new")
+                        else:
+                            self.assertIsNone(data.new_version)
+                            self.assertNotIn(data.State.OUTDATED, data.state)
+
+    async def test_tag_comparison_uses_pattern_and_scheme(self):
+        for current, candidate, pattern, scheme, update in (
+            ("2.0.0", "1.0.0", r"^[\d.]+$", "loose", False),
+            ("1.0.0", "2.0.0", r"^[\d.]+$", "loose", True),
+            ("2.0.0", "1.0.0", r"^[\d.]+$", "semantic", False),
+            ("1.0.0", "2.0.0", r"^[\d.]+$", "semantic", True),
+            ("release-1.0.0", "release-2.0.0", r"^release-([\d.]+)$", "loose", True),
+            ("release-next", "release-2.0.0", r"^release-([\d.]+)$", "loose", False),
+            ("v2.1.0-pre1", "release-2.0.0", r"^release-([\d.]+)$", "loose", False),
+            ("v2.1.0-pre1", "v2.1.0", r"^v(.+)$", "semantic", True),
+            ("v2.1.0-pre1", "v2.0.0", r"^v(.+)$", "semantic", False),
+            ("v2.0", "v3.0.0", r"^v(.+)$", "semantic", False),
+            ("v1.a", "v2.0", r"^v(.+)$", "loose", True),
+            ("v1.foo", "v1.2", r"^v(.+)$", "loose", False),
+            ("v2.0.0", "V2.0.0", r"^[vV](.+)$", "loose", False),
+            ("v2.0.0+one", "v2.0.0+two", r"^v(.+)$", "semantic", False),
+        ):
+            with self.subTest(current=current, candidate=candidate, scheme=scheme):
+                data = ExternalGitRepo.from_source_impl(
+                    source_path="test.git",
+                    source={
+                        "type": "git",
+                        "url": "https://example.org/test.git",
+                        "tag": current,
+                        "commit": "old",
+                        "x-checker-data": {
+                            "type": "git",
+                            "tag-pattern": pattern,
+                            "version-scheme": scheme,
+                        },
+                    },
+                )
+                with mock.patch(
+                    "src.checkers.gitchecker.git_ls_remote",
+                    return_value={f"refs/tags/{candidate}": "new"},
+                ):
+                    await GitChecker._check_has_new(data)
+                self.assertEqual(data.new_version is not None, update)
+
+    async def test_same_tag_peeled_commit_change(self):
+        data = ExternalGitRepo.from_source_impl(
+            source_path="test.git",
+            source={
+                "type": "git",
+                "url": "https://example.org/test.git",
+                "tag": "v2.0.0",
+                "commit": "old",
+                "x-checker-data": {"type": "git"},
+            },
+        )
+        with mock.patch(
+            "src.checkers.gitchecker.git_ls_remote",
+            return_value={
+                "refs/tags/v2.0.0": "tag-object",
+                "refs/tags/v2.0.0^{}": "new",
+            },
+        ):
+            await GitChecker._check_has_new(data)
+        self.assertEqual(data.new_version.tag, "v2.0.0")
+        self.assertEqual(data.new_version.commit, "new")
+        self.assertIn(data.State.BROKEN, data.state)
+        self.assertNotIn(data.State.OUTDATED, data.state)
+
+    async def test_equivalent_alias_preserves_same_tag_commit_repair(self):
+        for scheme in ("loose", "semantic"):
+            for constraints in ({}, {"!=": "1.0.0"}):
+                with self.subTest(scheme=scheme, constraints=constraints):
+                    data = ExternalGitRepo.from_source_impl(
+                        source_path="test.git",
+                        source={
+                            "type": "git",
+                            "url": "https://example.org/test.git",
+                            "tag": "1.0.0",
+                            "commit": "old",
+                            "x-checker-data": {
+                                "type": "git",
+                                "version-scheme": scheme,
+                                "versions": constraints,
+                            },
+                        },
+                    )
+                    with mock.patch(
+                        "src.checkers.gitchecker.git_ls_remote",
+                        return_value={
+                            "refs/tags/0.9.0": "older",
+                            "refs/tags/1.0.0": "tag-object",
+                            "refs/tags/1.0.0^{}": "new",
+                            "refs/tags/v1.0.0": "alias",
+                        },
+                    ):
+                        await GitChecker._check_has_new(data)
+                    if constraints:
+                        self.assertIsNone(data.new_version)
+                    else:
+                        self.assertIsNotNone(data.new_version)
+                        self.assertEqual(data.new_version.tag, "1.0.0")
+                        self.assertEqual(data.new_version.commit, "new")
+                        self.assertIn(data.State.BROKEN, data.state)
+                    self.assertNotIn(data.State.OUTDATED, data.state)
 
     async def test_github_tag_release_notes(self):
         repo = "https://github.com/NoRiskClient/noriskclient-launcher"
