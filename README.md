@@ -271,8 +271,10 @@ release:
 
 The version number for the latest version can be detected in two ways:
 
-* If the filename ends with `.AppImage`, the version number is extracted
-  from the AppImage.
+* If the filename ends with `.AppImage` or `.deb`, the version number is extracted
+  from the AppImage/.deb.
+  * Note: "pattern" is *not* considered in this case. If you want to disable this
+    auto-extraction, set `"no-extract-version"` to true in `"x-checker-data"`.
 * Otherwise, if `"pattern"` is specified in `"x-checker-data"`, the given
   regular expression matches the URL for the latest version. A single capture
   group extracts the version number. Without a capture group, the version is
