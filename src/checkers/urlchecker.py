@@ -93,6 +93,7 @@ class URLChecker(Checker):
             "url": {"type": "string", "format": "uri"},
             "pattern": {"type": "string", "format": "regex"},
             "strip-query": {"type": "boolean"},
+            "no-extract-version": {"type": "boolean"},
         },
         "required": ["url"],
     }
