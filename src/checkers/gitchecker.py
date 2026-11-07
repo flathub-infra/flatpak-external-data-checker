@@ -3,6 +3,7 @@ import re
 import typing as t
 
 import semver
+from packaging.version import Version
 
 from ..lib import OPERATORS_SCHEMA
 from ..lib.errors import CheckerFetchError, CheckerQueryError
@@ -10,6 +11,7 @@ from ..lib.externaldata import ExternalBase, ExternalGitRef, ExternalGitRepo
 from ..lib.releaselinks import api_release_url, github_release_api_url
 from ..lib.utils import (
     FallbackVersion,
+    VersionComparisonError,
     expand_version_constraints,
     filter_versioned_items,
     git_ls_remote,
@@ -126,6 +128,18 @@ class GitChecker(Checker):
         version_scheme = external_data.checker_data.get("version-scheme", "loose")
         tag_cls = TAG_VERSION_SCHEMES[version_scheme]
         sort_tags = external_data.checker_data.get("sort-tags", True)
+        current_tag = external_data.current_version.tag
+        current_match = tag_re.match(current_tag) if current_tag else None
+        if current_match:
+            current_version = current_match.group(1 if tag_re.groups else 0)
+            try:
+                tag_cls.parse_version(current_version)
+            except (ValueError, TypeError):
+                pass
+            else:
+                external_data.current_version = external_data.current_version._replace(
+                    version=current_version
+                )
 
         constraints = [
             (o, tag_cls.parse_version(v))
@@ -164,10 +178,6 @@ class GitChecker(Checker):
                 continue
 
             matching_tags.append(tag_cls(commit, tag, annotated, version))
-            if tag == external_data.current_version.tag:
-                external_data.current_version = external_data.current_version._replace(
-                    version=version
-                )
 
         if constraints:
             sorted_tags = filter_versioned_items(
@@ -188,6 +198,33 @@ class GitChecker(Checker):
                 f"{external_data.current_version.url} has no tags matching "
                 f"'{tag_re.pattern}'"
             ) from err
+
+        if sort_tags and current_tag and latest_tag.tag != current_tag:
+            try:
+                if current_match:
+                    newer = latest_tag.parsed_version > tag_cls.parse_version(
+                        current_match.group(1 if tag_re.groups else 0)
+                    )
+                # An unmatched tag has no pattern-defined version. Compare
+                # complete tags strictly rather than guessing an extraction.
+                elif version_scheme == "loose":
+                    newer = Version(latest_tag.tag) > Version(current_tag)
+                else:
+                    newer = semver.VersionInfo.parse(
+                        re.sub(r"^[vV]", "", latest_tag.tag)
+                    ) > semver.VersionInfo.parse(re.sub(r"^[vV]", "", current_tag))
+            except (ValueError, TypeError, VersionComparisonError):
+                newer = False
+            if not newer:
+                log.info(
+                    "Skipping tag %s: not demonstrably newer than current tag %s",
+                    latest_tag.tag,
+                    current_tag,
+                )
+                current_tags = [tag for tag in sorted_tags if tag.tag == current_tag]
+                if not current_tags:
+                    return
+                latest_tag = max(current_tags)
 
         new_version = ExternalGitRef(
             url=external_data.current_version.url,

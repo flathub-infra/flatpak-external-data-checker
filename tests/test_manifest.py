@@ -208,7 +208,7 @@ class TestManifest(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(len(checker.source_updates), 1)
                     update = checker.source_updates[0]
                     self.assertEqual(
-                        update.old_version, f"tag {old_tag}, commit {commit[:12]}"
+                        update.old_version, f"{old_tag}, commit {commit[:12]}"
                     )
                     self.assertEqual(
                         update.new_version, f"{new_tag}, commit {commit[:12]}"
@@ -262,7 +262,7 @@ class TestManifest(unittest.IsolatedAsyncioTestCase):
                         update = checker.source_updates[0]
                         self.assertEqual(
                             update.old_version,
-                            f"tag 2024-07-02, commit {commit[:12]}",
+                            f"2024-07-02, commit {commit[:12]}",
                         )
                         self.assertEqual(
                             update.comparison_url,
