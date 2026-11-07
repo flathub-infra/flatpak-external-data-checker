@@ -22,6 +22,7 @@ from __future__ import annotations
 import abc
 import asyncio
 import builtins
+import copy
 import dataclasses
 import datetime
 import logging
@@ -29,6 +30,7 @@ import typing as t
 from enum import Enum, IntFlag
 
 import jsonschema
+from ruamel.yaml.comments import CommentedMap
 from yarl import URL
 
 from . import FILE_URL_SCHEMES, utils
@@ -64,6 +66,77 @@ CHECKER_DATA_SCHEMA_COMMON: dict[str, t.Any] = {
 }
 
 log = logging.getLogger(__name__)
+
+
+def _update_source_field(source: dict[str, t.Any], key: str, value: object) -> None:
+    if key in source:
+        source[key] = value
+        return
+
+    field_order = (
+        "type",
+        "url",
+        "branch",
+        "tag",
+        "commit",
+        "md5",
+        "sha1",
+        "sha256",
+        "sha512",
+        "size",
+    )
+    keys = list(source)
+    positions = {name: index for index, name in enumerate(keys)}
+    key_count = len(keys)
+    if isinstance(source, CommentedMap) and source.merge:
+        # Older ruamel versions use (position, mapping) pairs instead of merge_pos.
+        merge_position = getattr(source.merge, "merge_pos", None)
+        if merge_position is None:
+            merge_position = source.merge[0][0]
+        keys = [name for name, _ in source.non_merged_items()]
+        positions = {
+            name: index + (index >= merge_position) for index, name in enumerate(keys)
+        }
+        for name in source:
+            positions.setdefault(name, merge_position)
+        key_count = len(keys) + 1
+    rank = field_order.index(key)
+    previous = next(
+        (name for name in reversed(field_order[:rank]) if name in source), None
+    )
+    following = next((name for name in field_order[rank + 1 :] if name in source), None)
+    if previous is not None:
+        position = positions[previous] + 1
+    elif following is not None:
+        position = positions[following]
+    elif "x-checker-data" in source:
+        position = positions["x-checker-data"]
+    else:
+        position = key_count
+
+    if isinstance(source, CommentedMap):
+        # ruamel attaches standalone comments before a key to the preceding value.
+        # Keep them after the inserted field, but leave inline comments in place.
+        if position:
+            previous_key = next(
+                (name for name in keys if positions[name] == position - 1), None
+            )
+            comments = source.ca.items.get(previous_key)
+            if comments and comments[2] is not None:
+                token = comments[2]
+                inline, newline, trailing = token.value.partition("\n")
+                if trailing:
+                    following_comment = copy.copy(token)
+                    following_comment.value = newline + trailing
+                    source.ca.items[key] = [None, None, following_comment, None]
+                    token.value = inline + newline
+                    if not inline:
+                        comments[2] = None
+        source.insert(position, key, value)
+    else:
+        source[key] = value
+        for trailing_key in keys[position:]:
+            source[trailing_key] = source.pop(trailing_key)
 
 
 @dataclasses.dataclass
@@ -391,11 +464,11 @@ class ExternalData(ExternalBase):
 
     def update(self) -> None:
         if self.new_version is not None:
-            self.source["url"] = self.new_version.url
+            _update_source_field(self.source, "url", self.new_version.url)
             self.new_version.checksum.update_source(self.source)
             if self.source["type"] == "extra-data":
                 assert self.new_version.size is not None
-                self.source["size"] = self.new_version.size
+                _update_source_field(self.source, "size", self.new_version.size)
             # Remove size property for non-extra-data sources
             elif "size" in self.source:
                 log.warning(
@@ -556,13 +629,13 @@ class ExternalGitRepo(ExternalBase):
 
     def update(self) -> None:
         if self.new_version is not None:
-            self.source["url"] = self.new_version.url
-            self.source["commit"] = self.new_version.commit
+            _update_source_field(self.source, "url", self.new_version.url)
+            _update_source_field(self.source, "commit", self.new_version.commit)
             if self.new_version.tag is not None:
-                self.source["tag"] = self.new_version.tag
+                _update_source_field(self.source, "tag", self.new_version.tag)
             else:
                 self.source.pop("tag", None)
             if self.new_version.branch is not None:
-                self.source["branch"] = self.new_version.branch
+                _update_source_field(self.source, "branch", self.new_version.branch)
             else:
                 self.source.pop("branch", None)
