@@ -213,34 +213,54 @@ class TestURLCheckerPatterns(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(data.new_version.url, data.current_version.url)
 
     async def test_no_autodetect(self):
-        data = self._make_data(
-            {
-                "type": "rotating-url",
-                "url": "https://example.com/prog.AppImage",
-                "pattern": r".*prog-([\d.]+)\.AppImage$",
-                "no-extract-version": True,
-            }
-        )
-        new_version = data.current_version._replace(
-            checksum=MultiDigest(sha256="1" * 64)
-        )
-        with (
-            mock.patch(
-                "src.checkers.urlchecker.utils.get_extra_data_info_from_url",
-                return_value=new_version,
-            ),
-            mock.patch(
-                "src.checkers.urlchecker.extract_version",
-                return_value="1.2.3",
-            ),
-            mock.patch(
-                "src.checkers.urlchecker.utils.extract_appimage_version",
-            ) as extract,
-        ):
-            await self.checker.validate_checker_data(data)
-            await self.checker.check(data)
-        extract.assert_not_awaited()
-        self.assertEqual(data.new_version.version, "1.2.3")
+        for suffix in ("AppImage", "deb"):
+            with self.subTest(suffix=suffix):
+                data = self._make_data(
+                    {
+                        "type": "rotating-url",
+                        "url": f"https://example.com/prog.{suffix}",
+                        "pattern": rf".*prog-([\d.]+)\.{suffix}$",
+                        "no-extract-version": True,
+                    }
+                )
+                new_version = data.current_version._replace(
+                    url=f"https://example.com/prog-1.2.3.{suffix}",
+                    checksum=MultiDigest(sha256="1" * 64),
+                )
+                with (
+                    mock.patch(
+                        "src.checkers.urlchecker.utils.get_extra_data_info_from_url",
+                        return_value=new_version,
+                    ),
+                    mock.patch(
+                        "src.checkers.urlchecker.utils.extract_appimage_version",
+                    ) as extract_appimage,
+                    mock.patch(
+                        "src.checkers.urlchecker.utils.extract_deb_version",
+                    ) as extract_deb,
+                ):
+                    await self.checker.validate_checker_data(data)
+                    await self.checker.check(data)
+                extract_appimage.assert_not_called()
+                extract_deb.assert_not_called()
+                self.assertEqual(data.new_version.version, "1.2.3")
+                self.assertEqual(data.new_version.url, new_version.url)
+
+    async def test_validate_no_extract_version(self):
+        for value in (True, False, "false", 0, None):
+            with self.subTest(value=value):
+                data = self._make_data(
+                    {
+                        "type": "rotating-url",
+                        "url": "https://example.com/prog.AppImage",
+                        "no-extract-version": value,
+                    }
+                )
+                if isinstance(value, bool):
+                    await self.checker.validate_checker_data(data)
+                else:
+                    with self.assertRaises(CheckerMetadataError):
+                        await self.checker.validate_checker_data(data)
 
 
 class TestIsSameVersion(unittest.TestCase):
