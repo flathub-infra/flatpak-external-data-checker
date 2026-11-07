@@ -25,12 +25,14 @@
 import argparse
 import asyncio
 import contextlib
+import datetime
 import getpass
 import json
 import logging
 import os
 import subprocess
 import sys
+import tempfile
 import typing as t
 from enum import IntFlag
 from pathlib import Path
@@ -587,6 +589,12 @@ def parse_cli_args(cli_args=None):
         action="store_true",
     )
     parser.add_argument(
+        "--report-json",
+        metavar="FILE",
+        type=os.path.abspath,
+        help="Write a versioned JSON health report to FILE (including failed runs)",
+    )
+    parser.add_argument(
         "--update",
         help="Update manifest(s) to refer to new versions of "
         "external data - also open PRs for changes unless "
@@ -703,10 +711,62 @@ def parse_cli_args(cli_args=None):
 
 
 async def run_with_args(args: argparse.Namespace) -> tuple[int, int, bool]:
+    report = {
+        "schema_version": 1,
+        "manifest": args.manifest,
+        "started_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "mode": "lint" if args.lint else "check",
+        "status": "failed",
+        "delivery": "not_requested",
+        "sources": [],
+        "errors": [],
+    }
+    try:
+        result = await _run_with_args(args, report)
+        report["status"] = (
+            "failed"
+            if result[1] or result[0] == -1 or report["errors"]
+            else "completed"
+        )
+        return result
+    except Exception as error:
+        report["errors"].append({"type": type(error).__name__, "message": str(error)})
+        if report["delivery"] == "pending":
+            report["delivery"] = "failed"
+        raise
+    finally:
+        if getattr(args, "report_json", None):
+            report["finished_at"] = datetime.datetime.now(
+                datetime.timezone.utc
+            ).isoformat()
+            destination = Path(args.report_json)
+            temporary = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="w",
+                    encoding="utf-8",
+                    dir=destination.parent,
+                    delete=False,
+                ) as output:
+                    temporary = Path(output.name)
+                    json.dump(report, output, indent=2)
+                    output.write("\n")
+                os.replace(temporary, destination)
+            finally:
+                if temporary is not None:
+                    temporary.unlink(missing_ok=True)
+
+
+async def _run_with_args(
+    args: argparse.Namespace, report: dict
+) -> tuple[int, int, bool]:
     init_logging(logging.DEBUG if args.verbose else logging.INFO)
 
     if args.lint:
         errors = ManifestLinter(args.max_manifest_size).lint(Path(args.manifest))
+        report["errors"] = [
+            {"type": type(error).__name__, "message": str(error)} for error in errors
+        ]
         for error in errors:
             log.error("%s", error)
         log.info("Lint finished with %d error(s)", len(errors))
@@ -725,16 +785,26 @@ async def run_with_args(args: argparse.Namespace) -> tuple[int, int, bool]:
     try:
         manifest_checker = manifest.ManifestChecker(args.manifest, options)
     except ManifestLoadError as err:
+        report["errors"] = [{"type": type(err).__name__, "message": str(err)}]
         log.error("Failed to load manifest %s: %s", args.manifest, err)
         return 0, 1, False
 
     await manifest_checker.check(args.filter_type)
+    if getattr(args, "report_json", None):
+        report["sources"] = manifest_checker.get_source_report()
+        report["errors"] = [
+            {"type": type(error).__name__, "message": str(error)}
+            for error in manifest_checker.get_report_errors()
+        ]
 
     outdated_num = print_outdated_external_data(manifest_checker)
 
     if should_update and outdated_num > 0:
+        report["delivery"] = "pending"
         changes = manifest_checker.update_manifests()
+        report["delivery"] = "edited" if changes else "no_changes"
         if changes and not args.edit_only:
+            report["delivery"] = "pending"
             git_checkout = get_manifest_git_checkout(args.manifest)
             ensure_git_safe_directory(git_checkout)
             with indir(git_checkout):
@@ -742,16 +812,45 @@ async def run_with_args(args: argparse.Namespace) -> tuple[int, int, bool]:
                     changes, commit_to_base=args.commit_to_current_branch
                 )
                 if not committed_changes:
+                    report["delivery"] = "failed"
+                    report["errors"].append(
+                        {
+                            "type": "CommitError",
+                            "message": (
+                                "Could not commit updates; see run logs for details"
+                            ),
+                        }
+                    )
                     return (-1, -1, False)
+                report["delivery"] = "committed"
                 if not (args.commit_only or args.commit_to_current_branch):
+                    report["delivery"] = "pending"
                     if not open_pr(
                         committed_changes,
                         manifest_checker=manifest_checker,
                         fork=args.fork,
                         pr_labels=args.pr_labels,
                     ):
+                        report["delivery"] = "failed"
+                        report["errors"].append(
+                            {
+                                "type": "PublicationError",
+                                "message": (
+                                    "Publication failed; see run logs for details"
+                                ),
+                            }
+                        )
                         return (-1, -1, False)
+                    report["delivery"] = "pr_handled"
         did_update = bool(changes)
+
+    if should_update and report["delivery"] == "not_requested":
+        report["delivery"] = "no_changes"
+    if getattr(args, "report_json", None):
+        report["errors"] = [
+            {"type": type(error).__name__, "message": str(error)}
+            for error in manifest_checker.get_report_errors()
+        ]
 
     errors_num = print_errors(manifest_checker)
 
