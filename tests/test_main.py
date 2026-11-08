@@ -304,6 +304,129 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual(await main.run_with_args(args), (2, 0, False))
 
+    async def test_runtime_branch_manifest_formats(self):
+        self._run_cmd(
+            ["git", "mv", self.manifest_filename, "net.invisible_island.xterm.yaml"]
+        )
+        self.manifest_filename = "net.invisible_island.xterm.yaml"
+        self.manifest_path = str(Path(self.test_dir.name, self.manifest_filename))
+        self._make_extension()
+        original_head = self._get_commit_data()["commit"]
+        original_manifest = Path(self.manifest_path).read_text()
+        with tempfile.TemporaryDirectory() as remote:
+            subprocess.run(["git", "init", "--bare", remote], check=True)
+            self._run_cmd(["git", "remote", "add", "origin", remote])
+            for runtime, suffix in (("24.08", ".json"), ("25.08", ".yml")):
+                self._run_cmd(
+                    ["git", "checkout", "-B", f"branch/{runtime}", original_head]
+                )
+                path = Path(self.manifest_path)
+                contents = main.read_manifest(path)[0]
+                contents["runtime-version"] = runtime
+                contents["modules"][0]["modules"].pop()
+                path.unlink()
+                path.with_suffix(suffix).write_text(json.dumps(contents))
+                self._run_cmd(["git", "add", "-A"])
+                self._run_cmd(["git", "commit", "-m", "Change manifest format"])
+                self._run_cmd(["git", "push", "origin", f"branch/{runtime}"])
+            self._run_cmd(["git", "checkout", "--detach", original_head])
+            local_manifest = original_manifest + "# local uncommitted work\n"
+            Path(self.manifest_path).write_text(local_manifest)
+            args = main.parse_cli_args(["--commit-only", self.manifest_path])
+            report_path = Path(self.test_dir.name, "report.json")
+            args.report_json = str(report_path)
+            self.assertEqual(await main.run_with_args(args), (4, 0, True))
+            report = json.loads(report_path.read_text())
+            self.assertEqual(report["errors"], [])
+            self.assertEqual(
+                [entry["status"] for entry in report["branches"]],
+                ["completed", "completed"],
+            )
+            branches = self._run_cmd(
+                ["git", "for-each-ref", "--format=%(refname:short)", "refs/heads/"],
+                capture_output=True,
+                text=True,
+            ).stdout.splitlines()
+            updates = [branch for branch in branches if branch.startswith("update-")]
+            self.assertEqual(len(updates), 2)
+            for runtime, suffix in (("24.08", ".json"), ("25.08", ".yml")):
+                branch = next(
+                    b for b in updates if b.startswith(f"update-branch/{runtime}-")
+                )
+                result = self._run_cmd(
+                    [
+                        "git",
+                        "show",
+                        f"{branch}:{Path(self.manifest_filename).with_suffix(suffix)}",
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertIn(runtime, result.stdout)
+                self.assertIn("1.0.99", result.stdout)
+            self.assertEqual(self._get_commit_data()["commit"], original_head)
+            self.assertEqual(Path(self.manifest_path).read_text(), local_manifest)
+            worktrees = self._run_cmd(
+                ["git", "worktree", "list", "--porcelain"],
+                capture_output=True,
+                text=True,
+            ).stdout
+            self.assertEqual(worktrees.count("worktree "), 1)
+
+    async def test_runtime_branch_manifest_selection_errors(self):
+        self._run_cmd(
+            ["git", "mv", self.manifest_filename, "net.invisible_island.xterm.yaml"]
+        )
+        self.manifest_filename = "net.invisible_island.xterm.yaml"
+        self.manifest_path = str(Path(self.test_dir.name, self.manifest_filename))
+        self._make_extension()
+        original_head = self._get_commit_data()["commit"]
+        with tempfile.TemporaryDirectory() as remote:
+            subprocess.run(["git", "init", "--bare", remote], check=True)
+            self._run_cmd(["git", "remote", "add", "origin", remote])
+            for runtime in ("01-eol", "02-missing", "03-ambiguous", "04-explicit"):
+                self._run_cmd(
+                    ["git", "checkout", "-B", f"branch/{runtime}", original_head]
+                )
+                path = Path(self.manifest_path)
+                if runtime != "04-explicit":
+                    path.unlink()
+                if runtime in ("03-ambiguous", "04-explicit"):
+                    for suffix in (".json", ".yml"):
+                        path.with_suffix(suffix).write_text("{}")
+                Path(self.test_dir.name, "unrelated.yaml").write_text("{}")
+                if runtime == "01-eol":
+                    Path(self.test_dir.name, "flathub.json").write_text(
+                        '{"end-of-life": "Retired"}'
+                    )
+                self._run_cmd(["git", "add", "-A"])
+                self._run_cmd(["git", "commit", "-m", "Set branch manifests"])
+                self._run_cmd(["git", "push", "origin", f"branch/{runtime}"])
+            self._run_cmd(["git", "checkout", "--detach", original_head])
+            args = main.parse_cli_args([self.manifest_path])
+            report = {"sources": [], "errors": [], "delivery": "not_requested"}
+            with patch(
+                "src.main.run_manifest_with_args", return_value=(2, 0, False)
+            ) as run:
+                self.assertEqual(
+                    await main.run_runtime_branches(args, report), (2, 2, False)
+                )
+                run.assert_awaited_once()
+                self.assertEqual(
+                    run.await_args.kwargs["base_branch"], "branch/04-explicit"
+                )
+                self.assertEqual(
+                    Path(run.await_args.args[0].manifest).name, self.manifest_filename
+                )
+            self.assertEqual(
+                [entry["status"] for entry in report["branches"]],
+                ["skipped", "failed", "failed", "completed"],
+            )
+            self.assertEqual(
+                [error["type"] for error in report["errors"]],
+                ["FileNotFoundError", "ValueError"],
+            )
+
     def _make_extension(self):
         path = Path(self.manifest_path)
         path.write_text("build-extension: true\n" + path.read_text())
