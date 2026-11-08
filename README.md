@@ -46,7 +46,8 @@ manifest.
 ### Runtime branches
 
 For manifests with `build-extension: true`, the checker fetches and checks each
-existing `branch/*` branch on `origin`.
+existing `branch/*` branch on `origin`, unless running in a current-checkout
+mode or linting.
 
 The checker reads the same manifest path relative to the repository root on
 each branch. Each update pull request targets that branch and keeps its runtime
@@ -54,7 +55,8 @@ settings and version constraints. Branches marked with `end-of-life` or
 `end-of-life-rebase` in their `flathub.json` are skipped. The checker does not
 create runtime branches or infer support status from runtime versions.
 
-Checks run in temporary worktrees and do not change your checkout.
+These runtime-branch checks run in temporary worktrees and do not change your
+checkout.
 Without a Git checkout, an `origin` remote, or matching runtime branches, the
 checker processes the supplied manifest normally. If a manifest is missing or
 a branch fails, the checker reports the error and continues with the remaining

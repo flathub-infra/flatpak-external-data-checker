@@ -43,7 +43,7 @@ from . import manifest
 from .lib.errors import ManifestLoadError
 from .lib.externaldata import ExternalData
 from .lib.sourceupdates import format_source_updates
-from .lib.utils import init_logging, parse_github_url
+from .lib.utils import init_logging, parse_github_url, read_manifest
 from .lint import ManifestLinter
 
 log = logging.getLogger(__name__)
@@ -782,6 +782,23 @@ async def _run_with_args(
     return await run_manifest_with_args(args, report)
 
 
+def is_extension_manifest(path: str, max_manifest_size: int) -> bool:
+    try:
+        if Path(path).stat().st_size > max_manifest_size:
+            return False
+        contents = read_manifest(path)
+    except Exception:
+        # Full loading reports errors after the EOL check for ordinary manifests.
+        return False
+    if isinstance(contents, tuple):
+        contents = contents[0]
+    return (
+        isinstance(contents, dict)
+        and ("id" in contents or "app-id" in contents)
+        and contents.get("build-extension") is True
+    )
+
+
 async def run_runtime_branches(
     args: argparse.Namespace,
     report: dict,
@@ -931,8 +948,21 @@ async def run_manifest_with_args(
         log.info("Lint finished with %d error(s)", len(errors))
         return 0, len(errors), False
 
+    if (
+        base_branch is None
+        and not args.edit_only
+        and not args.commit_to_current_branch
+        and is_extension_manifest(args.manifest, args.max_manifest_size)
+    ):
+        result = await run_runtime_branches(args, report)
+        if result is not None:
+            return result
+
     try:
-        end_of_life = is_end_of_life(args.manifest)
+        if is_end_of_life(args.manifest):
+            log.info("Skipping EOL manifest %s", args.manifest)
+            report["status"] = "skipped"
+            return 0, 0, False
     except (OSError, ValueError) as error:
         log.error("Failed to read flathub.json: %s", error)
         report["errors"].append({"type": type(error).__name__, "message": str(error)})
@@ -954,21 +984,6 @@ async def run_manifest_with_args(
         report["errors"] = [{"type": type(err).__name__, "message": str(err)}]
         log.error("Failed to load manifest %s: %s", args.manifest, err)
         return 0, 1, False
-
-    if (
-        manifest_checker.build_extension is True
-        and base_branch is None
-        and not args.edit_only
-        and not args.commit_to_current_branch
-    ):
-        result = await run_runtime_branches(args, report)
-        if result is not None:
-            return result
-
-    if end_of_life:
-        log.info("Skipping EOL manifest %s", args.manifest)
-        report["status"] = "skipped"
-        return 0, 0, False
 
     await manifest_checker.check(args.filter_type)
     if getattr(args, "report_json", None):

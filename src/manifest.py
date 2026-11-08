@@ -105,7 +105,6 @@ class ManifestChecker:
         self.kind = self.Kind.UNKNOWN
         self.app_id: str | None
         self.app_id = None
-        self.build_extension = False
 
         self.opts = options or CheckerOptions()
 
@@ -185,7 +184,6 @@ class ManifestChecker:
         assert isinstance(self._root_manifest, dict)
         if "id" in self._root_manifest or "app-id" in self._root_manifest:
             self.kind = self.Kind.APP
-            self.build_extension = self._root_manifest.get("build-extension") is True
             self.app_id = self._root_manifest.get(
                 "id", self._root_manifest.get("app-id")
             )
