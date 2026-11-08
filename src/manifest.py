@@ -25,6 +25,7 @@ import os
 import typing as t
 from collections import OrderedDict
 from enum import IntEnum
+from pathlib import Path
 
 import aiohttp
 from lxml.etree import XMLSyntaxError
@@ -110,6 +111,7 @@ class ManifestChecker:
 
         self._root_manifest_path = manifest
         self._root_manifest_dir = os.path.dirname(self._root_manifest_path)
+        self._repository = self._find_repository(manifest)
 
         self._modules: dict[str, list[BuilderModule]] = {}
         self._external_data: dict[str, list[ExternalBase]]
@@ -144,6 +146,12 @@ class ManifestChecker:
 
         # Map from manifest path to [ExternalBase]
         self._collect_external_data()
+        self._read_only_sources = {
+            id(data)
+            for path, datas in self._external_data.items()
+            if self._find_repository(path) != self._repository
+            for data in datas
+        }
         self._update_groups: dict[str, list[ExternalBase]] = {}
         for data in self.get_external_data():
             group = data.checker_data.get("update-group")
@@ -158,6 +166,17 @@ class ManifestChecker:
                 raise ManifestLoadError(
                     f"Update group {group!r} must contain at least two sources"
                 )
+
+    @staticmethod
+    def _find_repository(path: str) -> Path | None:
+        return next(
+            (
+                parent
+                for parent in Path(path).resolve().parents
+                if (parent / ".git").exists()
+            ),
+            None,
+        )
 
     def _load_root_manifest(self):
         if isinstance(self._root_manifest, list):
@@ -518,6 +537,7 @@ class ManifestChecker:
     def _validate_update_groups(self, allowed: list[ExternalBase] | None = None):
         """Check all groups before changing sources or writing files."""
         self._blocked_update_sources.clear()
+        self._blocked_update_sources.update(self._read_only_sources)
         self._errors = [e for e in self._errors if not isinstance(e, UpdateGroupError)]
         allowed_ids = None if allowed is None else {id(data) for data in allowed}
         for group, members in self._update_groups.items():
@@ -535,6 +555,10 @@ class ManifestChecker:
                 )
                 if data.check_failed:
                     status = "check failed"
+                elif (
+                    data.new_version is not None and id(data) in self._read_only_sources
+                ):
+                    status = "source belongs to another repository"
                 elif (
                     group_selected
                     and allowed_ids is not None
@@ -677,6 +701,7 @@ class ManifestChecker:
     def _can_update(self, data: ExternalBase) -> bool:
         return (
             data.new_version is not None
+            and id(data) not in self._read_only_sources
             and id(data) not in self._blocked_update_sources
             and (self._allowed_updates is None or id(data) in self._allowed_updates)
         )
@@ -755,6 +780,9 @@ class ManifestChecker:
         )
         if appdata is None:
             raise AppdataNotFound(f"Can't find appdata file matching {self.app_id}")
+        if self._find_repository(appdata) != self._repository:
+            log.info("Not updating appdata in another repository: %s", appdata)
+            return
 
         log.info("Preparing to update appdata %s", appdata)
 

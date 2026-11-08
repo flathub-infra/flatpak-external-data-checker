@@ -513,6 +513,64 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                 self._run_cmd(["git", "push", "origin", "HEAD:refs/heads/branch/25.08"])
                 args = main.parse_cli_args([self.manifest_path])
                 self.assertEqual(await main.run_with_args(args), (2, 0, False))
+                shared_path = Path(self.test_dir.name, "shared-modules/module.yml")
+                original_shared = shared_path.read_text()
+                for option in ("--edit-only", "--commit-only"):
+                    with self.subTest(option=option):
+                        args = main.parse_cli_args([option, self.manifest_path])
+                        self.assertEqual(await main.run_with_args(args), (2, 0, False))
+                        self.assertEqual(shared_path.read_text(), original_shared)
+                Path(self.test_dir.name, "local.yml").write_text(
+                    "name: local\n" + Path(TEST_MANIFEST).read_text()
+                )
+                with Path(self.manifest_path).open("a") as manifest_file:
+                    manifest_file.write("  - local.yml\n")
+                self._run_cmd(["git", "add", "local.yml", self.manifest_filename])
+                self._run_cmd(["git", "commit", "-m", "Add local module"])
+                self._run_cmd(["git", "push", "origin", "HEAD:refs/heads/branch/25.08"])
+                args = main.parse_cli_args(["--commit-only", self.manifest_path])
+                self.assertEqual(await main.run_with_args(args), (4, 0, True))
+                updates = self._run_cmd(
+                    [
+                        "git",
+                        "for-each-ref",
+                        "--format=%(refname)",
+                        "refs/heads/",
+                    ],
+                    capture_output=True,
+                    text=True,
+                ).stdout.splitlines()
+                updates = [
+                    ref for ref in updates if ref.startswith("refs/heads/update-")
+                ]
+                self.assertEqual(len(updates), 1)
+                changed = self._run_cmd(
+                    [
+                        "git",
+                        "diff-tree",
+                        "--no-commit-id",
+                        "--name-only",
+                        "-r",
+                        updates[0],
+                    ],
+                    capture_output=True,
+                    text=True,
+                ).stdout.splitlines()
+                self.assertEqual(changed, ["local.yml"])
+                self.assertNotIn("shared", self._get_commit_data(updates[0])["subject"])
+                args = main.parse_cli_args(
+                    ["--commit-only", "--commit-to-current-branch", self.manifest_path]
+                )
+                self.assertEqual(await main.run_with_args(args), (4, 0, True))
+                self.assertEqual(shared_path.read_text(), original_shared)
+                self.assertEqual(
+                    self._run_cmd(
+                        ["git", "status", "--porcelain"],
+                        capture_output=True,
+                        text=True,
+                    ).stdout,
+                    "",
+                )
             self.assertTrue(
                 Path(self.test_dir.name, "shared-modules/module.yml").is_file()
             )
