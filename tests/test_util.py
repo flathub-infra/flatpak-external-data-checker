@@ -850,6 +850,78 @@ class TestDumpManifest(unittest.TestCase):
         reloaded, _ = utils.read_manifest(path)
         self.assertEqual(reloaded["date"].value, "2024-7-2")
 
+    def test_yaml_update_preserves_quotes(self):
+        original = dedent(r"""
+            url: "https://example.com/old.tar.xz"
+            x-checker-data:
+              type: html
+              pattern: 'href="(https://example.com/(3\.14\.\d+)/Python-\2\.tar\.xz)"'
+            """).lstrip("\n")
+        for suffix in (".yaml", ".yml"):
+            with self.subTest(suffix=suffix):
+                path = Path(self.tmpdir.name) / f"test{suffix}"
+                path.write_text(original)
+                contents, has_yaml_header = utils.read_manifest(path)
+                contents["url"] = "https://example.com/new.tar.xz"
+                dump_manifest(contents, path, has_yaml_header)
+                self.assertEqual(
+                    path.read_text(), original.replace("old.tar.xz", "new.tar.xz")
+                )
+
+    def test_yaml_update_preserves_plain_scalar_wrapping(self):
+        original = dedent("""\
+            modules:
+              - name: browser
+                sources:
+                  - type: archive
+                    url:
+                      https://example.com/old.tar.xz
+                    x-checker-data:
+                      pattern: <a
+                        href="https://example.com/archive.tar.xz" # Keep this comment
+            """)
+        path = Path(self.tmpdir.name) / "test.yaml"
+        path.write_text(original)
+        contents, has_yaml_header = utils.read_manifest(path)
+        contents["modules"][0]["sources"][0]["url"] = "https://example.com/new.tar.xz"
+        dump_manifest(contents, path, has_yaml_header)
+        self.assertEqual(path.read_text(), original.replace("old.tar.xz", "new.tar.xz"))
+        self.assertEqual(utils.read_manifest(path)[0], contents)
+
+    def test_yaml_wrapping_respects_explicit_width(self):
+        path = Path(self.tmpdir.name) / "test.yaml"
+        path.write_text('pattern: <a\n  href="https://example.com/archive.tar.xz"\n')
+        (path.parent / ".editorconfig").write_text(
+            "root = true\n[*.yaml]\nmax_line_length = 120\n"
+        )
+        contents, has_yaml_header = utils.read_manifest(path)
+        dump_manifest(contents, path, has_yaml_header)
+        self.assertEqual(
+            path.read_text(),
+            'pattern: <a href="https://example.com/archive.tar.xz"\n',
+        )
+
+    def test_yaml_wrapping_preserves_changed_values_and_aliases(self):
+        original = dedent("""\
+            pattern: old
+              pattern
+            anchored: &pattern original
+              pattern
+            alias: *pattern
+            literal: |
+              original
+              pattern
+            flow: {pattern: original pattern}
+            """)
+        path = Path(self.tmpdir.name) / "test.yaml"
+        path.write_text(original)
+        contents, has_yaml_header = utils.read_manifest(path)
+        contents["pattern"] = "new pattern"
+        dump_manifest(contents, path, has_yaml_header)
+        updated = utils.read_manifest(path)[0]
+        self.assertEqual(updated, contents)
+        self.assertIs(updated["alias"], updated["anchored"])
+
     def test_yaml_width_is_per_manifest(self):
         contents = {"description": " ".join(["word"] * 12)}
         default_output = "description: " + contents["description"] + "\n"
