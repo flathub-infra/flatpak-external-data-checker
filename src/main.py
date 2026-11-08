@@ -246,7 +246,7 @@ def branch_exists(branch: str) -> bool:
 
 
 def commit_changes(
-    changes: list[str], commit_to_base: bool = False
+    changes: list[str], commit_to_base: bool = False, base_branch: str | None = None
 ) -> CommittedChanges | None:
     log.info("Committing updates")
     body: str | None
@@ -259,10 +259,10 @@ def commit_changes(
         message = subject
 
     # Remember the base branch
-    base_branch: str | None
-    base_branch = subprocess.check_output(
-        ["git", "branch", "--show-current"], text=True
-    ).strip()
+    if base_branch is None:
+        base_branch = subprocess.check_output(
+            ["git", "branch", "--show-current"], text=True
+        ).strip()
     if not base_branch:
         base_branch = None
 
@@ -779,6 +779,148 @@ async def _run_with_args(
 ) -> tuple[int, int, bool]:
     init_logging(logging.DEBUG if args.verbose else logging.INFO)
 
+    return await run_manifest_with_args(args, report)
+
+
+async def run_runtime_branches(
+    args: argparse.Namespace,
+    report: dict,
+) -> tuple[int, int, bool] | None:
+    try:
+        checkout = get_manifest_git_checkout(args.manifest)
+    except FileNotFoundError:
+        return None
+    try:
+        ensure_git_safe_directory(checkout)
+        manifest_path = Path(args.manifest).relative_to(checkout)
+        with indir(checkout):
+            origin = subprocess.run(
+                ["git", "remote", "get-url", "origin"], capture_output=True, check=False
+            )
+            if origin.returncode:
+                return None
+            check_call(
+                [
+                    "git",
+                    "fetch",
+                    "--prune",
+                    "origin",
+                    "+refs/heads/branch/*:refs/remotes/origin/branch/*",
+                ]
+            )
+            refs = subprocess.check_output(
+                [
+                    "git",
+                    "for-each-ref",
+                    "--format=%(refname)",
+                    "refs/remotes/origin/branch/",
+                ],
+                text=True,
+            ).splitlines()
+            if not refs:
+                return None
+
+            outdated_total = errors_total = 0
+            all_updated = True
+            any_updated = False
+            for ref in refs:
+                branch = ref.removeprefix("refs/remotes/origin/")
+                log.info("Checking runtime branch %s", branch)
+                branch_report: dict = {
+                    "branch": branch,
+                    "status": "failed",
+                    "delivery": "not_requested",
+                    "sources": [],
+                    "errors": [],
+                }
+                outdated = errors = 0
+                updated = False
+                try:
+                    with tempfile.TemporaryDirectory(prefix="fedc-") as directory:
+                        worktree = Path(directory) / "checkout"
+                        check_call(
+                            ["git", "worktree", "add", "--detach", str(worktree), ref]
+                        )
+                        try:
+                            branch_args = argparse.Namespace(**vars(args))
+                            branch_args.manifest = str(worktree / manifest_path)
+                            with indir(worktree):
+                                if is_end_of_life(branch_args.manifest):
+                                    log.info("Skipping EOL runtime branch %s", branch)
+                                    branch_report["status"] = "skipped"
+                                    continue
+                                check_call(
+                                    [
+                                        "git",
+                                        "submodule",
+                                        "update",
+                                        "--init",
+                                        "--recursive",
+                                    ]
+                                )
+                                (
+                                    outdated,
+                                    errors,
+                                    updated,
+                                ) = await run_manifest_with_args(
+                                    branch_args, branch_report, base_branch=branch
+                                )
+                            if (outdated, errors, updated) == (-1, -1, False):
+                                errors = 1
+                                outdated = t.cast(int, branch_report.get("outdated", 0))
+                        finally:
+                            check_call(
+                                ["git", "worktree", "remove", "--force", str(worktree)]
+                            )
+                except Exception as error:
+                    log.error("Failed to check runtime branch %s: %s", branch, error)
+                    errors += 1
+                    outdated = t.cast(int, branch_report.get("outdated", outdated))
+                    updated = False
+                    branch_report["errors"].append(
+                        {"type": type(error).__name__, "message": str(error)}
+                    )
+                    if branch_report["delivery"] == "pending":
+                        branch_report["delivery"] = "failed"
+                finally:
+                    outdated_total += outdated
+                    errors_total += errors
+                    any_updated |= updated
+                    if errors or (outdated and not updated):
+                        all_updated = False
+                    if errors or branch_report["errors"]:
+                        branch_report["status"] = "failed"
+                    elif branch_report["status"] != "skipped":
+                        branch_report["status"] = "completed"
+                    report.setdefault("branches", []).append(branch_report)
+                    for key in ("sources", "errors"):
+                        report[key].extend(
+                            {**entry, "branch": branch} for entry in branch_report[key]
+                        )
+                    deliveries = (
+                        "not_requested",
+                        "no_changes",
+                        "edited",
+                        "committed",
+                        "pr_handled",
+                        "pending",
+                        "failed",
+                    )
+                    report["delivery"] = max(
+                        report["delivery"],
+                        branch_report["delivery"],
+                        key=deliveries.index,
+                    )
+            return outdated_total, errors_total, any_updated and all_updated
+    except (OSError, subprocess.CalledProcessError) as error:
+        log.error("Failed to discover runtime branches: %s", error)
+        report["errors"].append({"type": type(error).__name__, "message": str(error)})
+        return 0, 1, False
+
+
+async def run_manifest_with_args(
+    args: argparse.Namespace, report: dict, base_branch: str | None = None
+) -> tuple[int, int, bool]:
     if args.lint:
         errors = ManifestLinter(args.max_manifest_size).lint(Path(args.manifest))
         report["errors"] = [
@@ -790,10 +932,7 @@ async def _run_with_args(
         return 0, len(errors), False
 
     try:
-        if is_end_of_life(args.manifest):
-            log.info("Skipping EOL manifest %s", args.manifest)
-            report["status"] = "skipped"
-            return 0, 0, False
+        end_of_life = is_end_of_life(args.manifest)
     except (OSError, ValueError) as error:
         log.error("Failed to read flathub.json: %s", error)
         report["errors"].append({"type": type(error).__name__, "message": str(error)})
@@ -816,6 +955,21 @@ async def _run_with_args(
         log.error("Failed to load manifest %s: %s", args.manifest, err)
         return 0, 1, False
 
+    if (
+        manifest_checker.build_extension is True
+        and base_branch is None
+        and not args.edit_only
+        and not args.commit_to_current_branch
+    ):
+        result = await run_runtime_branches(args, report)
+        if result is not None:
+            return result
+
+    if end_of_life:
+        log.info("Skipping EOL manifest %s", args.manifest)
+        report["status"] = "skipped"
+        return 0, 0, False
+
     await manifest_checker.check(args.filter_type)
     if getattr(args, "report_json", None):
         report["sources"] = manifest_checker.get_source_report()
@@ -825,6 +979,7 @@ async def _run_with_args(
         ]
 
     outdated_num = print_outdated_external_data(manifest_checker)
+    report["outdated"] = outdated_num
 
     if should_update and outdated_num > 0:
         report["delivery"] = "pending"
@@ -836,7 +991,9 @@ async def _run_with_args(
             ensure_git_safe_directory(git_checkout)
             with indir(git_checkout):
                 committed_changes = commit_changes(
-                    changes, commit_to_base=args.commit_to_current_branch
+                    changes,
+                    commit_to_base=args.commit_to_current_branch,
+                    base_branch=base_branch,
                 )
                 if not committed_changes:
                     report["delivery"] = "failed"
