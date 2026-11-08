@@ -799,6 +799,24 @@ def is_extension_manifest(path: str, max_manifest_size: int) -> bool:
     )
 
 
+def get_runtime_branch_manifest(path: Path) -> Path:
+    if path.exists():
+        return path
+    candidates = [
+        candidate
+        for suffix in (".json", ".yaml", ".yml")
+        if (candidate := path.with_suffix(suffix)).is_file()
+    ]
+    if not candidates:
+        raise FileNotFoundError(f"Cannot find runtime branch manifest for {path}")
+    if len(candidates) > 1:
+        raise ValueError(
+            f"Ambiguous runtime branch manifest for {path}: "
+            + ", ".join(str(candidate) for candidate in candidates)
+        )
+    return candidates[0]
+
+
 async def run_runtime_branches(
     args: argparse.Namespace,
     report: dict,
@@ -874,6 +892,11 @@ async def run_runtime_branches(
                                         "--init",
                                         "--recursive",
                                     ]
+                                )
+                                branch_args.manifest = str(
+                                    get_runtime_branch_manifest(
+                                        worktree / manifest_path
+                                    )
                                 )
                                 (
                                     outdated,
