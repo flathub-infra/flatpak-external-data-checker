@@ -71,8 +71,7 @@ class TestManifest(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(manifest.ManifestLoadError):
             manifest.ManifestChecker(self.mf_path)
 
-    @patch("src.manifest.os.stat")
-    def test_external_source_too_large(self, mock_stat):
+    def test_external_source_too_large(self):
         ext1 = os.path.join(self.test_dir.name, "ext1.json")
         with open(ext1, "w") as f:
             json.dump({"type": "file", "url": "http://a", "sha256": "b"}, f)
@@ -86,13 +85,17 @@ class TestManifest(unittest.IsolatedAsyncioTestCase):
                 f,
             )
 
-        def fake_stat(path):
+        real_stat = os.stat
+
+        def fake_stat(path, **kwargs):
+            if not os.fspath(path).endswith("ext1.json"):
+                return real_stat(path, **kwargs)
             mock_obj = MagicMock()
-            mock_obj.st_size = 99999999 if path.endswith("ext1.json") else 100
+            mock_obj.st_size = 99999999
             return mock_obj
 
-        mock_stat.side_effect = fake_stat
-        checker = manifest.ManifestChecker(self.mf_path)
+        with patch("src.manifest.os.stat", side_effect=fake_stat):
+            checker = manifest.ManifestChecker(self.mf_path)
         self.assertEqual(len(checker.get_external_data()), 0)
 
     async def test_check_skips_known_state(self):

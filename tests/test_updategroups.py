@@ -108,6 +108,60 @@ class TestUpdateGroups(unittest.IsolatedAsyncioTestCase):
         updated = json.loads(self.path.read_text())["modules"][0]["sources"]
         self.assertTrue(all(s["url"].endswith("-2.tar.gz") for s in updated))
 
+    async def test_group_spanning_submodule_is_not_partially_updated(self):
+        (self.root / ".git").mkdir()
+        shared = self.root / "shared"
+        shared.mkdir()
+        (shared / ".git").write_text("gitdir: ../.git/modules/shared\n")
+        external = shared / "source.json"
+        external.write_text(json.dumps(self.source("arm64")))
+        first = self.source("amd64")
+        first["x-checker-data"]["is-main-source"] = True
+        self.write([first, "shared/source.json", self.source("other", group=None)])
+        before = external.read_bytes()
+        appdata_before = self.appdata.read_bytes()
+        checker = ManifestChecker(str(self.path))
+        await self.check(checker)
+        self.assertEqual(len(checker.get_external_data()), 3)
+        self.assertEqual(len(checker.update_manifests()), 1)
+        self.assertEqual(external.read_bytes(), before)
+        self.assertEqual(self.appdata.read_bytes(), appdata_before)
+        updated = json.loads(self.path.read_text())["modules"][0]["sources"]
+        self.assertEqual(updated[0], first)
+        self.assertTrue(updated[2]["url"].endswith("-2.tar.gz"))
+        self.assertTrue(
+            any(isinstance(e, UpdateGroupError) for e in checker.get_errors())
+        )
+
+    async def test_direct_submodule_manifest_can_be_updated(self):
+        (self.root / ".git").mkdir()
+        shared = self.root / "shared"
+        shared.mkdir()
+        (shared / ".git").write_text("gitdir: ../.git/modules/shared\n")
+        path = shared / "source.json"
+        path.write_text(json.dumps([self.source("shared", group=None)]))
+        checker = ManifestChecker(str(path))
+        await self.check(checker)
+        self.assertEqual(len(checker.update_manifests()), 1)
+        self.assertTrue(json.loads(path.read_text())[0]["url"].endswith("-2.tar.gz"))
+
+    async def test_submodule_appdata_is_not_updated(self):
+        (self.root / ".git").mkdir()
+        shared = self.root / "shared"
+        shared.mkdir()
+        (shared / ".git").write_text("gitdir: ../.git/modules/shared\n")
+        appdata = shared / self.appdata.name
+        self.appdata.rename(appdata)
+        before = appdata.read_bytes()
+        source = self.source("app", group=None)
+        source["x-checker-data"]["is-main-source"] = True
+        self.write([source])
+        checker = ManifestChecker(str(self.path))
+        await self.check(checker)
+        with patch("src.manifest.find_appdata_file", return_value=str(appdata)):
+            self.assertEqual(len(checker.update_manifests()), 1)
+        self.assertEqual(appdata.read_bytes(), before)
+
     async def test_mismatch_is_atomic_across_files_but_unrelated_updates(self):
         first = self.source("amd64")
         first["x-checker-data"]["is-main-source"] = True
