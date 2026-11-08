@@ -168,6 +168,16 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(await main.run_with_args(args), (0, 1, False))
                     checker.assert_not_called()
 
+    async def test_eol_app_skips_invalid_manifest(self):
+        Path(self.test_dir.name, "flathub.json").write_text(
+            '{"end-of-life": "Retired"}'
+        )
+        for contents in ("{}", "["):
+            with self.subTest(contents=contents):
+                Path(self.manifest_path).write_text(contents)
+                args = main.parse_cli_args([self.manifest_path])
+                self.assertEqual(await main.run_with_args(args), (0, 0, False))
+
     def test_eol_metadata_location_and_values(self):
         config = Path(self.test_dir.name, "flathub.json")
         nested_manifest = Path(self.test_dir.name, "nested", "app.yml")
@@ -394,6 +404,13 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
 
     async def test_eol_checkout_still_discovers_runtime_branches(self):
         self._make_extension()
+        path = Path(self.manifest_path)
+        path.write_text(
+            path.read_text().replace(
+                "x-checker-data:", "x-checker-data:\n          update-group: app", 1
+            )
+            + "\n  - shared-modules/missing.yml\n"
+        )
         Path(self.test_dir.name, "flathub.json").write_text(
             '{"end-of-life": "Retired"}'
         )
@@ -401,6 +418,28 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
         with patch("src.main.run_runtime_branches", return_value=(2, 0, True)) as run:
             self.assertEqual(await main.run_with_args(args), (2, 0, True))
             run.assert_awaited_once()
+
+    async def test_invalid_checkout_metadata_does_not_block_other_branches(self):
+        self._make_extension()
+        with tempfile.TemporaryDirectory() as remote:
+            subprocess.run(["git", "init", "--bare", remote], check=True)
+            self._run_cmd(["git", "remote", "add", "origin", remote])
+            self._run_cmd(["git", "push", "origin", "HEAD:refs/heads/branch/25.08"])
+            Path(self.test_dir.name, "flathub.json").write_text("{")
+            self._run_cmd(["git", "add", "flathub.json"])
+            self._run_cmd(["git", "commit", "-m", "Invalid metadata"])
+            self._run_cmd(["git", "push", "origin", "HEAD:refs/heads/branch/24.08"])
+            report_path = Path(self.test_dir.name, "report.json")
+            args = main.parse_cli_args(
+                ["--report-json", str(report_path), self.manifest_path]
+            )
+            self.assertEqual(await main.run_with_args(args), (2, 1, False))
+            report = json.loads(report_path.read_text())
+            self.assertEqual(
+                [branch["status"] for branch in report["branches"]],
+                ["failed", "completed"],
+            )
+            self.assertEqual(report["errors"][0]["branch"], "branch/24.08")
 
     async def test_extension_without_origin(self):
         self._make_extension()
