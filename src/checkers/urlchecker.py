@@ -199,3 +199,5 @@ class URLChecker(Checker):
             new_version,
             is_update=is_rotating and not same_version,
         )
+        if is_rotating and external_data.new_version is None:
+            external_data.state |= external_data.State.LATEST

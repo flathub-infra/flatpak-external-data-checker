@@ -74,7 +74,10 @@ class SnapcraftChecker(Checker):
             and x["channel"]["name"] == channel
         ][0]
 
-        if external_data.current_version.url != data["download"]["url"]:
+        if external_data.current_version.url == data["download"]["url"]:
+            external_data.selected_version = data["version"]
+            external_data.state |= external_data.State.LATEST
+        else:
             log.debug("Downloading file from %s; may take a while", url)
             multidigest = await self._get_digests(
                 data["download"]["url"], data["download"]["sha3-384"]

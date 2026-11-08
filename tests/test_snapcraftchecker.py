@@ -110,6 +110,39 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
+    async def test_unchanged_release_is_checked(self):
+        checker = ManifestChecker(TEST_MANIFEST)
+        data = self._find_by_filename(checker.get_external_data(), "nordpass.snap")
+        metadata = {
+            "channel-map": [
+                {
+                    "channel": {"architecture": "amd64", "name": "stable"},
+                    "download": {"url": data.current_version.url},
+                    "version": "2.0.0",
+                }
+            ]
+        }
+
+        @asynccontextmanager
+        async def response(url, **kwargs):
+            yield mock.Mock(json=mock.AsyncMock(return_value=metadata))
+
+        with (
+            mock.patch("aiohttp.ClientSession.get", side_effect=response) as get,
+            mock.patch(
+                "src.checkers.urlchecker.URLChecker.check", new_callable=mock.AsyncMock
+            ) as fallback,
+        ):
+            await checker.check()
+        get.assert_called_once()
+        fallback.assert_not_awaited()
+        report = next(
+            s for s in checker.get_source_report() if s["checker_type"] == "snapcraft"
+        )
+        self.assertEqual(report["status"], "checked")
+        self.assertEqual(report["selected_version"], "2.0.0")
+        self.assertIsNone(data.new_version)
+
     def _find_by_filename(self, ext_data, filename):
         for data in ext_data:
             if data.filename == filename:
