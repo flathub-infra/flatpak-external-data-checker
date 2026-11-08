@@ -128,6 +128,64 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
         args2 = main.parse_cli_args([self.manifest_path])
         self.assertEqual(await main.run_with_args(args2), (0, 0, False))
 
+    async def test_eol_apps(self):
+        config = Path(self.test_dir.name, "flathub.json")
+        report_path = Path(self.test_dir.name, "report.json")
+        for key in ("end-of-life", "end-of-life-rebase"):
+            for option in (
+                None,
+                "--update",
+                "--commit-only",
+                "--edit-only",
+                "--commit-to-current-branch",
+            ):
+                with self.subTest(key=key, option=option):
+                    config.write_text(json.dumps({key: "Retired"}))
+                    args = main.parse_cli_args(
+                        ([option] if option else []) + [self.manifest_path]
+                    )
+                    args.report_json = str(report_path)
+                    with patch("src.main.manifest.ManifestChecker") as checker:
+                        self.assertEqual(await main.run_with_args(args), (0, 0, False))
+                        checker.assert_not_called()
+                    report = json.loads(report_path.read_text())
+                    self.assertEqual(report["status"], "skipped")
+                    self.assertEqual(report["delivery"], "not_requested")
+                    self.assertEqual(report["sources"], [])
+                    self.assertEqual(report["errors"], [])
+        args = main.parse_cli_args(["--lint", self.manifest_path])
+        with patch("src.main.ManifestLinter") as linter:
+            linter.return_value.lint.return_value = []
+            self.assertEqual(await main.run_with_args(args), (0, 0, False))
+            linter.return_value.lint.assert_called_once()
+
+    async def test_invalid_eol_metadata(self):
+        for config in ("{", "[]"):
+            with self.subTest(config=config):
+                Path(self.test_dir.name, "flathub.json").write_text(config)
+                args = main.parse_cli_args([self.manifest_path])
+                with patch("src.main.manifest.ManifestChecker") as checker:
+                    self.assertEqual(await main.run_with_args(args), (0, 1, False))
+                    checker.assert_not_called()
+
+    def test_eol_metadata_location_and_values(self):
+        config = Path(self.test_dir.name, "flathub.json")
+        nested_manifest = Path(self.test_dir.name, "nested", "app.yml")
+        for value, expected in (
+            (None, False),
+            (False, False),
+            ("", True),
+            ("Retired", True),
+        ):
+            with self.subTest(value=value):
+                config.write_text(json.dumps({"end-of-life": value}))
+                self.assertEqual(main.is_end_of_life(nested_manifest), expected)
+        config.unlink()
+        self.assertFalse(main.is_end_of_life(nested_manifest))
+        with tempfile.TemporaryDirectory() as directory:
+            Path(directory, "flathub.json").write_text('{"end-of-life": "Retired"}')
+            self.assertTrue(main.is_end_of_life(Path(directory, "app.yml")))
+
     async def test_git_envvars(self):
         os.environ["GIT_AUTHOR_NAME"] = "Some Guy"
         os.environ["GIT_AUTHOR_EMAIL"] = "someguy@localhost"

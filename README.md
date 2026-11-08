@@ -39,6 +39,10 @@ Linting cannot tell whether a query matches an upstream response. It is not a fu
 Flatpak manifest validator. You cannot combine `--lint` with update options or
 `--filter-type`.
 
+The checker skips apps marked with `end-of-life` or `end-of-life-rebase` in
+the repository's `flathub.json`. Outside a Git checkout, it looks beside the
+manifest.
+
 ### Installation
 
 Install from Flathub:

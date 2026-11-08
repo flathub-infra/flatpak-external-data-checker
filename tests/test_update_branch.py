@@ -112,6 +112,7 @@ class TestPublicationFailure(unittest.IsolatedAsyncioTestCase):
         with (
             patch("src.main.manifest.ManifestChecker") as factory,
             patch("src.main.init_logging"),
+            patch("src.main.is_end_of_life", return_value=False),
             patch("src.main.print_outdated_external_data", return_value=1),
             patch("src.main.get_manifest_git_checkout"),
             patch("src.main.ensure_git_safe_directory"),

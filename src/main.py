@@ -149,6 +149,24 @@ def get_manifest_git_checkout(manifest: Path | str) -> Path:
     raise FileNotFoundError(f"Cannot find git checkout for {manifest}")
 
 
+def is_end_of_life(manifest_path: Path | str) -> bool:
+    path = Path(manifest_path).resolve()
+    try:
+        directory = get_manifest_git_checkout(path)
+    except FileNotFoundError:
+        directory = path.parent
+    config_path = directory / "flathub.json"
+    if not config_path.exists():
+        return False
+    config = json.loads(config_path.read_text())
+    if not isinstance(config, dict):
+        raise ValueError("flathub.json must be an object")
+    return any(
+        config.get(key) is not None and config.get(key) is not False
+        for key in ("end-of-life", "end-of-life-rebase")
+    )
+
+
 def ensure_git_safe_directory(checkout: Path):
     uid = os.getuid()
     checkout_uid = os.stat(checkout).st_uid
@@ -723,11 +741,10 @@ async def run_with_args(args: argparse.Namespace) -> tuple[int, int, bool]:
     }
     try:
         result = await _run_with_args(args, report)
-        report["status"] = (
-            "failed"
-            if result[1] or result[0] == -1 or report["errors"]
-            else "completed"
-        )
+        if result[1] or result[0] == -1 or report["errors"]:
+            report["status"] = "failed"
+        elif report["status"] != "skipped":
+            report["status"] = "completed"
         return result
     except Exception as error:
         report["errors"].append({"type": type(error).__name__, "message": str(error)})
@@ -771,6 +788,16 @@ async def _run_with_args(
             log.error("%s", error)
         log.info("Lint finished with %d error(s)", len(errors))
         return 0, len(errors), False
+
+    try:
+        if is_end_of_life(args.manifest):
+            log.info("Skipping EOL manifest %s", args.manifest)
+            report["status"] = "skipped"
+            return 0, 0, False
+    except (OSError, ValueError) as error:
+        log.error("Failed to read flathub.json: %s", error)
+        report["errors"].append({"type": type(error).__name__, "message": str(error)})
+        return 0, 1, False
 
     should_update = args.update or args.commit_only or args.edit_only
     did_update = False
