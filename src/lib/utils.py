@@ -536,7 +536,7 @@ async def extract_appimage_version(appimg_io: t.IO):
     """
     Saves 'data' to a temporary file with the given basename, executes it (in a sandbox)
     with --appimage-extract to unpack it, and scrapes the version number out of the
-    first .desktop file it finds.
+    first root .desktop file that provides X-AppImage-Version, if any.
     """
     assert appimg_io.name
 
@@ -556,7 +556,17 @@ async def extract_appimage_version(appimg_io: t.IO):
         for desktop in (Path(tmpdir) / "squashfs-root").glob("*.desktop"):
             kf = GLib.KeyFile()
             kf.load_from_file(str(desktop), GLib.KeyFileFlags.NONE)
-            return kf.get_string(GLib.KEY_FILE_DESKTOP_GROUP, "X-AppImage-Version")
+            try:
+                return kf.get_string(GLib.KEY_FILE_DESKTOP_GROUP, "X-AppImage-Version")
+            except GLib.Error as err:
+                if not any(
+                    err.matches(GLib.key_file_error_quark(), code)
+                    for code in (
+                        GLib.KeyFileError.KEY_NOT_FOUND,
+                        GLib.KeyFileError.GROUP_NOT_FOUND,
+                    )
+                ):
+                    raise
 
 
 def extract_deb_version(deb_io: t.IO):
