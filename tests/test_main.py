@@ -147,7 +147,7 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                     args.report_json = str(report_path)
                     with patch("src.main.manifest.ManifestChecker") as checker:
                         self.assertEqual(await main.run_with_args(args), (0, 0, False))
-                        checker.assert_not_called()
+                        checker.return_value.check.assert_not_called()
                     report = json.loads(report_path.read_text())
                     self.assertEqual(report["status"], "skipped")
                     self.assertEqual(report["delivery"], "not_requested")
@@ -185,6 +185,343 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             Path(directory, "flathub.json").write_text('{"end-of-life": "Retired"}')
             self.assertTrue(main.is_end_of_life(Path(directory, "app.yml")))
+
+    async def test_runtime_branches(self):
+        self._make_extension()
+        with tempfile.TemporaryDirectory() as remote:
+            subprocess.run(["git", "init", "--bare", remote], check=True)
+            self._run_cmd(["git", "remote", "add", "origin", remote])
+            original_head = self._get_commit_data()["commit"]
+            for runtime in ("24.08", "25.08"):
+                self._run_cmd(
+                    ["git", "checkout", "-B", f"branch/{runtime}", original_head]
+                )
+                Path(self.test_dir.name, "runtime.txt").write_text(runtime)
+                manifest_file = Path(self.manifest_path)
+                manifest_file.write_text(
+                    f"runtime-version: '{runtime}'\n" + manifest_file.read_text()
+                )
+                self._run_cmd(["git", "add", "runtime.txt", self.manifest_filename])
+                self._run_cmd(["git", "commit", "-m", f"Runtime {runtime}"])
+                self._run_cmd(["git", "push", "origin", f"branch/{runtime}"])
+            self._run_cmd(["git", "checkout", "--detach", original_head])
+            local_manifest = (
+                Path(self.manifest_path).read_text() + "# local uncommitted work\n"
+            )
+            Path(self.manifest_path).write_text(local_manifest)
+            args = main.parse_cli_args(["--commit-only", self.manifest_path])
+            report_path = Path(self.test_dir.name, "report.json")
+            args.report_json = str(report_path)
+            self.assertEqual(await main.run_with_args(args), (4, 0, True))
+            report = json.loads(report_path.read_text())
+            self.assertEqual(report["status"], "completed")
+            self.assertEqual(report["delivery"], "committed")
+            self.assertEqual(report["errors"], [])
+            self.assertEqual(len(report["sources"]), 4)
+            self.assertEqual(
+                [entry["branch"] for entry in report["sources"]],
+                ["branch/24.08"] * 2 + ["branch/25.08"] * 2,
+            )
+            self.assertEqual(len(report["branches"]), 2)
+            self.assertEqual(self._get_commit_data()["commit"], original_head)
+            self.assertEqual(Path(self.manifest_path).read_text(), local_manifest)
+            branches = self._run_cmd(
+                ["git", "for-each-ref", "--format=%(refname:short)", "refs/heads/"],
+                capture_output=True,
+                text=True,
+            ).stdout.splitlines()
+            updates = [branch for branch in branches if branch.startswith("update-")]
+            self.assertEqual(len(updates), 2)
+            for runtime in ("24.08", "25.08"):
+                branch = next(
+                    b for b in updates if b.startswith(f"update-branch/{runtime}-")
+                )
+                result = self._run_cmd(
+                    ["git", "show", f"{branch}:runtime.txt"],
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.stdout, runtime)
+                result = self._run_cmd(
+                    ["git", "show", f"{branch}:{self.manifest_filename}"],
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertIn(f"runtime-version: '{runtime}'", result.stdout)
+                self.assertEqual(
+                    self._get_commit_data(branch)["subject"],
+                    "Update libXaw and xterm modules",
+                )
+            worktrees = self._run_cmd(
+                ["git", "worktree", "list", "--porcelain"],
+                capture_output=True,
+                text=True,
+            ).stdout
+            self.assertEqual(worktrees.count("worktree "), 1)
+
+            args.commit_only = False
+            args.update = True
+            with patch("src.main.open_pr", return_value=True) as open_pr:
+                self.assertEqual(await main.run_with_args(args), (4, 0, True))
+                self.assertEqual(
+                    [call.args[0].base_branch for call in open_pr.call_args_list],
+                    ["branch/24.08", "branch/25.08"],
+                )
+
+            # A branch error must not hide other branches' outstanding updates.
+            self._run_cmd(["git", "push", "origin", "HEAD:refs/heads/branch/00.00"])
+            args.update = False
+            with patch(
+                "src.main.run_manifest_with_args", new_callable=AsyncMock
+            ) as run:
+                run.side_effect = [(0, 1, False), (2, 0, True), (1, 0, False)]
+                report = {"sources": [], "errors": [], "delivery": "not_requested"}
+                self.assertEqual(
+                    await main.run_runtime_branches(args, report), (3, 1, False)
+                )
+                self.assertEqual(run.await_count, 3)
+
+            self._run_cmd(
+                [
+                    "git",
+                    "push",
+                    "origin",
+                    "--delete",
+                    "branch/00.00",
+                    "branch/24.08",
+                    "branch/25.08",
+                ]
+            )
+            self.assertEqual(await main.run_with_args(args), (2, 0, False))
+
+    def _make_extension(self):
+        path = Path(self.manifest_path)
+        path.write_text("build-extension: true\n" + path.read_text())
+        self._run_cmd(["git", "commit", "-am", "Build extension"])
+
+    async def test_runtime_branch_eol(self):
+        self._make_extension()
+        original_head = self._get_commit_data()["commit"]
+        configs = {
+            "01-eol": '{"end-of-life": "Retired"}',
+            "02-rebase": '{"end-of-life-rebase": "org.example.New"}',
+            "03-empty-reason": '{"end-of-life": ""}',
+            "04-invalid": "{",
+            "05-invalid-object": "[]",
+            "06-active": '{"end-of-life": null, "end-of-life-rebase": false}',
+            "07-missing": None,
+        }
+        with tempfile.TemporaryDirectory() as remote:
+            subprocess.run(["git", "init", "--bare", remote], check=True)
+            self._run_cmd(["git", "remote", "add", "origin", remote])
+            for runtime, config in configs.items():
+                self._run_cmd(
+                    ["git", "checkout", "-B", f"branch/{runtime}", original_head]
+                )
+                if config is not None:
+                    Path(self.test_dir.name, "flathub.json").write_text(config)
+                    self._run_cmd(["git", "add", "flathub.json"])
+                    self._run_cmd(["git", "commit", "-m", "Set branch metadata"])
+                self._run_cmd(["git", "push", "origin", f"branch/{runtime}"])
+            self._run_cmd(["git", "checkout", "--detach", original_head])
+            args = main.parse_cli_args(["--update", self.manifest_path])
+            report = {"sources": [], "errors": [], "delivery": "not_requested"}
+            with (
+                patch(
+                    "src.main.run_manifest_with_args", return_value=(2, 0, True)
+                ) as run,
+                patch("src.main.check_call", wraps=main.check_call) as check_call,
+            ):
+                self.assertEqual(
+                    await main.run_runtime_branches(args, report), (4, 2, False)
+                )
+                self.assertEqual(
+                    [call.kwargs["base_branch"] for call in run.await_args_list],
+                    ["branch/06-active", "branch/07-missing"],
+                )
+                self.assertEqual(
+                    sum(
+                        call.args[0][:2] == ["git", "submodule"]
+                        for call in check_call.call_args_list
+                    ),
+                    2,
+                )
+            self.assertEqual(
+                [entry["status"] for entry in report["branches"]],
+                ["skipped"] * 3 + ["failed"] * 2 + ["completed"] * 2,
+            )
+            for entry in report["branches"][:3]:
+                self.assertEqual(entry["delivery"], "not_requested")
+                self.assertEqual(entry["sources"], [])
+                self.assertEqual(entry["errors"], [])
+            self.assertEqual(
+                [error["type"] for error in report["errors"]],
+                ["JSONDecodeError", "ValueError"],
+            )
+            self._run_cmd(
+                ["git", "push", "origin", "--delete"]
+                + [f"branch/{runtime}" for runtime in list(configs)[3:]]
+            )
+            report = {"sources": [], "errors": [], "delivery": "not_requested"}
+            with patch("src.main.run_manifest_with_args") as run:
+                self.assertEqual(
+                    await main.run_runtime_branches(args, report), (0, 0, False)
+                )
+                run.assert_not_called()
+            self.assertEqual(
+                [entry["status"] for entry in report["branches"]], ["skipped"] * 3
+            )
+            worktrees = self._run_cmd(
+                ["git", "worktree", "list", "--porcelain"],
+                capture_output=True,
+                text=True,
+            ).stdout
+            self.assertEqual(worktrees.count("worktree "), 1)
+            self.assertEqual(self._get_commit_data()["commit"], original_head)
+
+    async def test_extension_current_checkout_modes(self):
+        self._make_extension()
+        for option in ("--edit-only", "--commit-to-current-branch", "--lint"):
+            with (
+                self.subTest(option=option),
+                patch(
+                    "src.main.run_runtime_branches", new_callable=AsyncMock
+                ) as discover,
+            ):
+                args = main.parse_cli_args([option, self.manifest_path])
+                await main.run_with_args(args)
+                discover.assert_not_awaited()
+
+    async def test_eol_checkout_still_discovers_runtime_branches(self):
+        self._make_extension()
+        Path(self.test_dir.name, "flathub.json").write_text(
+            '{"end-of-life": "Retired"}'
+        )
+        args = main.parse_cli_args([self.manifest_path])
+        with patch("src.main.run_runtime_branches", return_value=(2, 0, True)) as run:
+            self.assertEqual(await main.run_with_args(args), (2, 0, True))
+            run.assert_awaited_once()
+
+    async def test_extension_without_origin(self):
+        self._make_extension()
+        args = main.parse_cli_args([self.manifest_path])
+        self.assertEqual(await main.run_with_args(args), (2, 0, False))
+
+    async def test_normal_manifest_does_not_discover_branches(self):
+        with patch("src.main.run_runtime_branches", new_callable=AsyncMock) as discover:
+            args = main.parse_cli_args([self.manifest_path])
+            self.assertEqual(await main.run_with_args(args), (2, 0, False))
+            discover.assert_not_awaited()
+
+    async def test_runtime_branch_delivery_failure_continues(self):
+        self._make_extension()
+        with tempfile.TemporaryDirectory() as remote:
+            subprocess.run(["git", "init", "--bare", remote], check=True)
+            self._run_cmd(["git", "remote", "add", "origin", remote])
+            for runtime in ("24.08", "25.08"):
+                self._run_cmd(
+                    ["git", "push", "origin", f"HEAD:refs/heads/branch/{runtime}"]
+                )
+            args = main.parse_cli_args(["--update", self.manifest_path])
+            report_path = Path(self.test_dir.name, "report.json")
+            args.report_json = str(report_path)
+            for failure, error_type in (
+                (RuntimeError("Failed to merge PR: merge rejected"), "RuntimeError"),
+                (
+                    json.JSONDecodeError("Invalid configuration", "{", 1),
+                    "JSONDecodeError",
+                ),
+                (False, "PublicationError"),
+            ):
+                for reporting in (True, False):
+                    args.report_json = str(report_path) if reporting else None
+                    with (
+                        self.subTest(failure=error_type, reporting=reporting),
+                        patch(
+                            "src.main.open_pr", side_effect=[failure, True]
+                        ) as open_pr,
+                    ):
+                        self.assertEqual(await main.run_with_args(args), (4, 1, False))
+                        self.assertEqual(
+                            [
+                                call.args[0].base_branch
+                                for call in open_pr.call_args_list
+                            ],
+                            ["branch/24.08", "branch/25.08"],
+                        )
+                        if not reporting:
+                            continue
+                        report = json.loads(report_path.read_text())
+                        self.assertEqual(report["status"], "failed")
+                        self.assertEqual(report["delivery"], "failed")
+                        self.assertEqual(len(report["sources"]), 4)
+                        self.assertEqual(report["errors"][0]["branch"], "branch/24.08")
+                        self.assertEqual(report["errors"][0]["type"], error_type)
+                        self.assertEqual(
+                            [entry["outdated"] for entry in report["branches"]], [2, 2]
+                        )
+                        self.assertEqual(
+                            [entry["delivery"] for entry in report["branches"]],
+                            ["failed", "pr_handled"],
+                        )
+                        self.assertEqual(
+                            [entry["status"] for entry in report["branches"]],
+                            ["failed", "completed"],
+                        )
+            worktrees = self._run_cmd(
+                ["git", "worktree", "list", "--porcelain"],
+                capture_output=True,
+                text=True,
+            ).stdout
+            self.assertEqual(worktrees.count("worktree "), 1)
+
+    async def test_runtime_branch_submodule(self):
+        with (
+            tempfile.TemporaryDirectory() as remote,
+            tempfile.TemporaryDirectory() as shared,
+        ):
+            subprocess.run(["git", "init", "--bare", remote], check=True)
+            subprocess.run(["git", "init", shared], check=True)
+            Path(shared, "module.yml").write_text(
+                "name: shared\n" + Path(TEST_MANIFEST).read_text()
+            )
+            subprocess.run(["git", "-C", shared, "add", "."], check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    shared,
+                    "-c",
+                    "user.name=Test Runner",
+                    "-c",
+                    "user.email=test@localhost",
+                    "commit",
+                    "-m",
+                    "Shared module",
+                ],
+                check=True,
+            )
+            # Local submodule remotes keep this regression test offline.
+            with patch.dict(os.environ, {"GIT_ALLOW_PROTOCOL": "file"}):
+                self._run_cmd(["git", "submodule", "add", shared, "shared-modules"])
+                Path(self.manifest_path).write_text(
+                    "id: net.invisible_island.xterm\nbuild-extension: true\nmodules:\n"
+                    "  - shared-modules/module.yml\n"
+                )
+                self._run_cmd(["git", "commit", "-am", "Use shared module"])
+                self._run_cmd(["git", "remote", "add", "origin", remote])
+                self._run_cmd(["git", "push", "origin", "HEAD:refs/heads/branch/25.08"])
+                args = main.parse_cli_args([self.manifest_path])
+                self.assertEqual(await main.run_with_args(args), (2, 0, False))
+            self.assertTrue(
+                Path(self.test_dir.name, "shared-modules/module.yml").is_file()
+            )
+            worktrees = self._run_cmd(
+                ["git", "worktree", "list", "--porcelain"],
+                capture_output=True,
+                text=True,
+            ).stdout
+            self.assertEqual(worktrees.count("worktree "), 1)
 
     async def test_git_envvars(self):
         os.environ["GIT_AUTHOR_NAME"] = "Some Guy"
@@ -433,6 +770,7 @@ class TestErrorSummary(unittest.IsolatedAsyncioTestCase):
             self.assertLogs("src.main", level="INFO") as logs,
         ):
             checker = factory.return_value
+            checker.build_extension = False
             checker.get_errors.return_value = errors
             checker.get_outdated_external_data.return_value = []
             result = await main.run_with_args(main.parse_cli_args([TEST_MANIFEST]))
