@@ -76,7 +76,8 @@ class SnapcraftChecker(Checker):
 
         if external_data.current_version.url == data["download"]["url"]:
             external_data.selected_version = data["version"]
-            external_data.state |= external_data.State.LATEST
+            if external_data.type != ExternalBase.Type.EXTRA_DATA:
+                external_data.state |= external_data.State.LATEST
         else:
             log.debug("Downloading file from %s; may take a while", url)
             multidigest = await self._get_digests(
