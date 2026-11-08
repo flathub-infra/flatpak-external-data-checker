@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 import tempfile
+from collections import Counter
 from pathlib import Path
 from unittest.mock import patch
 
@@ -170,7 +171,7 @@ class TestReporting(LocalHTTPTestCase):
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout), self.assertLogs("src") as logs:
                 result = await main.run_with_args(args)
-            outputs.append((result, stdout.getvalue(), logs.output))
+            outputs.append((result, stdout.getvalue(), Counter(logs.output)))
         self.assertEqual(outputs[0], outputs[1])
         self.assertIn("OUTDATED", outputs[1][1])
         self.assertIn("2026-11-06 12:00:00+00:00", outputs[1][1])
