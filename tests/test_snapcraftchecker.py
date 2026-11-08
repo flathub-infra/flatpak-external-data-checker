@@ -111,8 +111,20 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_unchanged_release_is_checked(self):
+        await self._check_unchanged_release(False)
+
+    async def test_unchanged_release_repairs_download_metadata(self):
+        await self._check_unchanged_release(True)
+
+    async def _check_unchanged_release(self, changed):
         checker = ManifestChecker(TEST_MANIFEST)
         data = self._find_by_filename(checker.get_external_data(), "nordpass.snap")
+        downloaded = data.current_version
+        if changed:
+            downloaded = downloaded._replace(
+                checksum=MultiDigest(sha256="a" * 64),
+                size=123,
+            )
         metadata = {
             "channel-map": [
                 {
@@ -130,18 +142,24 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
         with (
             mock.patch("aiohttp.ClientSession.get", side_effect=response) as get,
             mock.patch(
-                "src.checkers.urlchecker.URLChecker.check", new_callable=mock.AsyncMock
-            ) as fallback,
+                "src.checkers.urlchecker.utils.get_extra_data_info_from_url",
+                new_callable=mock.AsyncMock,
+                return_value=downloaded,
+            ) as download,
         ):
             await checker.check()
         get.assert_called_once()
-        fallback.assert_not_awaited()
+        download.assert_awaited_once()
         report = next(
             s for s in checker.get_source_report() if s["checker_type"] == "snapcraft"
         )
-        self.assertEqual(report["status"], "checked")
+        self.assertEqual(report["status"], "update_available" if changed else "checked")
         self.assertEqual(report["selected_version"], "2.0.0")
-        self.assertIsNone(data.new_version)
+        if changed:
+            self.assertEqual(data.new_version.checksum, downloaded.checksum)
+            self.assertEqual(data.new_version.size, downloaded.size)
+        else:
+            self.assertIsNone(data.new_version)
 
     def _find_by_filename(self, ext_data, filename):
         for data in ext_data:

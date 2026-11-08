@@ -639,7 +639,9 @@ class ManifestChecker:
                 status, reason = "unchecked", "no_update_checker"
             elif not attempted:
                 status, reason = "unchecked", "no_applicable_checker"
-            elif data.State.LATEST in data.state:
+            elif data.State.LATEST in data.state or (
+                data.State.VALID in data.state and data.selected_version is not None
+            ):
                 status = "checked"
             else:
                 status, reason = "unchecked", "no_candidate"
