@@ -174,3 +174,14 @@ class TestReporting(LocalHTTPTestCase):
         self.assertEqual(outputs[0], outputs[1])
         self.assertIn("OUTDATED", outputs[1][1])
         self.assertIn("2026-11-06 12:00:00+00:00", outputs[1][1])
+
+    async def test_unchanged_rotating_url_is_checked(self):
+        source = self.source(same=True)
+        source["x-checker-data"] = {
+            "type": "rotating-url",
+            "url": source["url"],
+        }
+        self.write([source])
+        _, report = await self.run_report()
+        self.assertEqual(report["sources"][0]["status"], "checked")
+        self.assertIsNone(report["sources"][0]["candidate"])
