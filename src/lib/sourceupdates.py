@@ -1,8 +1,11 @@
 import dataclasses
 import html
 import re
-from urllib.parse import quote, unquote
+from urllib.parse import quote, unquote, urlsplit
 
+import semver
+
+from ..checkers.electronchecker import ElectronChecker
 from ..checkers.urlchecker import URLChecker, extract_version
 from .externaldata import ExternalBase, ExternalGitRef, ExternalState
 from .releaselinks import (
@@ -12,6 +15,36 @@ from .releaselinks import (
     download_release_url,
     http_url,
 )
+
+
+def _electron_previous_version(old_url: str, new: ExternalState) -> str | None:
+    version = new.version
+    if not version or not semver.Version.is_valid(version):
+        return None
+    try:
+        old_url_parts = urlsplit(old_url)
+        new_url_parts = urlsplit(new.url)
+    except ValueError:
+        return None
+    if (
+        new_url_parts.scheme not in ("http", "https")
+        or not new_url_parts.netloc
+        or old_url_parts._replace(path="") != new_url_parts._replace(path="")
+    ):
+        return None
+    old_dir, _, old_name = old_url_parts.path.rpartition("/")
+    new_dir, _, new_name = new_url_parts.path.rpartition("/")
+    if old_dir != new_dir or new_name.count(version) != 1:
+        return None
+    prefix, _, suffix = new_name.partition(version)
+    if not re.fullmatch(r"(?:.*[-_])?v?", prefix) or (
+        suffix and not re.match(r"(?:[-_]|\.[A-Za-z])", suffix)
+    ):
+        return None
+    if not old_name.startswith(prefix) or not old_name.endswith(suffix):
+        return None
+    candidate = old_name[len(prefix) : len(old_name) - len(suffix)]
+    return candidate if semver.Version.is_valid(candidate) else None
 
 
 def _version(data: ExternalBase, state: ExternalState) -> str:
@@ -27,6 +60,13 @@ def _version(data: ExternalBase, state: ExternalState) -> str:
     version = state.version
     if not version and data.checker_data.get("type") == URLChecker.CHECKER_DATA_TYPE:
         version = extract_version(data.checker_data, state.url)
+    if (
+        not version
+        and data.checker_data.get("type") == ElectronChecker.CHECKER_DATA_TYPE
+        and state is data.current_version
+        and data.new_version is not None
+    ):
+        version = _electron_previous_version(state.url, data.new_version)
     if not version:
         release_url = download_release_url(state.url)
         if release_url:
