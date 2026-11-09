@@ -17,6 +17,8 @@ from src.lib.externaldata import ExternalData, ExternalFile
 from src.lib.runtime import RuntimeStatus
 from src.lib.sourceupdates import SourceUpdate
 
+from .report_schema import validate_branch_report, validate_report
+
 TEST_MANIFEST = os.path.join(
     os.path.dirname(__file__), "net.invisible_island.xterm.yml"
 )
@@ -161,6 +163,7 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                         self.assertEqual(await main.run_with_args(args), (0, 0, False))
                         checker.return_value.check.assert_not_called()
                     report = json.loads(report_path.read_text())
+                    validate_report(report)
                     self.assertEqual(report["status"], "skipped")
                     self.assertEqual(report["delivery"], "not_requested")
                     self.assertEqual(report["sources"], [])
@@ -238,6 +241,7 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
             args.report_json = str(report_path)
             self.assertEqual(await main.run_with_args(args), (4, 0, True))
             report = json.loads(report_path.read_text())
+            validate_report(report)
             self.assertEqual(report["status"], "completed")
             self.assertEqual(report["delivery"], "committed")
             self.assertEqual(report["errors"], [])
@@ -351,6 +355,7 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
             args.report_json = str(report_path)
             self.assertEqual(await main.run_with_args(args), (4, 0, True))
             report = json.loads(report_path.read_text())
+            validate_report(report)
             self.assertEqual(report["errors"], [])
             self.assertEqual(
                 [entry["status"] for entry in report["branches"]],
@@ -581,6 +586,8 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                 )
             self.assertIn("Retired SDK", "\n".join(logs.output))
             report = json.loads(json.dumps(report))
+            for entry in report["branches"]:
+                validate_branch_report(entry)
             self.assertEqual(
                 [entry["status"] for entry in report["branches"]],
                 ["skipped", "failed", "completed", "skipped"],
@@ -647,6 +654,7 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual(await main.run_with_args(args), (2, 1, False))
             report = json.loads(report_path.read_text())
+            validate_report(report)
             self.assertEqual(
                 [branch["status"] for branch in report["branches"]],
                 ["failed", "completed"],
@@ -703,6 +711,7 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                         if not reporting:
                             continue
                         report = json.loads(report_path.read_text())
+                        validate_report(report)
                         self.assertEqual(report["status"], "failed")
                         self.assertEqual(report["delivery"], "failed")
                         self.assertEqual(len(report["sources"]), 4)

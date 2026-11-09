@@ -12,9 +12,11 @@ SCHEMA_PATH = Path(__file__).resolve().parents[1] / "data/source-state.schema.js
 
 
 class TestSourceStateSchema(unittest.TestCase):
+    schema_path = SCHEMA_PATH
+
     @classmethod
     def setUpClass(cls):
-        with SCHEMA_PATH.open() as stream:
+        with cls.schema_path.open() as stream:
             cls.schema = json.load(stream)
         validator_cls = jsonschema.validators.validator_for(cls.schema)
         validator_cls.check_schema(cls.schema)
@@ -210,3 +212,18 @@ class TestSourceStateSchema(unittest.TestCase):
             with self.subTest(invalid=invalid):
                 with self.assertRaises(jsonschema.ValidationError):
                     self.validator.validate(state | invalid)
+
+
+class TestVersionedSourceStateSchema(TestSourceStateSchema):
+    schema_path = SCHEMA_PATH.with_name("source-state.v1.schema.json")
+
+    def test_matches_existing_contract(self):
+        original = json.loads(SCHEMA_PATH.read_text())
+        versioned = self.schema.copy()
+        del versioned["$id"]
+        del versioned["title"]
+        original["description"] = versioned["description"]
+        original["$defs"]["timestamp"]["description"] = versioned["$defs"]["timestamp"][
+            "description"
+        ]
+        self.assertEqual(versioned, original)

@@ -77,3 +77,18 @@ blocking native calls.
 
 Keep new tests offline. Use `tests/support.py` for a local HTTP server with a
 five-second request timeout.
+
+# JSON schemas
+
+Use the [v1 report schema](data/report.v1.schema.json) for `schema_version: 1`.
+The [v1 source-state schema](data/source-state.v1.schema.json) covers report
+snapshots and the JSON checker's `$parent.current` and `$parent.new` values,
+not the enclosing object. Unknown metadata and absent candidates are `null`.
+
+Both schemas use JSON Schema Draft 2020-12. For offline validation, register both
+schemas by `$id`. Enable format checking for report timestamps and JSON Pointers.
+Source-state timestamps use Python's ISO format and need not conform to RFC 3339.
+
+For incompatible changes, add new schema files and increment `schema_version`.
+Readers should reject unsupported versions. Retain older schemas, including the
+unversioned [source-state schema](data/source-state.schema.json).
