@@ -51,6 +51,25 @@ def download_release_url(url: str) -> str | None:
     return None
 
 
+def archive_tag(url: str) -> str | None:
+    """Read an explicitly named tag, without guessing from an ambiguous Git ref."""
+    if not http_url(url):
+        return None
+    parsed = urlsplit(url)
+    if parsed.netloc.lower() != "github.com":
+        return None
+    match = re.fullmatch(
+        r"/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/archive/refs/tags/(.+)\.(?:tar\.gz|zip)",
+        parsed.path,
+    )
+    if not match:
+        return None
+    tag = unquote(match[1])
+    if any(part in (".", "..") for part in tag.split("/")):
+        return None
+    return tag
+
+
 def comparison_url(repository_url: str, old: object, new: object) -> str | None:
     if not isinstance(old, str) or not isinstance(new, str):
         return None

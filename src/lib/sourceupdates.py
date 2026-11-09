@@ -6,6 +6,7 @@ from urllib.parse import quote, unquote
 from ..checkers.urlchecker import URLChecker, extract_version
 from .externaldata import ExternalBase, ExternalGitRef, ExternalState
 from .releaselinks import (
+    archive_tag,
     comparison_url,
     download_comparison_url,
     download_release_url,
@@ -30,6 +31,9 @@ def _version(data: ExternalBase, state: ExternalState) -> str:
         release_url = download_release_url(state.url)
         if release_url:
             return f"tag {unquote(release_url.rsplit('/', 1)[1])}"
+        tag = archive_tag(state.url)
+        if tag:
+            return f"tag {tag}"
     return version or "unknown"
 
 
