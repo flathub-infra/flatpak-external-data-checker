@@ -110,7 +110,7 @@ exclude = ["tests/"]
 
 [tool.ty.analysis]
 # The uv environment lacks stubs for these system bindings.
-allowed-unresolved-imports = ["apt", "apt_inst", "apt_pkg", "gi.repository.Json"]
+allowed-unresolved-imports = ["apt", "apt_inst", "apt_pkg", "gi.repository.Json", "gi.repository.Flatpak"]
 
 [tool.ty.rules]
 dynamic-function-decorator-return = "error"
