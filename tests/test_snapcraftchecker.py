@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import hashlib
 import os
@@ -5,7 +6,11 @@ import unittest
 from contextlib import asynccontextmanager
 from unittest import mock
 
+import aiohttp
+from yarl import URL
+
 from src.lib.checksums import MultiDigest
+from src.lib.errors import CheckerFetchError, CheckerQueryError
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
 
@@ -22,6 +27,12 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(self.robots_patcher.stop)
 
     async def test_check(self):
+        await self._check_download(checksum_matches=True)
+
+    async def test_checksum_mismatch_does_not_offer_update(self):
+        await self._check_download(checksum_matches=False)
+
+    async def _check_download(self, checksum_matches):
         api_url = "http://api.snapcraft.io/v2/snaps/info/nordpass"
         download_url = (
             "https://api.snapcraft.io/api/v1/snaps/download/"
@@ -63,6 +74,8 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
                 release,
             ],
         }
+        if not checksum_matches:
+            release["download"]["sha3-384"] = "0" * 96
 
         async def chunks(block_size):
             for offset in range(0, len(contents), block_size):
@@ -79,7 +92,15 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
                 self.fail(f"Unexpected HTTP request: {url}")
 
         checker = ManifestChecker(TEST_MANIFEST)
-        with mock.patch("aiohttp.ClientSession.get", side_effect=response) as get:
+        original = self._find_by_filename(checker.get_external_data(), "nordpass.snap")
+        with (
+            mock.patch("aiohttp.ClientSession.get", side_effect=response) as get,
+            mock.patch(
+                "src.checkers.urlchecker.utils.get_extra_data_info_from_url",
+                new_callable=mock.AsyncMock,
+                return_value=original.current_version,
+            ) as validate_current,
+        ):
             ext_data = await checker.check()
         self.assertEqual(
             get.call_args_list,
@@ -93,6 +114,15 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
         data = self._find_by_filename(ext_data, "nordpass.snap")
         self.assertIsNotNone(data)
         self.assertEqual(data.filename, "nordpass.snap")
+        if not checksum_matches:
+            validate_current.assert_awaited_once()
+            self.assertEqual(
+                validate_current.call_args.args[0], original.current_version.url
+            )
+            self.assertIsNone(data.new_version)
+            self.assertFalse(data.state & data.State.LATEST)
+            return
+        validate_current.assert_not_awaited()
         self.assertIsNotNone(data.new_version)
         self.assertEqual(data.new_version.url, download_url)
         self.assertEqual(data.new_version.size, len(contents))
@@ -112,6 +142,92 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
 
     async def test_unchanged_release_is_checked(self):
         await self._check_unchanged_release(False)
+
+    async def test_api_failures_are_reported_per_source(self):
+        await self._check_request_failures(download=False)
+
+    async def test_download_failures_are_reported_per_source(self):
+        await self._check_request_failures(download=True)
+
+    async def _check_request_failures(self, download):
+        api_url = "http://api.snapcraft.io/v2/snaps/info/nordpass"
+        download_url = "https://example.invalid/nordpass.snap"
+        failed_url = download_url if download else api_url
+        failures = [
+            (
+                "http",
+                aiohttp.ClientResponseError(
+                    mock.Mock(real_url=URL(failed_url)),
+                    (),
+                    status=429,
+                    message="Too Many Requests",
+                ),
+            ),
+            ("connection", aiohttp.ClientConnectionError("Connection lost")),
+            ("timeout", asyncio.TimeoutError("Request timed out")),
+            ("body", aiohttp.ClientPayloadError("Incomplete response")),
+        ]
+        metadata = {
+            "channel-map": [
+                {
+                    "channel": {"architecture": "amd64", "name": "stable"},
+                    "download": {"url": download_url, "sha3-384": "unused"},
+                    "version": "2.0.0",
+                }
+            ]
+        }
+        for stage, failure in failures:
+            with self.subTest(stage=stage):
+                checker = ManifestChecker(TEST_MANIFEST)
+                data = self._find_by_filename(
+                    checker.get_external_data(), "nordpass.snap"
+                )
+                current = data.current_version
+
+                async def chunks(block_size, failure=failure):
+                    yield b"partial download"
+                    raise failure
+
+                @asynccontextmanager
+                async def response(url, stage=stage, failure=failure, **kwargs):
+                    if url == failed_url:
+                        if stage != "body":
+                            raise failure
+                        yield mock.Mock(
+                            json=mock.AsyncMock(side_effect=failure),
+                            content=mock.Mock(iter_chunked=chunks),
+                        )
+                    elif download and url == api_url:
+                        yield mock.Mock(json=mock.AsyncMock(return_value=metadata))
+                    else:
+                        self.fail(f"Unexpected HTTP request: {url}")
+
+                with (
+                    mock.patch(
+                        "aiohttp.ClientSession.get", side_effect=response
+                    ) as get,
+                    self.assertLogs("src.manifest", level="ERROR") as logs,
+                ):
+                    await checker.check()
+                self.assertEqual(get.call_count, 2 if download else 1)
+                errors = checker.get_errors()
+                self.assertEqual(len(errors), 1)
+                self.assertIsInstance(
+                    errors[0], CheckerFetchError if download else CheckerQueryError
+                )
+                self.assertIs(errors[0].__cause__, failure)
+                self.assertTrue(all(r.exc_info is None for r in logs.records))
+                self.assertTrue(data.check_failed)
+                self.assertTrue(data.checked.is_set())
+                self.assertIsNone(data.new_version)
+                self.assertEqual(data.current_version, current)
+                self.assertFalse(data.state & data.State.LATEST)
+                report = next(
+                    s
+                    for s in checker.get_source_report()
+                    if s["checker_type"] == "snapcraft"
+                )
+                self.assertEqual(report["status"], "failed")
 
     async def test_unchanged_release_repairs_download_metadata(self):
         await self._check_unchanged_release(True)

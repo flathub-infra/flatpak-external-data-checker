@@ -2,7 +2,9 @@ import datetime
 import hashlib
 import logging
 
+from ..lib import NETWORK_ERRORS
 from ..lib.checksums import MultiHash
+from ..lib.errors import CheckerFetchError, CheckerQueryError
 from ..lib.externaldata import ExternalBase, ExternalFile
 from . import Checker
 
@@ -44,10 +46,13 @@ class SnapcraftChecker(Checker):
         if self.robots_cache:
             await self.robots_cache.ensure_allowed(url)
 
-        async with self.session.get(url) as response:
-            async for data in response.content.iter_chunked(self._BLOCK_SIZE):
-                multihash.update(data)
-                sha3.update(data)
+        try:
+            async with self.session.get(url) as response:
+                async for data in response.content.iter_chunked(self._BLOCK_SIZE):
+                    multihash.update(data)
+                    sha3.update(data)
+        except NETWORK_ERRORS as err:
+            raise CheckerFetchError from err
 
         if sha3.hexdigest() == sha3_384:
             return multihash.hexdigest()
@@ -64,8 +69,11 @@ class SnapcraftChecker(Checker):
         if self.robots_cache:
             await self.robots_cache.ensure_allowed(url)
 
-        async with self.session.get(url, headers=header) as response:
-            js = await response.json()
+        try:
+            async with self.session.get(url, headers=header) as response:
+                js = await response.json()
+        except NETWORK_ERRORS as err:
+            raise CheckerQueryError from err
 
         data = [
             x
