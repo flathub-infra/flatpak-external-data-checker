@@ -43,6 +43,18 @@ The checker skips apps marked with `end-of-life` or `end-of-life-rebase` in
 the repository's `flathub.json`. Outside a Git checkout, it looks beside the
 manifest.
 
+### JSON reports
+
+Write a JSON report:
+
+```sh
+flatpak-external-data-checker --report-json report.json MANIFEST_FILE
+```
+
+Reports include failed and skipped runs. `--report-json` also works with `--lint`
+and does not change console output or exit codes. Create the destination directory
+first.
+
 ### Runtime branches
 
 For manifests with `build-extension: true`, the checker fetches and checks each

@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from src import main
 
+from .report_schema import validate_report
 from .support import LocalHTTPTestCase
 
 
@@ -49,7 +50,9 @@ class TestReporting(LocalHTTPTestCase):
             ["--report-json", str(self.report), *options, str(self.manifest)]
         )
         result = await main.run_with_args(args)
-        return result, json.loads(self.report.read_text())
+        report = json.loads(self.report.read_text())
+        validate_report(report)
+        return result, report
 
     async def test_mixed_results_with_referenced_source(self):
         current = self.source(same=True)
@@ -142,6 +145,7 @@ class TestReporting(LocalHTTPTestCase):
         ):
             await self.run_report()
         report = json.loads(self.report.read_text())
+        validate_report(report)
         self.assertEqual(report["status"], "failed")
         self.assertEqual(report["errors"][0]["message"], "bug")
         self.assertIn("finished_at", report)
