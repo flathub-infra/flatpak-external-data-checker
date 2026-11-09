@@ -227,6 +227,121 @@ class TestSourceUpdates(unittest.TestCase):
         self.assertEqual(update.old_version, update.new_version)
         self.assertNotIn("upgrade", format_source_updates([update]))
 
+    def test_previous_archive_tag(self):
+        data = ExternalBase.from_source(
+            "manifest.json",
+            {
+                "type": "archive",
+                "url": "https://github.com/benhoyt/inih/archive/refs/tags/r58.tar.gz",
+                "sha256": "abc",
+                "x-checker-data": {"type": "anitya", "project-id": 15151},
+            },
+        )
+        data.new_version = data.current_version._replace(
+            url="https://github.com/benhoyt/inih/archive/refs/tags/r63.tar.gz",
+            version="63",
+        )
+        update = SourceUpdate.from_source(data)
+        self.assertEqual(update.old_version, "tag r58")
+        self.assertEqual(update.new_version, "63")
+        self.assertIn(
+            "<code>tag r58</code> → <code>63</code>",
+            format_source_updates([update]),
+        )
+        self.assertIsNone(update.release_url)
+        self.assertIsNone(update.comparison_url)
+
+    def test_archive_tag_encoding_and_version_precedence(self):
+        for filename, tag, rendered in (
+            ("r58.tar.gz", "r58", "r58"),
+            ("r58.zip", "r58", "r58"),
+            ("release%2Fr58.tar.gz", "release/r58", "release/r58"),
+            ("release/r58.zip", "release/r58", "release/r58"),
+            ("r58%252Ffinal.zip", "r58%2Ffinal", "r58%2Ffinal"),
+            ("r58.tar.gz.tar.gz", "r58.tar.gz", r"r58\.tar\.gz"),
+            ("r58%2Ezip.zip", "r58.zip", r"r58\.zip"),
+            ("r58%2B%C3%A9.zip", "r58+é", r"r58\+é"),
+            ("r58%7C%3Ctag%3E%26.zip", "r58|<tag>&", r"r58\|&lt;tag&gt;&amp;"),
+        ):
+            with self.subTest(filename=filename):
+                data = self.file_source()
+                data.current_version = data.current_version._replace(
+                    url="https://github.com/benhoyt/inih/archive/refs/tags/"
+                    + filename
+                    + "?download=1#fragment"
+                )
+                data.new_version = data.current_version
+                update = SourceUpdate.from_source(data)
+                self.assertEqual(update.old_version, f"tag {tag}")
+                self.assertEqual(update.new_version, f"tag {tag}")
+                self.assertIn(
+                    f"<code>tag {rendered}</code> → <code>tag {rendered}</code>",
+                    format_source_updates([update]),
+                )
+                data.current_version = data.current_version._replace(version="58")
+                self.assertEqual(SourceUpdate.from_source(data).old_version, "58")
+
+        data = self.file_source(
+            {"type": "rotating-url", "pattern": r"https://.*/r(\d+)\.tar\.gz"}
+        )
+        data.current_version = data.current_version._replace(
+            url="https://github.com/benhoyt/inih/archive/refs/tags/r58.tar.gz"
+        )
+        self.assertEqual(SourceUpdate.from_source(data).old_version, "58")
+
+    def test_ambiguous_and_untrusted_archives(self):
+        for url in (
+            "https://github.com/owner/app/archive/refs/heads/main.tar.gz",
+            "https://github.com/owner/app/archive/" + "a" * 40 + ".zip",
+            "https://github.com/owner/app/archive/v1.tar.gz",
+            "https://github.com/owner/app/archive/refs/tags/.tar.gz",
+            "https://github.com/owner/app/archive/refs/tags/v1.tar.xz",
+            "https://github.com/owner/app/archive/refs/tags/v1.zip/extra",
+            "https://github.com/owner/app/archive/refs/tags/../heads/main.tar.gz",
+            "https://github.com/owner/app/archive/refs/tags/%2e%2e/heads/main.zip",
+            "https://github.com/owner/app/archive/refs/tags/release/../../heads/main.zip",
+            "https://github.com/owner/app/archive/refs/tags/..%2Fheads%2Fmain.zip",
+            "https://github.com/owner/app/archive/refs/tags/./v1.zip",
+            "https://gitlab.com/owner/app/-/archive/v1/app-v1.tar.gz",
+            "https://codeberg.org/owner/app/archive/v1.tar.gz",
+            "https://api.github.com/repos/owner/app/tarball/v1",
+            "https://codeload.github.com/owner/app/zip/v1",
+            "https://example.org/owner/app/archive/refs/tags/v1.zip",
+            "https://github.com.evil.test/owner/app/archive/refs/tags/v1.zip",
+            "https://github.com@evil.test/owner/app/archive/refs/tags/v1.zip",
+            "https://evil.test@github.com/owner/app/archive/refs/tags/v1.zip",
+            "https://github.com/owner%2Fevil/app/archive/refs/tags/v1.zip",
+            "ftp://github.com/owner/app/archive/refs/tags/v1.zip",
+            "https://[invalid",
+        ):
+            with self.subTest(url=url):
+                data = self.file_source()
+                data.current_version = data.current_version._replace(url=url)
+                data.new_version = data.current_version
+                update = SourceUpdate.from_source(data)
+                self.assertEqual(update.old_version, "unknown")
+                self.assertEqual(update.new_version, "unknown")
+
+    def test_exiv2_release_asset_to_archive(self):
+        data = self.file_source({"type": "anitya", "project-id": 769})
+        data.current_version = data.current_version._replace(
+            url="https://github.com/Exiv2/exiv2/releases/download/"
+            "v0.28.0/exiv2-0.28.0-Source.tar.gz"
+        )
+        data.new_version = data.new_version._replace(
+            url="https://github.com/Exiv2/exiv2/archive/refs/tags/v0.28.9.tar.gz",
+            version="0.28.9",
+        )
+        update = SourceUpdate.from_source(data)
+        self.assertEqual(update.old_version, "tag v0.28.0")
+        self.assertEqual(update.new_version, "0.28.9")
+        self.assertIn(
+            r"<code>tag v0\.28\.0</code> → <code>0\.28\.9</code>",
+            format_source_updates([update]),
+        )
+        self.assertIsNone(update.release_url)
+        self.assertIsNone(update.comparison_url)
+
     def test_previous_release_download_tag(self):
         for arch in ("x86_64", "aarch64"):
             with self.subTest(arch=arch):
