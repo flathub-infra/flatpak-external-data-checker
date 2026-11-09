@@ -97,6 +97,9 @@ class TestForgejoChecker(unittest.IsolatedAsyncioTestCase):
         manifest._blocked_update_sources = set()
         manifest._find_repository.return_value = manifest._repository
         manifest.get_external_data.return_value = [source]
+        manifest._main_sources.side_effect = lambda: ManifestChecker._main_sources(
+            manifest
+        )
         with (
             mock.patch("src.manifest.find_appdata_file", return_value="metainfo.xml"),
             mock.patch("src.manifest.add_release_to_file") as add_release,

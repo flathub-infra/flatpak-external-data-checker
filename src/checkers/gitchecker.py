@@ -200,6 +200,7 @@ class GitChecker(Checker):
             ) from err
 
         if sort_tags and current_tag and latest_tag.tag != current_tag:
+            allow_downgrade = external_data.checker_data.get("allow-downgrade", False)
             try:
                 if current_match:
                     newer = latest_tag.parsed_version > tag_cls.parse_version(
@@ -215,7 +216,8 @@ class GitChecker(Checker):
                     ) > semver.VersionInfo.parse(re.sub(r"^[vV]", "", current_tag))
             except (ValueError, TypeError, VersionComparisonError):
                 newer = False
-            if not newer:
+                allow_downgrade = False
+            if not newer and not allow_downgrade:
                 log.info(
                     "Skipping tag %s: not demonstrably newer than current tag %s",
                     latest_tag.tag,
