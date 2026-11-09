@@ -41,7 +41,7 @@ def fetch_runtime_statuses() -> dict[tuple[str, str], list[RuntimeStatus]]:
                 cancellable,
             )
             for ref in refs:
-                if ref.get_kind() != Flatpak.RefKind.RUNTIME:
+                if ref.get_kind() not in (Flatpak.RefKind.RUNTIME, Flatpak.RefKind.APP):
                     continue
                 runtimes.setdefault((ref.get_name(), ref.get_branch()), []).append(
                     RuntimeStatus(ref.format_ref(), ref.get_eol(), ref.get_eol_rebase())
@@ -69,6 +69,9 @@ class RuntimeEolChecker:
         parents = self._runtimes.get((runtime, version))
         if not parents:
             raise ValueError(f"Runtime {runtime}//{version} was not found on Flathub")
+        # An unqualified parent must not combine app and runtime identities.
+        if len({parent.ref.split("/", 1)[0] for parent in parents}) != 1:
+            raise ValueError(f"Runtime {runtime}//{version} is ambiguous on Flathub")
         # Do not retire a branch that still has an active published architecture.
         if not all(parent.is_eol for parent in parents):
             return None
