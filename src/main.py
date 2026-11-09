@@ -42,6 +42,7 @@ from github import Github, GithubException
 from . import manifest
 from .lib.errors import ManifestLoadError
 from .lib.externaldata import ExternalData
+from .lib.runtime import RuntimeEolChecker
 from .lib.sourceupdates import format_source_updates
 from .lib.utils import init_logging, parse_github_url, read_manifest
 from .lint import ManifestLinter
@@ -858,6 +859,7 @@ async def run_runtime_branches(
             outdated_total = errors_total = 0
             all_updated = True
             any_updated = False
+            runtime_eol = RuntimeEolChecker()
             for ref in refs:
                 branch = ref.removeprefix("refs/remotes/origin/")
                 log.info("Checking runtime branch %s", branch)
@@ -898,6 +900,35 @@ async def run_runtime_branches(
                                         worktree / manifest_path
                                     )
                                 )
+                                if (
+                                    Path(branch_args.manifest).stat().st_size
+                                    > args.max_manifest_size
+                                ):
+                                    raise ValueError(
+                                        "Runtime branch manifest is too large"
+                                    )
+                                contents = read_manifest(branch_args.manifest)
+                                if isinstance(contents, tuple):
+                                    contents = contents[0]
+                                if isinstance(contents, dict):
+                                    parents = await runtime_eol.check(contents)
+                                    if parents is not None:
+                                        branch_report["status"] = "skipped"
+                                        branch_report["skip_reason"] = (
+                                            "runtime-end-of-life"
+                                        )
+                                        branch_report["runtime_eol"] = parents
+                                        for parent in parents:
+                                            log.info(
+                                                "Skipping runtime branch %s: "
+                                                "%s is EOL: %s",
+                                                branch,
+                                                parent["ref"],
+                                                parent["end_of_life"]
+                                                or parent["end_of_life_rebase"]
+                                                or "No reason provided",
+                                            )
+                                        continue
                                 (
                                     outdated,
                                     errors,

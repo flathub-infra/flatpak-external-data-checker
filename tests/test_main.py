@@ -14,6 +14,7 @@ from src import main
 from src.lib.checksums import MultiDigest
 from src.lib.errors import AppdataLoadError, CheckerFetchError, SourceLoadError
 from src.lib.externaldata import ExternalData, ExternalFile
+from src.lib.runtime import RuntimeStatus
 from src.lib.sourceupdates import SourceUpdate
 
 TEST_MANIFEST = os.path.join(
@@ -50,6 +51,17 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
             )
 
         for patcher in (
+            patch(
+                "src.lib.runtime.fetch_runtime_statuses",
+                return_value={
+                    ("org.freedesktop.Sdk", version): [
+                        RuntimeStatus(
+                            f"runtime/org.freedesktop.Sdk/x86_64/{version}", None, None
+                        )
+                    ]
+                    for version in ("24.08", "25.08")
+                },
+            ),
             patch("aiohttp.ClientSession.get", side_effect=get),
             patch("src.lib.utils.get_extra_data_info_from_url", side_effect=fetch),
             patch(
@@ -209,7 +221,9 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                 Path(self.test_dir.name, "runtime.txt").write_text(runtime)
                 manifest_file = Path(self.manifest_path)
                 manifest_file.write_text(
-                    f"runtime-version: '{runtime}'\n" + manifest_file.read_text()
+                    manifest_file.read_text().replace(
+                        "runtime-version: '24.08'", f"runtime-version: '{runtime}'"
+                    )
                 )
                 self._run_cmd(["git", "add", "runtime.txt", self.manifest_filename])
                 self._run_cmd(["git", "commit", "-m", f"Runtime {runtime}"])
@@ -429,7 +443,10 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
 
     def _make_extension(self):
         path = Path(self.manifest_path)
-        path.write_text("build-extension: true\n" + path.read_text())
+        path.write_text(
+            "build-extension: true\nruntime: org.freedesktop.Sdk\n"
+            "runtime-version: '24.08'\n" + path.read_text()
+        )
         self._run_cmd(["git", "commit", "-am", "Build extension"])
 
     async def test_runtime_branch_eol(self):
@@ -504,6 +521,78 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(
                 [entry["status"] for entry in report["branches"]], ["skipped"] * 3
             )
+            worktrees = self._run_cmd(
+                ["git", "worktree", "list", "--porcelain"],
+                capture_output=True,
+                text=True,
+            ).stdout
+            self.assertEqual(worktrees.count("worktree "), 1)
+            self.assertEqual(self._get_commit_data()["commit"], original_head)
+
+    async def test_runtime_branch_parent_eol(self):
+        self._make_extension()
+        original_head = self._get_commit_data()["commit"]
+        parent = RuntimeStatus(
+            "runtime/org.freedesktop.Sdk/x86_64/23.08", "Retired SDK", None
+        )
+        with tempfile.TemporaryDirectory() as remote:
+            subprocess.run(["git", "init", "--bare", remote], check=True)
+            self._run_cmd(["git", "remote", "add", "origin", remote])
+            for branch, version in (
+                ("01-retired", "23.08"),
+                ("02-unknown", "missing"),
+                ("03-active", "24.08"),
+                ("04-retired", "23.08"),
+            ):
+                self._run_cmd(
+                    ["git", "checkout", "-B", f"branch/{branch}", original_head]
+                )
+                path = Path(self.manifest_path)
+                path.write_text(path.read_text().replace("'24.08'", f"'{version}'"))
+                self._run_cmd(["git", "commit", "--allow-empty", "-am", "Set runtime"])
+                self._run_cmd(["git", "push", "origin", f"branch/{branch}"])
+            self._run_cmd(["git", "checkout", "--detach", original_head])
+            args = main.parse_cli_args(["--update", self.manifest_path])
+            report = {"sources": [], "errors": [], "delivery": "not_requested"}
+            with (
+                patch(
+                    "src.lib.runtime.fetch_runtime_statuses",
+                    return_value={
+                        ("org.freedesktop.Sdk", "23.08"): [parent],
+                        ("org.freedesktop.Sdk", "24.08"): [
+                            RuntimeStatus(
+                                "runtime/org.freedesktop.Sdk/x86_64/24.08", None, None
+                            )
+                        ],
+                    },
+                ) as fetch,
+                patch(
+                    "src.main.run_manifest_with_args", return_value=(2, 0, True)
+                ) as run,
+                self.assertLogs("src.main", level="INFO") as logs,
+            ):
+                self.assertEqual(
+                    await main.run_runtime_branches(args, report), (2, 1, False)
+                )
+                fetch.assert_called_once()
+                run.assert_awaited_once()
+                self.assertEqual(
+                    run.await_args.kwargs["base_branch"], "branch/03-active"
+                )
+            self.assertIn("Retired SDK", "\n".join(logs.output))
+            report = json.loads(json.dumps(report))
+            self.assertEqual(
+                [entry["status"] for entry in report["branches"]],
+                ["skipped", "failed", "completed", "skipped"],
+            )
+            for index in (0, 3):
+                entry = report["branches"][index]
+                self.assertEqual(entry["skip_reason"], "runtime-end-of-life")
+                self.assertEqual(entry["runtime_eol"][0]["ref"], parent.ref)
+                self.assertEqual(entry["runtime_eol"][0]["end_of_life"], "Retired SDK")
+                self.assertEqual(entry["sources"], [])
+                self.assertEqual(entry["delivery"], "not_requested")
+            self.assertIn("not found on Flathub", report["errors"][0]["message"])
             worktrees = self._run_cmd(
                 ["git", "worktree", "list", "--porcelain"],
                 capture_output=True,
@@ -667,7 +756,8 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
             with patch.dict(os.environ, {"GIT_ALLOW_PROTOCOL": "file"}):
                 self._run_cmd(["git", "submodule", "add", shared, "shared-modules"])
                 Path(self.manifest_path).write_text(
-                    "id: net.invisible_island.xterm\nbuild-extension: true\nmodules:\n"
+                    "id: net.invisible_island.xterm\nbuild-extension: true\n"
+                    "runtime: org.freedesktop.Sdk\nruntime-version: '24.08'\nmodules:\n"
                     "  - shared-modules/module.yml\n"
                 )
                 self._run_cmd(["git", "commit", "-am", "Use shared module"])
