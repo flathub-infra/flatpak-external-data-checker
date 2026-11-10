@@ -93,6 +93,7 @@ jobs:
           context: .
           file: ./Dockerfile
           tags: ${{ env.DOCKER_IMAGE }}:build
+          build-args: CHECKER_REVISION=${{ github.sha }}
           push: false
           load: true
           cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:latest
@@ -173,6 +174,7 @@ jobs:
           context: .
           file: ./Dockerfile
           tags: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:latest
+          build-args: CHECKER_REVISION=${{ github.sha }}
           push: true
 
       - name: Login to ghcr.io using Flathub credentials
@@ -192,6 +194,7 @@ jobs:
           context: .
           file: ./Dockerfile
           tags: ghcr.io/flathub/flatpak-external-data-checker:latest
+          build-args: CHECKER_REVISION=${{ github.sha }}
           push: true
 
       - name: Save pip downloads cache

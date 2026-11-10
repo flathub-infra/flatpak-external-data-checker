@@ -6,6 +6,7 @@
   "type": "object",
   "properties": {
     "schema_version": { "const": 1 },
+    "checker": { "$ref": "#/$defs/checker", "description": "Checker provenance. Absent in reports from older checker versions." },
     "manifest": { "type": "string", "description": "The absolute path to the input manifest." },
     "started_at": { "type": "string", "format": "date-time" },
     "finished_at": { "type": "string", "format": "date-time" },
@@ -20,6 +21,21 @@
   "required": [ "schema_version", "manifest", "started_at", "finished_at", "mode", "status", "delivery", "sources", "errors" ],
   "additionalProperties": false,
   "$defs": {
+    "checker": {
+      "type": "object",
+      "properties": {
+        "revision": { "type": [ "string", "null" ], "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$" },
+        "source": { "enum": [ "build", "git", "unknown" ] },
+        "dirty": { "type": [ "boolean", "null" ], "description": "Local Git working tree changes, including untracked files. null means not measured, including container builds." }
+      },
+      "required": [ "revision", "source", "dirty" ],
+      "additionalProperties": false,
+      "oneOf": [
+        { "properties": { "source": { "const": "unknown" }, "revision": { "type": "null" }, "dirty": { "type": "null" } } },
+        { "properties": { "source": { "const": "build" }, "revision": { "type": "string" }, "dirty": { "type": "null" } } },
+        { "properties": { "source": { "const": "git" }, "revision": { "type": "string" }, "dirty": { "type": "boolean" } } }
+      ]
+    },
     "status": { "enum": [ "completed", "failed", "skipped" ] },
     "delivery": {
       "enum": [ "not_requested", "no_changes", "edited", "committed", "pr_handled", "pending", "failed" ],

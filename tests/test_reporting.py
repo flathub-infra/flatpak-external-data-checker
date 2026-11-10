@@ -2,6 +2,7 @@ import contextlib
 import hashlib
 import io
 import json
+import os
 import subprocess
 import tempfile
 from collections import Counter
@@ -22,6 +23,11 @@ class TestReporting(LocalHTTPTestCase):
         self.root = Path(self.tmp.name)
         self.manifest = self.root / "app.json"
         self.report = self.root / "report.json"
+        self.revision = "a" * 40
+        (self.root / "build-revision").write_text(self.revision)
+        self.provenance_patch = patch("src.lib.provenance.CHECKER_ROOT", self.root)
+        self.provenance_patch.start()
+        self.addCleanup(self.provenance_patch.stop)
 
     def source(self, version="2", *, same=False):
         headers = {"Last-Modified": "Fri, 06 Nov 2026 12:00:00 GMT"}
@@ -53,6 +59,10 @@ class TestReporting(LocalHTTPTestCase):
         result = await main.run_with_args(args)
         report = json.loads(self.report.read_text())
         validate_report(report)
+        self.assertEqual(
+            report["checker"],
+            {"revision": self.revision, "source": "build", "dirty": None},
+        )
         return result, report
 
     async def test_mixed_results_with_referenced_source(self):
@@ -162,6 +172,43 @@ class TestReporting(LocalHTTPTestCase):
         self.assertEqual(report["mode"], "lint")
         self.assertEqual(report["status"], "failed")
         self.assertEqual(self.requests, [])
+
+    async def test_git_decoding_failure_does_not_interrupt_lint(self):
+        (self.root / "build-revision").unlink()
+        for args in (
+            ["init"],
+            [
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.com",
+                "commit",
+                "--allow-empty",
+                "-m",
+                "Initial",
+            ],
+            ["config", "core.quotePath", "false"],
+        ):
+            subprocess.run(
+                ["git", "-C", str(self.root), *args],
+                check=True,
+                capture_output=True,
+            )
+        with open(os.fsencode(self.root) + b"/file-\xff", "wb"):
+            pass
+        self.write([])
+        args = main.parse_cli_args(
+            ["--lint", "--report-json", str(self.report), str(self.manifest)]
+        )
+        result = await main.run_with_args(args)
+        report = json.loads(self.report.read_text())
+        validate_report(report)
+        self.assertEqual(result, (0, 0, False))
+        self.assertEqual(report["status"], "completed")
+        self.assertEqual(
+            report["checker"],
+            {"revision": None, "source": "unknown", "dirty": None},
+        )
 
     async def test_publication_failure_keeps_detection_results(self):
         self.write([self.source()])
