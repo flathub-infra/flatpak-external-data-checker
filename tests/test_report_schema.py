@@ -271,3 +271,60 @@ class TestReportSchema(unittest.TestCase):
             with self.subTest(invalid=invalid):
                 with self.assertRaises(jsonschema.ValidationError):
                     validate_report(self.report() | {"branches": [branch | invalid]})
+
+
+class TestCheckoutSchema(unittest.TestCase):
+    def report(self):
+        return TestReportSchema().report() | {
+            "checkout": {"commit": "a" * 40, "branch": "beta", "dirty": False},
+        }
+
+    def test_checkout_contract(self):
+        report = self.report()
+        validate_report(report)
+        for changes in (
+            {"schema_version": 3},
+            {"schema_version": 2},
+            {"checkout": {"commit": "main", "branch": "beta", "dirty": False}},
+            {"checkout": {}},
+            {"delivery": "branches"},
+        ):
+            with (
+                self.subTest(changes=changes),
+                self.assertRaises(jsonschema.ValidationError),
+            ):
+                validate_report(report | changes)
+        for field in report["checkout"]:
+            invalid = report.copy()
+            invalid["checkout"] = report["checkout"].copy()
+            del invalid["checkout"][field]
+            with (
+                self.subTest(field=field),
+                self.assertRaises(jsonschema.ValidationError),
+            ):
+                validate_report(invalid)
+
+    def test_branch_checkout_is_optional(self):
+        source = TestReportSchema().source()
+        branch = {
+            "branch": "branch/25.08",
+            "checkout": self.report()["checkout"],
+            "status": "completed",
+            "delivery": "not_requested",
+            "sources": [source],
+            "errors": [],
+        }
+        report = self.report() | {"branches": [branch]}
+        validate_report(report)
+        del report["checkout"]
+        del branch["checkout"]
+        validate_report(report)
+
+    def test_older_strict_schema_needs_updating(self):
+        legacy_schema = copy.deepcopy(REPORT_SCHEMA)
+        del legacy_schema["properties"]["checkout"]
+        del legacy_schema["$defs"]["checkout"]
+        validator = jsonschema.Draft202012Validator(legacy_schema)
+        validator.validate(TestReportSchema().report())
+        with self.assertRaises(jsonschema.ValidationError):
+            validator.validate(self.report())

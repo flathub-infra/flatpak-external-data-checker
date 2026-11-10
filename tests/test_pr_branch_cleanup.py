@@ -31,6 +31,7 @@ class TestPRBranchCleanup(unittest.TestCase):
         self.repo.owner.login = "flathub"
         self.pr = MagicMock()
         self.pr.state = "open"
+        self.pr.html_url = "https://github.com/flathub/com.github.marhkb.Pods/pull/30"
         self.pr.head.ref = "update-master-cc7de96"
         self.pr.mergeable = True
         commit = self.pr.head.repo.get_commit.return_value
@@ -47,7 +48,11 @@ class TestPRBranchCleanup(unittest.TestCase):
         )
 
     def open_pr(self):
-        main.open_pr(self.change, fork=False)
+        report = {}
+        self.assertTrue(main.open_pr(self.change, fork=False, report=report))
+        self.assertEqual(
+            report["pull_request"], {"url": self.pr.html_url, "outcome": "merged"}
+        )
         self.pr.merge.assert_called_once_with(merge_method="rebase")
         self.repo.get_git_ref.assert_called_once_with("heads/update-master-cc7de96")
         self.repo.create_pull.assert_not_called()
@@ -62,6 +67,48 @@ class TestPRBranchCleanup(unittest.TestCase):
                 call.create_issue_comment(main.AUTOMERGE_DUE_TO_CONFIG),
             ]
         )
+
+    def test_existing_pr_delivery(self):
+        for state, merged, outcome in (
+            ("closed", False, "pr_existing_closed"),
+            ("closed", True, "pr_existing_merged"),
+            ("open", False, "pr_existing_open"),
+        ):
+            with self.subTest(outcome=outcome):
+                self.pr.state = state
+                self.pr.is_merged.return_value = merged
+                self.pr.mergeable = False
+                report = {}
+                self.assertTrue(main.open_pr(self.change, fork=False, report=report))
+                self.assertEqual(
+                    report["pull_request"],
+                    {
+                        "url": self.pr.html_url,
+                        "outcome": outcome.removeprefix("pr_"),
+                    },
+                )
+                self.pr.merge.assert_not_called()
+                self.repo.create_pull.assert_not_called()
+
+    def test_created_pr_delivery(self):
+        self.repo.get_pulls.return_value = []
+        self.repo.create_pull.return_value = self.pr
+        report = {}
+        with patch("src.main.subprocess.run") as push:
+            push.return_value.returncode = 0
+            self.assertTrue(main.open_pr(self.change, fork=False, report=report))
+        self.assertEqual(
+            report["pull_request"], {"url": self.pr.html_url, "outcome": "created"}
+        )
+        self.repo.create_pull.assert_called_once()
+
+    def test_cleanup_failure_retains_merge_observation(self):
+        self.ref.delete.side_effect = RuntimeError("cleanup failed")
+        report = {"delivery": "pending"}
+        with self.assertRaisesRegex(RuntimeError, "cleanup failed"):
+            main.open_pr(self.change, fork=False, report=report)
+        self.assertEqual(report["pull_request"]["outcome"], "merged")
+        self.assertEqual(report["delivery"], "pending")
 
     def test_comment_failure_does_not_prevent_cleanup(self):
         self.pr.create_issue_comment.side_effect = GithubException(

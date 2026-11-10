@@ -746,10 +746,55 @@ def parse_cli_args(cli_args=None):
     return args
 
 
+def get_checkout_identity(manifest_path: str) -> dict:
+    identity = {"commit": None, "branch": None, "dirty": None}
+    try:
+        checkout = get_manifest_git_checkout(manifest_path)
+        for field, command in (
+            ("commit", ["rev-parse", "--verify", "HEAD"]),
+            ("branch", ["symbolic-ref", "--quiet", "HEAD"]),
+            (
+                "dirty",
+                [
+                    "status",
+                    "--porcelain",
+                    "--untracked-files=normal",
+                    "--ignore-submodules=all",
+                ],
+            ),
+        ):
+            result = subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    f"safe.directory={checkout}",
+                    "-C",
+                    str(checkout),
+                    *command,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode == 0:
+                if field == "branch":
+                    identity[field] = result.stdout.strip().removeprefix("refs/heads/")
+                else:
+                    identity[field] = (
+                        bool(result.stdout)
+                        if field == "dirty"
+                        else result.stdout.strip()
+                    )
+    except (OSError, UnicodeError):
+        pass
+    return identity
+
+
 async def run_with_args(args: argparse.Namespace) -> tuple[int, int, bool]:
-    report = {
+    report: dict = {
         "schema_version": 1,
         "manifest": args.manifest,
+        "checkout": get_checkout_identity(args.manifest),
         "started_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "mode": "lint" if args.lint else "check",
         "status": "failed",
@@ -761,7 +806,14 @@ async def run_with_args(args: argparse.Namespace) -> tuple[int, int, bool]:
         if getattr(args, "report_json", None):
             report["checker"] = checker_provenance()
         result = await _run_with_args(args, report)
-        if result[1] or result[0] == -1 or report["errors"]:
+        if (
+            result[1]
+            or result[0] == -1
+            or report["errors"]
+            or any(
+                branch["status"] == "failed" for branch in report.get("branches", [])
+            )
+        ):
             report["status"] = "failed"
         elif report["status"] != "skipped":
             report["status"] = "completed"
@@ -884,6 +936,7 @@ async def run_runtime_branches(
                 log.info("Checking runtime branch %s", branch)
                 branch_report: dict = {
                     "branch": branch,
+                    "checkout": {"commit": None, "branch": branch, "dirty": None},
                     "status": "failed",
                     "delivery": "not_requested",
                     "sources": [],
@@ -901,9 +954,14 @@ async def run_runtime_branches(
                             branch_args = argparse.Namespace(**vars(args))
                             branch_args.manifest = str(worktree / manifest_path)
                             with indir(worktree):
+                                branch_report["checkout"] = get_checkout_identity(
+                                    branch_args.manifest
+                                )
+                                branch_report["checkout"]["branch"] = branch
                                 if is_end_of_life(branch_args.manifest):
                                     log.info("Skipping EOL runtime branch %s", branch)
                                     branch_report["status"] = "skipped"
+                                    branch_report["skip_reason"] = "end-of-life"
                                     continue
                                 branch_args.manifest = str(
                                     get_runtime_branch_manifest(
@@ -974,10 +1032,6 @@ async def run_runtime_branches(
                     elif branch_report["status"] != "skipped":
                         branch_report["status"] = "completed"
                     report.setdefault("branches", []).append(branch_report)
-                    for key in ("sources", "errors"):
-                        report[key].extend(
-                            {**entry, "branch": branch} for entry in branch_report[key]
-                        )
                     deliveries = (
                         "not_requested",
                         "no_changes",
@@ -1028,6 +1082,7 @@ async def run_manifest_with_args(
         if is_end_of_life(args.manifest):
             log.info("Skipping EOL manifest %s", args.manifest)
             report["status"] = "skipped"
+            report["skip_reason"] = "end-of-life"
             return 0, 0, False
     except (OSError, ValueError) as error:
         log.error("Failed to read flathub.json: %s", error)
