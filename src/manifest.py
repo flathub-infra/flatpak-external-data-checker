@@ -22,6 +22,7 @@ import dataclasses
 import datetime
 import logging
 import os
+import subprocess
 import typing as t
 from collections import OrderedDict
 from enum import IntEnum
@@ -41,6 +42,7 @@ from .lib.errors import (
     ManifestFileOpenError,
     ManifestFileTooLarge,
     ManifestLoadError,
+    ManifestScopeError,
     SourceLoadError,
     SourceUnsupported,
     UpdateGroupError,
@@ -111,6 +113,7 @@ class ManifestChecker:
         self._root_manifest_path = manifest
         self._root_manifest_dir = os.path.dirname(self._root_manifest_path)
         self._repository = self._find_repository(manifest)
+        self._submodule_paths: list[Path] | None = None
 
         self._modules: dict[str, list[BuilderModule]] = {}
         self._external_data: dict[str, list[ExternalBase]]
@@ -123,6 +126,7 @@ class ManifestChecker:
         self._blocked_update_sources: set[int] = set()
         self._source_checks: dict[int, list[str]] = {}
         self._source_errors: dict[int, list[Exception]] = {}
+        self._unresolved_parent_sources: set[int] = set()
         self._filter_type = None
 
         # Initialize checkers
@@ -156,12 +160,15 @@ class ManifestChecker:
             group = data.checker_data.get("update-group")
             if group is not None:
                 self._update_groups.setdefault(group, []).append(data)
-        if self._update_groups and self._incomplete_manifests:
+        if self._update_groups and any(
+            not isinstance(error, ManifestScopeError)
+            for error in self._incomplete_manifests
+        ):
             raise ManifestLoadError(
                 "Cannot validate update groups in an incomplete manifest"
             ) from self._incomplete_manifests[0]
         for group, members in self._update_groups.items():
-            if len(members) < 2:
+            if len(members) < 2 and not self._incomplete_manifests:
                 raise ManifestLoadError(
                     f"Update group {group!r} must contain at least two sources"
                 )
@@ -176,6 +183,35 @@ class ManifestChecker:
             ),
             None,
         )
+
+    def _skip_external_repository(self, path: str) -> bool:
+        if self._submodule_paths is None:
+            self._submodule_paths = []
+            if self._repository is not None:
+                result = subprocess.run(
+                    ["git", "-C", str(self._repository), "ls-files", "--stage", "-z"],
+                    capture_output=True,
+                    check=False,
+                )
+                if result.returncode == 0:
+                    self._submodule_paths = [
+                        self._repository / os.fsdecode(entry.split(b"\t", 1)[1])
+                        for entry in result.stdout.split(b"\0")
+                        if entry.startswith(b"160000 ")
+                    ]
+        resolved = Path(path).resolve()
+        if self._find_repository(path) == self._repository and not any(
+            resolved.is_relative_to(submodule.resolve())
+            for submodule in self._submodule_paths
+        ):
+            return False
+        error = ManifestScopeError(
+            f"Skipping included manifest outside repository scope: {path}; "
+            "coverage is incomplete"
+        )
+        self._incomplete_manifests.append(error)
+        log.warning(error)
+        return True
 
     def _load_root_manifest(self):
         if isinstance(self._root_manifest, list):
@@ -268,6 +304,18 @@ class ManifestChecker:
             try:
                 data.parent = sources_by_id[parent_id]
             except KeyError as err:
+                if any(
+                    isinstance(error, ManifestScopeError)
+                    for error in self._incomplete_manifests
+                ):
+                    self._unresolved_parent_sources.add(id(data))
+                    log.warning(
+                        'Source %s: parent source with ID "%s" unavailable in '
+                        "incomplete manifest; skipping check",
+                        data,
+                        parent_id,
+                    )
+                    continue
                 raise ManifestLoadError(
                     f'Source {data}: parent source with ID "{parent_id}" not found'
                 ) from err
@@ -277,6 +325,15 @@ class ManifestChecker:
                 if parent is data:
                     raise ManifestLoadError(f"Source {data}: inheritance loop detected")
                 parent = parent.parent
+
+        if self._unresolved_parent_sources:
+            for data in collected_data:
+                parent = data.parent
+                while parent is not None:
+                    if id(parent) in self._unresolved_parent_sources:
+                        self._unresolved_parent_sources.add(id(data))
+                        break
+                    parent = parent.parent
 
     def _collect_module_data(
         self,
@@ -292,6 +349,8 @@ class ManifestChecker:
             )
 
             try:
+                if self._skip_external_repository(ext_module_path):
+                    return None
                 ext_module = self._read_manifest(ext_module_path)
             except ManifestFileOpenError as err:
                 self._incomplete_manifests.append(err)
@@ -340,6 +399,8 @@ class ManifestChecker:
                 os.path.relpath(ext_source_path, self._root_manifest_dir),
             )
             try:
+                if self._skip_external_repository(ext_source_path):
+                    return
                 ext_source = self._read_manifest(ext_source_path)
             except ManifestFileTooLarge as err:
                 self._incomplete_manifests.append(err)
@@ -408,7 +469,7 @@ class ManifestChecker:
         checkers = [
             c(http_session, robots_cache)
             for c in self._checkers
-            if c.should_check(data)
+            if id(data) not in self._unresolved_parent_sources and c.should_check(data)
         ]
         if not checkers:
             counter.finished += 1
@@ -551,7 +612,9 @@ class ManifestChecker:
                     if data.new_version is not None
                     else data.selected_version
                 )
-                if data.check_failed:
+                if self._incomplete_manifests:
+                    status = "incomplete manifest coverage"
+                elif data.check_failed:
                     status = "check failed"
                 elif (
                     data.new_version is not None and id(data) in self._read_only_sources
@@ -633,6 +696,8 @@ class ManifestChecker:
             elif data.State.BROKEN in data.state:
                 status = "failed"
                 reason = "broken_url"
+            elif id(data) in self._unresolved_parent_sources:
+                status, reason = "unchecked", "unresolved_parent"
             elif self._filter_type is not None and data.type != self._filter_type:
                 status, reason = "unchecked", "filtered"
             elif not data.checker_data.get("type"):
@@ -738,7 +803,7 @@ class ManifestChecker:
                     and data.checker_data.get(IMPORTANT_SRC_PROP) is not False
                 )
             }
-            if important and not any(
+            if (important or self._incomplete_manifests) and not any(
                 id(data) in important and data.has_version_changed for data in updates
             ):
                 return []
@@ -795,6 +860,12 @@ class ManifestChecker:
             if data.source_path == self._root_manifest_path:
                 selected_data = data
         else:
+            if self._incomplete_manifests:
+                log.info(
+                    "Manifest coverage is incomplete; not guessing main source "
+                    "for appdata"
+                )
+                return
             if selected_data is not None:
                 # Guess that the last external source in the root manifest is the one
                 # corresponding to the main application bundle.

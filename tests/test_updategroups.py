@@ -18,7 +18,7 @@ from src.lib.errors import (
 )
 from src.lib.externaldata import ExternalFile, ExternalGitRepo
 from src.lint import ManifestLinter
-from src.manifest import ManifestChecker
+from src.manifest import CheckerOptions, ManifestChecker
 
 
 class TestUpdateGroups(unittest.IsolatedAsyncioTestCase):
@@ -122,7 +122,7 @@ class TestUpdateGroups(unittest.IsolatedAsyncioTestCase):
         appdata_before = self.appdata.read_bytes()
         checker = ManifestChecker(str(self.path))
         await self.check(checker)
-        self.assertEqual(len(checker.get_external_data()), 3)
+        self.assertEqual(len(checker.get_external_data()), 2)
         self.assertEqual(len(checker.update_manifests()), 1)
         self.assertEqual(external.read_bytes(), before)
         self.assertEqual(self.appdata.read_bytes(), appdata_before)
@@ -144,6 +144,71 @@ class TestUpdateGroups(unittest.IsolatedAsyncioTestCase):
         await self.check(checker)
         self.assertEqual(len(checker.update_manifests()), 1)
         self.assertTrue(json.loads(path.read_text())[0]["url"].endswith("-2.tar.gz"))
+
+    def write_skipped_main_source(self):
+        (self.root / ".git").mkdir()
+        shared = self.root / "shared"
+        shared.mkdir()
+        (shared / ".git").write_text("gitdir: ../.git/modules/shared\n")
+        source = self.source("main", group=None, version="1")
+        source["x-checker-data"].update({"source-id": "main", "is-main-source": True})
+        (shared / "source.json").write_text(json.dumps(source))
+        return "shared/source.json"
+
+    async def test_skipped_parent_leaves_dependents_unchecked(self):
+        shared = self.write_skipped_main_source()
+        child = self.source("child", group=None)
+        child["x-checker-data"].update({"source-id": "child", "parent-id": "main"})
+        descendant = self.source("descendant", group=None)
+        descendant["x-checker-data"]["parent-id"] = "child"
+        self.write([shared, descendant, child, self.source("independent", group=None)])
+        checker = ManifestChecker(str(self.path))
+        await asyncio.wait_for(self.check(checker), timeout=5)
+        reports = checker.get_source_report()
+        for report in reports[:2]:
+            self.assertEqual(report["status"], "unchecked")
+            self.assertEqual(report["reason"], "unresolved_parent")
+            self.assertEqual(report["checkers_run"], [])
+            self.assertIsNone(report["candidate"])
+        self.assertEqual(reports[2]["status"], "update_available")
+        self.assertEqual(len(checker.update_manifests()), 1)
+        sources = json.loads(self.path.read_text())["modules"][0]["sources"]
+        self.assertEqual(sources[1:3], [descendant, child])
+        self.assertTrue(sources[3]["url"].endswith("-2.tar.gz"))
+        self.assertTrue(checker.get_report_errors())
+
+    async def test_incomplete_coverage_requires_known_important_update(self):
+        shared = self.write_skipped_main_source()
+        for important in (False, True):
+            with self.subTest(important=important):
+                local = self.source("local", group=None)
+                if important:
+                    local["x-checker-data"]["is-important"] = True
+                self.write([shared, local])
+                checker = ManifestChecker(
+                    str(self.path), CheckerOptions(require_important_update=True)
+                )
+                await self.check(checker)
+                self.assertEqual(len(checker.update_manifests()), int(important))
+
+    async def test_incomplete_coverage_does_not_guess_appdata_source(self):
+        shared = self.write_skipped_main_source()
+        before = self.appdata.read_bytes()
+        self.write([shared, self.source("dependency", group=None)])
+        checker = ManifestChecker(str(self.path))
+        await self.check(checker)
+        self.assertEqual(len(checker.update_manifests()), 1)
+        self.assertEqual(self.appdata.read_bytes(), before)
+
+    async def test_incomplete_coverage_keeps_explicit_local_appdata_source(self):
+        shared = self.write_skipped_main_source()
+        local = self.source("local", group=None)
+        local["x-checker-data"]["is-main-source"] = True
+        self.write([shared, local])
+        checker = ManifestChecker(str(self.path))
+        await self.check(checker)
+        self.assertEqual(len(checker.update_manifests()), 1)
+        self.assertIn('version="2"', self.appdata.read_text())
 
     async def test_submodule_appdata_is_not_updated(self):
         (self.root / ".git").mkdir()
