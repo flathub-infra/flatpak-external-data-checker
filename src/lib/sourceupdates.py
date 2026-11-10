@@ -1,10 +1,12 @@
 import dataclasses
 import html
 import re
-from urllib.parse import quote, unquote, urlsplit
+from string import Template
+from urllib.parse import quote, unquote, urljoin, urlsplit
 
 import semver
 
+from ..checkers import Checker
 from ..checkers.electronchecker import ElectronChecker
 from ..checkers.urlchecker import URLChecker, extract_version
 from .externaldata import ExternalBase, ExternalGitRef, ExternalState
@@ -47,6 +49,43 @@ def _electron_previous_version(old_url: str, new: ExternalState) -> str | None:
     return candidate if semver.Version.is_valid(candidate) else None
 
 
+def _template_version(template: str, url: str) -> str | None:
+    pattern = []
+    end = 0
+    has_version = False
+    for match in Template.pattern.finditer(template):
+        if end and match.start() == end:
+            return None
+        pattern.append(re.escape(template[end : match.start()]))
+        name = match.group("named") or match.group("braced")
+        if name == "version":
+            pattern.append(
+                r"(?P<version>[^/?#]+)" if not has_version else r"(?P=version)"
+            )
+            has_version = True
+        elif name and re.fullmatch(r"version\d+|major|minor|patch", name):
+            pattern.append(r"[^/?#]+?")
+        elif match.group("escaped"):
+            pattern.append(re.escape("$"))
+        else:
+            return None
+        end = match.end()
+    if not has_version:
+        return None
+    pattern.append(re.escape(template[end:]))
+    url_match = re.fullmatch("".join(pattern), url)
+    if not url_match:
+        return None
+    version = url_match.group("version")
+    assert isinstance(version, str)
+    try:
+        if Template(template).substitute(Checker._version_parts(version)) == url:
+            return version
+    except (KeyError, ValueError):
+        pass
+    return None
+
+
 def _version(data: ExternalBase, state: ExternalState) -> str:
     if isinstance(state, ExternalGitRef):
         parts = []
@@ -67,6 +106,10 @@ def _version(data: ExternalBase, state: ExternalState) -> str:
         and data.new_version is not None
     ):
         version = _electron_previous_version(state.url, data.new_version)
+    if not version and (template := data.checker_data.get("url-template")):
+        if data.checker_data.get("type") == "html":
+            template = urljoin(data.checker_data.get("url", ""), template)
+        version = _template_version(template, state.url)
     if not version:
         release_url = download_release_url(state.url)
         if release_url:
