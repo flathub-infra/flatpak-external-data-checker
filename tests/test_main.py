@@ -165,6 +165,7 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                     report = json.loads(report_path.read_text())
                     validate_report(report)
                     self.assertEqual(report["status"], "skipped")
+                    self.assertEqual(report["skip_reason"], "end-of-life")
                     self.assertEqual(report["delivery"], "not_requested")
                     self.assertEqual(report["sources"], [])
                     self.assertEqual(report["errors"], [])
@@ -245,12 +246,29 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(report["status"], "completed")
             self.assertEqual(report["delivery"], "committed")
             self.assertEqual(report["errors"], [])
-            self.assertEqual(len(report["sources"]), 4)
+            self.assertEqual(report["sources"], [])
             self.assertEqual(
-                [entry["branch"] for entry in report["sources"]],
-                ["branch/24.08"] * 2 + ["branch/25.08"] * 2,
+                [len(entry["sources"]) for entry in report["branches"]], [2, 2]
             )
             self.assertEqual(len(report["branches"]), 2)
+            self.assertEqual(
+                report["checkout"],
+                {
+                    "commit": original_head,
+                    "branch": None,
+                    "dirty": True,
+                },
+            )
+            for entry in report["branches"]:
+                expected = self._get_commit_data("origin/" + entry["branch"])["commit"]
+                self.assertEqual(
+                    entry["checkout"],
+                    {
+                        "commit": expected,
+                        "branch": entry["branch"],
+                        "dirty": False,
+                    },
+                )
             self.assertEqual(self._get_commit_data()["commit"], original_head)
             self.assertEqual(Path(self.manifest_path).read_text(), local_manifest)
             branches = self._run_cmd(
@@ -317,6 +335,10 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
             validate_report(report)
             self.assertNotIn("pull_request", report)
             self.assertEqual(report["delivery"], "pr_handled")
+            self.assertEqual(
+                [entry["delivery"] for entry in report["branches"]],
+                ["pr_handled", "pr_handled"],
+            )
             self.assertEqual(
                 [entry["pull_request"] for entry in report["branches"]],
                 [
@@ -471,7 +493,11 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                 ["skipped", "failed", "failed", "completed"],
             )
             self.assertEqual(
-                [error["type"] for error in report["errors"]],
+                [
+                    error["type"]
+                    for branch in report["branches"]
+                    for error in branch["errors"]
+                ],
                 ["FileNotFoundError", "ValueError"],
             )
 
@@ -536,10 +562,15 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
             )
             for entry in report["branches"][:3]:
                 self.assertEqual(entry["delivery"], "not_requested")
+                self.assertEqual(entry["skip_reason"], "end-of-life")
                 self.assertEqual(entry["sources"], [])
                 self.assertEqual(entry["errors"], [])
             self.assertEqual(
-                [error["type"] for error in report["errors"]],
+                [
+                    error["type"]
+                    for branch in report["branches"]
+                    for error in branch["errors"]
+                ],
                 ["JSONDecodeError", "ValueError"],
             )
             self._run_cmd(
@@ -629,8 +660,12 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                         )
                         self.assertEqual(report["schema_version"], 1)
                         self.assertEqual(report["delivery"], "not_requested")
-                        if "completed" not in statuses:
-                            self.assertEqual(report["sources"], [])
+                        self.assertEqual(report["sources"], [])
+                        self.assertEqual(report["errors"], [])
+                        self.assertEqual(
+                            [entry["delivery"] for entry in report["branches"]],
+                            ["not_requested", "not_requested"],
+                        )
             self.assertEqual(self._get_commit_data()["commit"], original_head)
 
     async def test_runtime_branch_parent_eol(self):
@@ -698,7 +733,9 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(entry["runtime_eol"][0]["end_of_life"], "Retired SDK")
                 self.assertEqual(entry["sources"], [])
                 self.assertEqual(entry["delivery"], "not_requested")
-            self.assertIn("not found on Flathub", report["errors"][0]["message"])
+            self.assertIn(
+                "not found on Flathub", report["branches"][1]["errors"][0]["message"]
+            )
             worktrees = self._run_cmd(
                 ["git", "worktree", "list", "--porcelain"],
                 capture_output=True,
@@ -758,7 +795,10 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                 [branch["status"] for branch in report["branches"]],
                 ["failed", "completed"],
             )
-            self.assertEqual(report["errors"][0]["branch"], "branch/24.08")
+            self.assertEqual(report["errors"], [])
+            self.assertEqual(
+                report["branches"][0]["errors"][0]["type"], "JSONDecodeError"
+            )
 
     async def test_extension_without_origin(self):
         self._make_extension()
@@ -793,11 +833,25 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
             ):
                 for reporting in (True, False):
                     args.report_json = str(report_path) if reporting else None
+                    attempts = 0
+
+                    def publish(*_args, report, failure=failure, **_kwargs):
+                        nonlocal attempts
+                        attempts += 1
+                        if attempts == 1:
+                            if isinstance(failure, Exception):
+                                raise failure
+                            return failure
+                        report["delivery"] = "pr_handled"
+                        report["pull_request"] = {
+                            "url": "https://github.com/example/app/pull/1",
+                            "outcome": "created",
+                        }
+                        return True
+
                     with (
                         self.subTest(failure=error_type, reporting=reporting),
-                        patch(
-                            "src.main.open_pr", side_effect=[failure, True]
-                        ) as open_pr,
+                        patch("src.main.open_pr", side_effect=publish) as open_pr,
                     ):
                         self.assertEqual(await main.run_with_args(args), (4, 1, False))
                         self.assertEqual(
@@ -813,9 +867,11 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                         validate_report(report)
                         self.assertEqual(report["status"], "failed")
                         self.assertEqual(report["delivery"], "failed")
-                        self.assertEqual(len(report["sources"]), 4)
-                        self.assertEqual(report["errors"][0]["branch"], "branch/24.08")
-                        self.assertEqual(report["errors"][0]["type"], error_type)
+                        self.assertEqual(report["sources"], [])
+                        self.assertEqual(report["errors"], [])
+                        self.assertEqual(
+                            report["branches"][0]["errors"][0]["type"], error_type
+                        )
                         self.assertEqual(
                             [entry["outdated"] for entry in report["branches"]], [2, 2]
                         )
@@ -872,11 +928,19 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                 self._run_cmd(["git", "remote", "add", "origin", remote])
                 self._run_cmd(["git", "push", "origin", "HEAD:refs/heads/branch/25.08"])
                 args = main.parse_cli_args([self.manifest_path])
+                report_path = Path(self.test_dir.name, "report.json")
+                args.report_json = str(report_path)
                 with patch("src.main.check_call", wraps=main.check_call) as git_call:
                     self.assertEqual(await main.run_with_args(args), (0, 0, False))
                 self.assertFalse(
                     any("submodule" in call.args[0] for call in git_call.call_args_list)
                 )
+                report = json.loads(report_path.read_text())
+                validate_report(report)
+                self.assertEqual(report["status"], "completed")
+                self.assertEqual(report["branches"][0]["sources"], [])
+                self.assertEqual(report["branches"][0]["errors"], [])
+                report_path.unlink()
                 shared_path = Path(self.test_dir.name, "shared-modules/module.yml")
                 original_shared = shared_path.read_text()
                 for option in ("--edit-only", "--commit-only"):
@@ -911,11 +975,12 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(branch_report["status"], "completed")
                 self.assertEqual(branch_report["errors"], [])
                 self.assertNotIn("exclusions", branch_report)
-                self.assertEqual(len(report["sources"]), 2)
+                self.assertEqual(report["sources"], [])
+                self.assertEqual(len(branch_report["sources"]), 2)
                 self.assertTrue(
                     all(
                         source["manifest"] == "local.yml"
-                        for source in report["sources"]
+                        for source in branch_report["sources"]
                     )
                 )
                 report_path.unlink()

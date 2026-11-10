@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import subprocess
 import tempfile
 from collections import Counter
@@ -136,11 +137,81 @@ class TestReporting(LocalHTTPTestCase):
         result, report = await self.run_report("--edit-only")
         self.assertTrue(result[2])
         self.assertEqual(report["delivery"], "edited")
+        self.assertEqual(report["mode"], "check")
         entry = report["sources"][0]
         self.assertEqual(entry["current"]["url"], source["url"])
         self.assertNotEqual(entry["candidate"]["url"], source["url"])
         updated = json.loads(self.manifest.read_text())["sources"][0]
         self.assertEqual(updated["url"], entry["candidate"]["url"])
+
+    async def test_checkout_identity_before_edits(self):
+        self.write([self.source()])
+
+        def git(*args):
+            return subprocess.check_output(
+                ["git", "-C", str(self.root), *args], text=True
+            ).strip()
+
+        git("init", "-b", "beta")
+        git("add", self.manifest.name, "build-revision")
+        git(
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "Initial manifest",
+        )
+        commit = git("rev-parse", "HEAD")
+        _, report = await self.run_report("--edit-only")
+        self.assertEqual(
+            report["checkout"], {"commit": commit, "branch": "beta", "dirty": False}
+        )
+        self.assertTrue(git("diff"))
+        git("tag", "beta")
+        _, report = await self.run_report("--lint")
+        self.assertEqual(
+            report["checkout"], {"commit": commit, "branch": "beta", "dirty": True}
+        )
+        git("checkout", "--detach")
+        _, report = await self.run_report("--lint")
+        self.assertEqual(
+            report["checkout"], {"commit": commit, "branch": None, "dirty": True}
+        )
+
+    async def test_missing_manifest_retains_unknown_identity(self):
+        _, report = await self.run_report()
+        self.assertEqual(report["status"], "failed")
+        self.assertEqual(
+            report["checkout"], {"commit": None, "branch": None, "dirty": None}
+        )
+        self.assertTrue(report["errors"])
+
+    async def test_untracked_manifest_is_dirty_when_git_hides_untracked_files(self):
+        self.write([])
+        for args in (
+            ["init", "-b", "main"],
+            [
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.com",
+                "commit",
+                "--allow-empty",
+                "-m",
+                "Initial commit",
+            ],
+            ["config", "status.showUntrackedFiles", "no"],
+        ):
+            subprocess.run(
+                ["git", "-C", str(self.root), *args], check=True, capture_output=True
+            )
+        _, report = await self.run_report()
+        self.assertEqual(report["status"], "completed")
+        self.assertTrue(report["checkout"]["dirty"])
+        self.assertEqual(report["checkout"]["branch"], "main")
+        self.assertIsNotNone(report["checkout"]["commit"])
 
     async def test_blocked_group_and_filtered_source(self):
         sources = [self.source("2"), self.source("3")]
@@ -413,7 +484,12 @@ class TestReporting(LocalHTTPTestCase):
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout), self.assertLogs("src") as logs:
                 result = await main.run_with_args(args)
-            outputs.append((result, stdout.getvalue(), Counter(logs.output)))
+            # Completion ordinals can belong to different sources between runs.
+            messages = Counter(
+                re.sub(r"Finished check \[\d+/", "Finished check [N/", line)
+                for line in logs.output
+            )
+            outputs.append((result, stdout.getvalue(), messages))
         self.assertEqual(outputs[0], outputs[1])
         self.assertIn("OUTDATED", outputs[1][1])
         self.assertIn("2026-11-06 12:00:00+00:00", outputs[1][1])
