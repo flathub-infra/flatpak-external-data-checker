@@ -197,6 +197,72 @@ class TestSourceUpdates(unittest.TestCase):
         self.assertIn(r"| app\-1\.0\.tar\.gz |", text)
         self.assertNotIn(data.new_version.url, text)
 
+    def test_previous_version_from_url_template(self):
+        data = self.file_source(
+            {
+                "type": "html",
+                "url": "https://kerberos.org/dist/",
+                "version-pattern": r"Kerberos V5 Release ([\d\.-]*) - current release",
+                "url-template": "https://kerberos.org/dist/krb5/"
+                "$version0.$version1/krb5-$version.tar.gz",
+            }
+        )
+        data.current_version = data.current_version._replace(
+            url="https://kerberos.org/dist/krb5/1.22/krb5-1.22.2.tar.gz"
+        )
+        data.new_version = data.new_version._replace(
+            url="https://kerberos.org/dist/krb5/1.22/krb5-1.22.3.tar.gz",
+            version="1.22.3",
+        )
+        update = SourceUpdate.from_source(data)
+        self.assertEqual(update.old_version, "1.22.2")
+        self.assertEqual(update.new_version, "1.22.3")
+        self.assertIsNone(data.current_version.version)
+
+    def test_url_template_version_inference(self):
+        for template, path, expected in (
+            ("app-$version.tar.gz", "app-1.2.3.tar.gz", "1.2.3"),
+            ("app-${version}.tar.gz", "app-1.2.3.tar.gz", "1.2.3"),
+            ("$major/$minor/$patch/app-$version.zip", "1/2/3/app-1.2.3.zip", "1.2.3"),
+            ("$version/app-$version.zip", "1.2/app-1.2.zip", "1.2"),
+            ("$$/app-$version.zip", "$/app-1.2.zip", "1.2"),
+            ("app-$version.zip", "app-1.2-rc1.zip", "1.2-rc1"),
+            ("app-${version}-${major}.tar.gz", "app-1.2-rc1-1.tar.gz", "1.2-rc1"),
+            ("$version0.$version1/app-$version.zip", "1.3/app-1.2.zip", "unknown"),
+            ("$version/app-$version.zip", "1.3/app-1.2.zip", "unknown"),
+            ("$parent_version/app-$version.zip", "1.2/app-1.2.zip", "unknown"),
+            ("app-$version$major.zip", "app-1.21.zip", "unknown"),
+            ("app-$version0.$version1.zip", "app-1.2.zip", "unknown"),
+            ("app-$version.zip", "other-1.2.zip", "unknown"),
+            ("app-$version.zip", "app-.zip", "unknown"),
+            ("app-$version.zip", "app-1/2.zip", "unknown"),
+            ("app-$version.zip", "app-1.zip?mirror=2", "unknown"),
+            ("app-$version.$.zip", "app-1.2.$.zip", "unknown"),
+        ):
+            with self.subTest(template=template, path=path):
+                data = self.file_source(
+                    {"type": "html", "url-template": f"https://example.org/{template}"}
+                )
+                data.current_version = data.current_version._replace(
+                    url=f"https://example.org/{path}"
+                )
+                self.assertEqual(SourceUpdate.from_source(data).old_version, expected)
+                data.current_version = data.current_version._replace(version="known")
+                self.assertEqual(SourceUpdate.from_source(data).old_version, "known")
+
+    def test_relative_html_url_template(self):
+        data = self.file_source(
+            {
+                "type": "html",
+                "url": "https://example.org/dist/",
+                "url-template": "app-$version.tar.gz",
+            }
+        )
+        data.current_version = data.current_version._replace(
+            url="https://example.org/dist/app-1.2.3.tar.gz"
+        )
+        self.assertEqual(SourceUpdate.from_source(data).old_version, "1.2.3")
+
     def test_unknown_and_unresolved_links(self):
         data = self.file_source()
         self.assertEqual(SourceUpdate.from_source(data).old_version, "unknown")
