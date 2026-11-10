@@ -526,12 +526,82 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(
                 [entry["status"] for entry in report["branches"]], ["skipped"] * 3
             )
+            self.assertEqual(report["status"], "skipped")
             worktrees = self._run_cmd(
                 ["git", "worktree", "list", "--porcelain"],
                 capture_output=True,
                 text=True,
             ).stdout
             self.assertEqual(worktrees.count("worktree "), 1)
+            self.assertEqual(self._get_commit_data()["commit"], original_head)
+
+    async def test_runtime_branch_report_aggregation(self):
+        self._make_extension()
+        original_head = self._get_commit_data()["commit"]
+        with tempfile.TemporaryDirectory() as remote:
+            subprocess.run(["git", "init", "--bare", remote], check=True)
+            self._run_cmd(["git", "remote", "add", "origin", remote])
+            for version in ("24.08", "25.08"):
+                self._run_cmd(
+                    ["git", "checkout", "-B", f"branch/{version}", original_head]
+                )
+                path = Path(self.manifest_path)
+                path.write_text(path.read_text().replace("'24.08'", f"'{version}'"))
+                self._run_cmd(["git", "commit", "--allow-empty", "-am", "Set runtime"])
+                self._run_cmd(["git", "push", "origin", f"branch/{version}"])
+            self._run_cmd(["git", "checkout", "--detach", original_head])
+            report_path = Path(self.test_dir.name, "report.json")
+            args = main.parse_cli_args(
+                ["--report-json", str(report_path), self.manifest_path]
+            )
+            for first in ("skipped", "completed", "failed"):
+                for second in ("skipped", "completed", "failed"):
+                    statuses = [first, second]
+                    parents = {
+                        ("org.freedesktop.Sdk", version): [
+                            RuntimeStatus(
+                                f"runtime/org.freedesktop.Sdk/x86_64/{version}",
+                                "Retired SDK" if status == "skipped" else None,
+                                None,
+                            )
+                        ]
+                        for version, status in zip(
+                            ("24.08", "25.08"), statuses, strict=True
+                        )
+                        if status != "failed"
+                    }
+                    with (
+                        self.subTest(statuses=statuses),
+                        patch(
+                            "src.lib.runtime.fetch_runtime_statuses",
+                            return_value=parents,
+                        ),
+                    ):
+                        self.assertEqual(
+                            await main.run_with_args(args),
+                            (
+                                2 * statuses.count("completed"),
+                                statuses.count("failed"),
+                                False,
+                            ),
+                        )
+                        report = json.loads(report_path.read_text())
+                        validate_report(report)
+                        expected = (
+                            "failed"
+                            if "failed" in statuses
+                            else "completed"
+                            if "completed" in statuses
+                            else "skipped"
+                        )
+                        self.assertEqual(report["status"], expected)
+                        self.assertEqual(
+                            [entry["status"] for entry in report["branches"]], statuses
+                        )
+                        self.assertEqual(report["schema_version"], 1)
+                        self.assertEqual(report["delivery"], "not_requested")
+                        if "completed" not in statuses:
+                            self.assertEqual(report["sources"], [])
             self.assertEqual(self._get_commit_data()["commit"], original_head)
 
     async def test_runtime_branch_parent_eol(self):

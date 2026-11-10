@@ -982,6 +982,8 @@ async def run_runtime_branches(
                         branch_report["delivery"],
                         key=deliveries.index,
                     )
+            if all(branch["status"] == "skipped" for branch in report["branches"]):
+                report["status"] = "skipped"
             return outdated_total, errors_total, any_updated and all_updated
     except (OSError, subprocess.CalledProcessError) as error:
         log.error("Failed to discover runtime branches: %s", error)
