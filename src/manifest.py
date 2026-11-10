@@ -142,6 +142,7 @@ class ManifestChecker:
 
         self._manifest_headers: dict[str, bool] = {}
         self._incomplete_manifests: list[ManifestLoadError] = []
+        self._shared_module_exclusions: set[ManifestScopeError] = set()
 
         # Top-level manifest contents
         self._root_manifest = self._read_manifest(self._root_manifest_path)
@@ -210,7 +211,20 @@ class ManifestChecker:
             "coverage is incomplete"
         )
         self._incomplete_manifests.append(error)
-        log.warning(error)
+        shared_modules = (
+            self._repository / "shared-modules"
+            if self._repository is not None
+            else None
+        )
+        if (
+            shared_modules is not None
+            and shared_modules in self._submodule_paths
+            and resolved.is_relative_to(shared_modules.resolve())
+        ):
+            self._shared_module_exclusions.add(error)
+            log.info(error)
+        else:
+            log.warning(error)
         return True
 
     def _load_root_manifest(self):
@@ -657,8 +671,15 @@ class ManifestChecker:
         ]
 
     def get_report_errors(self) -> list[Exception]:
-        """Include skipped manifest files so partial coverage is visible."""
-        return [*self.get_errors(), *self._incomplete_manifests]
+        """Include skipped manifest files except the shared-modules submodule."""
+        return [
+            *self.get_errors(),
+            *(
+                error
+                for error in self._incomplete_manifests
+                if error not in self._shared_module_exclusions
+            ),
+        ]
 
     def get_source_report(self) -> list[dict[str, t.Any]]:
         """Snapshot detection results before update_manifests mutates sources."""
