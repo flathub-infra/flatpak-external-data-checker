@@ -1,3 +1,4 @@
+import itertools
 import json
 import subprocess
 import tempfile
@@ -10,12 +11,17 @@ from src.manifest import ManifestChecker
 
 class TestSubmoduleScope(unittest.TestCase):
     def test_includes_do_not_load_submodules(self):
-        for initialized in (False, True):
+        for initialized, submodule in itertools.product(
+            (False, True), ("shared-modules", "shared modules")
+        ):
             for kind in ("module", "sources"):
                 for symlink in (False, True):
                     with (
                         self.subTest(
-                            initialized=initialized, kind=kind, symlink=symlink
+                            initialized=initialized,
+                            kind=kind,
+                            symlink=symlink,
+                            submodule=submodule,
                         ),
                         tempfile.TemporaryDirectory() as directory,
                     ):
@@ -33,11 +39,11 @@ class TestSubmoduleScope(unittest.TestCase):
                                 "--cacheinfo",
                                 "160000",
                                 "a" * 40,
-                                "shared modules",
+                                submodule,
                             ],
                             check=True,
                         )
-                        shared = root / "shared modules"
+                        shared = root / submodule
                         shared.mkdir()
                         if initialized:
                             (shared / ".git").write_text("gitdir: unused\n")
@@ -50,7 +56,7 @@ class TestSubmoduleScope(unittest.TestCase):
                         include = (
                             "alias/include.json"
                             if symlink
-                            else "shared modules/include.json"
+                            else f"{submodule}/include.json"
                         )
                         source = {
                             "type": "file",
@@ -78,10 +84,14 @@ class TestSubmoduleScope(unittest.TestCase):
                         )
                         self.assertEqual(len(checker.get_external_data()), 1)
                         self.assertEqual(checker.get_errors(), [])
-                        self.assertEqual(len(checker.get_report_errors()), 1)
-                        self.assertIsInstance(
-                            checker.get_report_errors()[0], ManifestScopeError
-                        )
+                        if submodule == "shared-modules":
+                            self.assertEqual(checker.get_report_errors(), [])
+                        else:
+                            self.assertEqual(len(checker.get_report_errors()), 1)
+                            self.assertIsInstance(
+                                checker.get_report_errors()[0], ManifestScopeError
+                            )
+                        self.assertEqual(len(checker._incomplete_manifests), 1)
                         report = checker.get_source_report()
                         self.assertEqual(len(report), 1)
                         self.assertEqual(report[0]["status"], "unchecked")

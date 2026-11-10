@@ -2,6 +2,7 @@ import contextlib
 import hashlib
 import io
 import json
+import subprocess
 import tempfile
 from collections import Counter
 from pathlib import Path
@@ -77,6 +78,47 @@ class TestReporting(LocalHTTPTestCase):
         self.assertEqual(sources[0]["source_pointer"], "/sources/0")
         self.assertEqual(sources[3]["manifest"], "source.json")
         self.assertEqual(sources[3]["source_pointer"], "")
+
+    async def test_shared_modules_exclusion_is_not_a_report_failure(self):
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(self.root),
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                "160000",
+                "a" * 40,
+                "shared-modules",
+            ],
+            check=True,
+        )
+        self.write([self.source(same=True), "shared-modules/source.json"])
+        result, report = await self.run_report()
+        self.assertEqual(result[1], 0)
+        self.assertEqual(report["status"], "completed")
+        self.assertEqual(report["errors"], [])
+        self.assertNotIn("exclusions", report)
+        self.assertEqual(report["sources"][0]["status"], "checked")
+
+        self.write([self.source(), "shared-modules/source.json"])
+        before = self.manifest.read_bytes()
+        result, report = await self.run_report(
+            "--edit-only", "--require-important-update"
+        )
+        self.assertFalse(result[2])
+        self.assertEqual(report["errors"], [])
+        self.assertEqual(report["sources"][0]["status"], "blocked")
+        self.assertEqual(self.manifest.read_bytes(), before)
+
+    async def test_missing_shared_modules_without_gitlink_remains_an_error(self):
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        self.write(["shared-modules/source.json"])
+        _, report = await self.run_report()
+        self.assertEqual(report["status"], "failed")
+        self.assertEqual(report["errors"][0]["type"], "ManifestFileOpenError")
 
     async def test_edit_preserves_pre_update_snapshot(self):
         source = self.source()

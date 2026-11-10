@@ -875,11 +875,13 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(await main.run_with_args(args), (2, 0, True))
                 report = json.loads(report_path.read_text())
                 validate_report(report)
-                self.assertEqual(report["status"], "failed")
-                self.assertEqual(
-                    [error["type"] for error in report["errors"]],
-                    ["ManifestScopeError"],
-                )
+                self.assertEqual(report["status"], "completed")
+                self.assertEqual(report["errors"], [])
+                self.assertNotIn("exclusions", report)
+                branch_report = report["branches"][0]
+                self.assertEqual(branch_report["status"], "completed")
+                self.assertEqual(branch_report["errors"], [])
+                self.assertNotIn("exclusions", branch_report)
                 self.assertEqual(len(report["sources"]), 2)
                 self.assertTrue(
                     all(
