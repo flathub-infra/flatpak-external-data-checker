@@ -59,6 +59,54 @@ class TestReportSchema(unittest.TestCase):
                 with self.assertRaises(jsonschema.ValidationError):
                     validate_report(invalid)
 
+    def test_pull_request(self):
+        details = {
+            "url": "https://github.com/flathub/app/pull/123",
+            "outcome": "existing_closed",
+        }
+        branch = {
+            "branch": "branch/25.08",
+            "status": "completed",
+            "delivery": "pr_handled",
+            "sources": [],
+            "errors": [],
+        }
+        for outcome in (
+            "created",
+            "existing_open",
+            "existing_closed",
+            "existing_merged",
+            "merged",
+        ):
+            with self.subTest(outcome=outcome):
+                pull_request = details | {"outcome": outcome}
+                validate_report(
+                    self.report()
+                    | {
+                        "delivery": "pr_handled",
+                        "pull_request": pull_request,
+                    }
+                )
+                validate_report(
+                    self.report()
+                    | {"branches": [branch | {"pull_request": pull_request}]}
+                )
+        for invalid in (
+            {},
+            {"url": details["url"]},
+            {"outcome": "created"},
+            details | {"outcome": "recovered"},
+            details | {"url": None},
+            details | {"extra": True},
+        ):
+            with self.subTest(invalid=invalid):
+                for report in (
+                    self.report() | {"pull_request": invalid},
+                    self.report() | {"branches": [branch | {"pull_request": invalid}]},
+                ):
+                    with self.assertRaises(jsonschema.ValidationError):
+                        validate_report(report)
+
     def test_invalid_report_values(self):
         for invalid in (
             {"schema_version": 2},

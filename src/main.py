@@ -365,6 +365,7 @@ def open_pr(
     manifest_checker: manifest.ManifestChecker | None = None,
     fork: bool | None = None,
     pr_labels: list[str] | None = None,
+    report: dict | None = None,
 ) -> bool:
 
     try:
@@ -490,15 +491,26 @@ def open_pr(
     # we don't want to open another one.
     closed_prs = [pr for pr in prs if pr.state == "closed"]
     for pr in closed_prs:
+        merged = pr.is_merged()
+        if report is not None:
+            report["pull_request"] = {
+                "url": pr.html_url,
+                "outcome": "existing_merged" if merged else "existing_closed",
+            }
         log.info(
             "Found existing %s PR: %s",
-            "merged" if pr.is_merged() else pr.state,
+            "merged" if merged else pr.state,
             pr.html_url,
         )
         return True
 
     open_prs = [pr for pr in prs if pr.state == "open"]
     for pr in open_prs:
+        if report is not None:
+            report["pull_request"] = {
+                "url": pr.html_url,
+                "outcome": "existing_open",
+            }
         log.info("Found open PR: %s", pr.html_url)
 
         if automerge or force_automerge:
@@ -510,6 +522,8 @@ def open_pr(
                     raise RuntimeError(
                         f"Failed to merge {pr.html_url}: {result.message}"
                     )
+                if report is not None:
+                    report["pull_request"]["outcome"] = "merged"
                 try:
                     pr.create_issue_comment(
                         AUTOMERGE_DUE_TO_CONFIG
@@ -589,6 +603,8 @@ def open_pr(
         maintainer_can_modify=True,
     )
     log.info("Opened pull request %s", pr.html_url)
+    if report is not None:
+        report["pull_request"] = {"url": pr.html_url, "outcome": "created"}
     if pr_labels:
         log.info("Adding labels to PR: %s", ", ".join(pr_labels))
         pr.set_labels(*pr_labels)
@@ -1079,6 +1095,7 @@ async def run_manifest_with_args(
                         manifest_checker=manifest_checker,
                         fork=args.fork,
                         pr_labels=args.pr_labels,
+                        report=report,
                     ):
                         report["delivery"] = "failed"
                         report["errors"].append(

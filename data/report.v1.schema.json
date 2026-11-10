@@ -13,6 +13,7 @@
     "mode": { "enum": [ "check", "lint" ] },
     "status": { "$ref": "#/$defs/status" },
     "delivery": { "$ref": "#/$defs/delivery" },
+    "pull_request": { "$ref": "#/$defs/pull_request" },
     "sources": { "type": "array", "items": { "$ref": "#/$defs/source" } },
     "errors": { "type": "array", "items": { "$ref": "#/$defs/error" } },
     "outdated": { "type": "integer", "minimum": 0 },
@@ -35,6 +36,16 @@
         { "properties": { "source": { "const": "build" }, "revision": { "type": "string" }, "dirty": { "type": "null" } } },
         { "properties": { "source": { "const": "git" }, "revision": { "type": "string" }, "dirty": { "type": "boolean" } } }
       ]
+    },
+    "pull_request": {
+      "description": "Last confirmed PR outcome, retained if a later step fails. Omitted when no PR was found or created.",
+      "type": "object",
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "outcome": { "enum": [ "created", "existing_open", "existing_closed", "existing_merged", "merged" ], "description": "created and merged describe actions in this run; existing_* describes an observed state." }
+      },
+      "required": [ "url", "outcome" ],
+      "additionalProperties": false
     },
     "status": { "enum": [ "completed", "failed", "skipped" ] },
     "delivery": {
@@ -89,6 +100,7 @@
         "branch": { "type": "string" },
         "status": { "$ref": "#/$defs/status" },
         "delivery": { "$ref": "#/$defs/delivery" },
+        "pull_request": { "$ref": "#/$defs/pull_request" },
         "skip_reason": { "const": "runtime-end-of-life", "description": "Why the checker skipped this branch." },
         "runtime_eol": { "type": "array", "items": { "$ref": "#/$defs/runtime_eol" }, "description": "Parent runtime refs with EOL reasons or replacement refs." },
         "sources": { "type": "array", "items": { "$ref": "#/$defs/source" } },
