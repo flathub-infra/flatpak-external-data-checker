@@ -143,6 +143,61 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
     async def test_unchanged_release_is_checked(self):
         await self._check_unchanged_release(False)
 
+    async def test_unchanged_release_download_timeout_has_detail(self):
+        checker = ManifestChecker(TEST_MANIFEST)
+        data = self._find_by_filename(checker.get_external_data(), "nordpass.snap")
+        current = data.current_version
+        timeout = asyncio.TimeoutError()
+        metadata = {
+            "channel-map": [
+                {
+                    "channel": {"architecture": "amd64", "name": "stable"},
+                    "download": {"url": current.url},
+                    "version": "2.0.0",
+                }
+            ]
+        }
+
+        async def chunks(block_size):
+            yield b"partial download"
+            raise timeout
+
+        @asynccontextmanager
+        async def response(url, **kwargs):
+            if url == "http://api.snapcraft.io/v2/snaps/info/nordpass":
+                yield mock.Mock(json=mock.AsyncMock(return_value=metadata))
+            elif url == current.url:
+                yield mock.Mock(
+                    url=URL(url), headers={}, content=mock.Mock(iter_chunked=chunks)
+                )
+            else:
+                self.fail(f"Unexpected HTTP request: {url}")
+
+        with (
+            mock.patch("aiohttp.ClientSession.get", side_effect=response) as get,
+            self.assertLogs("src.manifest", level="ERROR") as logs,
+        ):
+            await checker.check()
+        self.assertEqual(get.call_count, 2)
+        (error,) = checker.get_errors()
+        self.assertIsInstance(error, CheckerFetchError)
+        self.assertIs(error.__cause__, timeout)
+        message = f"Error downloading upstream source: {type(timeout).__name__}"
+        self.assertEqual(str(error), message)
+        self.assertIn(f"with URLChecker: {message}", logs.output[0])
+        self.assertTrue(all(r.exc_info is None for r in logs.records))
+        self.assertTrue(data.check_failed)
+        self.assertTrue(data.checked.is_set())
+        self.assertIsNone(data.new_version)
+        self.assertEqual(data.current_version, current)
+        self.assertFalse(data.state & data.State.LATEST)
+        report = checker.get_source_report()[0]
+        self.assertEqual(report["checkers_run"], ["SnapcraftChecker", "URLChecker"])
+        self.assertEqual(report["status"], "failed")
+        self.assertEqual(
+            report["errors"], [{"type": "CheckerFetchError", "message": message}]
+        )
+
     async def test_api_failures_are_reported_per_source(self):
         await self._check_request_failures(download=False)
 

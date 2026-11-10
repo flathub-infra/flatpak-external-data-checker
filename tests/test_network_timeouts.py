@@ -9,6 +9,7 @@ import aiohttp
 from yarl import URL
 
 from src.checkers.jsonchecker import JSONChecker
+from src.checkers.urlchecker import URLChecker
 from src.lib import HTTP_CHUNK_SIZE
 from src.lib.checksums import MultiDigest
 from src.lib.errors import CheckerFetchError, CheckerQueryError
@@ -112,6 +113,105 @@ class TestNetworkTimeouts(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(errors[0], CheckerFetchError)
         self.assertIs(errors[0].__cause__, timeout)
         self.assertEqual(len(responses), 2)
+
+    async def test_url_download_failure_diagnostics(self):
+        failed_url = "https://example.com/failed.snap?token=sensitive&empty="
+        failures = (
+            asyncio.TimeoutError(),
+            aiohttp.ClientConnectionError(),
+            aiohttp.ClientPayloadError(),
+            aiohttp.ClientConnectionError("Connection lost"),
+            aiohttp.ClientResponseError(
+                mock.Mock(real_url=URL("https://example.com/failed.snap")),
+                (),
+                status=503,
+                message="Service Unavailable",
+            ),
+        )
+        for failure in failures:
+            for stage in ("request", "body"):
+                with self.subTest(failure=type(failure).__name__, stage=stage):
+                    session = mock.MagicMock(spec=aiohttp.ClientSession)
+                    contexts = []
+
+                    def get(
+                        url, failure=failure, stage=stage, contexts=contexts, **kwargs
+                    ):
+                        context, _ = self._response(
+                            url, failure if url == failed_url else None
+                        )
+                        if url == failed_url and stage == "request":
+                            context.__aenter__.side_effect = failure
+                        contexts.append(context)
+                        return context
+
+                    session.get.side_effect = get
+                    sources = [self._source("failed"), self._source("independent")]
+                    for source in sources:
+                        del source["x-checker-data"]
+                    sources[0]["url"] = failed_url
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        path = os.path.join(tmpdir, "sources.json")
+                        with open(path, "w") as stream:
+                            json.dump(sources, stream)
+                        checker = ManifestChecker(path)
+                        checker._checkers = [URLChecker]
+                        with (
+                            mock.patch("src.manifest.aiohttp.ClientSession") as cls,
+                            mock.patch(
+                                "src.lib.robots.RobotsCache.ensure_allowed",
+                                new_callable=mock.AsyncMock,
+                            ),
+                            self.assertLogs("src.manifest", level="ERROR") as logs,
+                        ):
+                            cls.return_value.__aenter__.return_value = session
+                            checked = await checker.check()
+
+                    self.assertEqual(len(checked), 2)
+                    failed, independent = checker.get_external_data()
+                    self.assertTrue(failed.checked.is_set())
+                    self.assertTrue(failed.check_failed)
+                    self.assertTrue(failed.state & failed.State.BROKEN)
+                    self.assertFalse(failed.state & failed.State.LATEST)
+                    self.assertIsNone(failed.new_version)
+                    self.assertEqual(failed.current_version.url, failed_url)
+                    self.assertFalse(independent.check_failed)
+                    self.assertTrue(independent.checked.is_set())
+                    self.assertIsNotNone(independent.new_version)
+                    (error,) = checker.get_errors()
+                    self.assertIsInstance(error, CheckerFetchError)
+                    self.assertIs(error.__cause__, failure)
+                    detail = str(failure) or type(failure).__name__
+                    message = f"Error downloading upstream source: {detail}"
+                    self.assertEqual(str(error), message)
+                    self.assertIn(message, logs.output[0])
+                    self.assertNotIn("sensitive", str(error))
+                    self.assertTrue(all(r.exc_info is None for r in logs.records))
+                    report = checker.get_source_report()[0]
+                    self.assertEqual(report["status"], "failed")
+                    self.assertEqual(
+                        report["errors"],
+                        [{"type": "CheckerFetchError", "message": message}],
+                    )
+                    self.assertEqual(session.get.call_count, 2)
+                    if stage == "body":
+                        for context in contexts:
+                            context.__aexit__.assert_awaited_once()
+
+    async def test_url_download_unexpected_errors_propagate(self):
+        for failure in (asyncio.CancelledError(), TypeError("Programming error")):
+            with self.subTest(failure=type(failure).__name__):
+                session = mock.MagicMock(spec=aiohttp.ClientSession)
+                context, _ = self._response("https://example.com/file.bin", failure)
+                session.get.return_value = context
+                source = self._source("failed")
+                del source["x-checker-data"]
+                data = ExternalData.from_source("test.json", source)
+                with self.assertRaises(type(failure)) as caught:
+                    await URLChecker(session).check(data)
+                self.assertIs(caught.exception, failure)
+                self.assertIsNone(data.new_version)
+                context.__aexit__.assert_awaited_once()
 
     async def test_metadata_timeout_becomes_query_error(self):
         timeout = asyncio.TimeoutError()

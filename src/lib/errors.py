@@ -7,7 +7,8 @@ class FlatpakExternalDataCheckerError(Exception):
 
     def __str__(self):
         if self.__cause__ is not None:
-            return f"{self.message}: {self.__cause__}"
+            cause = str(self.__cause__) or type(self.__cause__).__name__
+            return f"{self.message}: {cause}"
         return self.message
 
 
