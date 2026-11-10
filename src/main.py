@@ -42,6 +42,7 @@ from github import Github, GithubException
 from . import manifest
 from .lib.errors import ManifestLoadError
 from .lib.externaldata import ExternalData
+from .lib.provenance import checker_provenance
 from .lib.runtime import RuntimeEolChecker
 from .lib.sourceupdates import format_source_updates
 from .lib.utils import init_logging, parse_github_url, read_manifest
@@ -741,6 +742,8 @@ async def run_with_args(args: argparse.Namespace) -> tuple[int, int, bool]:
         "errors": [],
     }
     try:
+        if getattr(args, "report_json", None):
+            report["checker"] = checker_provenance()
         result = await _run_with_args(args, report)
         if result[1] or result[0] == -1 or report["errors"]:
             report["status"] = "failed"

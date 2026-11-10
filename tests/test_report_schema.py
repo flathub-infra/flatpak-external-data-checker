@@ -3,13 +3,19 @@ import unittest
 
 import jsonschema
 
-from .report_schema import REPORT_VALIDATOR, SOURCE_SCHEMA, validate_report
+from .report_schema import (
+    REPORT_SCHEMA,
+    REPORT_VALIDATOR,
+    SOURCE_SCHEMA,
+    validate_report,
+)
 
 
 class TestReportSchema(unittest.TestCase):
     def report(self):
         return {
             "schema_version": 1,
+            "checker": {"revision": None, "source": "unknown", "dirty": None},
             "manifest": "/manifests/app.json",
             "started_at": "2026-11-09T12:00:00+00:00",
             "finished_at": "2026-11-09T12:01:00+00:00",
@@ -45,6 +51,8 @@ class TestReportSchema(unittest.TestCase):
         report = self.report()
         validate_report(report)
         for field in report:
+            if field == "checker":
+                continue
             with self.subTest(field=field):
                 invalid = report.copy()
                 del invalid[field]
@@ -65,6 +73,9 @@ class TestReportSchema(unittest.TestCase):
             {"errors": [{"type": "Error"}]},
             {"branches": [{"branch": "branch/25.08"}]},
             {"unexpected": True},
+            {"checker": {}},
+            {"checker": {"revision": "latest", "source": "build", "dirty": None}},
+            {"checker": {"revision": None, "source": "git", "dirty": False}},
         ):
             with self.subTest(invalid=invalid):
                 with self.assertRaises(jsonschema.ValidationError):
@@ -94,6 +105,19 @@ class TestReportSchema(unittest.TestCase):
                     validate_report(
                         self.report() | {"sources": [self.source() | changes]}
                     )
+
+    def test_v1_compatibility_boundary(self):
+        legacy = self.report()
+        del legacy["checker"]
+        validate_report(legacy)
+        validate_report(self.report())
+        legacy_schema = copy.deepcopy(REPORT_SCHEMA)
+        del legacy_schema["properties"]["checker"]
+        del legacy_schema["$defs"]["checker"]
+        validator = jsonschema.Draft202012Validator(legacy_schema)
+        validator.validate(legacy)
+        with self.assertRaises(jsonschema.ValidationError):
+            validator.validate(self.report())
 
     @unittest.skipUnless(
         "date-time" in REPORT_VALIDATOR.format_checker.checkers,
