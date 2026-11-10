@@ -95,6 +95,7 @@ class TestForgejoChecker(unittest.IsolatedAsyncioTestCase):
         )
         manifest = mock.Mock(app_id="org.example.App", _root_manifest_path="test.json")
         manifest._blocked_update_sources = set()
+        manifest._incomplete_manifests = []
         manifest._find_repository.return_value = manifest._repository
         manifest.get_external_data.return_value = [source]
         with (

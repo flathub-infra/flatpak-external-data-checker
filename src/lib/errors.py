@@ -23,6 +23,10 @@ class ManifestFileOpenError(ManifestLoadError):
     """Can't open manifest file"""
 
 
+class ManifestScopeError(ManifestLoadError):
+    """Included manifest is outside repository scope; coverage is incomplete"""
+
+
 class ManifestFileTooLarge(ManifestLoadError):
     """Manifest file size is too big"""
 

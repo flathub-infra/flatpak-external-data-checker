@@ -886,15 +886,6 @@ async def run_runtime_branches(
                                     log.info("Skipping EOL runtime branch %s", branch)
                                     branch_report["status"] = "skipped"
                                     continue
-                                check_call(
-                                    [
-                                        "git",
-                                        "submodule",
-                                        "update",
-                                        "--init",
-                                        "--recursive",
-                                    ]
-                                )
                                 branch_args.manifest = str(
                                     get_runtime_branch_manifest(
                                         worktree / manifest_path

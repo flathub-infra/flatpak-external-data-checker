@@ -499,7 +499,7 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                         call.args[0][:2] == ["git", "submodule"]
                         for call in check_call.call_args_list
                     ),
-                    2,
+                    0,
                 )
             self.assertEqual(
                 [entry["status"] for entry in report["branches"]],
@@ -773,13 +773,17 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                 self._run_cmd(["git", "remote", "add", "origin", remote])
                 self._run_cmd(["git", "push", "origin", "HEAD:refs/heads/branch/25.08"])
                 args = main.parse_cli_args([self.manifest_path])
-                self.assertEqual(await main.run_with_args(args), (2, 0, False))
+                with patch("src.main.check_call", wraps=main.check_call) as git_call:
+                    self.assertEqual(await main.run_with_args(args), (0, 0, False))
+                self.assertFalse(
+                    any("submodule" in call.args[0] for call in git_call.call_args_list)
+                )
                 shared_path = Path(self.test_dir.name, "shared-modules/module.yml")
                 original_shared = shared_path.read_text()
                 for option in ("--edit-only", "--commit-only"):
                     with self.subTest(option=option):
                         args = main.parse_cli_args([option, self.manifest_path])
-                        self.assertEqual(await main.run_with_args(args), (2, 0, False))
+                        self.assertEqual(await main.run_with_args(args), (0, 0, False))
                         self.assertEqual(shared_path.read_text(), original_shared)
                 Path(self.test_dir.name, "local.yml").write_text(
                     "name: local\n" + Path(TEST_MANIFEST).read_text()
@@ -789,8 +793,31 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                 self._run_cmd(["git", "add", "local.yml", self.manifest_filename])
                 self._run_cmd(["git", "commit", "-m", "Add local module"])
                 self._run_cmd(["git", "push", "origin", "HEAD:refs/heads/branch/25.08"])
-                args = main.parse_cli_args(["--commit-only", self.manifest_path])
-                self.assertEqual(await main.run_with_args(args), (4, 0, True))
+                report_path = Path(self.test_dir.name, "report.json")
+                args = main.parse_cli_args(
+                    [
+                        "--commit-only",
+                        "--report-json",
+                        str(report_path),
+                        self.manifest_path,
+                    ]
+                )
+                self.assertEqual(await main.run_with_args(args), (2, 0, True))
+                report = json.loads(report_path.read_text())
+                validate_report(report)
+                self.assertEqual(report["status"], "failed")
+                self.assertEqual(
+                    [error["type"] for error in report["errors"]],
+                    ["ManifestScopeError"],
+                )
+                self.assertEqual(len(report["sources"]), 2)
+                self.assertTrue(
+                    all(
+                        source["manifest"] == "local.yml"
+                        for source in report["sources"]
+                    )
+                )
+                report_path.unlink()
                 updates = self._run_cmd(
                     [
                         "git",
@@ -817,12 +844,12 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
                     capture_output=True,
                     text=True,
                 ).stdout.splitlines()
-                self.assertEqual(changed, ["local.yml"])
+                self.assertEqual(changed, ["local.yml", self.appdata_filename])
                 self.assertNotIn("shared", self._get_commit_data(updates[0])["subject"])
                 args = main.parse_cli_args(
                     ["--commit-only", "--commit-to-current-branch", self.manifest_path]
                 )
-                self.assertEqual(await main.run_with_args(args), (4, 0, True))
+                self.assertEqual(await main.run_with_args(args), (2, 0, True))
                 self.assertEqual(shared_path.read_text(), original_shared)
                 self.assertEqual(
                     self._run_cmd(
