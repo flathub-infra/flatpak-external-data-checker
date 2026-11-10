@@ -289,12 +289,41 @@ class TestEntrypoint(unittest.IsolatedAsyncioTestCase):
 
             args.commit_only = False
             args.update = True
-            with patch("src.main.open_pr", return_value=True) as open_pr:
+            with (
+                patch("src.main.Github") as github,
+                patch.dict("os.environ", {"GITHUB_TOKEN": "test-token"}),
+                patch("src.main.parse_github_url", return_value="flathub/app"),
+            ):
+                repo = github.return_value.get_repo.return_value
+                repo.full_name = "flathub/app"
+                closed = MagicMock(state="closed")
+                closed.html_url = "https://github.com/flathub/app/pull/1"
+                closed.is_merged.return_value = False
+                opened = MagicMock(state="open")
+                opened.html_url = "https://github.com/flathub/app/pull/2"
+                opened.mergeable = False
+                repo.get_pulls.side_effect = [[closed], [opened]]
                 self.assertEqual(await main.run_with_args(args), (4, 0, True))
                 self.assertEqual(
-                    [call.args[0].base_branch for call in open_pr.call_args_list],
+                    [call.kwargs["base"] for call in repo.get_pulls.call_args_list],
                     ["branch/24.08", "branch/25.08"],
                 )
+                repo.create_pull.assert_not_called()
+                for pr in (closed, opened):
+                    pr.edit.assert_not_called()
+                    pr.merge.assert_not_called()
+                    pr.create_issue_comment.assert_not_called()
+            report = json.loads(report_path.read_text())
+            validate_report(report)
+            self.assertNotIn("pull_request", report)
+            self.assertEqual(report["delivery"], "pr_handled")
+            self.assertEqual(
+                [entry["pull_request"] for entry in report["branches"]],
+                [
+                    {"url": closed.html_url, "outcome": "existing_closed"},
+                    {"url": opened.html_url, "outcome": "existing_open"},
+                ],
+            )
 
             # A branch error must not hide other branches' outstanding updates.
             self._run_cmd(["git", "push", "origin", "HEAD:refs/heads/branch/00.00"])

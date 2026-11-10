@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 from collections import Counter
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from src import main
 
@@ -222,6 +222,155 @@ class TestReporting(LocalHTTPTestCase):
         self.assertEqual(result, (-1, -1, False))
         self.assertEqual(report["delivery"], "failed")
         self.assertEqual(report["sources"][0]["status"], "update_available")
+
+    @contextlib.contextmanager
+    def mock_publication(self, *, existing=True, automerge=False):
+        self.write([self.source()])
+        (self.root / "flathub.json").write_text(
+            json.dumps({"automerge-flathubbot-prs": automerge})
+        )
+        repo = MagicMock(full_name="flathub/app", default_branch="master")
+        repo.owner.login = "flathub"
+        pr = MagicMock(
+            state="open",
+            mergeable=True,
+            html_url="https://github.com/flathub/app/pull/123",
+        )
+        pr.is_merged.return_value = False
+        pr.merge.return_value.merged = True
+        commit = pr.head.repo.get_commit.return_value
+        commit.get_combined_status.return_value.state = "success"
+        repo.get_pulls.return_value = [pr] if existing else []
+        repo.create_pull.return_value = pr
+        push = MagicMock(return_value=subprocess.CompletedProcess([], 0, "", ""))
+        open_pr = main.open_pr
+
+        def publish(*args, **kwargs):
+            with (
+                patch("src.main.Github") as github,
+                patch.dict("os.environ", {"GITHUB_TOKEN": "test-token"}),
+                patch(
+                    "src.main.subprocess.check_output",
+                    return_value=b"https://github.com/flathub/app",
+                ),
+                patch("src.main.subprocess.run", push),
+            ):
+                github.return_value.get_repo.return_value = repo
+                return open_pr(*args, **kwargs)
+
+        change = main.CommittedChanges("Update app", None, "tree", "update", "master")
+        with (
+            patch("src.main.get_manifest_git_checkout", return_value=self.root),
+            patch("src.main.ensure_git_safe_directory"),
+            patch("src.main.commit_changes", return_value=change),
+            patch("src.main.open_pr", side_effect=publish),
+        ):
+            yield repo, pr, push
+
+    async def test_existing_pr_outcomes(self):
+        for state, merged, outcome in (
+            ("open", False, "existing_open"),
+            ("closed", False, "existing_closed"),
+            ("closed", True, "existing_merged"),
+        ):
+            with (
+                self.subTest(outcome=outcome),
+                self.mock_publication() as (repo, pr, push),
+            ):
+                pr.state = state
+                pr.is_merged.return_value = merged
+                result, report = await self.run_report("--update")
+                self.assertEqual(result, (1, 0, True))
+                self.assertEqual(report["delivery"], "pr_handled")
+                self.assertEqual(
+                    report["pull_request"], {"url": pr.html_url, "outcome": outcome}
+                )
+                push.assert_not_called()
+                repo.create_pull.assert_not_called()
+                pr.edit.assert_not_called()
+                pr.merge.assert_not_called()
+                pr.create_issue_comment.assert_not_called()
+
+    async def test_created_pr_outcome(self):
+        with self.mock_publication(existing=False) as (repo, pr, push):
+            result, report = await self.run_report("--update")
+            self.assertEqual(result, (1, 0, True))
+            self.assertEqual(report["delivery"], "pr_handled")
+            self.assertEqual(
+                report["pull_request"], {"url": pr.html_url, "outcome": "created"}
+            )
+            push.assert_called_once()
+            repo.create_pull.assert_called_once()
+            pr.create_issue_comment.assert_not_called()
+
+    async def test_merged_pr_outcome(self):
+        with self.mock_publication(automerge=True) as (repo, pr, push):
+            result, report = await self.run_report("--update")
+            self.assertEqual(result, (1, 0, True))
+            self.assertEqual(report["delivery"], "pr_handled")
+            self.assertEqual(
+                report["pull_request"], {"url": pr.html_url, "outcome": "merged"}
+            )
+            pr.merge.assert_called_once_with(merge_method="rebase")
+            pr.create_issue_comment.assert_called_once()
+            push.assert_not_called()
+            repo.create_pull.assert_not_called()
+
+    async def test_pr_outcome_survives_failure(self):
+        for operation, existing, automerge, outcome in (
+            ("create_pull", False, False, None),
+            ("set_labels", False, False, "created"),
+            ("merge", True, True, "existing_open"),
+            ("get_git_ref", True, True, "merged"),
+        ):
+            with (
+                self.subTest(operation=operation),
+                self.mock_publication(existing=existing, automerge=automerge) as (
+                    repo,
+                    pr,
+                    push,
+                ),
+            ):
+                target = repo if operation in ("create_pull", "get_git_ref") else pr
+                getattr(target, operation).side_effect = RuntimeError(operation)
+                with self.assertRaisesRegex(RuntimeError, operation):
+                    await self.run_report("--update", "--pr-labels", "update")
+                report = json.loads(self.report.read_text())
+                validate_report(report)
+                self.assertEqual(report["delivery"], "failed")
+                self.assertEqual(report["status"], "failed")
+                self.assertEqual(report["sources"][0]["status"], "update_available")
+                if outcome is None:
+                    self.assertNotIn("pull_request", report)
+                else:
+                    self.assertEqual(
+                        report["pull_request"], {"url": pr.html_url, "outcome": outcome}
+                    )
+                if outcome != "merged":
+                    pr.create_issue_comment.assert_not_called()
+
+    async def test_rejected_merge_keeps_open_pr_outcome(self):
+        with self.mock_publication(automerge=True) as (_, pr, _):
+            pr.merge.return_value.merged = False
+            pr.merge.return_value.message = "rejected"
+            with self.assertRaisesRegex(RuntimeError, "rejected"):
+                await self.run_report("--update")
+            report = json.loads(self.report.read_text())
+            validate_report(report)
+            self.assertEqual(report["delivery"], "failed")
+            self.assertEqual(
+                report["pull_request"], {"url": pr.html_url, "outcome": "existing_open"}
+            )
+            pr.create_issue_comment.assert_not_called()
+
+    async def test_rejected_push_has_no_pr_outcome(self):
+        with self.mock_publication(existing=False) as (repo, _, push):
+            push.return_value.returncode = 1
+            result, report = await self.run_report("--update")
+            self.assertEqual(result, (-1, -1, False))
+            self.assertEqual(report["delivery"], "failed")
+            self.assertNotIn("pull_request", report)
+            repo.create_pull.assert_not_called()
 
     async def test_unexpected_failure_writes_report_and_propagates(self):
         self.write([self.source()])
