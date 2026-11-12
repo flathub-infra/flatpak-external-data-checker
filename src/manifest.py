@@ -18,6 +18,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import asyncio
 import dataclasses
 import datetime
 import logging
@@ -53,6 +54,7 @@ from .lib.externaldata import (
 )
 from .lib.robots import RobotsCache
 from .lib.sourceupdates import SourceUpdate
+from .lib.submodules import SubmoduleChecker, SubmoduleUpdate, local_source_paths
 from .lib.utils import asyncio_gather_failfast, dump_manifest, read_manifest
 
 MAIN_SRC_PROP = "is-main-source"
@@ -113,6 +115,9 @@ class ManifestChecker:
         self._root_manifest_path = manifest
         self._root_manifest_dir = os.path.dirname(self._root_manifest_path)
         self._repository = self._find_repository(manifest)
+        self.submodule_checker = SubmoduleChecker(
+            self._repository, self.opts.max_manifest_size
+        )
         self._submodule_paths: list[Path] | None = None
 
         self._modules: dict[str, list[BuilderModule]] = {}
@@ -186,6 +191,7 @@ class ManifestChecker:
         )
 
     def _skip_external_repository(self, path: str) -> bool:
+        self.submodule_checker.add_reference(path, manifest=True)
         if self._submodule_paths is None:
             self._submodule_paths = []
             if self._repository is not None:
@@ -426,6 +432,10 @@ class ManifestChecker:
             return
 
         assert isinstance(source, dict)
+        for path in local_source_paths(source):
+            self.submodule_checker.add_reference(
+                os.path.join(os.path.dirname(source_path), path), manifest=False
+            )
         # Collect only sources we didn't collect previously
         # NOTE here we rely on ruamel.yaml to make YAML aliases into
         # pointers to the same dict object ridden from YAML anchor
@@ -605,6 +615,10 @@ class ManifestChecker:
             ext_data_checked = await asyncio_gather_failfast(check_tasks)
 
         self._validate_update_groups()
+        if filter_type is None:
+            await asyncio.to_thread(self.submodule_checker.check)
+        else:
+            self.submodule_checker.reset()
         return ext_data_checked
 
     def _validate_update_groups(self, allowed: list[ExternalBase] | None = None):
@@ -758,6 +772,27 @@ class ManifestChecker:
             )
         return results
 
+    def get_submodule_report(self) -> list[dict[str, t.Any]]:
+        planned = self._planned_submodule_updates(self._select_updates())
+        return [
+            {
+                "path": update.path,
+                "current": update.current,
+                "candidate": update.candidate,
+                "files": list(update.files),
+                "status": "update_available" if update in planned else "blocked",
+            }
+            for update in self.submodule_checker.updates
+        ]
+
+    def _planned_submodule_updates(
+        self, source_updates: list[ExternalBase]
+    ) -> list[SubmoduleUpdate]:
+        if self.opts.require_important_update and not source_updates:
+            if self._incomplete_manifests or self._important_sources():
+                return []
+        return self.submodule_checker.updates
+
     def get_errors(
         self,
         only_type: type[Exception] | None = None,
@@ -765,7 +800,9 @@ class ManifestChecker:
         """Return a list of errors occurred while checking/updating the manifest"""
 
         return [
-            e for e in self._errors if only_type is None or isinstance(e, only_type)
+            e
+            for e in [*self._errors, *self.submodule_checker.errors]
+            if only_type is None or isinstance(e, only_type)
         ]
 
     def get_outdated_external_data(
@@ -802,6 +839,17 @@ class ManifestChecker:
         self._validate_update_groups(allowed)
         return self._select_updates(allowed)
 
+    def _important_sources(self) -> set[int]:
+        return {
+            id(data)
+            for data in self.get_external_data()
+            if data.checker_data.get(IMPORTANT_SRC_PROP)
+            or (
+                data.checker_data.get(MAIN_SRC_PROP)
+                and data.checker_data.get(IMPORTANT_SRC_PROP) is not False
+            )
+        }
+
     def _select_updates(
         self, allowed: list[ExternalBase] | None = None
     ) -> list[ExternalBase]:
@@ -815,15 +863,7 @@ class ManifestChecker:
             and (allowed_ids is None or id(data) in allowed_ids)
         ]
         if self.opts.require_important_update:
-            important = {
-                id(data)
-                for data in sources
-                if data.checker_data.get(IMPORTANT_SRC_PROP)
-                or (
-                    data.checker_data.get(MAIN_SRC_PROP)
-                    and data.checker_data.get(IMPORTANT_SRC_PROP) is not False
-                )
-            }
+            important = self._important_sources()
             if (important or self._incomplete_manifests) and not any(
                 id(data) in important and data.has_version_changed for data in updates
             ):
@@ -944,8 +984,12 @@ class ManifestChecker:
         changes: dict[str, t.Any]
         changes = OrderedDict()
         self.source_updates = []
-        self._allowed_updates = {id(data) for data in self.get_planned_updates(allowed)}
-        if not self._allowed_updates:
+        planned = self.get_planned_updates(allowed)
+        self._allowed_updates = {id(data) for data in planned}
+        submodule_updates = (
+            self._planned_submodule_updates(planned) if allowed is None else []
+        )
+        if not self._allowed_updates and not submodule_updates:
             log.info("No eligible source updates, not updating manifest")
             return []
 
@@ -959,5 +1003,12 @@ class ManifestChecker:
             except AppdataError as err:
                 self._errors.append(err)
                 log.error(err)
+
+        for update in submodule_updates:
+            if self.submodule_checker.apply(update):
+                changes[
+                    f"Update submodule {update.path} to {update.candidate[:12]}"
+                ] = None
+                self.source_updates.append(update.source_update())
 
         return list(changes)

@@ -167,6 +167,50 @@ class TestReportSchema(unittest.TestCase):
         with self.assertRaises(jsonschema.ValidationError):
             validator.validate(self.report())
 
+    def test_submodule_contract(self):
+        update = {
+            "path": "shared-modules",
+            "current": "a" * 40,
+            "candidate": "b" * 40,
+            "files": ["module.json", "fix.patch"],
+            "status": "update_available",
+        }
+        branch = {
+            "branch": "branch/25.08",
+            "status": "completed",
+            "delivery": "not_requested",
+            "sources": [],
+            "errors": [],
+        }
+        for changes in ({}, {"status": "blocked"}):
+            submodules = [update | changes]
+            validate_report(self.report() | {"submodules": submodules})
+            validate_report(
+                self.report() | {"branches": [branch | {"submodules": submodules}]}
+            )
+        invalid_updates = [
+            {key: value for key, value in update.items() if key != missing}
+            for missing in update
+        ]
+        invalid_updates.extend(
+            update | changes
+            for changes in (
+                {"current": "invalid"},
+                {"candidate": None},
+                {"files": [1]},
+                {"status": "checked"},
+                {"unexpected": True},
+            )
+        )
+        for invalid in invalid_updates:
+            with self.subTest(invalid=invalid):
+                for report in (
+                    self.report() | {"submodules": [invalid]},
+                    self.report() | {"branches": [branch | {"submodules": [invalid]}]},
+                ):
+                    with self.assertRaises(jsonschema.ValidationError):
+                        validate_report(report)
+
     @unittest.skipUnless(
         "date-time" in REPORT_VALIDATOR.format_checker.checkers,
         "jsonschema date-time format dependency not installed",

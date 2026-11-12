@@ -1285,6 +1285,7 @@ class TestErrorSummary(unittest.IsolatedAsyncioTestCase):
             checker.build_extension = False
             checker.get_errors.return_value = errors
             checker.get_outdated_external_data.return_value = []
+            checker.submodule_checker = unittest.mock.Mock(updates=[])
             result = await main.run_with_args(main.parse_cli_args([TEST_MANIFEST]))
 
         self.assertEqual(result, (0, len(errors), False))

@@ -120,7 +120,15 @@ def print_outdated_external_data(manifest_checker: manifest.ManifestChecker) -> 
             **message_args,
         )
         print(message, flush=True)
-    return len(ext_data)
+    submodules = manifest_checker.submodule_checker.updates
+    for update in submodules:
+        print(
+            f"OUTDATED: submodule {update.path}\n"
+            f" Has a new version: {update.candidate}\n"
+            f"  Changed files: {', '.join(update.files)}\n",
+            flush=True,
+        )
+    return len(ext_data) + len(submodules)
 
 
 def print_errors(manifest_checker: manifest.ManifestChecker) -> int:
@@ -1109,6 +1117,7 @@ async def run_manifest_with_args(
     await manifest_checker.check(args.filter_type)
     if getattr(args, "report_json", None):
         report["sources"] = manifest_checker.get_source_report()
+        report["submodules"] = manifest_checker.get_submodule_report()
         report["errors"] = [
             {"type": type(error).__name__, "message": str(error)}
             for error in manifest_checker.get_report_errors()
