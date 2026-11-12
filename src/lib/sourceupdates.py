@@ -127,6 +127,7 @@ class SourceUpdate:
     new_version: str
     release_url: str | None
     comparison_url: str | None = None
+    submodule_files: tuple[str, ...] = ()
 
     @classmethod
     def from_source(cls, data: ExternalBase) -> "SourceUpdate":
@@ -207,4 +208,17 @@ def format_source_updates(updates: list[SourceUpdate]) -> str:
             else "Unavailable"
         )
         lines.append(f"| {source} | {change} | {release} |")
+    submodules = [update for update in updates if update.submodule_files]
+    if submodules:
+        lines.extend(["", "### Submodule changes"])
+        for update in submodules:
+            lines.extend(
+                [
+                    "",
+                    f"{_escape(update.source)} needs updating because these "
+                    "files used by the manifest changed:",
+                    "",
+                ]
+            )
+            lines.extend(f"- {_code(file)}" for file in update.submodule_files)
     return "\n".join(lines)

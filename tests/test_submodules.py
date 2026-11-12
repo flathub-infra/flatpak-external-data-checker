@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from src import main
 from src.lib.externaldata import ExternalData
+from src.lib.sourceupdates import format_source_updates
 from src.manifest import CheckerOptions, ManifestChecker
 from tests.test_reporting import validate_report
 
@@ -84,11 +85,14 @@ class TestSubmodules(unittest.IsolatedAsyncioTestCase):
         self.commit(self.remote)
         changes = checker.update_manifests()
         self.assertEqual(
-            changes, [f"Update submodule shared-modules to {candidate[:12]}"]
+            changes,
+            [f"Update submodule shared-modules to {candidate[:12]}"],
         )
         self.assertEqual(self.git(self.shared, "rev-parse", "HEAD"), candidate)
         self.assertEqual(self.manifest.read_bytes(), original)
         self.assertEqual(checker.source_updates[0].new_version, candidate[:12])
+        self.assertEqual(checker.source_updates[0].source, "Submodule shared-modules")
+        self.assertEqual(checker.source_updates[0].submodule_files, ("used.json",))
         self.assertEqual(checker.get_errors(), [])
 
     async def test_unrelated_changes_do_not_trigger_updates(self):
@@ -136,7 +140,19 @@ class TestSubmodules(unittest.IsolatedAsyncioTestCase):
                 "used.json",
             ],
         )
-        self.assertEqual(len(checker.update_manifests()), 1)
+        self.assertEqual(
+            checker.update_manifests(),
+            [f"Update submodule shared-modules to {candidate[:12]}"],
+        )
+        self.assertIn(
+            "### Submodule changes\n\n"
+            r"Submodule shared\-modules needs updating because these "
+            "files used by the manifest changed:\n\n"
+            "- <code>patch\\.diff</code>\n"
+            "- <code>second\\.json</code>\n"
+            "- <code>used\\.json</code>",
+            format_source_updates(checker.source_updates),
+        )
         self.assertEqual(self.git(self.shared, "rev-parse", "HEAD"), candidate)
         self.assertEqual(
             json.loads((self.shared / "used.json").read_text())["name"], "updated-first"
@@ -394,6 +410,10 @@ class TestSubmodules(unittest.IsolatedAsyncioTestCase):
             candidate, self.git(self.root, "ls-tree", "HEAD", "shared-modules")
         )
         self.assertEqual(self.git(self.root, "status", "--porcelain"), "")
+        self.assertEqual(
+            self.git(self.root, "log", "-1", "--format=%s"),
+            f"Update submodule shared-modules to {candidate[:12]}",
+        )
 
     async def test_report_includes_update_and_policy(self):
         self.write_module("used.json", {"name": "new"})
