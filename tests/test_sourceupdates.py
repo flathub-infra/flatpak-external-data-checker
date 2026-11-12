@@ -538,4 +538,40 @@ class TestSourceUpdates(unittest.TestCase):
         self.assertIn(r"<code>\[old\]</code> → <code>\*new\*</code>", text)
         self.assertIn("https://example.org/notes/%282%29%7Cx%20y", text)
         self.assertEqual(text.count("[Release notes]"), 2)
+        self.assertNotIn("### Submodule changes", text)
         self.assertEqual(format_source_updates([]), "")
+
+    def test_submodule_update_reasons(self):
+        updates = [
+            SourceUpdate(
+                "Submodule shared-modules",
+                "abc",
+                "def",
+                None,
+                submodule_files=("libfoo/libfoo.json", "libfoo/fix|<bug>.patch"),
+            ),
+            SourceUpdate(
+                "Submodule other-modules",
+                "123",
+                "456",
+                None,
+                submodule_files=("libbar.json",),
+            ),
+        ]
+        text = format_source_updates(updates)
+        table, reasons = text.split("### Submodule changes")
+        self.assertNotIn("libfoo", table)
+        self.assertNotIn("libbar", table)
+        self.assertIn(
+            r"Submodule shared\-modules needs updating because these "
+            "files used by the manifest changed:",
+            reasons,
+        )
+        self.assertIn("- <code>libfoo/libfoo\\.json</code>", reasons)
+        self.assertIn(r"- <code>libfoo/fix\|&lt;bug&gt;\.patch</code>", reasons)
+        self.assertIn(
+            r"Submodule other\-modules needs updating because these "
+            "files used by the manifest changed:",
+            reasons,
+        )
+        self.assertIn("- <code>libbar\\.json</code>", reasons)

@@ -56,6 +56,7 @@ class SubmoduleUpdate:
             self.candidate[:12],
             None,
             comparison_url(self.url, self.current, self.candidate),
+            submodule_files=self.files,
         )
 
 
