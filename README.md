@@ -74,6 +74,12 @@ checker processes the supplied manifest normally. If a manifest is missing or
 a branch fails, the checker reports the error and continues with the remaining
 branches.
 
+### Git submodules
+
+Git submodules such as `shared-modules` need no `x-checker-data`. The checker
+proposes an update only if a referenced manifest or local source changes. It
+follows the branch configured in `.gitmodules`, or the remote's default branch.
+
 ### Installation
 
 Install from Flathub:
