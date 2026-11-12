@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 import typing as t
@@ -9,7 +10,7 @@ from packaging.version import InvalidVersion
 from packaging.version import Version as PackagingVersion
 from yarl import URL
 
-from ..lib import OPERATORS_SCHEMA
+from ..lib import NETWORK_ERRORS, OPERATORS_SCHEMA
 from ..lib.checksums import MultiDigest
 from ..lib.errors import CheckerQueryError
 from ..lib.externaldata import ExternalBase, ExternalFile
@@ -151,8 +152,15 @@ class PyPIChecker(Checker):
             except InvalidWheelFilename:
                 pass
 
-        async with self.session.get(f"{PYPI_INDEX}/{package_name}/json") as response:
-            pypi_data = await response.json()
+        try:
+            async with self.session.get(
+                f"{PYPI_INDEX}/{package_name}/json"
+            ) as response:
+                pypi_data = await response.json()
+        except (*NETWORK_ERRORS, json.JSONDecodeError, UnicodeDecodeError) as err:
+            raise CheckerQueryError(
+                f"Error querying PyPI for package {package_name}"
+            ) from err
 
         downloads = []
         if stable_only and not constraints:

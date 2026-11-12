@@ -1,9 +1,14 @@
+import asyncio
 import hashlib
 import json
 import os
+import tempfile
 import unittest
+from contextlib import asynccontextmanager
+from pathlib import Path
 from unittest import mock
 
+import aiohttp
 from packaging.version import Version
 
 from src.checkers.pypichecker import PyPIChecker
@@ -15,6 +20,129 @@ from src.manifest import ManifestChecker
 from tests.support import LocalHTTPTestCase, upstream_test
 
 TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.valvesoftware.Steam.yml")
+
+
+class TestPyPIRequestErrors(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.manifest = Path(directory.name) / "test.json"
+        self.manifest.write_text(
+            json.dumps(
+                {
+                    "name": "test",
+                    "modules": [
+                        {
+                            "name": name,
+                            "sources": [
+                                {
+                                    "type": "archive",
+                                    "url": f"https://example.org/{name}-1.0.tar.gz",
+                                    "sha256": "0" * 64,
+                                    "x-checker-data": {"type": "pypi", "name": name},
+                                }
+                            ],
+                        }
+                        for name in ("PyNaCl", "independent")
+                    ],
+                }
+            )
+        )
+
+    async def check_error(self, error, *, body=False, metadata=None, payload=None):
+        @asynccontextmanager
+        async def response(url, **kwargs):
+            if url == "https://pypi.org/pypi/PyNaCl/json":
+                if not body:
+                    raise error
+                yield mock.Mock(
+                    json=mock.AsyncMock(side_effect=error, return_value=payload)
+                )
+            elif url == "https://pypi.org/pypi/independent/json":
+                await asyncio.sleep(0)
+                download = TestPyPIReleaseEligibility.download("2.0")
+                yield mock.Mock(
+                    json=mock.AsyncMock(
+                        return_value={
+                            "info": {"version": "2.0"},
+                            "urls": [download],
+                        }
+                    )
+                )
+            else:
+                self.fail(f"Unexpected request: {url}")
+
+        checker = ManifestChecker(str(self.manifest))
+        if metadata is not None:
+            data = checker.get_external_data()[0]
+            data.checker_data.update(metadata)
+        with mock.patch("aiohttp.ClientSession.get", side_effect=response):
+            await checker.check()
+        return checker
+
+    async def test_request_failures_are_source_errors(self):
+        request_info = mock.Mock(real_url="https://pypi.org/pypi/PyNaCl/json")
+        cases = (
+            (
+                aiohttp.ConnectionTimeoutError("Connection timeout to host PyNaCl"),
+                False,
+            ),
+            (asyncio.TimeoutError(), False),
+            (aiohttp.ClientResponseError(request_info, (), status=503), False),
+            (aiohttp.ContentTypeError(request_info, (), message="not JSON"), True),
+            (aiohttp.ClientPayloadError("incomplete body"), True),
+            (asyncio.TimeoutError("reading body"), True),
+            (json.JSONDecodeError("Invalid JSON", "", 0), True),
+            (UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid byte"), True),
+        )
+        for error, body in cases:
+            with self.subTest(error=type(error).__name__, body=body):
+                with self.assertLogs("src.manifest", level="ERROR") as logs:
+                    checker = await self.check_error(error, body=body)
+                failed, independent = checker.get_external_data()
+                self.assertTrue(failed.check_failed)
+                self.assertTrue(failed.checked.is_set())
+                self.assertIsNone(failed.new_version)
+                self.assertFalse(independent.check_failed)
+                self.assertTrue(independent.checked.is_set())
+                self.assertEqual(independent.new_version.version, "2.0")
+                (query_error,) = checker.get_errors()
+                self.assertIsInstance(query_error, CheckerQueryError)
+                self.assertIs(query_error.__cause__, error)
+                detail = str(error) or type(error).__name__
+                self.assertIn(detail, str(query_error))
+                self.assertIn("PyNaCl", str(query_error))
+                self.assertIn("PyNaCl", " ".join(logs.output))
+                failed_report, independent_report = checker.get_source_report()
+                self.assertEqual(failed_report["module"], "PyNaCl")
+                self.assertEqual(
+                    failed_report["source_pointer"], "/modules/0/sources/0"
+                )
+                self.assertEqual(failed_report["status"], "failed")
+                self.assertEqual(failed_report["checkers_run"], ["PyPIChecker"])
+                self.assertEqual(
+                    failed_report["errors"],
+                    [{"type": "CheckerQueryError", "message": str(query_error)}],
+                )
+                self.assertEqual(independent_report["status"], "update_available")
+                self.assertEqual(independent_report["errors"], [])
+
+    async def test_unexpected_errors_propagate(self):
+        for error in (asyncio.CancelledError(), RuntimeError("bug"), ValueError("bug")):
+            with self.subTest(error=type(error).__name__):
+                with self.assertRaises(type(error)) as raised:
+                    await self.check_error(error, body=True)
+                self.assertIs(raised.exception, error)
+
+    async def test_release_data_errors_propagate(self):
+        for payload, expected in (({}, KeyError), ({"info": None}, TypeError)):
+            with self.subTest(payload=payload):
+                with self.assertRaises(expected):
+                    await self.check_error(None, body=True, payload=payload)
+
+    async def test_invalid_version_constraint_propagates(self):
+        with self.assertRaises(ValueError):
+            await self.check_error(None, metadata={"versions": {">=": "not-a-version"}})
 
 
 class TestPyPIChecker(unittest.IsolatedAsyncioTestCase):
