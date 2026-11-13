@@ -34,6 +34,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import logging
 import tempfile
+from collections.abc import Sequence
 from typing import Any, cast
 
 from ..lib import (
@@ -129,15 +130,24 @@ class URLChecker(Checker):
             wrong_content_types = WRONG_CONTENT_TYPES_FILE
 
         version_string = None
-        mirror_urls = []
         has_mirror_templates = (
             is_rotating and "mirror-url-templates" in external_data.checker_data
         )
-        if has_mirror_templates:
-            version_string = extract_version(external_data.checker_data, url)
+        head_urls = [url]
+        download_urls: list[str] = []
+
+        def resolve_mirrors(primary_urls: Sequence[str]) -> tuple[str, list[str]]:
+            for primary_url in reversed([*head_urls, *primary_urls]):
+                version = extract_version(external_data.checker_data, primary_url)
+                if version is not None:
+                    return primary_url, external_data.mirror_urls_for_version(version)
+            return primary_urls[-1], []
 
         try:
-            if strip_query or (has_mirror_templates and version_string is None):
+            if strip_query or (
+                has_mirror_templates
+                and extract_version(external_data.checker_data, url) is None
+            ):
                 if self.robots_cache:
                     await self.robots_cache.ensure_allowed(url)
 
@@ -145,17 +155,23 @@ class URLChecker(Checker):
                     async with self.session.head(
                         url, allow_redirects=True, headers=HTTP_CLIENT_HEADERS
                     ) as head:
+                        if has_mirror_templates:
+                            head_urls.extend(
+                                str(response.url) for response in head.history
+                            )
                         url = str(head.url.with_query("") if strip_query else head.url)
                 except NETWORK_ERRORS:
                     if not has_mirror_templates:
                         raise
-                if is_rotating:
-                    version_string = extract_version(external_data.checker_data, url)
 
-            if has_mirror_templates and version_string is not None:
-                mirror_urls = external_data.mirror_urls_for_version(version_string)
+            package_url = url
+            if has_mirror_templates:
+                for candidate in reversed([*head_urls, url]):
+                    if candidate.endswith((".AppImage", ".deb")):
+                        package_url = candidate
+                        break
 
-            if url.endswith(".AppImage"):
+            if package_url.endswith(".AppImage"):
                 with tempfile.NamedTemporaryFile("w+b") as tmpfile:
                     new_version = await utils.get_extra_data_info_from_url(
                         url,
@@ -163,13 +179,17 @@ class URLChecker(Checker):
                         dest_io=tmpfile,
                         content_type_deny=wrong_content_types,
                         robots_cache=self.robots_cache,
-                        mirror_urls=mirror_urls,
+                        mirror_urls=resolve_mirrors if has_mirror_templates else None,
+                        preserve_primary_url_on_mirror=True,
+                        on_primary_url=download_urls.append
+                        if has_mirror_templates
+                        else None,
                     )
                     if not no_extract_version:
                         version_string = await utils.extract_appimage_version(
                             tmpfile,
                         )
-            elif url.endswith(".deb"):
+            elif package_url.endswith(".deb"):
                 with tempfile.NamedTemporaryFile("w+b") as tmpfile:
                     new_version = await utils.get_extra_data_info_from_url(
                         url,
@@ -177,7 +197,11 @@ class URLChecker(Checker):
                         dest_io=tmpfile,
                         content_type_deny=wrong_content_types,
                         robots_cache=self.robots_cache,
-                        mirror_urls=mirror_urls,
+                        mirror_urls=resolve_mirrors if has_mirror_templates else None,
+                        preserve_primary_url_on_mirror=True,
+                        on_primary_url=download_urls.append
+                        if has_mirror_templates
+                        else None,
                     )
                     if not no_extract_version:
                         version_string = utils.extract_deb_version(
@@ -189,14 +213,18 @@ class URLChecker(Checker):
                     session=self.session,
                     content_type_deny=wrong_content_types,
                     robots_cache=self.robots_cache,
-                    mirror_urls=mirror_urls,
+                    mirror_urls=resolve_mirrors if has_mirror_templates else None,
+                    preserve_primary_url_on_mirror=True,
+                    on_primary_url=download_urls.append
+                    if has_mirror_templates
+                    else None,
                 )
         except NETWORK_ERRORS as err:
             if not is_rotating:
                 external_data.state |= external_data.State.BROKEN
             raise CheckerFetchError from err
 
-        if not is_rotating or mirror_urls:
+        if not is_rotating:
             new_version = new_version._replace(url=url)
 
         if is_rotating and not version_string:
@@ -204,6 +232,13 @@ class URLChecker(Checker):
                 external_data.checker_data,
                 new_version.url,
             )
+            if version_string is None and has_mirror_templates:
+                for primary_url in reversed([*head_urls, *download_urls]):
+                    version_string = extract_version(
+                        external_data.checker_data, primary_url
+                    )
+                    if version_string is not None:
+                        break
 
         if version_string is not None:
             log.debug("%s is version %s", external_data.filename, version_string)
