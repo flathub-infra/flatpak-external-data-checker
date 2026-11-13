@@ -238,23 +238,55 @@ async def get_extra_data_info_from_url(
     dest_io: t.IO | None = None,
     content_type_deny: t.Iterable[re.Pattern] | None = None,
     robots_cache: RobotsCache | None = None,
-    mirror_urls: t.Iterable[str] | None = None,
+    mirror_urls: t.Iterable[str]
+    | t.Callable[[t.Sequence[str]], tuple[str, t.Iterable[str]]]
+    | None = None,
+    preserve_primary_url_on_mirror: bool = False,
+    on_primary_url: t.Callable[[str], None] | None = None,
 ):
-    candidates = [url, *(mirror_urls or ())]
+    """Download with fallback; a resolver maps primary URL history to a
+    canonical primary URL and its mirrors after a failed primary download.
+    """
+    primary_url = url
+    primary_urls = [url]
+    track_primary_urls = callable(mirror_urls) or on_primary_url is not None
+
+    def remember_primary_url(resolved_url: str) -> None:
+        if primary_urls[-1] != resolved_url:
+            primary_urls.append(resolved_url)
+        if on_primary_url is not None:
+            on_primary_url(resolved_url)
+
+    candidates = [url]
     for attempt, candidate in enumerate(candidates):
         if dest_io is not None:
             dest_io.seek(0)
             dest_io.truncate()
         try:
-            return await _download_extra_data_info_from_url(
+            result = await _download_extra_data_info_from_url(
                 candidate,
                 session,
                 follow_redirects,
                 dest_io,
                 content_type_deny,
                 robots_cache,
+                remember_primary_url if attempt == 0 and track_primary_urls else None,
             )
-        except NETWORK_ERRORS:
+            if attempt > 0 and preserve_primary_url_on_mirror:
+                result = result._replace(url=strip_query(primary_url))
+            return result
+        except NETWORK_ERRORS as err:
+            if attempt == 0:
+                if (
+                    isinstance(err, aiohttp.ClientResponseError)
+                    and err.request_info is not None
+                ):
+                    remember_primary_url(str(err.request_info.real_url))
+                if callable(mirror_urls):
+                    primary_url, mirrors = mirror_urls(primary_urls)
+                else:
+                    mirrors = mirror_urls or ()
+                candidates.extend(mirrors)
             if attempt == len(candidates) - 1:
                 raise
 
@@ -266,15 +298,43 @@ async def _download_extra_data_info_from_url(
     dest_io: t.IO | None,
     content_type_deny: t.Iterable[re.Pattern] | None,
     robots_cache: RobotsCache | None,
+    on_response_url: t.Callable[[str], None] | None = None,
+    redirect_count: int = 0,
 ):
+    if on_response_url is not None:
+        on_response_url(url)
     if robots_cache:
         await robots_cache.ensure_allowed(url)
 
     async with session.get(
         url,
         skip_auto_headers=[aiohttp.hdrs.ACCEPT_ENCODING],
+        allow_redirects=on_response_url is None,
     ) as response:
         real_url = str(response.url)
+        if on_response_url is not None:
+            on_response_url(real_url)
+            if response.status in (301, 302, 303, 307, 308):
+                location = response.headers.get("Location") or response.headers.get(
+                    "URI"
+                )
+                if location:
+                    if redirect_count >= 9:
+                        raise aiohttp.TooManyRedirects(response.request_info, ())
+                    target = urllib.parse.urljoin(real_url, location)
+                    if urllib.parse.urlsplit(target).scheme not in ("http", "https"):
+                        raise aiohttp.InvalidURL(target)
+                    response.release()
+                    return await _download_extra_data_info_from_url(
+                        target,
+                        session,
+                        follow_redirects,
+                        dest_io,
+                        content_type_deny,
+                        robots_cache,
+                        on_response_url,
+                        redirect_count + 1,
+                    )
 
         if robots_cache and real_url != url:
             await robots_cache.ensure_allowed(real_url)
