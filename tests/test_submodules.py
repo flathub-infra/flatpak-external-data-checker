@@ -8,8 +8,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from src import main
+from src.lib.errors import CheckerError
 from src.lib.externaldata import ExternalData
 from src.lib.sourceupdates import format_source_updates
+from src.lib.submodules import SubmoduleChecker, git
 from src.manifest import CheckerOptions, ManifestChecker
 from tests.test_reporting import validate_report
 
@@ -101,6 +103,165 @@ class TestSubmodules(unittest.IsolatedAsyncioTestCase):
         checker = await self.checker()
         self.assertEqual(checker.submodule_checker.updates, [])
         self.assertEqual(checker.update_manifests(), [])
+
+    def omitted_pin_remote(self, *, changed=True, missing=False):
+        if missing:
+            (self.remote / "used.json").unlink()
+        elif changed:
+            self.write_module("used.json", {"name": "new", "sources": []})
+        self.git(self.remote, "add", ".")
+        tree = self.git(self.remote, "write-tree")
+        candidate = self.git(self.remote, "commit-tree", tree, "-m", "New history")
+        self.git(self.remote, "update-ref", "refs/heads/main", candidate)
+        url = self.remote.as_uri()
+        self.git(self.root, "config", "submodule.shared-modules.url", url)
+
+        # Use the upload-pack transport, not local clone's copy of all objects.
+        probe = self.directory / "probe"
+        self.git(self.directory, "clone", "--no-checkout", "--", url, str(probe))
+        self.assertEqual(
+            self.git(probe, "rev-parse", "--is-shallow-repository"), "false"
+        )
+        self.assertEqual(self.git(probe, "rev-parse", "origin/HEAD"), candidate)
+        result = subprocess.run(
+            ["git", "-C", str(probe), "checkout", "--detach", self.old],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(f"unable to read tree ({self.old})", result.stderr)
+        self.git(probe, "fetch", "--no-tags", "--", url, self.old)
+        self.assertEqual(
+            self.git(probe, "rev-parse", f"{self.old}^{{commit}}"), self.old
+        )
+        return candidate
+
+    async def test_omitted_pin_is_fetched_without_changing_app_checkout(self):
+        candidate = self.omitted_pin_remote()
+        original = self.manifest.read_bytes()
+        with patch("src.lib.submodules.git", wraps=git) as calls:
+            checker = await self.checker()
+        update = checker.submodule_checker.updates[0]
+        self.assertEqual((update.current, update.candidate), (self.old, candidate))
+        self.assertEqual(update.files, ("used.json",))
+        fetches = [
+            call.args[1:] for call in calls.call_args_list if call.args[1] == "fetch"
+        ]
+        self.assertEqual(
+            fetches,
+            [("fetch", "--no-tags", "--depth=1", "--", self.remote.as_uri(), self.old)],
+        )
+        clones = [
+            call.args[-1] for call in calls.call_args_list if call.args[1] == "clone"
+        ]
+        self.assertEqual(len(clones), 1)
+        self.assertFalse(Path(clones[0]).parent.exists())
+        self.assertEqual(self.manifest.read_bytes(), original)
+        self.assertEqual(self.git(self.shared, "rev-parse", "HEAD"), self.old)
+        self.assertEqual(self.git(self.root, "status", "--porcelain"), "")
+
+    async def test_present_pin_does_not_need_fetch(self):
+        self.write_module("used.json", {"name": "new"})
+        self.commit(self.remote)
+        with patch("src.lib.submodules.git", wraps=git) as calls:
+            checker = await self.checker()
+        self.assertEqual(len(checker.submodule_checker.updates), 1)
+        self.assertFalse(any(call.args[1] == "fetch" for call in calls.call_args_list))
+
+    def test_invalid_pin_is_not_used_as_a_git_argument(self):
+        checker = SubmoduleChecker(self.root, 1024)
+        for current in ("--upload-pack=command", "main", "a" * 39, "a" * 41):
+            with (
+                self.subTest(current=current),
+                patch("src.lib.submodules.git") as calls,
+            ):
+                with self.assertRaisesRegex(CheckerError, "Invalid submodule commit"):
+                    checker._check_submodule(
+                        "shared-modules", "shared-modules", current, {}
+                    )
+                calls.assert_not_called()
+
+    async def test_unavailable_pin_blocks_update(self):
+        self.omitted_pin_remote()
+        unavailable = "a" * 40
+        self.git(
+            self.root,
+            "update-index",
+            "--cacheinfo",
+            "160000",
+            unavailable,
+            "shared-modules",
+        )
+        original = self.git(self.root, "status", "--porcelain")
+        checker = ManifestChecker(str(self.manifest))
+        await checker.check()
+        self.assertEqual(checker.submodule_checker.updates, [])
+        self.assertIn(
+            "Submodule shared-modules: Git fetch failed", str(checker.get_errors()[0])
+        )
+        self.assertIn(unavailable, str(checker.get_errors()[0]))
+        self.assertEqual(self.git(self.shared, "rev-parse", "HEAD"), self.old)
+        self.assertEqual(self.git(self.root, "status", "--porcelain"), original)
+
+    async def test_pin_fetch_transport_failure_blocks_update(self):
+        self.omitted_pin_remote()
+
+        def disconnect_after_clone(directory, *args):
+            result = git(directory, *args)
+            if args[0] == "clone":
+                self.remote.rename(self.directory / "offline")
+            return result
+
+        with patch("src.lib.submodules.git", side_effect=disconnect_after_clone):
+            checker = ManifestChecker(str(self.manifest))
+            await checker.check()
+        self.assertEqual(checker.submodule_checker.updates, [])
+        self.assertIn(
+            "Submodule shared-modules: Git fetch failed", str(checker.get_errors()[0])
+        )
+        self.assertIn(
+            "does not appear to be a git repository", str(checker.get_errors()[0])
+        )
+        self.assertEqual(self.git(self.shared, "rev-parse", "HEAD"), self.old)
+        self.assertEqual(self.git(self.root, "status", "--porcelain"), "")
+
+    async def test_omitted_pin_with_unchanged_snapshot_does_not_update(self):
+        self.omitted_pin_remote(changed=False)
+        checker = await self.checker()
+        self.assertEqual(checker.submodule_checker.updates, [])
+        self.assertEqual(self.git(self.root, "status", "--porcelain"), "")
+
+    async def test_pin_fetch_timeout_is_reported_and_checkout_cleaned_up(self):
+        self.omitted_pin_remote()
+        checkouts = []
+
+        def timeout_fetch(directory, *args):
+            if args[0] == "fetch":
+                raise subprocess.TimeoutExpired(["git", *args], 120)
+            result = git(directory, *args)
+            if args[0] == "clone":
+                checkouts.append(Path(args[-1]))
+            return result
+
+        with patch("src.lib.submodules.git", side_effect=timeout_fetch):
+            checker = ManifestChecker(str(self.manifest))
+            await checker.check()
+        self.assertEqual(checker.submodule_checker.updates, [])
+        self.assertIn("timed out after 120 seconds", str(checker.get_errors()[0]))
+        self.assertEqual(len(checkouts), 1)
+        self.assertFalse(checkouts[0].parent.exists())
+        self.assertEqual(self.git(self.shared, "rev-parse", "HEAD"), self.old)
+        self.assertEqual(self.git(self.root, "status", "--porcelain"), "")
+
+    async def test_omitted_pin_does_not_allow_missing_candidate_reference(self):
+        self.omitted_pin_remote(missing=True)
+        checker = ManifestChecker(str(self.manifest))
+        await checker.check()
+        self.assertEqual(checker.submodule_checker.updates, [])
+        self.assertIn("Referenced file missing", str(checker.get_errors()[0]))
+        self.assertEqual(self.git(self.shared, "rev-parse", "HEAD"), self.old)
+        self.assertEqual(self.git(self.root, "status", "--porcelain"), "")
 
     async def test_multiple_changed_components_are_updated_together(self):
         self.write_module("second.json", {"name": "second"})
