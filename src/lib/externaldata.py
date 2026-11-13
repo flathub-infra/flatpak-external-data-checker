@@ -38,6 +38,7 @@ from . import FILE_URL_SCHEMES, utils
 from .checksums import MultiDigest
 from .errors import (
     CheckerFetchError,
+    CheckerMetadataError,
     SourceLoadError,
     SourceUnsupported,
 )
@@ -56,6 +57,11 @@ CHECKER_DATA_SCHEMA_COMMON: dict[str, t.Any] = {
         "is-main-source": {"type": "boolean"},
         "is-important": {"type": "boolean"},
         "release-url-template": {"type": "string"},
+        "mirror-url-templates": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 1,
+        },
         "arches": {
             "type": "array",
             "items": {"type": "string"},
@@ -175,6 +181,10 @@ class BuilderSource(abc.ABC):
         "type": "object",
         "properties": {
             "type": {"type": "string"},
+            "mirror-urls": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
             "x-checker-data": CHECKER_DATA_SCHEMA_COMMON,
         },
         "required": ["type"],
@@ -249,6 +259,13 @@ class BuilderSource(abc.ABC):
             data_type = cls.Type(source["type"])
         except ValueError as err:
             raise SourceUnsupported("Can't handle source") from err
+
+        if data_type not in (cls.Type.FILE, cls.Type.ARCHIVE) and source.get(
+            "x-checker-data", {}
+        ).get("mirror-url-templates"):
+            raise SourceLoadError(
+                "mirror-url-templates is only supported for file and archive sources"
+            )
 
         data_cls = cls.data_classes()[data_type]
 
@@ -448,6 +465,13 @@ class ExternalData(ExternalBase):
         checksum = MultiDigest.from_source(source)
         size = source.get("size")
         checker_data = source.get("x-checker-data", {})
+        mirror_templates = checker_data.get("mirror-url-templates", [])
+        if mirror_templates and len(mirror_templates) != len(
+            source.get("mirror-urls", [])
+        ):
+            raise SourceLoadError(
+                "mirror-url-templates must have one entry per mirror-urls entry"
+            )
         arches = checker_data.get("arches") or source.get("only-arches") or ["x86_64"]
 
         obj = cls(
@@ -469,8 +493,39 @@ class ExternalData(ExternalBase):
         )
         return obj
 
+    def mirror_urls_for_version(self, version: str | None) -> list[str]:
+        templates = self.checker_data.get("mirror-url-templates")
+        if templates is None:
+            return []
+        if version is None:
+            raise CheckerMetadataError(
+                "mirror-url-templates requires the checker to report a version"
+            )
+        variables = utils.version_parts(version)
+        mirror_urls = [utils.substitute_template(item, variables) for item in templates]
+        for mirror_url in mirror_urls:
+            scheme = URL(mirror_url).scheme
+            if scheme not in FILE_URL_SCHEMES:
+                raise CheckerMetadataError(f"Invalid mirror URL scheme {scheme}")
+        return mirror_urls
+
     def update(self) -> None:
         if self.new_version is not None:
+            if "mirror-url-templates" in self.checker_data and (
+                self.new_version.url != self.current_version.url
+                or self.new_version.version != self.current_version.version
+            ):
+                self.source["mirror-urls"] = self.mirror_urls_for_version(
+                    self.new_version.version
+                )
+            elif self.new_version.url != self.current_version.url and self.source.get(
+                "mirror-urls"
+            ):
+                log.warning(
+                    "Leaving mirror-urls unchanged for source %s: "
+                    "mirror-url-templates is not set",
+                    self,
+                )
             _update_source_field(self.source, "url", self.new_version.url)
             self.new_version.checksum.update_source(self.source)
             if self.source["type"] == "extra-data":

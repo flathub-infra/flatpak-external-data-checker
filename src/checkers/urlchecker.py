@@ -34,7 +34,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import logging
 import tempfile
-from typing import Any
+from typing import Any, cast
 
 from ..lib import (
     HTTP_CLIENT_HEADERS,
@@ -112,6 +112,7 @@ class URLChecker(Checker):
 
     async def check(self, external_data: ExternalBase):
         assert self.should_check(external_data)
+        external_data = cast(ExternalData, external_data)
 
         is_rotating = external_data.checker_data.get("type") == self.CHECKER_DATA_TYPE
         if is_rotating:
@@ -128,16 +129,25 @@ class URLChecker(Checker):
             wrong_content_types = WRONG_CONTENT_TYPES_FILE
 
         version_string = None
+        mirror_urls = []
 
         try:
-            if strip_query:
+            if strip_query or (
+                is_rotating and "mirror-url-templates" in external_data.checker_data
+            ):
                 if self.robots_cache:
                     await self.robots_cache.ensure_allowed(url)
 
                 async with self.session.head(
                     url, allow_redirects=True, headers=HTTP_CLIENT_HEADERS
                 ) as head:
-                    url = str(head.url.with_query(""))
+                    url = str(head.url.with_query("") if strip_query else head.url)
+                if is_rotating:
+                    version_string = extract_version(external_data.checker_data, url)
+                    if version_string is not None:
+                        mirror_urls = external_data.mirror_urls_for_version(
+                            version_string
+                        )
 
             if url.endswith(".AppImage"):
                 with tempfile.NamedTemporaryFile("w+b") as tmpfile:
@@ -147,6 +157,7 @@ class URLChecker(Checker):
                         dest_io=tmpfile,
                         content_type_deny=wrong_content_types,
                         robots_cache=self.robots_cache,
+                        mirror_urls=mirror_urls,
                     )
                     if not no_extract_version:
                         version_string = await utils.extract_appimage_version(
@@ -160,6 +171,7 @@ class URLChecker(Checker):
                         dest_io=tmpfile,
                         content_type_deny=wrong_content_types,
                         robots_cache=self.robots_cache,
+                        mirror_urls=mirror_urls,
                     )
                     if not no_extract_version:
                         version_string = utils.extract_deb_version(
@@ -171,11 +183,15 @@ class URLChecker(Checker):
                     session=self.session,
                     content_type_deny=wrong_content_types,
                     robots_cache=self.robots_cache,
+                    mirror_urls=mirror_urls,
                 )
         except NETWORK_ERRORS as err:
             if not is_rotating:
                 external_data.state |= external_data.State.BROKEN
             raise CheckerFetchError from err
+
+        if not is_rotating or mirror_urls:
+            new_version = new_version._replace(url=url)
 
         if is_rotating and not version_string:
             version_string = extract_version(
@@ -186,9 +202,6 @@ class URLChecker(Checker):
         if version_string is not None:
             log.debug("%s is version %s", external_data.filename, version_string)
             new_version = new_version._replace(version=version_string)
-
-        if not is_rotating:
-            new_version = new_version._replace(url=url)
 
         same_version = is_same_version(
             external_data.checker_data, external_data.current_version.url, new_version

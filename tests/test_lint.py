@@ -243,6 +243,58 @@ class TestLint(unittest.TestCase):
                     else:
                         self.assertEqual(errors, [])
 
+    def test_mirror_url_templates(self):
+        source = self.source(
+            {
+                "type": "github",
+                "repo": "o/r",
+                "asset-name": "app-$version.tar.gz",
+                "mirror-url-templates": [
+                    "https://mirror.invalid/$major.$minor/app-$version.tar.gz"
+                ],
+            }
+        )
+        source["mirror-urls"] = ["https://mirror.invalid/1.0/app-1.0.0.tar.gz"]
+        path = self.write("source.json", source)
+        self.assertEqual(ManifestLinter(1024 * 1024).lint(path), [])
+
+        for template, expected in (
+            ("${version", "Invalid template placeholder"),
+            ("$arch.tar.gz", "Unknown template variable"),
+            ("$tag.tar.gz", "Unknown template variable"),
+        ):
+            with self.subTest(template=template):
+                source["x-checker-data"]["mirror-url-templates"] = [template]
+                path = self.write("source.json", source)
+                errors = ManifestLinter(1024 * 1024).lint(path)
+                self.assertIn(expected, "\n".join(errors))
+                self.assertIn("mirror-url-templates[0]", errors[0])
+
+        source["x-checker-data"]["mirror-url-templates"] = [
+            "https://mirror.invalid/$version.tar.gz",
+            "https://mirror2.invalid/$version.tar.gz",
+        ]
+        path = self.write("source.json", source)
+        self.assertIn(
+            "one entry per mirror-urls entry",
+            "\n".join(ManifestLinter(1024 * 1024).lint(path)),
+        )
+
+        git_source = {
+            "type": "git",
+            "url": "https://example.org/repo.git",
+            "x-checker-data": {
+                "type": "anitya",
+                "project-id": 1,
+                "mirror-url-templates": ["https://mirror.invalid/$version.tar.gz"],
+            },
+        }
+        path = self.write("git.json", git_source)
+        self.assertIn(
+            "only supported for file and archive sources",
+            "\n".join(ManifestLinter(1024 * 1024).lint(path)),
+        )
+
     def test_only_executed_version_templates_are_checked(self):
         source = {
             "type": "git",

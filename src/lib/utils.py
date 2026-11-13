@@ -36,6 +36,7 @@ import urllib.request
 import zoneinfo
 from collections import OrderedDict
 from pathlib import Path
+from string import Template
 
 import aiohttp
 import apt_inst
@@ -54,7 +55,12 @@ from ruamel.yaml.nodes import MappingNode, ScalarNode, SequenceNode
 
 from . import HTTP_CHUNK_SIZE, NETWORK_ERRORS, OPERATORS, TIMEOUT_CONNECT, externaldata
 from .checksums import MultiHash
-from .errors import CheckerFetchError, CheckerQueryError, CheckerRemoteError
+from .errors import (
+    CheckerFetchError,
+    CheckerMetadataError,
+    CheckerQueryError,
+    CheckerRemoteError,
+)
 from .robots import RobotsCache
 from .version import LooseVersion
 
@@ -204,6 +210,27 @@ async def get_timestamp_from_url(
         raise CheckerQueryError(f"Failed to query timestamp for {url}") from err
 
 
+def version_parts(version: str) -> dict[str, str]:
+    version_list = LooseVersion.split_components(version)
+    tmpl_vars = {"version": version}
+    for i, version_part in enumerate(version_list):
+        tmpl_vars[f"version{i}"] = version_part
+        if i == 0:
+            tmpl_vars["major"] = version_part
+        elif i == 1:
+            tmpl_vars["minor"] = version_part
+        elif i == 2:
+            tmpl_vars["patch"] = version_part
+    return tmpl_vars
+
+
+def substitute_template(template_string: str, variables: dict[str, t.Any]) -> str:
+    try:
+        return Template(template_string).substitute(**variables)
+    except (KeyError, ValueError) as err:
+        raise CheckerMetadataError("Error substituting template") from err
+
+
 async def get_extra_data_info_from_url(
     url: str,
     session: aiohttp.ClientSession,
@@ -211,6 +238,34 @@ async def get_extra_data_info_from_url(
     dest_io: t.IO | None = None,
     content_type_deny: t.Iterable[re.Pattern] | None = None,
     robots_cache: RobotsCache | None = None,
+    mirror_urls: t.Iterable[str] | None = None,
+):
+    candidates = [url, *(mirror_urls or ())]
+    for attempt, candidate in enumerate(candidates):
+        if dest_io is not None:
+            dest_io.seek(0)
+            dest_io.truncate()
+        try:
+            return await _download_extra_data_info_from_url(
+                candidate,
+                session,
+                follow_redirects,
+                dest_io,
+                content_type_deny,
+                robots_cache,
+            )
+        except NETWORK_ERRORS:
+            if attempt == len(candidates) - 1:
+                raise
+
+
+async def _download_extra_data_info_from_url(
+    url: str,
+    session: aiohttp.ClientSession,
+    follow_redirects: bool,
+    dest_io: t.IO | None,
+    content_type_deny: t.Iterable[re.Pattern] | None,
+    robots_cache: RobotsCache | None,
 ):
     if robots_cache:
         await robots_cache.ensure_allowed(url)

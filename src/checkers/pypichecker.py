@@ -13,7 +13,7 @@ from yarl import URL
 from ..lib import NETWORK_ERRORS, OPERATORS_SCHEMA
 from ..lib.checksums import MultiDigest
 from ..lib.errors import CheckerQueryError
-from ..lib.externaldata import ExternalBase, ExternalFile
+from ..lib.externaldata import ExternalBase, ExternalData, ExternalFile
 from ..lib.utils import expand_version_constraints, filter_versioned_items
 from . import Checker
 
@@ -129,6 +129,7 @@ class PyPIChecker(Checker):
         super().__init__(*new_args, **kwargs)
 
     async def check(self, external_data: ExternalBase):
+        external_data = t.cast(ExternalData, external_data)
         package_name = external_data.checker_data["name"]
         package_type = external_data.checker_data.get("packagetype", "sdist")
         constraints = [
@@ -193,7 +194,13 @@ class PyPIChecker(Checker):
         ):
             # Complete every declared digest, not just one for comparison, so
             # updating a mixed-checksum source cannot leave stale checksums.
-            checksum = await self._complete_digests(pypi_download["url"], checksum)
+            checksum = await self._complete_digests(
+                pypi_download["url"],
+                checksum,
+                mirror_urls=external_data.mirror_urls_for_version(
+                    pypi_version.orig_str
+                ),
+            )
 
         new_version = ExternalFile(
             url=pypi_download["url"],
