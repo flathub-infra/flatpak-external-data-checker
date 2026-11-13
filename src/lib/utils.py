@@ -35,6 +35,7 @@ import urllib.parse
 import urllib.request
 import zoneinfo
 from collections import OrderedDict
+from collections.abc import Callable
 from pathlib import Path
 from string import Template
 
@@ -282,7 +283,7 @@ async def get_extra_data_info_from_url(
                     and err.request_info is not None
                 ):
                     remember_primary_url(str(err.request_info.real_url))
-                if callable(mirror_urls):
+                if isinstance(mirror_urls, Callable):
                     primary_url, mirrors = mirror_urls(primary_urls)
                 else:
                     mirrors = mirror_urls or ()
