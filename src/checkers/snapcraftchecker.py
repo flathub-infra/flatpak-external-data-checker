@@ -63,7 +63,7 @@ class SnapcraftChecker(Checker):
         name = external_data.checker_data["name"]
         channel = external_data.checker_data["channel"]
 
-        url = f"http://api.snapcraft.io/v2/snaps/info/{name}"
+        url = f"https://api.snapcraft.io/v2/snaps/info/{name}"
         header = {"Snap-Device-Series": "16"}
 
         if self.robots_cache:

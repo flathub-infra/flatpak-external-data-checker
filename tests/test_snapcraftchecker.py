@@ -33,7 +33,7 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
         await self._check_download(checksum_matches=False)
 
     async def _check_download(self, checksum_matches):
-        api_url = "http://api.snapcraft.io/v2/snaps/info/nordpass"
+        api_url = "https://api.snapcraft.io/v2/snaps/info/nordpass"
         download_url = (
             "https://api.snapcraft.io/api/v1/snaps/download/"
             "00CQ2MvSr0Ex7zwdGhCYTa0ZLMw3H6hf_24.snap"
@@ -164,7 +164,8 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
 
         @asynccontextmanager
         async def response(url, **kwargs):
-            if url == "http://api.snapcraft.io/v2/snaps/info/nordpass":
+            if url == "https://api.snapcraft.io/v2/snaps/info/nordpass":
+                self.assertEqual(kwargs, {"headers": {"Snap-Device-Series": "16"}})
                 yield mock.Mock(json=mock.AsyncMock(return_value=metadata))
             elif url == current.url:
                 yield mock.Mock(
@@ -205,7 +206,7 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
         await self._check_request_failures(download=True)
 
     async def _check_request_failures(self, download):
-        api_url = "http://api.snapcraft.io/v2/snaps/info/nordpass"
+        api_url = "https://api.snapcraft.io/v2/snaps/info/nordpass"
         download_url = "https://example.invalid/nordpass.snap"
         failed_url = download_url if download else api_url
         failures = [
@@ -245,6 +246,10 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
 
                 @asynccontextmanager
                 async def response(url, stage=stage, failure=failure, **kwargs):
+                    if url == api_url:
+                        self.assertEqual(
+                            kwargs, {"headers": {"Snap-Device-Series": "16"}}
+                        )
                     if url == failed_url:
                         if stage != "body":
                             raise failure
@@ -319,7 +324,10 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
             ) as download,
         ):
             await checker.check()
-        get.assert_called_once()
+        get.assert_called_once_with(
+            "https://api.snapcraft.io/v2/snaps/info/nordpass",
+            headers={"Snap-Device-Series": "16"},
+        )
         download.assert_awaited_once()
         report = next(
             s for s in checker.get_source_report() if s["checker_type"] == "snapcraft"
