@@ -2,6 +2,7 @@ import dataclasses
 import logging
 import os
 import posixpath
+import re
 import subprocess
 import tempfile
 from collections.abc import Mapping
@@ -233,6 +234,8 @@ class SubmoduleChecker:
         current: str,
         references: Mapping[Path, bool],
     ) -> SubmoduleUpdate | None:
+        if not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", current):
+            raise CheckerError(f"Invalid submodule commit: {current}")
         url = self._url(name)
         branch = self._config(name, "branch")
         if branch == ".":
@@ -251,6 +254,10 @@ class SubmoduleChecker:
             ).strip()
             if current == candidate:
                 return None
+            try:
+                git(checkout, "cat-file", "-e", f"{current}^{{commit}}")
+            except CheckerError:
+                git(checkout, "fetch", "--no-tags", "--depth=1", "--", url, current)
             git(checkout, "checkout", "--detach", current)
             old = self._snapshot(checkout, references)
             git(checkout, "checkout", "--detach", candidate)
