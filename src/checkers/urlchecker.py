@@ -130,24 +130,30 @@ class URLChecker(Checker):
 
         version_string = None
         mirror_urls = []
+        has_mirror_templates = (
+            is_rotating and "mirror-url-templates" in external_data.checker_data
+        )
+        if has_mirror_templates:
+            version_string = extract_version(external_data.checker_data, url)
 
         try:
-            if strip_query or (
-                is_rotating and "mirror-url-templates" in external_data.checker_data
-            ):
+            if strip_query or (has_mirror_templates and version_string is None):
                 if self.robots_cache:
                     await self.robots_cache.ensure_allowed(url)
 
-                async with self.session.head(
-                    url, allow_redirects=True, headers=HTTP_CLIENT_HEADERS
-                ) as head:
-                    url = str(head.url.with_query("") if strip_query else head.url)
+                try:
+                    async with self.session.head(
+                        url, allow_redirects=True, headers=HTTP_CLIENT_HEADERS
+                    ) as head:
+                        url = str(head.url.with_query("") if strip_query else head.url)
+                except NETWORK_ERRORS:
+                    if not has_mirror_templates:
+                        raise
                 if is_rotating:
                     version_string = extract_version(external_data.checker_data, url)
-                    if version_string is not None:
-                        mirror_urls = external_data.mirror_urls_for_version(
-                            version_string
-                        )
+
+            if has_mirror_templates and version_string is not None:
+                mirror_urls = external_data.mirror_urls_for_version(version_string)
 
             if url.endswith(".AppImage"):
                 with tempfile.NamedTemporaryFile("w+b") as tmpfile:
