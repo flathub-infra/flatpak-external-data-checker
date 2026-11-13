@@ -262,6 +262,7 @@ class TestLint(unittest.TestCase):
             ("${version", "Invalid template placeholder"),
             ("$arch.tar.gz", "Unknown template variable"),
             ("$tag.tar.gz", "Unknown template variable"),
+            ("file:///tmp/$version", "Invalid mirror URL scheme file"),
         ):
             with self.subTest(template=template):
                 source["x-checker-data"]["mirror-url-templates"] = [template]

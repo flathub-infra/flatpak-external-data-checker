@@ -13,7 +13,7 @@ from packaging.version import Version
 
 from src.checkers.pypichecker import PyPIChecker
 from src.lib.checksums import MultiDigest
-from src.lib.errors import CheckerFetchError, CheckerQueryError
+from src.lib.errors import CheckerFetchError, CheckerMetadataError, CheckerQueryError
 from src.lib.externaldata import ExternalData, ExternalFile
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
@@ -350,6 +350,24 @@ class TestPyPIChecksums(LocalHTTPTestCase):
         data.update()
         self.assertEqual(data.source["sha256"], self.digests["sha256"])
         self.assertEqual(self.requests, [("GET", "/pypi/example/json")])
+
+    async def test_metadata_only_update_validates_mirrors(self):
+        for template in (
+            "file:///tmp/$version",
+            "https://mirror.invalid/$unknown.tar.gz",
+            "https://mirror.invalid/$patch.tar.gz",
+            "https://[broken/$version",
+            "https://mirror.invalid:bad/$version",
+        ):
+            with self.subTest(template=template):
+                self.requests.clear()
+                data = self.make_data(("sha256",), mirror_template=template)
+                original = data.source.copy()
+                with self.assertRaises(CheckerMetadataError):
+                    await self.checker.check(data)
+                self.assertIsNone(data.new_version)
+                self.assertEqual(data.source, original)
+                self.assertEqual(self.requests, [("GET", "/pypi/example/json")])
 
     async def test_completed_digests_detect_unchanged_content(self):
         data = self.make_data(("sha512",), current=True)

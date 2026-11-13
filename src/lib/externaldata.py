@@ -493,6 +493,12 @@ class ExternalData(ExternalBase):
         )
         return obj
 
+    def set_new_version(
+        self, new_version: ExternalState, is_update: bool = True
+    ) -> None:
+        self.mirror_urls_for_version(new_version.version)
+        super().set_new_version(new_version, is_update=is_update)
+
     def mirror_urls_for_version(self, version: str | None) -> list[str]:
         templates = self.checker_data.get("mirror-url-templates")
         if templates is None:
@@ -504,7 +510,10 @@ class ExternalData(ExternalBase):
         variables = utils.version_parts(version)
         mirror_urls = [utils.substitute_template(item, variables) for item in templates]
         for mirror_url in mirror_urls:
-            scheme = URL(mirror_url).scheme
+            try:
+                scheme = URL(mirror_url).scheme
+            except ValueError as err:
+                raise CheckerMetadataError("Invalid mirror URL") from err
             if scheme not in FILE_URL_SCHEMES:
                 raise CheckerMetadataError(f"Invalid mirror URL scheme {scheme}")
         return mirror_urls
