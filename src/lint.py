@@ -224,10 +224,30 @@ class ManifestLinter:
             self._version_template(path, location, metadata, "url-template")
         elif metadata["type"] in {"github", "forgejo"} and "asset-name" in metadata:
             self._version_template(path, location, metadata, "asset-name")
+        for index, template in enumerate(metadata.get("mirror-url-templates", [])):
+            self._version_template(
+                path,
+                f"{location}.mirror-url-templates[{index}]",
+                metadata,
+                None,
+                template,
+                allow_tag=False,
+            )
 
-    def _version_template(self, path: Path, location: str, metadata: dict, field: str):
-        template = Template(metadata[field])
-        location += "." + field
+    def _version_template(
+        self,
+        path: Path,
+        location: str,
+        metadata: dict,
+        field: str | None,
+        template_string: str | None = None,
+        allow_tag: bool = True,
+    ):
+        if field is not None:
+            template_string = metadata[field]
+            location += "." + field
+        assert template_string is not None
+        template = Template(template_string)
         matches = list(template.pattern.finditer(template.template))
         if any(match.group("invalid") is not None for match in matches):
             self._error(
@@ -240,7 +260,11 @@ class ManifestLinter:
             if (name := match.group("named") or match.group("braced")) is not None
         )
         for name in names:
-            if name == "tag" and metadata["type"] in {"github", "forgejo"}:
+            if (
+                name == "tag"
+                and allow_tag
+                and metadata["type"] in {"github", "forgejo"}
+            ):
                 continue
             if name in {"version", "major", "minor", "patch"} or re.fullmatch(
                 r"version(?:0|[1-9][0-9]*)", name

@@ -3,6 +3,8 @@ import unittest
 from unittest import mock
 from unittest.mock import MagicMock
 
+from yarl import URL
+
 from src.checkers.urlchecker import URLChecker, extract_version, is_same_version
 from src.lib.checksums import MultiDigest
 from src.lib.errors import CheckerMetadataError
@@ -211,6 +213,51 @@ class TestURLCheckerPatterns(unittest.IsolatedAsyncioTestCase):
                 extract.assert_awaited_once()
                 self.assertEqual(data.new_version.version, "1.2.3")
                 self.assertEqual(data.new_version.url, data.current_version.url)
+
+    async def test_rotating_url_uses_rendered_mirror(self):
+        primary = "https://example.com/prog_2.0.0.tar.gz"
+        mirror = "https://mirror.example.com/prog_2.0.0.tar.gz"
+        data = ExternalData.from_source(
+            "test.yaml",
+            {
+                "type": "archive",
+                "url": CURRENT_URL,
+                "mirror-urls": ["https://mirror.example.com/prog_1.2.3.tar.gz"],
+                "sha256": "0" * 64,
+                "x-checker-data": {
+                    "type": "rotating-url",
+                    "url": "https://example.com/latest",
+                    **CHECKER_DATA_WITH_PATTERN,
+                    "mirror-url-templates": [
+                        "https://mirror.example.com/prog_$version.tar.gz"
+                    ],
+                },
+            },
+        )
+        head = MagicMock()
+        head.url = URL(primary)
+        head_context = MagicMock()
+        head_context.__aenter__ = mock.AsyncMock(return_value=head)
+        head_context.__aexit__ = mock.AsyncMock(return_value=False)
+        self.checker.session.head = MagicMock(return_value=head_context)
+        downloaded = data.current_version._replace(
+            url=mirror,
+            checksum=MultiDigest(sha256="1" * 64),
+        )
+
+        with mock.patch(
+            "src.checkers.urlchecker.utils.get_extra_data_info_from_url",
+            new_callable=mock.AsyncMock,
+            return_value=downloaded,
+        ) as fetch:
+            await self.checker.check(data)
+
+        self.assertEqual(fetch.await_args.kwargs["mirror_urls"], [mirror])
+        self.assertIsNotNone(data.new_version)
+        self.assertEqual(data.new_version.url, primary)
+        self.assertEqual(data.new_version.version, "2.0.0")
+        data.update()
+        self.assertEqual(data.source["mirror-urls"], [mirror])
 
     async def test_no_autodetect(self):
         for suffix in ("AppImage", "deb"):

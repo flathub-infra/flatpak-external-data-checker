@@ -616,6 +616,45 @@ class TestCheckerHelpers(LocalHTTPTestCase):
                 str(self.server.make_url("/missing")), MultiDigest(sha512=sha512)
             )
 
+        checksum = await checker._complete_digests(
+            str(self.server.make_url("/missing")),
+            MultiDigest(sha512=sha512),
+            mirror_urls=[self.serve(CORRECT)],
+        )
+        self.assertEqual(checksum.sha256, sha256)
+
+    async def test_update_version_uses_and_updates_mirror_urls(self):
+        primary = str(self.server.make_url("/missing-2.0.tar.xz"))
+        mirror_path = "/app-2.0.tar.xz"
+        self.responses[mirror_path] = {
+            "body": b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\x03new archive",
+            "content_type": "application/octet-stream",
+        }
+        mirror = str(self.server.make_url(mirror_path))
+        source = {
+            "type": "archive",
+            "url": "https://example.invalid/app-1.0.tar.xz",
+            "mirror-urls": ["https://mirror.invalid/app-1.0.tar.xz"],
+            "sha256": "0" * 64,
+            "x-checker-data": {
+                "type": "anitya",
+                "mirror-url-templates": [mirror.replace("2.0", "$version")],
+            },
+        }
+        data = ExternalData.from_source("test.yaml", source)
+
+        await DummyChecker(self.http)._update_version(data, "2.0", primary)
+
+        self.assertIsNotNone(data.new_version)
+        self.assertEqual(data.new_version.url, primary)
+        data.update()
+        self.assertEqual(source["url"], primary)
+        self.assertEqual(source["mirror-urls"], [mirror])
+        self.assertEqual(
+            self.requests,
+            [("GET", "/missing-2.0.tar.xz"), ("GET", mirror_path)],
+        )
+
     async def test_get_json(self):
         expected = {"key": 123}
         url = self.serve(json.dumps(expected).encode(), content_type="application/json")

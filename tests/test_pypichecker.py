@@ -289,18 +289,17 @@ class TestPyPIChecksums(LocalHTTPTestCase):
         self.addCleanup(patcher.stop)
         self.checker = PyPIChecker(self.http)
 
-    def make_data(self, kinds, *, current=False):
-        return ExternalData.from_source(
-            "source.json",
-            {
-                "type": "archive",
-                "url": self.artifact_url
-                if current
-                else "https://example.org/old.tar.gz",
-                **{kind: self.digests[kind] if current else "0" for kind in kinds},
-                "x-checker-data": {"type": "pypi", "name": "example"},
-            },
-        )
+    def make_data(self, kinds, *, current=False, mirror_template=None):
+        source = {
+            "type": "archive",
+            "url": self.artifact_url if current else "https://example.org/old.tar.gz",
+            **{kind: self.digests[kind] if current else "0" for kind in kinds},
+            "x-checker-data": {"type": "pypi", "name": "example"},
+        }
+        if mirror_template is not None:
+            source["mirror-urls"] = ["https://mirror.invalid/old.tar.gz"]
+            source["x-checker-data"]["mirror-url-templates"] = [mirror_template]
+        return ExternalData.from_source("source.json", source)
 
     async def test_updates_all_declared_checksums(self):
         for kinds in (("sha512",), ("sha256", "sha512")):
@@ -324,6 +323,26 @@ class TestPyPIChecksums(LocalHTTPTestCase):
                     self.requests,
                     [("GET", "/pypi/example/json"), ("GET", "/response-0")],
                 )
+
+    async def test_digest_completion_falls_back_to_mirror(self):
+        self.responses["/response-0"]["status"] = 404
+        mirror = self.serve(self.content)
+        data = self.make_data(("sha512",), mirror_template=mirror)
+
+        await self.checker.check(data)
+
+        self.assertIsNotNone(data.new_version)
+        self.assertEqual(data.new_version.url, self.artifact_url)
+        data.update()
+        self.assertEqual(data.source["mirror-urls"], [mirror])
+        self.assertEqual(
+            self.requests,
+            [
+                ("GET", "/pypi/example/json"),
+                ("GET", "/response-0"),
+                ("GET", "/response-2"),
+            ],
+        )
 
     async def test_metadata_digests_need_no_download(self):
         data = self.make_data(("sha256",))

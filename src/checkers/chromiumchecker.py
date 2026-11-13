@@ -46,13 +46,23 @@ class Component:
     async def update_external_source_version(self, latest_url):
         assert latest_url is not None
 
+        mirror_urls = (
+            self.external_data.mirror_urls_for_version(self.latest_version)
+            if isinstance(self.external_data, ExternalData)
+            else []
+        )
         try:
             new_version = await get_extra_data_info_from_url(
-                latest_url, self.session, robots_cache=self.robots_cache
+                latest_url,
+                self.session,
+                robots_cache=self.robots_cache,
+                mirror_urls=mirror_urls,
             )
         except NETWORK_ERRORS as err:
             raise CheckerFetchError from err
         else:
+            if mirror_urls:
+                new_version = new_version._replace(url=latest_url)
             new_version = new_version._replace(version=self.latest_version)
             self.external_data.set_new_version(new_version)
 

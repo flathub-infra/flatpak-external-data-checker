@@ -9,7 +9,6 @@ import pkgutil
 import re
 import typing as t
 import zlib
-from string import Template
 from typing import TypeAlias, cast
 
 import aiohttp
@@ -42,7 +41,6 @@ from ..lib.externaldata import (
     ExternalState,
 )
 from ..lib.robots import RobotsCache
-from ..lib.version import LooseVersion
 
 JSONType = str | int | float | bool | None | dict[str, t.Any] | list[t.Any]
 XMLElement: TypeAlias = ElementTree._Element
@@ -168,17 +166,7 @@ class Checker:
         """
         Parse version string and return a dict of named components.
         """
-        version_list = LooseVersion.split_components(version)
-        tmpl_vars = {"version": version}
-        for i, version_part in enumerate(version_list):
-            tmpl_vars[f"version{i}"] = version_part
-            if i == 0:
-                tmpl_vars["major"] = version_part
-            elif i == 1:
-                tmpl_vars["minor"] = version_part
-            elif i == 2:
-                tmpl_vars["patch"] = version_part
-        return tmpl_vars
+        return utils.version_parts(version)
 
     @classmethod
     def _substitute_template(
@@ -186,11 +174,7 @@ class Checker:
         template_string: str,
         variables: dict[str, t.Any],
     ) -> str:
-        tmpl = Template(template_string)
-        try:
-            return tmpl.substitute(**variables)
-        except (KeyError, ValueError) as err:
-            raise CheckerMetadataError("Error substituting template") from err
+        return utils.substitute_template(template_string, variables)
 
     @classmethod
     def _get_pattern(
@@ -226,27 +210,36 @@ class Checker:
         return pattern
 
     async def _complete_digests(
-        self, url: str | URL, digests: MultiDigest
+        self,
+        url: str | URL,
+        digests: MultiDigest,
+        mirror_urls: t.Iterable[str] = (),
     ) -> MultiDigest:
         """
         Re-download given `url`, verify it against given `digests`,
         and return a `MultiDigest` with all digest types set.
         """
-        if self.robots_cache:
-            await self.robots_cache.ensure_allowed(url)
-        multihash = MultiHash()
-        try:
-            async with self.session.get(url) as resp:
-                async for chunk, _ in resp.content.iter_chunks():
-                    multihash.update(chunk)
-        except NETWORK_ERRORS as err:
-            raise CheckerFetchError from err
-        new_digests = multihash.hexdigest()
-        if new_digests != digests:
-            raise CheckerFetchError(
-                f"Checksum mismatch for {url}: expected {digests}, got {new_digests}"
-            )
-        return new_digests
+        candidates = [url, *mirror_urls]
+        for attempt, candidate in enumerate(candidates):
+            if self.robots_cache:
+                await self.robots_cache.ensure_allowed(candidate)
+            multihash = MultiHash()
+            try:
+                async with self.session.get(candidate) as resp:
+                    async for chunk, _ in resp.content.iter_chunks():
+                        multihash.update(chunk)
+            except NETWORK_ERRORS as err:
+                if attempt == len(candidates) - 1:
+                    raise CheckerFetchError from err
+                continue
+            new_digests = multihash.hexdigest()
+            if new_digests != digests:
+                raise CheckerFetchError(
+                    f"Checksum mismatch for {candidate}: "
+                    f"expected {digests}, got {new_digests}"
+                )
+            return new_digests
+        raise AssertionError("unreachable")
 
     async def _set_new_version(
         self, source: ExternalBase, new_version: ExternalState
@@ -267,7 +260,9 @@ class Checker:
                 new_version.checksum.digests,
             )
             checksum = await self._complete_digests(
-                new_version.url, new_version.checksum
+                new_version.url,
+                new_version.checksum,
+                mirror_urls=source.mirror_urls_for_version(new_version.version),
             )
             new_version = new_version._replace(checksum=checksum)
 
@@ -302,6 +297,7 @@ class Checker:
         if latest_url_scheme not in FILE_URL_SCHEMES:
             raise CheckerMetadataError(f"Invalid URL scheme {latest_url_scheme}")
 
+        mirror_urls = external_data.mirror_urls_for_version(latest_version)
         try:
             new_version = await utils.get_extra_data_info_from_url(
                 url=latest_url,
@@ -309,10 +305,13 @@ class Checker:
                 session=self.session,
                 content_type_deny=wrong_content_types,
                 robots_cache=self.robots_cache,
+                mirror_urls=mirror_urls,
             )
         except NETWORK_ERRORS as err:
             raise CheckerFetchError from err
 
+        if mirror_urls:
+            new_version = new_version._replace(url=latest_url)
         new_version = new_version._replace(version=latest_version)
         if timestamp is not None:
             new_version = new_version._replace(timestamp=timestamp)

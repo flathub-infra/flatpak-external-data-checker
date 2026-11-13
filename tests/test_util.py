@@ -19,11 +19,13 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import asyncio
 import gc
+import io
 import os
 import re
 import subprocess
 import time
 import unittest
+import urllib.parse
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -35,6 +37,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import aiohttp
 
 from src.lib import utils
+from src.lib.checksums import MultiHash
 from src.lib.errors import CheckerFetchError, CheckerQueryError, CheckerRemoteError
 from src.lib.utils import (
     Command,
@@ -531,6 +534,31 @@ class TestDownload(LocalHTTPTestCase):
                 session=self.http,
                 content_type_deny=[re.compile(r"^application/json$")],
             )
+
+    async def test_mirror_urls_fallback_on_network_error(self):
+        primary = str(self.server.make_url("/missing-archive.tar.gz"))
+        body = b"mirror payload data"
+        mirror = self.serve(body)
+        dest_io = io.BytesIO(b"stale contents from an earlier attempt")
+
+        result = await get_extra_data_info_from_url(
+            url=primary,
+            session=self.http,
+            dest_io=dest_io,
+            mirror_urls=[mirror],
+        )
+
+        self.assertEqual(result.url, mirror)
+        self.assertEqual(result.size, len(body))
+        self.assertEqual(result.checksum, MultiHash(body).hexdigest())
+        self.assertEqual(dest_io.getvalue(), body)
+        self.assertEqual(
+            self.requests,
+            [
+                ("GET", urllib.parse.urlsplit(primary).path),
+                ("GET", urllib.parse.urlsplit(mirror).path),
+            ],
+        )
 
 
 class TestDetectJsonIndent(unittest.TestCase):
