@@ -133,7 +133,7 @@ class URLChecker(Checker):
         has_mirror_templates = (
             is_rotating and "mirror-url-templates" in external_data.checker_data
         )
-        head_urls = [url]
+        head_urls: list[str] = [url]
         download_urls: list[str] = []
 
         def resolve_mirrors(primary_urls: Sequence[str]) -> tuple[str, list[str]]:
