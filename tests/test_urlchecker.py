@@ -3,6 +3,7 @@ import unittest
 from unittest import mock
 from unittest.mock import MagicMock
 
+from aiohttp import web
 from yarl import URL
 
 from src.checkers.urlchecker import URLChecker, extract_version, is_same_version
@@ -11,7 +12,7 @@ from src.lib.errors import CheckerMetadataError
 from src.lib.externaldata import ExternalData
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
-from tests.support import upstream_test
+from tests.support import LocalHTTPTestCase, upstream_test
 
 
 def _make_version(url, version=None):
@@ -308,6 +309,93 @@ class TestURLCheckerPatterns(unittest.IsolatedAsyncioTestCase):
                 else:
                     with self.assertRaises(CheckerMetadataError):
                         await self.checker.validate_checker_data(data)
+
+
+class TestURLCheckerMirrors(LocalHTTPTestCase):
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.head_statuses = {}
+        self.checker = URLChecker(self.http)
+        self.content = b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\x03new archive"
+
+    async def _respond(self, request):
+        if request.method == "HEAD" and request.path in self.head_statuses:
+            self.requests.append((request.method, request.path_qs))
+            return web.Response(status=self.head_statuses[request.path])
+        return await super()._respond(request)
+
+    def make_data(self, checker_url):
+        return ExternalData.from_source(
+            "test.yaml",
+            {
+                "type": "archive",
+                "url": str(self.server.make_url("/app-1.0.tar.gz")),
+                "mirror-urls": [str(self.server.make_url("/mirror-1.0.tar.gz"))],
+                "sha256": "0" * 64,
+                "x-checker-data": {
+                    "type": "rotating-url",
+                    "url": checker_url,
+                    "pattern": r".*/app-([\d.]+)\.tar\.gz",
+                    "mirror-url-templates": [
+                        str(self.server.make_url("/mirror-$version.tar.gz"))
+                    ],
+                },
+            },
+        )
+
+    async def test_versioned_url_does_not_require_head(self):
+        path = "/app-2.0.tar.gz"
+        self.head_statuses[path] = 405
+        self.responses[path] = {"body": self.content}
+        primary = str(self.server.make_url(path))
+        data = self.make_data(primary)
+
+        await self.checker.check(data)
+
+        self.assertIsNotNone(data.new_version)
+        self.assertEqual(data.new_version.url, primary)
+        self.assertEqual(data.new_version.version, "2.0")
+        self.assertEqual(self.requests, [("GET", path)])
+
+    async def test_versioned_url_falls_back_to_mirror(self):
+        path = "/app-2.0.tar.gz"
+        mirror_path = "/mirror-2.0.tar.gz"
+        self.responses[mirror_path] = {"body": self.content}
+        primary = str(self.server.make_url(path))
+        data = self.make_data(primary)
+
+        await self.checker.check(data)
+
+        self.assertIsNotNone(data.new_version)
+        self.assertEqual(data.new_version.url, primary)
+        self.assertEqual(data.new_version.version, "2.0")
+        data.update()
+        self.assertEqual(data.source["url"], primary)
+        self.assertEqual(
+            data.source["mirror-urls"], [str(self.server.make_url(mirror_path))]
+        )
+        self.assertEqual(self.requests, [("GET", path), ("GET", mirror_path)])
+
+    async def test_failed_head_allows_get_to_discover_version(self):
+        path = "/app-2.0.tar.gz"
+        self.head_statuses["/latest"] = 405
+        self.responses["/latest"] = {"status": 302, "headers": {"Location": path}}
+        self.responses[path] = {"body": self.content}
+        data = self.make_data(str(self.server.make_url("/latest")))
+
+        await self.checker.check(data)
+
+        self.assertIsNotNone(data.new_version)
+        self.assertEqual(data.new_version.url, str(self.server.make_url(path)))
+        self.assertEqual(data.new_version.version, "2.0")
+        data.update()
+        self.assertEqual(
+            data.source["mirror-urls"],
+            [str(self.server.make_url("/mirror-2.0.tar.gz"))],
+        )
+        self.assertEqual(
+            self.requests, [("HEAD", "/latest"), ("GET", "/latest"), ("GET", path)]
+        )
 
 
 class TestIsSameVersion(unittest.TestCase):
