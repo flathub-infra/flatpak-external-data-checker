@@ -6,10 +6,12 @@ from string import Template
 import jsonschema
 from gi.repository import GLib
 from ruamel.yaml.error import YAMLError
+from yarl import URL
 
 from .checkers import ALL_CHECKERS
 from .checkers.forgejochecker import ForgejoChecker
 from .checkers.jsonchecker import JSONChecker
+from .lib import FILE_URL_SCHEMES
 from .lib.errors import CheckerMetadataError, ManifestLoadError, SourceLoadError
 from .lib.externaldata import CHECKER_DATA_SCHEMA_COMMON, ExternalBase, ExternalGitRepo
 from .lib.utils import read_manifest
@@ -225,14 +227,24 @@ class ManifestLinter:
         elif metadata["type"] in {"github", "forgejo"} and "asset-name" in metadata:
             self._version_template(path, location, metadata, "asset-name")
         for index, template in enumerate(metadata.get("mirror-url-templates", [])):
+            template_location = f"{location}.mirror-url-templates[{index}]"
             self._version_template(
                 path,
-                f"{location}.mirror-url-templates[{index}]",
+                template_location,
                 metadata,
                 None,
                 template,
                 allow_tag=False,
             )
+            try:
+                scheme = URL(template).scheme
+            except ValueError as err:
+                self._error(path, template_location, str(err))
+            else:
+                if scheme not in FILE_URL_SCHEMES:
+                    self._error(
+                        path, template_location, f"Invalid mirror URL scheme {scheme}"
+                    )
 
     def _version_template(
         self,
