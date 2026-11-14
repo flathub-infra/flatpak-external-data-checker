@@ -21,10 +21,10 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "ty>=0.0.97,<0.1",
+    "ty>=0.0.100,<0.1",
     "typing-extensions>=4.6,<5",
     "PyGObject-stubs>=2.11.0,<3",
-    "ruff>=0.6.7,<1",
+    "ruff>=0.17.4,<1",
     "types-jsonschema>=4.23.0.20240813,<5",
     "types-lxml>=2024.9.16,<2027",
     "types-toml<0.11,<1",
