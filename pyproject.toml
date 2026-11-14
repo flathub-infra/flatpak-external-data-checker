@@ -14,7 +14,7 @@ dependencies = [
     "PyGObject==3.58.1",
     "python-magic==0.4.27",
     "ruamel.yaml==0.19.1",
-    "semver==3.1.0",
+    "semver==3.1.1",
     "toml==0.10.2",
     "yarl==1.25.1",
 ]
