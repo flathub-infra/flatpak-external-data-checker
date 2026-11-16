@@ -1689,6 +1689,95 @@ class TestOpenPR(unittest.TestCase):
     @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
     @patch("src.main.check_call")
     @patch("src.main.Github")
+    def test_existing_update_with_matching_tree_is_reused(
+        self, mock_github, mock_check_call, mock_check_output
+    ):
+        for branch, base, fork, automerge in (
+            ("update-main-1234567", "main", False, False),
+            ("update-1234567", "main", False, False),
+            ("update-branch/25.08-1234567", "branch/25.08", False, True),
+            ("update-main-1234567", "main", True, False),
+        ):
+            with (
+                self.subTest(branch=branch, fork=fork),
+                patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}),
+                patch(
+                    "builtins.open",
+                    unittest.mock.mock_open(
+                        read_data=json.dumps({"automerge-flathubbot-prs": automerge})
+                    ),
+                ),
+            ):
+                _, _, repo = self._setup_mocks(mock_github)
+                head_repo = repo.create_fork.return_value if fork else repo
+                head_repo.full_name = "forkowner/repo" if fork else "owner/repo"
+                change = self._make_change()._replace(base_branch=base)
+                pr = MagicMock(state="open", mergeable=True)
+                pr.html_url = "https://github.com/owner/repo/pull/1"
+                pr.head.ref = branch
+                pr.head.repo = head_repo
+                pr.head.sha = "updated-head"
+                commit = head_repo.get_commit.return_value
+                commit.commit.tree.sha = change.commit
+                commit.get_combined_status.return_value.state = "success"
+                repo.get_pulls.side_effect = [[], [pr]]
+                report = {}
+
+                self.assertTrue(main.open_pr(change, fork=fork, report=report))
+
+                self.assertEqual(
+                    repo.get_pulls.call_args_list[-1].kwargs,
+                    {"state": "open", "base": base},
+                )
+                head_repo.get_commit.assert_called_with("updated-head")
+                repo.create_pull.assert_not_called()
+                self.push.assert_not_called()
+                self.assertEqual(pr.merge.called, automerge)
+                self.assertEqual(
+                    report["pull_request"],
+                    {
+                        "url": pr.html_url,
+                        "outcome": "merged" if automerge else "existing_open",
+                    },
+                )
+
+    @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
+    @patch("src.main.Github")
+    def test_tree_lookup_ignores_unrelated_prs(self, mock_github, mock_check_output):
+        for mismatch in ("tree", "repository", "deleted_repository", "branch", "base"):
+            with (
+                self.subTest(mismatch=mismatch),
+                patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}),
+                patch("builtins.open", side_effect=FileNotFoundError),
+            ):
+                _, _, repo = self._setup_mocks(mock_github)
+                pr = MagicMock(state="open")
+                pr.head.ref = "update-main-1234567"
+                pr.head.repo = repo
+                repo.get_commit.return_value.commit.tree.sha = (
+                    self._make_change().commit
+                )
+                if mismatch == "tree":
+                    repo.get_commit.return_value.commit.tree.sha = "different-tree"
+                elif mismatch == "repository":
+                    pr.head.repo = MagicMock(full_name="someone/repo")
+                elif mismatch == "deleted_repository":
+                    pr.head.repo = None
+                elif mismatch == "branch":
+                    pr.head.ref = "manual-update"
+                else:
+                    pr.head.ref = "update-stable-1234567"
+                repo.get_pulls.side_effect = [[], [pr]]
+
+                self.assertTrue(main.open_pr(self._make_change()))
+
+                repo.create_pull.assert_called_once()
+                if mismatch != "tree":
+                    repo.get_commit.assert_not_called()
+
+    @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
+    @patch("src.main.check_call")
+    @patch("src.main.Github")
     def test_no_existing_prs_creates_pr(
         self, mock_github, mock_check_call, mock_check_output
     ):

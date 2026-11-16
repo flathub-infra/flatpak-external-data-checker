@@ -30,6 +30,7 @@ import getpass
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -513,6 +514,21 @@ def open_pr(
         return True
 
     open_prs = [pr for pr in prs if pr.state == "open"]
+    if not open_prs:
+        # Merging the base branch changes a PR's tree but not its branch name.
+        update_branch = re.compile(rf"update-(?:{re.escape(base)}-)?[0-9a-f]{{7}}")
+        for pr in origin_repo.get_pulls(state="open", base=base):
+            if (
+                pr.head.repo is None
+                or pr.head.repo.full_name != repo.full_name
+                or not update_branch.fullmatch(pr.head.ref)
+            ):
+                continue
+            pr_commit = pr.head.repo.get_commit(pr.head.sha)
+            if pr_commit.commit.tree.sha == change.commit:
+                open_prs.append(pr)
+                break
+
     for pr in open_prs:
         if report is not None:
             report["pull_request"] = {
