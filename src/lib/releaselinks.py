@@ -51,23 +51,42 @@ def download_release_url(url: str) -> str | None:
     return None
 
 
-def archive_tag(url: str) -> str | None:
-    """Read an explicitly named tag, without guessing from an ambiguous Git ref."""
+def _archive_ref(
+    url: str, *, tags_only: bool = False, allow_branches: bool = False
+) -> tuple[str, str] | None:
     if not http_url(url):
         return None
     parsed = urlsplit(url)
     if parsed.netloc.lower() != "github.com":
         return None
     match = re.fullmatch(
-        r"/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/archive/refs/tags/(.+)\.(?:tar\.gz|zip)",
+        r"/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/archive/(.+)\.(?:tar\.gz|zip)",
         parsed.path,
     )
     if not match:
         return None
-    tag = unquote(match[1])
-    if any(part in (".", "..") for part in tag.split("/")):
+    ref = match[2]
+    if ref.startswith("refs/tags/"):
+        ref = ref.removeprefix("refs/tags/")
+    elif allow_branches and ref.startswith("refs/heads/"):
+        ref = ref.removeprefix("refs/heads/")
+    elif tags_only or "/" in unquote(ref):
         return None
-    return tag
+    ref = unquote(ref)
+    if any(part in ("", ".", "..") for part in ref.split("/")):
+        return None
+    return f"https://github.com/{match[1]}", ref
+
+
+def archive_tag(url: str) -> str | None:
+    """Read an explicitly named tag, without guessing from an ambiguous Git ref."""
+    archive = _archive_ref(url, tags_only=True)
+    return archive[1] if archive else None
+
+
+def archive_repository_url(url: str) -> str | None:
+    archive = _archive_ref(url, allow_branches=True)
+    return archive[0] if archive else None
 
 
 def comparison_url(repository_url: str, old: object, new: object) -> str | None:
@@ -93,26 +112,32 @@ def comparison_url(repository_url: str, old: object, new: object) -> str | None:
     )
 
 
+def _download_ref(url: str) -> tuple[str, str] | None:
+    release = download_release_url(url)
+    if not release:
+        return _archive_ref(url)
+    separator = (
+        "/-/releases/"
+        if urlsplit(release).hostname == "gitlab.com"
+        else "/releases/tag/"
+    )
+    repo, tag = release.rsplit(separator, 1)
+    return repo, unquote(tag)
+
+
 def download_comparison_url(old_url: str, new_url: str) -> str | None:
-    old_release = download_release_url(old_url)
-    new_release = download_release_url(new_url)
-    if not old_release or not new_release:
+    old = _download_ref(old_url)
+    new = _download_ref(new_url)
+    if not old or not new:
         return None
-    separator = (
-        "/-/releases/"
-        if urlsplit(old_release).hostname == "gitlab.com"
-        else "/releases/tag/"
-    )
-    old_repo, old_tag = old_release.rsplit(separator, 1)
-    separator = (
-        "/-/releases/"
-        if urlsplit(new_release).hostname == "gitlab.com"
-        else "/releases/tag/"
-    )
-    new_repo, new_tag = new_release.rsplit(separator, 1)
-    if old_repo != new_repo:
+    old_repo, old_ref = old
+    new_repo, new_ref = new
+    if old_repo != new_repo and not (
+        urlsplit(new_repo).hostname == "github.com"
+        and old_repo.lower() == new_repo.lower()
+    ):
         return None
-    return comparison_url(old_repo, unquote(old_tag), unquote(new_tag))
+    return comparison_url(new_repo, old_ref, new_ref)
 
 
 def api_release_url(

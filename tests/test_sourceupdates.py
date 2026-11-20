@@ -315,7 +315,58 @@ class TestSourceUpdates(unittest.TestCase):
             format_source_updates([update]),
         )
         self.assertIsNone(update.release_url)
+        self.assertEqual(
+            update.comparison_url, "https://github.com/benhoyt/inih/compare/r58...r63"
+        )
+
+    def test_short_github_archive_comparison(self):
+        repo = "https://github.com/sahlberg/libnfs"
+        data = self.file_source()
+        data.current_version = data.current_version._replace(
+            url=f"{repo}/archive/libnfs-8.0.1.tar.gz"
+        )
+        data.new_version = data.new_version._replace(
+            url=f"{repo}/archive/libnfs-8.1.0.tar.gz"
+        )
+        update = SourceUpdate.from_source(data)
+        self.assertIn(
+            f"]({repo}/compare/libnfs-8.0.1...libnfs-8.1.0)",
+            format_source_updates([update]),
+        )
+        self.assertIsNone(update.release_url)
+        data.new_version = data.new_version._replace(
+            url=data.new_version.url.replace("/sahlberg/", "/fork/")
+        )
+        self.assertIsNone(SourceUpdate.from_source(data).comparison_url)
+
+    def test_github_archive_repository_casing(self):
+        data = self.file_source()
+        data.current_version = data.current_version._replace(
+            url="https://github.com/owner/app/archive/ReleaseA.zip"
+        )
+        data.new_version = data.new_version._replace(
+            url="https://github.com/Owner/App/archive/ReleaseB.zip"
+        )
+        update = SourceUpdate.from_source(data)
+        self.assertEqual(
+            update.comparison_url,
+            "https://github.com/Owner/App/compare/ReleaseA...ReleaseB",
+        )
+        self.assertIsNone(update.repository_url)
+
+    def test_github_archive_repository_fallback(self):
+        data = self.file_source()
+        data.new_version = data.new_version._replace(
+            url="https://github.com/sahlberg/libnfs/archive/libnfs-8.1.0.tar.gz"
+        )
+        update = SourceUpdate.from_source(data)
         self.assertIsNone(update.comparison_url)
+        self.assertIn(
+            r"| [app\-1\.0\.tar\.gz](https://github.com/sahlberg/libnfs) |",
+            format_source_updates([update]),
+        )
+        data.new_release_url = "https://example.org/notes"
+        self.assertIsNone(SourceUpdate.from_source(data).repository_url)
 
     def test_archive_tag_encoding_and_version_precedence(self):
         for filename, tag, rendered in (
@@ -388,6 +439,20 @@ class TestSourceUpdates(unittest.TestCase):
                 self.assertEqual(update.old_version, "unknown")
                 self.assertEqual(update.new_version, "unknown")
 
+    def test_branch_archive_links_repository(self):
+        data = self.file_source()
+        repo = "https://github.com/owner/app"
+        data.current_version = data.current_version._replace(
+            url=f"{repo}/archive/v1.zip"
+        )
+        data.new_version = data.current_version._replace(
+            url=f"{repo}/archive/refs/heads/release/stable.tar.gz"
+        )
+        update = SourceUpdate.from_source(data)
+        self.assertEqual(update.new_version, "unknown")
+        self.assertIsNone(update.comparison_url)
+        self.assertIn(f"]({repo})", format_source_updates([update]))
+
     def test_exiv2_release_asset_to_archive(self):
         data = self.file_source({"type": "anitya", "project-id": 769})
         data.current_version = data.current_version._replace(
@@ -406,7 +471,10 @@ class TestSourceUpdates(unittest.TestCase):
             format_source_updates([update]),
         )
         self.assertIsNone(update.release_url)
-        self.assertIsNone(update.comparison_url)
+        self.assertEqual(
+            update.comparison_url,
+            "https://github.com/Exiv2/exiv2/compare/v0.28.0...v0.28.9",
+        )
 
     def test_previous_release_download_tag(self):
         for arch in ("x86_64", "aarch64"):
