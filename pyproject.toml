@@ -139,4 +139,4 @@ missing-type-argument = "error"
 include = ["src/lib/externaldata.py"]
 [tool.ty.overrides.rules]
 # File and Git dataclasses narrow the mutable state fields.
-invalid-mutable-override = "ignore"
+incompatible-mutable-override = "ignore"
