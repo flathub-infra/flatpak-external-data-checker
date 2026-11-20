@@ -11,6 +11,7 @@ from ..checkers.electronchecker import ElectronChecker
 from ..checkers.urlchecker import URLChecker, extract_version
 from .externaldata import ExternalBase, ExternalGitRef, ExternalState
 from .releaselinks import (
+    archive_repository_url,
     archive_tag,
     comparison_url,
     download_comparison_url,
@@ -128,6 +129,7 @@ class SourceUpdate:
     release_url: str | None
     comparison_url: str | None = None
     submodule_files: tuple[str, ...] = ()
+    repository_url: str | None = None
 
     @classmethod
     def from_source(cls, data: ExternalBase) -> "SourceUpdate":
@@ -154,6 +156,7 @@ class SourceUpdate:
             )
         old = data.current_version
         compare = None
+        repository_url = None
         if isinstance(old, ExternalGitRef) and isinstance(new, ExternalGitRef):
             if old.url == new.url:
                 if old.tag and new.tag and old.tag != new.tag:
@@ -162,12 +165,15 @@ class SourceUpdate:
                     compare = comparison_url(old.url, old.commit, new.commit)
         else:
             compare = download_comparison_url(old.url, new.url)
+            if not compare and not release_url:
+                repository_url = archive_repository_url(new.url)
         return cls(
             source,
             _version(data, data.current_version),
             _version(data, new),
             release_url,
             compare,
+            repository_url=repository_url,
         )
 
 
@@ -202,6 +208,8 @@ def format_source_updates(updates: list[SourceUpdate]) -> str:
             url = _url(update.comparison_url)
             change = f"[{change}]({url})"
         source = _escape(update.source)
+        if update.repository_url:
+            source = f"[{source}]({_url(update.repository_url)})"
         release = (
             f"[Release notes]({_url(update.release_url)})"
             if update.release_url
