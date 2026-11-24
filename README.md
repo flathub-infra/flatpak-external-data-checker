@@ -677,6 +677,11 @@ Check for [JetBrains](https://www.jetbrains.com/) product updates:
 `release-type` accepts `release`, `eap`, `rc`, or `preview` and defaults to
 `release`. Not every product offers every release type.
 
+Set `include-release-notes` to `true` on the main source to include usable
+JetBrains release highlights in metainfo for stable releases. Only enable this
+if the text can be redistributed under your metainfo license. The release-notes
+URL is still included when available, even if the highlights cannot be used.
+
 ### Snapcraft checker
 
 Check for [Snapcraft](https://snapcraft.io/) package updates:

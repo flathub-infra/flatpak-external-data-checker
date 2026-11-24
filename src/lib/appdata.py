@@ -23,6 +23,7 @@ preserving as much formatting as is feasible and inserting that element if it is
 missing.
 """
 
+import copy
 import io
 import typing as t
 from pathlib import Path
@@ -31,6 +32,7 @@ from typing import TypeAlias
 import lxml.etree as ElementTree
 
 XMLElement: TypeAlias = ElementTree._Element
+ReleaseDescription: TypeAlias = tuple[XMLElement, ...]
 
 DEFAULT_INDENT = "  "
 
@@ -75,6 +77,8 @@ def add_release(
     date: str,
     release_url_template: str | None,
     release_url: str | None = None,
+    *,
+    release_description: ReleaseDescription | None = None,
 ):
     data = Path(src).read_bytes() if isinstance(src, str) else src.read()
 
@@ -116,9 +120,22 @@ def add_release(
 
     description = ElementTree.Element("description")
 
-    # Give <description> a closing </description> rather than it being
-    # self-closing
-    description.text = ""
+    if release_description:
+        padding = release.text or "\n" + indent * 3
+        block_padding = padding + indent
+        description.text = block_padding
+        for block in copy.deepcopy(release_description):
+            description.append(block)
+            block.tail = block_padding
+            if block.tag in {"ol", "ul"} and len(block):
+                block.text = block_padding + indent
+                for item in block:
+                    item.tail = block.text
+                block[-1].tail = block_padding
+        description[-1].tail = padding
+    else:
+        # Keep an explicit closing tag for the empty placeholder.
+        description.text = ""
 
     # Indent the closing </release> tag by the same amount as the opening
     # <release> tag (which we know to be the first child of <releases> since
@@ -148,9 +165,19 @@ def add_release_to_file(
     date: str,
     release_url_template: str | None,
     release_url: str | None = None,
+    *,
+    release_description: ReleaseDescription | None = None,
 ):
     with io.BytesIO() as buf:
-        add_release(appdata_path, buf, version, date, release_url_template, release_url)
+        add_release(
+            appdata_path,
+            buf,
+            version,
+            date,
+            release_url_template,
+            release_url,
+            release_description=release_description,
+        )
 
         with open(appdata_path, "wb") as f:
             f.write(buf.getvalue())

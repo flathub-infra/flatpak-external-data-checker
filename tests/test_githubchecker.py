@@ -150,7 +150,12 @@ class TestGitHubChecker(unittest.IsolatedAsyncioTestCase):
         ):
             ManifestChecker._update_appdata(manifest)
         add_release.assert_called_once_with(
-            "metainfo.xml", TAG, "2026-11-04", None, release_url=PAGE
+            "metainfo.xml",
+            TAG,
+            "2026-11-04",
+            None,
+            release_url=PAGE,
+            release_description=None,
         )
 
     async def test_source_archives(self):
