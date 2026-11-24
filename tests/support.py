@@ -1,9 +1,12 @@
 """Small, shared fixtures for deterministic HTTP tests and upstream smoke tests."""
 
 import asyncio
+import json
 import os
+import tempfile
 import unittest
 from functools import wraps
+from pathlib import Path
 
 import aiohttp
 from aiohttp import web
@@ -30,6 +33,15 @@ def upstream_test(test):
         await asyncio.wait_for(test(self), timeout=60)
 
     return unittest.skipUnless(UPSTREAM_TESTS, "set FEDC_TEST_UPSTREAM=1")(bounded)
+
+
+def write_sources(test, *sources):
+    """Write a standalone source list for tests that need manifest orchestration."""
+    directory = tempfile.TemporaryDirectory()
+    test.addCleanup(directory.cleanup)
+    path = Path(directory.name) / "sources.json"
+    path.write_text(json.dumps(sources), encoding="utf-8")
+    return str(path)
 
 
 class LocalHTTPTestCase(unittest.IsolatedAsyncioTestCase):

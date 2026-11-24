@@ -76,7 +76,9 @@ Tests workflow to run live tests. Their 60-second timeout cannot interrupt
 blocking native calls.
 
 Keep new tests offline. Use `tests/support.py` for a local HTTP server with a
-five-second request timeout.
+five-second request timeout. Test checkers directly with one source. When testing
+manifest orchestration, use `write_sources` from the same module to write a
+standalone source list, unless the manifest structure itself is under test.
 
 # JSON schemas
 

@@ -1,7 +1,6 @@
 import asyncio
 import datetime
 import hashlib
-import os
 import unittest
 from contextlib import asynccontextmanager
 from unittest import mock
@@ -9,15 +8,16 @@ from unittest import mock
 import aiohttp
 from yarl import URL
 
+from src.checkers.snapcraftchecker import SnapcraftChecker
 from src.lib.checksums import MultiDigest
 from src.lib.errors import CheckerFetchError, CheckerQueryError
+from src.lib.externaldata import ExternalData
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
+from tests.support import write_sources
 
-TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.nordpass.NordPass.yaml")
 
-
-class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
+class TestSnapcraftChecker(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         init_logging()
         self.robots_patcher = mock.patch(
@@ -25,14 +25,33 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
         )
         self.robots_patcher.start()
         self.addCleanup(self.robots_patcher.stop)
+        self.source = {
+            "type": "extra-data",
+            "filename": "nordpass.snap",
+            "url": "https://example.invalid/old.snap",
+            "sha256": "0" * 64,
+            "size": 42,
+            "only-arches": ["x86_64"],
+            "x-checker-data": {
+                "type": "snapcraft",
+                "name": "nordpass",
+                "channel": "stable",
+            },
+        }
+
+    def manifest(self):
+        return ManifestChecker(write_sources(self, self.source))
 
     async def test_check(self):
         await self._check_download(checksum_matches=True)
 
-    async def test_checksum_mismatch_does_not_offer_update(self):
-        await self._check_download(checksum_matches=False)
+    async def test_matching_checksum_skips_url_fallback(self):
+        await self._check_download(checksum_matches=True, check_fallback=True)
 
-    async def _check_download(self, checksum_matches):
+    async def test_checksum_mismatch_does_not_offer_update(self):
+        await self._check_download(checksum_matches=False, check_fallback=True)
+
+    async def _check_download(self, checksum_matches, *, check_fallback=False):
         api_url = "https://api.snapcraft.io/v2/snaps/info/nordpass"
         download_url = (
             "https://api.snapcraft.io/api/v1/snaps/download/"
@@ -91,17 +110,30 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
             else:
                 self.fail(f"Unexpected HTTP request: {url}")
 
-        checker = ManifestChecker(TEST_MANIFEST)
-        original = self._find_by_filename(checker.get_external_data(), "nordpass.snap")
-        with (
-            mock.patch("aiohttp.ClientSession.get", side_effect=response) as get,
-            mock.patch(
-                "src.checkers.urlchecker.utils.get_extra_data_info_from_url",
-                new_callable=mock.AsyncMock,
-                return_value=original.current_version,
-            ) as validate_current,
-        ):
-            ext_data = await checker.check()
+        get = mock.Mock(side_effect=response)
+        if check_fallback:
+            checker = self.manifest()
+            (data,) = checker.get_external_data()
+            with (
+                mock.patch("aiohttp.ClientSession.get", new=get),
+                mock.patch(
+                    "src.checkers.urlchecker.utils.get_extra_data_info_from_url",
+                    new_callable=mock.AsyncMock,
+                    return_value=data.current_version,
+                ) as validate_current,
+            ):
+                await checker.check()
+            self.assertEqual(checker.get_errors(), [])
+            if checksum_matches:
+                validate_current.assert_not_awaited()
+            else:
+                validate_current.assert_awaited_once()
+                self.assertEqual(
+                    validate_current.call_args.args[0], data.current_version.url
+                )
+        else:
+            data = ExternalData.from_source("sources.json", self.source)
+            await SnapcraftChecker(mock.Mock(get=get)).check(data)
         self.assertEqual(
             get.call_args_list,
             [
@@ -109,20 +141,11 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
                 mock.call(download_url),
             ],
         )
-        self.assertEqual(checker.get_errors(), [])
-
-        data = self._find_by_filename(ext_data, "nordpass.snap")
-        self.assertIsNotNone(data)
         self.assertEqual(data.filename, "nordpass.snap")
         if not checksum_matches:
-            validate_current.assert_awaited_once()
-            self.assertEqual(
-                validate_current.call_args.args[0], original.current_version.url
-            )
             self.assertIsNone(data.new_version)
             self.assertFalse(data.state & data.State.LATEST)
             return
-        validate_current.assert_not_awaited()
         self.assertIsNotNone(data.new_version)
         self.assertEqual(data.new_version.url, download_url)
         self.assertEqual(data.new_version.size, len(contents))
@@ -144,8 +167,8 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
         await self._check_unchanged_release(False)
 
     async def test_unchanged_release_download_timeout_has_detail(self):
-        checker = ManifestChecker(TEST_MANIFEST)
-        data = self._find_by_filename(checker.get_external_data(), "nordpass.snap")
+        checker = self.manifest()
+        (data,) = checker.get_external_data()
         current = data.current_version
         timeout = asyncio.TimeoutError()
         metadata = {
@@ -234,10 +257,8 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
         }
         for stage, failure in failures:
             with self.subTest(stage=stage):
-                checker = ManifestChecker(TEST_MANIFEST)
-                data = self._find_by_filename(
-                    checker.get_external_data(), "nordpass.snap"
-                )
+                checker = self.manifest()
+                (data,) = checker.get_external_data()
                 current = data.current_version
 
                 async def chunks(block_size, failure=failure):
@@ -282,19 +303,15 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNone(data.new_version)
                 self.assertEqual(data.current_version, current)
                 self.assertFalse(data.state & data.State.LATEST)
-                report = next(
-                    s
-                    for s in checker.get_source_report()
-                    if s["checker_type"] == "snapcraft"
-                )
+                (report,) = checker.get_source_report()
                 self.assertEqual(report["status"], "failed")
 
     async def test_unchanged_release_repairs_download_metadata(self):
         await self._check_unchanged_release(True)
 
     async def _check_unchanged_release(self, changed):
-        checker = ManifestChecker(TEST_MANIFEST)
-        data = self._find_by_filename(checker.get_external_data(), "nordpass.snap")
+        checker = self.manifest()
+        (data,) = checker.get_external_data()
         downloaded = data.current_version
         if changed:
             downloaded = downloaded._replace(
@@ -329,9 +346,7 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
             headers={"Snap-Device-Series": "16"},
         )
         download.assert_awaited_once()
-        report = next(
-            s for s in checker.get_source_report() if s["checker_type"] == "snapcraft"
-        )
+        (report,) = checker.get_source_report()
         self.assertEqual(report["status"], "update_available" if changed else "checked")
         self.assertEqual(report["selected_version"], "2.0.0")
         if changed:
@@ -339,12 +354,6 @@ class TestSnapctaftChecker(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(data.new_version.size, downloaded.size)
         else:
             self.assertIsNone(data.new_version)
-
-    def _find_by_filename(self, ext_data, filename):
-        for data in ext_data:
-            if data.filename == filename:
-                return data
-        return None
 
 
 if __name__ == "__main__":
