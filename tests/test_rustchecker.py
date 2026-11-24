@@ -1,4 +1,3 @@
-import os
 import unittest
 from datetime import datetime
 from unittest import mock
@@ -8,11 +7,7 @@ from src.lib.checksums import MultiDigest
 from src.lib.externaldata import ExternalData, ExternalFile
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
-from tests.support import upstream_test
-
-TEST_MANIFEST = os.path.join(
-    os.path.dirname(__file__), "org.freedesktop.Sdk.Extension.rust-nightly.yml"
-)
+from tests.support import upstream_test, write_sources
 
 
 class TestRustChecker(unittest.IsolatedAsyncioTestCase):
@@ -26,7 +21,22 @@ class TestRustChecker(unittest.IsolatedAsyncioTestCase):
 
     @upstream_test
     async def test_check(self):
-        checker = ManifestChecker(TEST_MANIFEST)
+        checker = ManifestChecker(
+            write_sources(
+                self,
+                {
+                    "type": "archive",
+                    "url": "https://example.invalid/rust-old.tar.gz",
+                    "sha256": "0" * 64,
+                    "x-checker-data": {
+                        "type": "rust",
+                        "package": "rust",
+                        "channel": "nightly",
+                        "target": "x86_64-unknown-linux-gnu",
+                    },
+                },
+            )
+        )
         ext_data = await checker.check()
 
         self.assertEqual(len(ext_data), 1)
@@ -39,12 +49,7 @@ class TestRustChecker(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(data.new_version.size)
         self.assertIsNotNone(data.new_version.checksum)
         self.assertIsInstance(data.new_version.checksum, MultiDigest)
-        self.assertNotEqual(
-            data.new_version.checksum,
-            MultiDigest(
-                sha256="24b4681187654778817652273a68a4d55f5090604cd14b1f1c3ff8785ad24b99"
-            ),
-        )
+        self.assertNotEqual(data.new_version.checksum, data.current_version.checksum)
 
 
 class TestRustChannelMetadata(unittest.IsolatedAsyncioTestCase):
@@ -85,9 +90,10 @@ version = "{version} (abcdef123 2024-10-31)"
             body += f'available = true\nxz_url = "{url}"\nxz_hash = "{checksum}"\n'
         else:
             body += "available = false\n"
-        session = mock.MagicMock()
-        response = session.get.return_value.__aenter__.return_value
-        response.text = mock.AsyncMock(return_value=body)
+        response = mock.Mock(text=mock.AsyncMock(return_value=body))
+        request = mock.MagicMock()
+        request.__aenter__.return_value = response
+        session = mock.Mock(get=mock.Mock(return_value=request))
 
         await RustChecker(session).check(data)
 

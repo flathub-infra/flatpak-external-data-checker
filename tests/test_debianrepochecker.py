@@ -1,7 +1,6 @@
 import asyncio
 import contextlib
 import datetime as dt
-import os
 import unittest
 from types import SimpleNamespace
 from unittest import mock
@@ -21,10 +20,6 @@ from src.lib.externaldata import ExternalBase
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
 from tests.support import LocalHTTPTestCase, upstream_test, write_sources
-
-TEST_MANIFEST = os.path.join(
-    os.path.dirname(__file__), "org.debian.tracker.pkg.apt.yml"
-)
 
 
 def debian_source(package="apt", *, source_package=False):
@@ -56,8 +51,13 @@ class TestDebianRepoChecker(unittest.IsolatedAsyncioTestCase):
 
     @upstream_test
     async def test_check(self):
-        checker = ManifestChecker(TEST_MANIFEST)
+        checker = ManifestChecker(
+            write_sources(
+                self, debian_source("python-apt", source_package=True), debian_source()
+            )
+        )
         ext_data = await checker.check()
+        self.assertEqual(len(ext_data), 2)
         for data in ext_data:
             self.assertIsNotNone(data)
             self.assertIsNotNone(data.new_version)
@@ -74,18 +74,16 @@ class TestDebianRepoChecker(unittest.IsolatedAsyncioTestCase):
             self.assertRegex(
                 data.new_version.url, r"http://deb.debian.org/debian/pool/main/.+"
             )
-            if data.filename == "python-apt-source.tar.xz":
+            if data.checker_data.get("source"):
                 self.assertRegex(
                     data.new_version.url,
                     r"http://deb.debian.org/debian/pool/main/p/python-apt/python-apt_(\d[\d\.-]+\d).tar.xz",
                 )
-            elif data.filename == "apt-aarch64.deb":
+            else:
                 self.assertRegex(
                     data.new_version.url,
                     r"http://deb.debian.org/debian/pool/main/a/apt/apt_(\d[\d\.-]+\d)_arm64.deb",
                 )
-            else:
-                self.fail(f"Unknown data {data.filename}")
 
 
 class TestDebianRepoCheckerMocked(unittest.IsolatedAsyncioTestCase):
@@ -337,9 +335,9 @@ class TestDebianRepoCheckerTimestamps(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.data = [
             ExternalBase.from_source(
-                "sources.json", debian_source(source_package=source)
+                "sources.json", debian_source(source_package=source_package)
             )
-            for source in (False, True)
+            for source_package in (False, True)
         ]
         self.url = "https://example.com/package-2.tar.xz"
         self.cache = mock.MagicMock()
@@ -408,12 +406,12 @@ class TestDebianRepoCheckerTimestamps(unittest.IsolatedAsyncioTestCase):
                     self.assertIsNone(data.new_version)
 
     async def test_manifest_records_head_timeout_and_checks_independent_source(self):
-        for source in (False, True):
-            with self.subTest(source=source):
+        for source_package in (False, True):
+            with self.subTest(source_package=source_package):
                 manifest = ManifestChecker(
                     write_sources(
                         self,
-                        debian_source(source_package=source),
+                        debian_source(source_package=source_package),
                         debian_source("working"),
                     )
                 )

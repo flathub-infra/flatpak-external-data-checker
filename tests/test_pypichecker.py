@@ -1,7 +1,6 @@
 import asyncio
 import hashlib
 import json
-import os
 import tempfile
 import unittest
 from contextlib import asynccontextmanager
@@ -17,9 +16,7 @@ from src.lib.errors import CheckerFetchError, CheckerMetadataError, CheckerQuery
 from src.lib.externaldata import ExternalData, ExternalFile
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
-from tests.support import LocalHTTPTestCase, upstream_test
-
-TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.valvesoftware.Steam.yml")
+from tests.support import LocalHTTPTestCase, upstream_test, write_sources
 
 
 class TestPyPIRequestErrors(unittest.IsolatedAsyncioTestCase):
@@ -156,7 +153,40 @@ class TestPyPIChecker(unittest.IsolatedAsyncioTestCase):
 
     @upstream_test
     async def test_check(self):
-        checker = ManifestChecker(TEST_MANIFEST)
+        cases = [
+            (
+                "setuptools-50.3.2-py3-none-any.whl",
+                "setuptools",
+                {"packagetype": "bdist_wheel"},
+            ),
+            ("PyYAML-5.3.1.tar.gz", "PyYAML", {"packagetype": "sdist"}),
+            (
+                "vdf-3.1-py2.py3-none-any.whl",
+                "vdf",
+                {"versions": {"==": "3.2"}, "packagetype": "bdist_wheel"},
+            ),
+            ("Pillow-7.2.0.tar.gz", "Pillow", {"packagetype": "bdist_wheel"}),
+            (
+                "allow-prerelease",
+                "borgbackup",
+                {"versions": {"<": "1.2"}, "stable-only": False},
+            ),
+            (
+                "disallow-prerelease",
+                "borgbackup",
+                {"versions": {"<": "1.2"}, "stable-only": True},
+            ),
+        ]
+        sources = [
+            {
+                "type": "file",
+                "url": f"https://example.invalid/{filename}",
+                "sha256": "0" * 64,
+                "x-checker-data": {"type": "pypi", "name": name, **options},
+            }
+            for filename, name, options in cases
+        ]
+        checker = ManifestChecker(write_sources(self, *sources))
         ext_data = await checker.check()
 
         self.assertEqual(len(ext_data), 6)
