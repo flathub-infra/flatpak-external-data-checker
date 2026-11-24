@@ -1,5 +1,4 @@
 import gzip
-import os
 import unittest
 from datetime import datetime, timezone
 from unittest import mock
@@ -9,9 +8,7 @@ from src.lib.checksums import MultiDigest
 from src.lib.externaldata import ExternalData, ExternalFile
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
-from tests.support import LocalHTTPTestCase, upstream_test
-
-TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.visualstudio.code.yaml")
+from tests.support import LocalHTTPTestCase, upstream_test, write_sources
 
 
 class TestRPMRepoChecker(unittest.IsolatedAsyncioTestCase):
@@ -25,8 +22,23 @@ class TestRPMRepoChecker(unittest.IsolatedAsyncioTestCase):
 
     @upstream_test
     async def test_check(self):
-        checker = ManifestChecker(TEST_MANIFEST)
+        sources = [
+            {
+                "type": "file",
+                "only-arches": [arch],
+                "url": f"https://example.invalid/code-old.{arch}.rpm",
+                "sha256": "0" * 64,
+                "x-checker-data": {
+                    "type": "rpm-repo",
+                    "package-name": "code",
+                    "root": "https://packages.microsoft.com/yumrepos/vscode/",
+                },
+            }
+            for arch in ("x86_64", "aarch64")
+        ]
+        checker = ManifestChecker(write_sources(self, *sources))
         ext_data = await checker.check()
+        self.assertEqual(len(ext_data), len(sources))
         for data in ext_data:
             self.assertIsNotNone(data)
             self.assertIsNotNone(data.new_version)

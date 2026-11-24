@@ -39,8 +39,10 @@ class TestSnapcraftChecker(unittest.IsolatedAsyncioTestCase):
             },
         }
 
-    def manifest(self):
-        return ManifestChecker(write_sources(self, self.source))
+    def manifest_and_source(self):
+        manifest = ManifestChecker(write_sources(self, self.source))
+        (data,) = manifest.get_external_data()
+        return manifest, data
 
     async def test_check(self):
         await self._check_download(checksum_matches=True)
@@ -112,8 +114,7 @@ class TestSnapcraftChecker(unittest.IsolatedAsyncioTestCase):
 
         get = mock.Mock(side_effect=response)
         if check_fallback:
-            checker = self.manifest()
-            (data,) = checker.get_external_data()
+            checker, data = self.manifest_and_source()
             with (
                 mock.patch("aiohttp.ClientSession.get", new=get),
                 mock.patch(
@@ -131,9 +132,12 @@ class TestSnapcraftChecker(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(
                     validate_current.call_args.args[0], data.current_version.url
                 )
-        else:
-            data = ExternalData.from_source("sources.json", self.source)
-            await SnapcraftChecker(mock.Mock(get=get)).check(data)
+                self.assertIsNone(data.new_version)
+                self.assertFalse(data.state & data.State.LATEST)
+            return
+
+        data = ExternalData.from_source("sources.json", self.source)
+        await SnapcraftChecker(mock.Mock(get=get)).check(data)
         self.assertEqual(
             get.call_args_list,
             [
@@ -142,10 +146,6 @@ class TestSnapcraftChecker(unittest.IsolatedAsyncioTestCase):
             ],
         )
         self.assertEqual(data.filename, "nordpass.snap")
-        if not checksum_matches:
-            self.assertIsNone(data.new_version)
-            self.assertFalse(data.state & data.State.LATEST)
-            return
         self.assertIsNotNone(data.new_version)
         self.assertEqual(data.new_version.url, download_url)
         self.assertEqual(data.new_version.size, len(contents))
@@ -167,8 +167,7 @@ class TestSnapcraftChecker(unittest.IsolatedAsyncioTestCase):
         await self._check_unchanged_release(False)
 
     async def test_unchanged_release_download_timeout_has_detail(self):
-        checker = self.manifest()
-        (data,) = checker.get_external_data()
+        checker, data = self.manifest_and_source()
         current = data.current_version
         timeout = asyncio.TimeoutError()
         metadata = {
@@ -257,8 +256,7 @@ class TestSnapcraftChecker(unittest.IsolatedAsyncioTestCase):
         }
         for stage, failure in failures:
             with self.subTest(stage=stage):
-                checker = self.manifest()
-                (data,) = checker.get_external_data()
+                checker, data = self.manifest_and_source()
                 current = data.current_version
 
                 async def chunks(block_size, failure=failure):
@@ -310,8 +308,7 @@ class TestSnapcraftChecker(unittest.IsolatedAsyncioTestCase):
         await self._check_unchanged_release(True)
 
     async def _check_unchanged_release(self, changed):
-        checker = self.manifest()
-        (data,) = checker.get_external_data()
+        checker, data = self.manifest_and_source()
         downloaded = data.current_version
         if changed:
             downloaded = downloaded._replace(
