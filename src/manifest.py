@@ -54,7 +54,12 @@ from .lib.externaldata import (
 )
 from .lib.robots import RobotsCache
 from .lib.sourceupdates import SourceUpdate
-from .lib.submodules import SubmoduleChecker, SubmoduleUpdate, local_source_paths
+from .lib.submodules import (
+    SubmoduleChecker,
+    SubmoduleUpdate,
+    git_command,
+    local_source_paths,
+)
 from .lib.utils import asyncio_gather_failfast, dump_manifest, read_manifest
 
 MAIN_SRC_PROP = "is-main-source"
@@ -196,7 +201,7 @@ class ManifestChecker:
             self._submodule_paths = []
             if self._repository is not None:
                 result = subprocess.run(
-                    ["git", "-C", str(self._repository), "ls-files", "--stage", "-z"],
+                    git_command(self._repository, "ls-files", "--stage", "-z"),
                     capture_output=True,
                     check=False,
                 )

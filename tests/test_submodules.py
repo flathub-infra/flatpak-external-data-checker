@@ -97,6 +97,31 @@ class TestSubmodules(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(checker.source_updates[0].submodule_files, ("used.json",))
         self.assertEqual(checker.get_errors(), [])
 
+    async def test_check_in_checkout_owned_by_another_user(self):
+        self.git(self.root, "submodule", "deinit", "--", "shared-modules")
+        config = self.directory / "gitconfig"
+        self.git(
+            self.remote,
+            "config",
+            "--file",
+            str(config),
+            "safe.directory",
+            str(self.remote / ".git"),
+        )
+        self.git(
+            self.root, "config", "submodule.shared-modules.url", self.remote.as_uri()
+        )
+        with patch.dict(
+            os.environ,
+            {
+                "GIT_TEST_ASSUME_DIFFERENT_OWNER": "1",
+                "GIT_CONFIG_GLOBAL": str(config),
+            },
+        ):
+            checker = await self.checker()
+        self.assertEqual(checker.get_report_errors(), [])
+        self.assertEqual(checker.submodule_checker.updates, [])
+
     async def test_unrelated_changes_do_not_trigger_updates(self):
         self.write_module("unused.json", {"name": "unused"})
         self.commit(self.remote)
