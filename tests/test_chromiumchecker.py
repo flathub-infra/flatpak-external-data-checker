@@ -1,26 +1,24 @@
 import base64
 import hashlib
-import logging
-import os
 import unittest
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
 
-from src.checkers.chromiumchecker import ChromiumComponent, LLVMGitComponent
+from src.checkers.chromiumchecker import (
+    ChromiumChecker,
+    ChromiumComponent,
+    LLVMGitComponent,
+)
 from src.lib.checksums import MultiDigest
 from src.lib.errors import CheckerFetchError
 from src.lib.externaldata import (
+    ExternalBase,
     ExternalData,
     ExternalFile,
     ExternalGitRef,
-    ExternalGitRepo,
 )
-from src.lib.utils import init_logging
-from src.manifest import ManifestChecker
-
-TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "org.chromium.Chromium.yaml")
 
 
 class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
@@ -40,15 +38,24 @@ class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
     )
     ARCHIVE_BODY = b"test archive contents"
 
-    def setUp(self):
-        init_logging(logging.INFO)
-        self.robots_patcher = mock.patch(
-            "src.lib.robots.RobotsCache.ensure_allowed", new_callable=mock.AsyncMock
-        )
-        self.robots_patcher.start()
-        self.addCleanup(self.robots_patcher.stop)
+    def source(self, component):
+        source = {"x-checker-data": {"type": "chromium", "component": component}}
+        if component == "llvm-git":
+            source.update(
+                type="git", url="https://github.com/llvm/llvm-project", commit="0" * 40
+            )
+        else:
+            source.update(
+                type="archive",
+                url=f"https://example.invalid/{component}-old.tar.xz",
+                sha256="0" * 64,
+            )
+        return ExternalBase.from_source("sources.json", source)
 
-    async def check_manifest(self, primary_status=200, fallback_status=200):
+    def checker(self, downloads=None):
+        downloads = downloads or {}
+        requested_downloads = []
+
         def get(url, **kwargs):
             response = MagicMock()
             response.__aenter__ = AsyncMock(return_value=response)
@@ -77,12 +84,9 @@ class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
                     ).decode()
                 )
             else:
-                self.assertIn(url, (self.CHROMIUM_URL, self.GENTOO_URL, self.CLANG_URL))
-                status = {
-                    self.CHROMIUM_URL: primary_status,
-                    self.GENTOO_URL: fallback_status,
-                    self.CLANG_URL: 200,
-                }[url]
+                self.assertIn(url, downloads)
+                requested_downloads.append(url)
+                status = downloads[url]
                 if status != 200:
                     # ClientSession(raise_for_status=True) raises on entry.
                     response.__aenter__.side_effect = aiohttp.ClientResponseError(
@@ -98,78 +102,65 @@ class TestChromiumChecker(unittest.IsolatedAsyncioTestCase):
                 response.content.iter_chunked.return_value = chunks()
             return response
 
-        checker = ManifestChecker(TEST_MANIFEST)
-        with mock.patch("aiohttp.ClientSession.get", side_effect=get) as request:
-            ext_data = await checker.check()
-        urls = [call.args[0] for call in request.call_args_list]
-        self.assertEqual(urls.count(self.CHROMIUM_URL), 1)
-        self.assertEqual(urls.count(self.GENTOO_URL), int(primary_status == 404))
-        return ext_data
+        return ChromiumChecker(mock.Mock(get=get)), requested_downloads
 
-    def assert_updates(self, ext_data, chromium_url):
-        self.assertEqual(len(ext_data), 3)
-        for data in ext_data:
-            if data.filename.startswith("chromium-") and chromium_url is None:
-                self.assertIsNone(data.new_version)
-                continue
+    def assert_archive_update(self, data, url):
+        self.assertIsInstance(data.new_version, ExternalFile)
+        self.assertEqual(data.new_version.url, url)
+        self.assertEqual(data.new_version.version, self.CHROMIUM_VERSION)
+        self.assertEqual(data.new_version.size, len(self.ARCHIVE_BODY))
+        self.assertEqual(
+            data.new_version.checksum,
+            MultiDigest(sha256=hashlib.sha256(self.ARCHIVE_BODY).hexdigest()),
+        )
 
-            self.assertIsNotNone(data.new_version)
-            self.assertEqual(data.new_version.version, self.CHROMIUM_VERSION)
-
-            if isinstance(data, ExternalData):
-                self.assertIsInstance(data.new_version, ExternalFile)
-                self.assertIsNotNone(data.new_version.checksum)
-                self.assertIsInstance(data.new_version.checksum, MultiDigest)
-                self.assertEqual(
-                    data.new_version.checksum.sha256,
-                    hashlib.sha256(self.ARCHIVE_BODY).hexdigest(),
-                )
-                self.assertEqual(data.new_version.size, len(self.ARCHIVE_BODY))
-                if data.filename.startswith("chromium-"):
-                    self.assertEqual(data.new_version.url, chromium_url)
-                    self.assertNotEqual(
-                        data.new_version.checksum,
-                        MultiDigest(
-                            sha256="a68d31f77a6b7700a5161d82f5932c2822f85f7ae68ad51be3d3cf689a3fe2b0"
-                        ),
-                    )
-                elif data.filename.startswith("clang-"):
-                    self.assertEqual(data.new_version.url, self.CLANG_URL)
-                    self.assertNotEqual(
-                        data.new_version.checksum,
-                        MultiDigest(
-                            sha256="cf6b516a4e410d79439a150927fc8b450b325e2a6349395ae153c9d2dd6c6ed2"
-                        ),
-                    )
-                else:
-                    self.fail(f"unexpected extra-data filename {data.filename}")
-            elif isinstance(data, ExternalGitRepo):
-                self.assertEqual(data.filename, "llvm-project")
-                self.assertIsInstance(data.new_version, ExternalGitRef)
-                self.assertEqual(data.new_version.commit, self.CLANG_REV)
-                self.assertNotEqual(
-                    data.new_version.commit, data.current_version.commit
-                )
-            else:
-                self.fail(repr(type(data)))
-
-    async def test_check(self):
-        self.assert_updates(await self.check_manifest(), self.CHROMIUM_URL)
+    async def test_check_chromium(self):
+        data = self.source("chromium")
+        checker, downloads = self.checker({self.CHROMIUM_URL: 200})
+        await checker.check(data)
+        self.assertEqual(downloads, [self.CHROMIUM_URL])
+        self.assert_archive_update(data, self.CHROMIUM_URL)
 
     async def test_check_gentoo_fallback(self):
-        self.assert_updates(
-            await self.check_manifest(primary_status=404), self.GENTOO_URL
+        data = self.source("chromium")
+        checker, downloads = self.checker(
+            {self.CHROMIUM_URL: 404, self.GENTOO_URL: 200}
         )
+        with self.assertLogs("src.checkers.chromiumchecker", level="ERROR"):
+            await checker.check(data)
+        self.assertEqual(downloads, [self.CHROMIUM_URL, self.GENTOO_URL])
+        self.assert_archive_update(data, self.GENTOO_URL)
 
     async def test_check_both_mirrors_missing(self):
-        with self.assertLogs("src.manifest", level="ERROR") as logs:
-            ext_data = await self.check_manifest(
-                primary_status=404, fallback_status=404
-            )
-        self.assertTrue(
-            any("Failed to check archive chromium/" in log for log in logs.output)
+        data = self.source("chromium")
+        checker, downloads = self.checker(
+            {self.CHROMIUM_URL: 404, self.GENTOO_URL: 404}
         )
-        self.assert_updates(ext_data, None)
+        with (
+            self.assertLogs("src.checkers.chromiumchecker", level="ERROR"),
+            self.assertRaises(CheckerFetchError) as caught,
+        ):
+            await checker.check(data)
+        self.assertEqual(caught.exception.__cause__.status, 404)
+        self.assertEqual(downloads, [self.CHROMIUM_URL, self.GENTOO_URL])
+        self.assertIsNone(data.new_version)
+
+    async def test_check_llvm_prebuilt(self):
+        data = self.source("llvm-prebuilt")
+        checker, downloads = self.checker({self.CLANG_URL: 200})
+        await checker.check(data)
+        self.assertEqual(downloads, [self.CLANG_URL])
+        self.assert_archive_update(data, self.CLANG_URL)
+
+    async def test_check_llvm_git(self):
+        data = self.source("llvm-git")
+        checker, downloads = self.checker()
+        await checker.check(data)
+        self.assertEqual(downloads, [])
+        self.assertIsInstance(data.new_version, ExternalGitRef)
+        self.assertEqual(data.new_version.version, self.CHROMIUM_VERSION)
+        self.assertEqual(data.new_version.url, data.current_version.url)
+        self.assertEqual(data.new_version.commit, self.CLANG_REV)
 
 
 class TestLLVMComponent(unittest.IsolatedAsyncioTestCase):

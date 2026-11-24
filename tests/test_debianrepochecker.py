@@ -1,6 +1,5 @@
 import asyncio
 import contextlib
-import copy
 import datetime as dt
 import os
 import unittest
@@ -21,11 +20,29 @@ from src.lib.errors import CheckerFetchError, CheckerQueryError
 from src.lib.externaldata import ExternalBase
 from src.lib.utils import init_logging
 from src.manifest import ManifestChecker
-from tests.support import LocalHTTPTestCase, upstream_test
+from tests.support import LocalHTTPTestCase, upstream_test, write_sources
 
 TEST_MANIFEST = os.path.join(
     os.path.dirname(__file__), "org.debian.tracker.pkg.apt.yml"
 )
+
+
+def debian_source(package="apt", *, source_package=False):
+    return {
+        "type": "archive" if source_package else "file",
+        "url": f"https://example.invalid/{package}-1.0"
+        + (".tar.xz" if source_package else ".deb"),
+        "sha256": "0" * 64,
+        "only-arches": ["aarch64"],
+        "x-checker-data": {
+            "type": "debian-repo",
+            "root": "http://deb.debian.org/debian",
+            "dist": "trixie",
+            "component": "main",
+            "package-name": package,
+            "source": source_package,
+        },
+    }
 
 
 class TestDebianRepoChecker(unittest.IsolatedAsyncioTestCase):
@@ -196,12 +213,7 @@ class TestDebianRepoCheckerErrors(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.checker = DebianRepoChecker(mock.AsyncMock())
         self.cache_class = apt.Cache
-        manifest = ManifestChecker(TEST_MANIFEST)
-        self.data = next(
-            data
-            for data in manifest.get_external_data()
-            if not data.checker_data.get("source")
-        )
+        self.data = ExternalBase.from_source("sources.json", debian_source())
         for target in ("apt.Cache", "apt_pkg.init", "apt_pkg.config"):
             patcher = mock.patch(target)
             patched = patcher.start()
@@ -276,17 +288,10 @@ class TestDebianRepoCheckerErrors(unittest.IsolatedAsyncioTestCase):
             ("fetch-failed", CheckerFetchError),
         ):
             with self.subTest(failure=failure):
-                manifest = ManifestChecker(TEST_MANIFEST)
-                failed = next(
-                    data
-                    for data in manifest.get_external_data()
-                    if not data.checker_data.get("source")
+                manifest = ManifestChecker(
+                    write_sources(self, debian_source(), debian_source("working"))
                 )
-                source = copy.deepcopy(failed.source)
-                source["x-checker-data"]["package-name"] = "working"
-                working = ExternalBase.from_source(TEST_MANIFEST, source, None)
-                manifest._external_data = {TEST_MANIFEST: [failed, working]}
-                manifest._checkers = [DebianRepoChecker]
+                failed, working = manifest.get_external_data()
 
                 bad_cache = mock.MagicMock(spec=self.cache_class)
                 if failure == "missing-package":
@@ -330,9 +335,12 @@ class TestDebianRepoCheckerErrors(unittest.IsolatedAsyncioTestCase):
 
 class TestDebianRepoCheckerTimestamps(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        self.manifest = ManifestChecker(TEST_MANIFEST)
-        self.manifest._checkers = [DebianRepoChecker]
-        self.data = self.manifest.get_external_data()
+        self.data = [
+            ExternalBase.from_source(
+                "sources.json", debian_source(source_package=source)
+            )
+            for source in (False, True)
+        ]
         self.url = "https://example.com/package-2.tar.xz"
         self.cache = mock.MagicMock()
         candidate = self.cache.__getitem__.return_value.candidate
@@ -400,23 +408,24 @@ class TestDebianRepoCheckerTimestamps(unittest.IsolatedAsyncioTestCase):
                     self.assertIsNone(data.new_version)
 
     async def test_manifest_records_head_timeout_and_checks_independent_source(self):
-        for data in self.data:
-            with self.subTest(source=data.checker_data.get("source")):
-                failed = copy.deepcopy(data)
-                working = copy.deepcopy(data)
-                working.checker_data["source"] = False
-                working.checker_data["package-name"] = "working"
-                self.manifest._external_data = {TEST_MANIFEST: [failed, working]}
+        for source in (False, True):
+            with self.subTest(source=source):
+                manifest = ManifestChecker(
+                    write_sources(
+                        self,
+                        debian_source(source_package=source),
+                        debian_source("working"),
+                    )
+                )
+                failed, working = manifest.get_external_data()
                 self._prepare(failed)
                 error = aiohttp.ConnectionTimeoutError("connection timed out")
                 self.head.return_value.__aenter__.side_effect = [error, self.response]
-                self.manifest._errors.clear()
 
-                checked = await self.manifest.check()
+                checked = await manifest.check()
 
                 self.assertEqual(checked, [failed, working])
-                self.assertEqual(len(self.manifest.get_errors()), 1)
-                caught = self.manifest.get_errors()[0]
+                (caught,) = manifest.get_errors()
                 self.assertIsInstance(caught, CheckerQueryError)
                 self.assertIs(caught.__cause__, error)
                 self.assertIsNone(failed.new_version)
@@ -529,11 +538,7 @@ class TestDebianChangelogs(LocalHTTPTestCase):
         self.assertEqual(self.requests, [("GET", "/response-1")])
 
     async def test_check_uses_changelog_date_without_release_link(self):
-        data = next(
-            data
-            for data in ManifestChecker(TEST_MANIFEST).get_external_data()
-            if not data.checker_data.get("source")
-        )
+        data = ExternalBase.from_source("sources.json", debian_source())
         cache = mock.MagicMock()
         cache.__getitem__.return_value.candidate = self.candidate
         self.candidate.size = 123
