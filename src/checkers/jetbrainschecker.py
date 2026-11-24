@@ -1,6 +1,7 @@
 import datetime
 import logging
 import re
+from collections.abc import Iterator
 
 from lxml import etree, html
 
@@ -20,7 +21,9 @@ _JB_ARCH_MAP = {
 _MAX_WHATSNEW_LENGTH = 16_384
 _DISCARD = {"hr", "img", "iframe", "script", "style", "video"}
 _HEADINGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
-_VERSION = r"(?P<version>20\d\d(?:\.\d+)+)"
+_VERSION = (
+    r"(?P<version>20\d\d(?:\.\d+)+(?:[- ]?(?:eap|rc|beta|preview)(?:[ -]?\d+)?)?)"
+)
 _VERSION_LABELS = (
     re.compile(
         rf".+? {_VERSION}(?: hotfix)? "
@@ -28,15 +31,18 @@ _VERSION_LABELS = (
         re.IGNORECASE,
     ),
     re.compile(rf"what['\u2019]s new in {_VERSION}\b", re.IGNORECASE),
+    re.compile(rf"changes (?:for|in) (?:.+? )?{_VERSION}\b", re.IGNORECASE),
 )
 _BOILERPLATE = re.compile(
-    r"^(?:for (?:more details|details|the list of changes)\b"
+    r"(?:for (?:more details|details|the list of changes)\b.*?\brelease notes\b"
     r"|(?:please )?(?:see|refer to|visit) (?:the |our )?release notes\b"
-    r"|the full list of changes\b"
+    r"|(?:here (?:are|is) (?:the )?(?:full )?)release notes\b"
+    r"|the full list of changes\b.*?\b(?:release notes|available at)\b"
     r"|(?:discover|explore) .*what['\u2019]s new"
     r"|tweet us\b|report bugs\b)",
     re.IGNORECASE,
 )
+_SENTENCE_BREAK = re.compile(r"[.!?]\s")
 _NAVIGATION_LINK = re.compile(
     r"^(?:download\b|(?:read more|learn more|more information|release notes)$)",
     re.IGNORECASE,
@@ -45,6 +51,26 @@ _URL = re.compile(r"https?://", re.IGNORECASE)
 _INVALID_XML_CHARACTERS = re.compile(
     r"[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]"
 )
+_PARAGRAPH_TAGS = _HEADINGS | {"p", "div", "strong", "b"}
+_LIST_TAGS = {"ul", "ol"}
+_BLOCK_TAGS = _PARAGRAPH_TAGS | _LIST_TAGS
+
+
+def _normalize_whitespace(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _iter_blocks(container: XMLElement) -> Iterator[XMLElement]:
+    if (container.text or "").strip():
+        raise ValueError("Unexpected text between release notes blocks")
+
+    for child in container:
+        if (child.tail or "").strip():
+            raise ValueError("Unexpected text between release notes blocks")
+        if child.tag == "div" and any(element.tag in _BLOCK_TAGS for element in child):
+            yield from _iter_blocks(child)
+        else:
+            yield child
 
 
 def _copy_inline(source: XMLElement, target: XMLElement) -> None:
@@ -82,7 +108,7 @@ def _copy_inline(source: XMLElement, target: XMLElement) -> None:
 def _release_prose(source: XMLElement, tag: str, version: str) -> XMLElement | None:
     node = etree.Element(tag)
     _copy_inline(source, node)
-    text = " ".join("".join(node.itertext()).split())
+    text = _normalize_whitespace("".join(node.itertext()))
     for label in _VERSION_LABELS:
         match = label.match(text)
         if match is None:
@@ -92,13 +118,12 @@ def _release_prose(source: XMLElement, tag: str, version: str) -> XMLElement | N
         if not text[match.end() :].strip(" .!:"):
             return None
         break
-    if not text or _BOILERPLATE.match(text):
+    if not text or (_BOILERPLATE.match(text) and not _SENTENCE_BREAK.search(text)):
         return None
     links = " ".join("".join(link.itertext()) for link in source.iter("a"))
+    link_label = _normalize_whitespace(links).rstrip(" .!")
     label_text = text.rstrip(" .!")
-    if label_text == " ".join(links.split()).rstrip(" .!") and _NAVIGATION_LINK.match(
-        label_text
-    ):
+    if label_text == link_label and _NAVIGATION_LINK.match(label_text):
         return None
     if _URL.search(text):
         raise ValueError("Bare URL in release notes")
@@ -116,26 +141,24 @@ def _release_description(notes: object, version: str) -> ReleaseDescription | No
     try:
         parser = html.HTMLParser(no_network=True)
         fragment = html.fragment_fromstring(notes, create_parent=True, parser=parser)
-        if (
-            parser.error_log.filter_from_level(etree.ErrorLevels.FATAL)
-            or (fragment.text or "").strip()
-        ):
+        if parser.error_log.filter_from_level(etree.ErrorLevels.FATAL):
             return None
 
         blocks = []
-        has_paragraph_or_list = False
-        for child in fragment:
-            if (child.tail or "").strip():
-                return None
+        has_body_content = False
+        for child in _iter_blocks(fragment):
             tag = child.tag
             if not isinstance(tag, str) or tag in _DISCARD:
                 continue
-            if tag in _HEADINGS or tag in {"p", "div", "strong", "b"}:
+            if tag in _PARAGRAPH_TAGS:
                 if (block := _release_prose(child, "p", version)) is not None:
                     blocks.append(block)
-                    has_paragraph_or_list |= tag in {"p", "div"}
-            elif tag in {"ul", "ol"}:
-                if (child.text or "").strip():
+                    has_body_content |= tag in {"p", "div"}
+            elif tag in _LIST_TAGS:
+                ordered = tag == "ol"
+                if (child.text or "").strip() or (
+                    ordered and ("start" in child.attrib or "reversed" in child.attrib)
+                ):
                     return None
                 block = etree.Element(tag)
                 for item in child:
@@ -143,19 +166,22 @@ def _release_description(notes: object, version: str) -> ReleaseDescription | No
                         return None
                     if not isinstance(item.tag, str):
                         continue
-                    if item.tag != "li":
+                    if item.tag != "li" or (ordered and "value" in item.attrib):
                         return None
                     if (entry := _release_prose(item, "li", version)) is not None:
                         block.append(entry)
+                    elif ordered:
+                        # Dropping an entry would change the remaining item numbers.
+                        return None
                 if len(block):
                     blocks.append(block)
-                    has_paragraph_or_list = True
+                    has_body_content = True
             else:
                 return None
     except (etree.LxmlError, ValueError):
         return None
 
-    return tuple(blocks) if has_paragraph_or_list else None
+    return tuple(blocks) if has_body_content else None
 
 
 class JetBrainsChecker(Checker):

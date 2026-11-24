@@ -264,6 +264,32 @@ class TestJetBrainsReleaseLinks(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
+    async def test_inline_notes_preserve_blocks_inside_wrappers(self):
+        source = await self.checked_source(
+            "<div><p>Fixed startup on Linux.</p>"
+            "<div><ul><li>Search works offline.</li></ul></div></div>",
+            **{"include-release-notes": True},
+        )
+        self.assert_release_description(
+            source,
+            [
+                "<p>Fixed startup on Linux.</p>",
+                "<ul><li>Search works offline.</li></ul>",
+            ],
+        )
+
+    async def test_inline_notes_keep_prose_after_a_release_notes_pointer(self):
+        source = await self.checked_source(
+            "<p>For details, see the release notes. This update fixes startup on Linux."
+            "</p>",
+            **{"include-release-notes": True},
+        )
+        self.assertIsNotNone(source.new_release_description)
+        self.assertIn(
+            "This update fixes startup on Linux.",
+            source.new_release_description[0].text,
+        )
+
     async def test_unusable_notes_leave_url_and_update_intact(self):
         for notes in (
             mock.sentinel.missing,
@@ -273,14 +299,21 @@ class TestJetBrainsReleaseLinks(unittest.IsolatedAsyncioTestCase):
             "x" * 20_000,
             "<h1>IntelliJ IDEA 2026.2 is now available!</h1><p>Improved search.</p>",
             "<h1>IntelliJ IDEA 2026.2 Release Notes</h1><p>Improved search.</p>",
+            "<h1>Changes for IntelliJ IDEA 2026.2</h1><p>Improved search.</p>",
+            "<h3>What's new in 2026.3-RC1:</h3><ul><li>Improved search.</li></ul>",
             "<h3>What\u2019s new in 2026.2 when upgrading from 2026.1:</h3>"
             "<ul><li>Improved search.</li></ul>",
             "<p>IntelliJ IDEA 2026.3 is out!</p><p>See the release notes.</p>",
             "<p><a href='https://example.org'>More information</a></p>",
             '<p>Visit our <a href="https://example.org">release notes</a> '
             "to learn about the changes.</p>",
+            '<p><a href="https://example.org">Here are full release notes.</a></p>',
             "<p>Invalid XML character: \x01</p>",
             "<ul><li>Fix<ul><li>Details</li></ul></li></ul>",
+            '<ol start="3" reversed><li>First fix.</li><li>Second fix.</li></ol>',
+            '<ol><li value="3">Fix.</li></ol>',
+            '<ol><li><a href="https://example.org">Read more.</a></li>'
+            "<li>Second fix.</li></ol>",
             "<p>Incomplete note" + "<em>" * 300 + "truncated" + "</em>" * 300 + "</p>",
             "## Release notes [read more](https://example.org)",
         ):
