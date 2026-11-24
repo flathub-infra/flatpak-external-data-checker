@@ -29,11 +29,14 @@ class TestJSONChecker(unittest.IsolatedAsyncioTestCase):
             "GITHUB_TOKEN": "github-token-sentinel",
             "FLATHUBBOT_TOKEN": "flathubbot-token-sentinel",
             "FEDC_TEST_VARIABLE": "unrelated-sentinel",
+            "PWD": "/fedc-test-parent-directory",
         }
         with mock.patch.dict(os.environ, environment):
             for query in ("env | tojson", "$ENV | tojson"):
                 with self.subTest(query=query):
-                    self.assertEqual(await _jq(query, {}, {}), "{}")
+                    # Bubblewrap can set PWD to its sandbox root even with env={}.
+                    observed = json.loads(await _jq(query, {}, {}))
+                    self.assertIn(observed, ({}, {"PWD": "/"}))
             for name, value in environment.items():
                 self.assertEqual(os.environ[name], value)
 

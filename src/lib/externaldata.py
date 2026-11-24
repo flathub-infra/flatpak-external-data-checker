@@ -43,6 +43,9 @@ from .errors import (
     SourceUnsupported,
 )
 
+if t.TYPE_CHECKING:
+    from .appdata import ReleaseDescription
+
 _BuilderModuleT = t.TypeVar("_BuilderModuleT", bound="BuilderModule")
 _BuilderSourceT = t.TypeVar("_BuilderSourceT", bound="BuilderSource")
 _ExternalBaseT = t.TypeVar("_ExternalBaseT", bound="ExternalBase")
@@ -334,6 +337,9 @@ class ExternalBase(BuilderSource):
     current_version: ExternalState
     new_version: ExternalState | None
     new_release_url: str | None = dataclasses.field(init=False, default=None)
+    new_release_description: ReleaseDescription | None = dataclasses.field(
+        init=False, default=None
+    )
     # Keep the selected version even when new_version is None.
     selected_version: str | None = dataclasses.field(init=False, default=None)
     check_failed: bool = dataclasses.field(init=False, default=False)

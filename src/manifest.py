@@ -972,6 +972,7 @@ class ManifestChecker:
                     timestamp.strftime("%F"),
                     release_url_template,
                     release_url=selected_data.new_release_url,
+                    release_description=selected_data.new_release_description,
                 )
             except XMLSyntaxError as err:
                 raise AppdataLoadError from err
