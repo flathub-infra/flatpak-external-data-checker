@@ -76,6 +76,43 @@ class TestRuntimeEol(unittest.IsolatedAsyncioTestCase):
                             refs[1].get_eol_rebase.return_value = None
                             self.assertIsNone(await RuntimeEolChecker().check(manifest))
 
+    async def test_extension_with_stable_parent_and_versioned_sdk(self):
+        manifest = {
+            "build-extension": True,
+            "runtime": "org.freedesktop.LinuxAudio.BaseExtension",
+            "runtime-version": "stable",
+            "sdk": "org.freedesktop.Sdk//22.08",
+        }
+        kind = Flatpak.RefKind.RUNTIME
+        parent = self.remote_ref(kind, manifest["runtime"], "stable")
+        sdk = self.remote_ref(kind, "org.freedesktop.Sdk", "22.08", reason="Retired")
+        active = self.remote_ref(kind, "org.freedesktop.Sdk", "22.08", "aarch64")
+        with patch("src.lib.runtime.Flatpak.Installation.new_for_path") as new:
+            listing = new.return_value.list_remote_refs_sync_full
+            listing.return_value = [parent, sdk]
+            self.assertEqual(
+                await RuntimeEolChecker().check(manifest),
+                [
+                    {
+                        "ref": sdk.format_ref(),
+                        "end_of_life": "Retired",
+                        "end_of_life_rebase": None,
+                    }
+                ],
+            )
+            listing.return_value = [parent, sdk, active]
+            self.assertIsNone(await RuntimeEolChecker().check(manifest))
+            for sdk_ref, retired in (
+                ("org.freedesktop.Sdk/x86_64/22.08", True),
+                ("org.freedesktop.Sdk/aarch64/22.08", False),
+                ("org.freedesktop.Sdk", False),
+            ):
+                with self.subTest(sdk=sdk_ref):
+                    result = await RuntimeEolChecker().check(
+                        manifest | {"sdk": sdk_ref}
+                    )
+                    self.assertEqual(result is not None, retired)
+
     async def test_missing_and_ambiguous_parents_through_fetch(self):
         manifest = {
             "build-extension": True,

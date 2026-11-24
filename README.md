@@ -64,8 +64,10 @@ mode or linting.
 The checker reads the same manifest path relative to the repository root on
 each branch. Each update pull request targets that branch and keeps its runtime
 settings and version constraints. Branches marked with `end-of-life` or
-`end-of-life-rebase` in their `flathub.json` are skipped. The checker does not
-create runtime branches or infer support status from runtime versions.
+`end-of-life-rebase` in their `flathub.json` are skipped. The checker also skips
+branches whose parent runtime or SDK is EOL on all matching architectures.
+The checker does not create runtime branches or infer support status from
+runtime versions.
 
 These runtime-branch checks run in temporary worktrees and do not change your
 checkout.
