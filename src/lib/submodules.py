@@ -28,9 +28,20 @@ def local_source_paths(source: Mapping[str, object]) -> list[str]:
     ]
 
 
+def git_command(directory: Path, *args: str) -> list[str]:
+    return [
+        "git",
+        "-c",
+        f"safe.directory={directory.resolve()}",
+        "-C",
+        str(directory),
+        *args,
+    ]
+
+
 def git(directory: Path, *args: str) -> str:
     result = subprocess.run(
-        ["git", "-c", "submodule.recurse=false", "-C", str(directory), *args],
+        git_command(directory, "-c", "submodule.recurse=false", *args),
         capture_output=True,
         text=True,
         errors="surrogateescape",
@@ -92,15 +103,13 @@ class SubmoduleChecker:
         assert self.repository is not None
         for options in ((), ("--file", ".gitmodules")):
             result = subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    str(self.repository),
+                git_command(
+                    self.repository,
                     "config",
                     *options,
                     "--get",
                     f"submodule.{name}.{key}",
-                ],
+                ),
                 capture_output=True,
                 text=True,
                 check=False,
