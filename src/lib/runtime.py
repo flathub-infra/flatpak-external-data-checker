@@ -73,6 +73,19 @@ class RuntimeEolChecker:
         if len({parent.ref.split("/", 1)[0] for parent in parents}) != 1:
             raise ValueError(f"Runtime {runtime}//{version} is ambiguous on Flathub")
         # Do not retire a branch that still has an active published architecture.
-        if not all(parent.is_eol for parent in parents):
-            return None
-        return [asdict(parent) for parent in parents]
+        if all(parent.is_eol for parent in parents):
+            return [asdict(parent) for parent in parents]
+
+        sdk = contents.get("sdk")
+        if isinstance(sdk, str):
+            name, _, qualifier = sdk.partition("/")
+            arch, _, branch = qualifier.partition("/")
+            sdk_refs = [
+                ref
+                for ref in self._runtimes.get((name, branch or version), [])
+                if ref.ref.startswith("runtime/")
+                and (not arch or ref.ref.split("/")[2] == arch)
+            ]
+            if sdk_refs and all(ref.is_eol for ref in sdk_refs):
+                return [asdict(ref) for ref in sdk_refs]
+        return None
