@@ -1,3 +1,5 @@
+from collections.abc import AsyncIterator
+from itertools import count
 from typing import Any
 
 from ..lib.errors import CheckerMetadataError, CheckerQueryError
@@ -25,6 +27,7 @@ class GitHubChecker(Checker):
                 "pattern": r"^[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$",
             },
             "tag-pattern": {"type": "string", "format": "regex"},
+            "include-prereleases": {"type": "boolean"},
             "asset-name": {"type": "string", "minLength": 1},
             "source-archive": {"enum": ["tarball", "zipball"]},
             "enable-robots-txt": {"type": "boolean"},
@@ -44,13 +47,45 @@ class GitHubChecker(Checker):
             schema["oneOf"] = selectors
         return schema
 
+    async def _published_releases(
+        self, api_url: str, include_prereleases: bool
+    ) -> AsyncIterator[dict[str, Any]]:
+        if not include_prereleases:
+            api_url += "/latest"
+            release = await self._get_json(api_url)
+            if (
+                not isinstance(release, dict)
+                or release.get("draft") is not False
+                or release.get("prerelease") is not False
+            ):
+                raise CheckerQueryError(
+                    f"{api_url}: expected a published stable release"
+                )
+            yield release
+            return
+
+        for page in count(1):
+            releases = await self._get_json(f"{api_url}?per_page=100&page={page}")
+            if not isinstance(releases, list):
+                raise CheckerQueryError(f"{api_url}: expected a release list")
+            for release in releases:
+                if not isinstance(release, dict) or not isinstance(
+                    release.get("draft"), bool
+                ):
+                    raise CheckerQueryError(f"{api_url}: invalid release")
+                if not release["draft"]:
+                    yield release
+            if len(releases) < 100:
+                return
+
     async def check(self, external_data: ExternalBase) -> None:
         assert self.should_check(external_data)
         external_data.new_release_url = None
         metadata = external_data.checker_data
         repo = metadata["repo"]
         repository_url = f"https://github.com/{repo}"
-        api_url = f"https://api.github.com/repos/{repo}/releases/latest"
+        include_prereleases = metadata.get("include-prereleases", False)
+        api_url = f"https://api.github.com/repos/{repo}/releases"
         if isinstance(external_data, ExternalGitRepo):
             source_api = github_release_api_url(
                 external_data.current_version.url, "HEAD"
@@ -61,27 +96,26 @@ class GitHubChecker(Checker):
                     f"Git source must be an HTTP(S) URL for GitHub repository {repo}"
                 )
 
-        release = await self._get_json(api_url)
-        if (
-            not isinstance(release, dict)
-            or release.get("draft") is not False
-            or release.get("prerelease") is not False
-        ):
-            raise CheckerQueryError(f"{repo}: expected a published stable release")
-        tag = release.get("tag_name")
-        if not isinstance(tag, str) or not tag:
-            raise CheckerQueryError(f"{repo}: release has no tag name")
-        version = tag
         pattern = self._get_pattern(metadata, "tag-pattern")
-        if pattern is not None:
+        async for release in self._published_releases(api_url, include_prereleases):
+            tag = release.get("tag_name")
+            if not isinstance(tag, str) or not tag:
+                raise CheckerQueryError(f"{repo}: release has no tag name")
+            if pattern is None:
+                version = tag
+                break
             match = pattern.fullmatch(tag)
             group = 1 if pattern.groups else 0
-            if match is None or not match.group(group):
+            if match is not None and match.group(group):
+                version = match.group(group)
+                break
+            if not include_prereleases:
                 raise CheckerQueryError(
                     f"{repo}: latest release tag {tag!r} "
                     f"does not match {pattern.pattern!r}"
                 )
-            version = match.group(group)
+        else:
+            raise CheckerQueryError(f"{repo}: no matching published release")
         published_at = release.get("published_at")
         if published_at is not None and not isinstance(published_at, str):
             raise CheckerQueryError(f"{repo}: invalid release publication date")

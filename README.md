@@ -449,9 +449,13 @@ The [`versions`](#version-constraining) property is supported.
 
 ### GitHub releases checker
 
-Use `github` to follow a repository's latest published stable GitHub release.
-Unlike the Git checker, it selects a release, not the highest Git tag.
-The `repo` property is the repository's `owner/name`.
+Set `type: github` and `repo: owner/name` to track GitHub releases.
+By default, the checker uses only the latest stable release. If none exists
+or its tag does not match `tag-pattern`, the check fails.
+
+Set `include-prereleases: true` to include prereleases. The checker skips drafts
+and selects the first release in GitHub API order that matches the optional
+`tag-pattern`.
 
 For an uploaded release asset, specify its exact name using `asset-name`:
 
@@ -485,8 +489,6 @@ x-checker-data:
 For a `type: git` source, omit both artifact selectors. The checker updates its
 tag and commit to the release's tag. The source must use an HTTP or HTTPS GitHub
 URL for the same repository as `repo`. The URL may end in `.git`.
-
-Use the JSON checker if you need prereleases or custom release selection.
 
 ### Forgejo releases checker
 

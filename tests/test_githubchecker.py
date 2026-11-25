@@ -13,6 +13,7 @@ from tests.support import TAG_PATTERN_CASES
 
 REPO = "pulsar-edit/pulsar"
 API = f"https://api.github.com/repos/{REPO}/releases/latest"
+LIST_API = API.removesuffix("/latest")
 TAG = "v1.02.3"
 PAGE = f"https://github.com/{REPO}/releases/tag/{TAG}"
 DATE = "2026-11-04T12:00:00Z"
@@ -119,6 +120,63 @@ class TestGitHubChecker(unittest.IsolatedAsyncioTestCase):
         await self.checker.check(source)
         self.assertEqual(source.new_version.version, TAG)
         self.assertTrue(source.new_version.url.endswith(f"source-{TAG}.tar.gz"))
+
+    async def test_include_prereleases_in_api_order(self):
+        for prerelease in (True, False):
+            with self.subTest(prerelease=prerelease):
+                self.fetch.return_value = [
+                    RELEASE | {"draft": True},
+                    RELEASE | {"tag_name": "nightly"},
+                    RELEASE | {"prerelease": prerelease},
+                    RELEASE | {"tag_name": "v99", "prerelease": not prerelease},
+                ]
+                source = self.source(
+                    {
+                        "include-prereleases": True,
+                        "tag-pattern": r"v([\d.]+)",
+                        "asset-name": "Linux.pulsar_${version}_amd64.deb",
+                    }
+                )
+                await self.checker.validate_checker_data(source)
+                await self.checker.check(source)
+                self.assertEqual(source.new_version.version, "1.02.3")
+                self.assertEqual(source.new_release_url, PAGE)
+
+    async def test_prerelease_channel_on_second_page(self):
+        self.fetch.side_effect = [
+            [RELEASE | {"tag_name": "nightly"}] * 100,
+            [RELEASE | {"prerelease": True}],
+        ]
+        source = self.source(
+            {
+                "include-prereleases": True,
+                "tag-pattern": r"v([\d.]+)",
+                "source-archive": "tarball",
+            }
+        )
+        await self.checker.check(source)
+        self.assertEqual(source.new_version.url, RELEASE["tarball_url"])
+        self.assertEqual(source.new_release_url, PAGE)
+        self.assertEqual(
+            self.fetch.await_args_list,
+            [mock.call(f"{LIST_API}?per_page=100&page={n}") for n in (1, 2)],
+        )
+
+    async def test_only_drafts(self):
+        self.fetch.return_value = [RELEASE | {"draft": True}]
+        source = self.source({"include-prereleases": True, "source-archive": "zipball"})
+        with self.assertRaisesRegex(CheckerQueryError, "no matching published release"):
+            await self.checker.check(source)
+        self.download.assert_not_awaited()
+
+    async def test_no_stable_release_does_not_fall_back(self):
+        self.fetch.side_effect = CheckerQueryError("404")
+        for metadata in ({}, {"include-prereleases": False}):
+            self.fetch.reset_mock()
+            source = self.source({"source-archive": "tarball", **metadata})
+            with self.assertRaisesRegex(CheckerQueryError, "404"):
+                await self.checker.check(source)
+            self.fetch.assert_awaited_once_with(API)
 
     async def test_tag_pattern_extraction(self):
         for pattern, tag, version in TAG_PATTERN_CASES:
