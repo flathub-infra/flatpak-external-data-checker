@@ -138,8 +138,11 @@ class HTMLChecker(Checker):
                 external_data.parent.new_version or external_data.parent.current_version
             )
             parent_json = parent_state.json
-            if parent_state.version:
-                parent_json |= self._version_parts(parent_state.version)
+            parent_version = (
+                parent_state.version or external_data.parent.selected_version
+            )
+            if parent_version:
+                parent_json |= self._version_parts(parent_version)
         else:
             parent_json = {}
 
