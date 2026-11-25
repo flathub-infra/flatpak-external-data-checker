@@ -677,6 +677,10 @@ Check for [JetBrains](https://www.jetbrains.com/) product updates:
 `release-type` accepts `release`, `eap`, `rc`, or `preview` and defaults to
 `release`. Not every product offers every release type.
 
+For OSS archives from JetBrains' GitHub releases, add `"oss": true`.
+Use `"code": "IIC"` for IntelliJ IDEA or `"code": "PCC"` for PyCharm.
+OSS mode supports only stable releases for `x86_64` and `aarch64`.
+
 ### Snapcraft checker
 
 Check for [Snapcraft](https://snapcraft.io/) package updates:
