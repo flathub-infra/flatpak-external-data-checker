@@ -52,6 +52,7 @@ from .lib.externaldata import (
     BuilderModule,
     ExternalBase,
 )
+from .lib.http import connection_diagnostics_options
 from .lib.robots import RobotsCache
 from .lib.sourceupdates import SourceUpdate
 from .lib.submodules import (
@@ -606,6 +607,7 @@ class ManifestChecker:
             trust_env=True,
             max_field_size=MAXIMUM_HEADER_SIZE,
             max_line_size=MAXIMUM_HEADER_SIZE,
+            **connection_diagnostics_options(),
         ) as http_session:
             global_robots_cache = RobotsCache(http_session)
             check_tasks = []
