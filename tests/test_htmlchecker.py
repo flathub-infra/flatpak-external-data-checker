@@ -28,6 +28,7 @@ import aiohttp
 import semver
 
 from src.checkers.htmlchecker import HTMLChecker, _semantic_version
+from src.checkers.jsonchecker import JSONChecker
 from src.lib.checksums import MultiDigest
 from src.lib.errors import CheckerError, CheckerFetchError, CheckerQueryError
 from src.lib.externaldata import ExternalData
@@ -199,6 +200,44 @@ class TestHTMLChecker(unittest.IsolatedAsyncioTestCase):
         )
         self.robots_patcher.start()
         self.addCleanup(self.robots_patcher.stop)
+
+    async def test_check_url_with_up_to_date_json_parent(self):
+        parent = ExternalData.from_source(
+            "parent.json",
+            {
+                "type": "archive",
+                "url": "https://example.org/parent.tar.gz",
+                "sha256": "0" * 64,
+                "x-checker-data": {
+                    "type": "json",
+                    "version-query": '"7.37-1"',
+                    "url-query": '"https://example.org/parent.tar.gz"',
+                },
+            },
+        )
+        session = mock.MagicMock()
+        await JSONChecker(session).check(parent)
+        self.assertIsNone(parent.new_version)
+
+        child = ExternalData.from_source(
+            "child.json",
+            {
+                "type": "archive",
+                "url": "https://example.org/child-1.tar.gz",
+                "sha256": "0" * 64,
+                "x-checker-data": {
+                    "type": "html",
+                    "url": "https://example.org/GE-Proton$parent_major-$parent_minor",
+                    "version-pattern": r"child-(\d+)",
+                    "url-template": "https://example.org/child-$version.tar.gz",
+                },
+            },
+        )
+        child.parent = parent
+        checker = HTMLChecker(session)
+        with mock.patch.object(checker, "_get_text", return_value="child-1") as fetch:
+            await checker.check(child)
+        fetch.assert_awaited_once_with("https://example.org/GE-Proton7-37")
 
     @upstream_test
     async def test_check(self):
