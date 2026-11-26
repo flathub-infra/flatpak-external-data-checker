@@ -1,15 +1,20 @@
 import copy
+import json
 import os
+import subprocess
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import aiohttp
+from lxml import etree
 
 from src.checkers.gitchecker import GitChecker, TagWithSemver, TagWithVersion
 from src.lib.errors import CheckerFetchError, CheckerQueryError
 from src.lib.externaldata import ExternalGitRef, ExternalGitRepo
 from src.lib.sourceupdates import SourceUpdate
-from src.lib.utils import init_logging
+from src.lib.utils import git_tag_timestamp, init_logging
 from src.manifest import ManifestChecker
 from tests.support import TAG_PATTERN_CASES, upstream_test
 
@@ -17,6 +22,85 @@ TEST_MANIFEST = os.path.join(os.path.dirname(__file__), "com.virustotal.Uploader
 
 
 class TestGitChecker(unittest.IsolatedAsyncioTestCase):
+    async def test_release_date_from_selected_git_tag(self):
+        with (
+            tempfile.TemporaryDirectory() as root,
+            mock.patch("src.lib.utils.check_bwrap", return_value=False),
+        ):
+
+            def git(*args, date="2024-01-02T08:00:00Z"):
+                return subprocess.run(
+                    [
+                        "git",
+                        "-C",
+                        root,
+                        "-c",
+                        "user.name=Test",
+                        "-c",
+                        "user.email=test@example.org",
+                        *args,
+                    ],
+                    env={
+                        **os.environ,
+                        "GIT_COMMITTER_DATE": date,
+                        "GIT_AUTHOR_DATE": "2024-01-01T00:00:00Z",
+                    },
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip()
+
+            git("init")
+            git("config", "uploadpack.allowFilter", "true")
+            Path(root, "payload").write_bytes(os.urandom(2 * 1024 * 1024))
+            git("add", "payload")
+            git("commit", "-m", "release")
+            git("tag", "v2.0")
+            git("tag", "-a", "v3.0", "-m", "release", date="2024-01-08T00:30:00+02:00")
+            for version, expected in (
+                ("2.0", "2024-01-02"),
+                ("3.0", "2024-01-07"),
+            ):
+                with self.subTest(version=version):
+                    app = Path(root, "org.example.App.json")
+                    xml = app.with_suffix(".metainfo.xml")
+                    xml.write_text("<component><releases/></component>")
+                    source = {
+                        "type": "git",
+                        "url": os.path.relpath(root)
+                        if version == "2.0"
+                        else Path(root).as_uri(),
+                        "tag": "v1.0",
+                        "x-checker-data": {
+                            "type": "git",
+                            "versions": {"<=": version},
+                        },
+                    }
+                    app.write_text(
+                        json.dumps(
+                            {
+                                "app-id": "org.example.App",
+                                "modules": [{"name": "test", "sources": [source]}],
+                            }
+                        )
+                    )
+                    checker = ManifestChecker(str(app))
+                    data = checker.get_external_data()[0]
+                    await GitChecker._check_has_new(data)
+                    checker.update_manifests()
+                    self.assertEqual(
+                        etree.parse(xml)
+                        .find(f".//release[@version='{version}']")
+                        .get("date"),
+                        expected,
+                    )
+            original = git("rev-parse", "refs/tags/v3.0")
+            git("config", "uploadpack.allowFilter", "false")
+            self.assertIsNone(git_tag_timestamp(Path(root).as_uri(), "v3.0", original))
+            git("config", "uploadpack.allowFilter", "true")
+            git("tag", "-f", "-a", "v3.0", "-m", "reissued")
+            self.assertIsNone(git_tag_timestamp(Path(root).as_uri(), "v3.0", original))
+
     async def test_tag_pattern_extraction(self):
         for pattern, tag, version in (
             *TAG_PATTERN_CASES,

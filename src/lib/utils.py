@@ -627,17 +627,20 @@ class Command:
         return " ".join(shlex.quote(a) for a in self._orig_argv)
 
 
+_GIT_NETWORK_PATHS = [
+    Command.SandboxPath("/etc/ssl", True, True),
+    Command.SandboxPath("/etc/pki", True, True),
+    Command.SandboxPath("/var/lib/ca-certificates", True, True),
+    Command.SandboxPath("/etc/resolv.conf", True, False),
+]
+
+
 async def git_ls_remote(url: str) -> dict[str, str]:
     git_cmd = Command(
         ["git", "ls-remote", "--exit-code", url],
         timeout=TIMEOUT_CONNECT,
         allow_network=True,
-        allow_paths=[
-            Command.SandboxPath("/etc/ssl", True, True),
-            Command.SandboxPath("/etc/pki", True, True),
-            Command.SandboxPath("/var/lib/ca-certificates", True, True),
-            Command.SandboxPath("/etc/resolv.conf", True, False),
-        ],
+        allow_paths=[*_GIT_NETWORK_PATHS],
     )
     try:
         git_stdout_raw, _ = await git_cmd.run()
@@ -646,6 +649,55 @@ async def git_ls_remote(url: str) -> dict[str, str]:
     git_stdout = git_stdout_raw.decode()
 
     return {r: c for c, r in (line.split() for line in git_stdout.splitlines())}
+
+
+def git_tag_timestamp(url: str, tag: str, object_id: str) -> dt.datetime | None:
+    try:
+        # Git treats a colon before the first slash as a transport or scp URL.
+        if ":" not in url.partition("/")[0]:
+            url = Path(url).absolute().as_uri()
+        with tempfile.TemporaryDirectory() as repo:
+
+            def git(*args: str, network: bool = False) -> bytes:
+                argv = ["git", "--git-dir=.", *args]
+                if network:
+                    # Keep even an unfiltered fetch in one size-limited pack.
+                    argv = ["prlimit", "--fsize=1048576", "--", *argv]
+                stdout, _ = Command(
+                    argv,
+                    cwd=repo,
+                    timeout=TIMEOUT_CONNECT,
+                    allow_network=network,
+                    allow_paths=[repo, *(_GIT_NETWORK_PATHS if network else [])],
+                ).run_sync()
+                return stdout
+
+            ref = "refs/tags/selected"
+            object_format = "sha256" if len(object_id) == 64 else "sha1"
+            git("init", "--bare", f"--object-format={object_format}")
+            git(
+                "-c",
+                "fetch.unpackLimit=1",
+                "fetch",
+                "--no-tags",
+                "--no-recurse-submodules",
+                "--depth=1",
+                "--filter=tree:0",
+                "--",
+                url,
+                f"refs/tags/{tag}:{ref}",
+                network=True,
+            )
+            fetched_object_id, creator_epoch = git(
+                "for-each-ref",
+                "--format=%(objectname) %(creatordate:unix)",
+                ref,
+            ).split()
+            if fetched_object_id == object_id.encode():
+                return dt.datetime.fromtimestamp(int(creator_epoch), tz=dt.timezone.utc)
+    except (subprocess.SubprocessError, OSError, ValueError, OverflowError) as err:
+        log.debug("Could not read Git tag date for %s: %s", tag, err)
+    return None
 
 
 async def extract_appimage_version(appimg_io: t.IO):
