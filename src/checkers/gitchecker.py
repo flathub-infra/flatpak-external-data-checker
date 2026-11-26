@@ -234,6 +234,9 @@ class GitChecker(Checker):
             version=latest_tag.version,
             timestamp=None,
         )
+        external_data.selected_tag_object = refs.get(
+            f"{REF_TAG_PREFIX}{latest_tag.tag}"
+        )
         external_data.set_new_version(new_version)
 
     @staticmethod

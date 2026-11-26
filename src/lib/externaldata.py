@@ -660,6 +660,16 @@ class ExternalGitRepo(ExternalBase):
 
     current_version: ExternalGitRef
     new_version: ExternalGitRef | None
+    # The advertised tag object, before peeling an annotated tag to its commit.
+    selected_tag_object: str | None = dataclasses.field(init=False, default=None)
+
+    def fetch_selected_tag_timestamp(self) -> datetime.datetime | None:
+        candidate = self.new_version
+        if candidate and candidate.tag and self.selected_tag_object:
+            return utils.git_tag_timestamp(
+                candidate.url, candidate.tag, self.selected_tag_object
+            )
+        return None
 
     @classmethod
     def from_source_impl(

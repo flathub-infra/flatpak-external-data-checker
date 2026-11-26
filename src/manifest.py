@@ -51,6 +51,7 @@ from .lib.errors import (
 from .lib.externaldata import (
     BuilderModule,
     ExternalBase,
+    ExternalGitRepo,
 )
 from .lib.robots import RobotsCache
 from .lib.sourceupdates import SourceUpdate
@@ -60,7 +61,11 @@ from .lib.submodules import (
     git_command,
     local_source_paths,
 )
-from .lib.utils import asyncio_gather_failfast, dump_manifest, read_manifest
+from .lib.utils import (
+    asyncio_gather_failfast,
+    dump_manifest,
+    read_manifest,
+)
 
 MAIN_SRC_PROP = "is-main-source"
 IMPORTANT_SRC_PROP = "is-important"
@@ -958,11 +963,12 @@ class ManifestChecker:
         if self._can_update(selected_data) and selected_data.has_version_changed:
             assert last_update is not None
             log.info("Version changed, adding release to %s", appdata)
-            if last_update.timestamp is None:
+            timestamp = last_update.timestamp
+            if timestamp is None and isinstance(selected_data, ExternalGitRepo):
+                timestamp = selected_data.fetch_selected_tag_timestamp()
+            if timestamp is None:
                 log.warning("Using current time in appdata release")
                 timestamp = datetime.datetime.now(tz=datetime.timezone.utc)
-            else:
-                timestamp = last_update.timestamp
             try:
                 version_str = last_update.version
                 assert version_str is not None
