@@ -191,6 +191,10 @@ only the built-in token.
 [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
 with access to the target repository.
 
+On a later `--update` run, the checker looks for unchanged update branches
+left by closed or manually merged PRs, even if no new update is available.
+Closing a PR without merging it still suppresses that update after cleanup.
+
 ### Selectively submitting PRs
 
 By default, the tool opens a PR whenever a source has an update. To avoid PRs

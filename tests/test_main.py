@@ -1720,7 +1720,9 @@ class TestOpenPR(unittest.TestCase):
                 commit = head_repo.get_commit.return_value
                 commit.commit.tree.sha = change.commit
                 commit.get_combined_status.return_value.state = "success"
-                repo.get_pulls.side_effect = [[], [pr]]
+                repo.get_pulls.side_effect = lambda *, state, base, head=None, pr=pr: (
+                    [pr] if state == "open" else []
+                )
                 report = {}
 
                 self.assertTrue(main.open_pr(change, fork=fork, report=report))
@@ -1767,7 +1769,9 @@ class TestOpenPR(unittest.TestCase):
                     pr.head.ref = "manual-update"
                 else:
                     pr.head.ref = "update-stable-1234567"
-                repo.get_pulls.side_effect = [[], [pr]]
+                repo.get_pulls.side_effect = lambda *, state, base, head=None, pr=pr: (
+                    [pr] if state == "open" else []
+                )
 
                 self.assertTrue(main.open_pr(self._make_change()))
 
@@ -1830,7 +1834,9 @@ class TestOpenPR(unittest.TestCase):
         ):
             main.open_pr(self._make_change())
 
-        open_pr.merge.assert_called_once_with(merge_method="rebase")
+        open_pr.merge.assert_called_once_with(
+            merge_method="rebase", sha=open_pr.head.sha
+        )
         open_pr.create_issue_comment.assert_called_once_with(
             main.AUTOMERGE_DUE_TO_CONFIG
         )
@@ -1870,7 +1876,9 @@ class TestOpenPR(unittest.TestCase):
             open_pr_mock.create_issue_comment.assert_called_once_with(
                 main.AUTOMERGE_DUE_TO_BROKEN_URLS
             )
-            open_pr_mock.merge.assert_called_once_with(merge_method="rebase")
+            open_pr_mock.merge.assert_called_once_with(
+                merge_method="rebase", sha=open_pr_mock.head.sha
+            )
 
     @patch("subprocess.check_output", return_value=b"https://github.com/owner/repo\n")
     @patch("src.main.check_call")

@@ -90,6 +90,91 @@ class TestReporting(LocalHTTPTestCase):
         self.assertEqual(sources[3]["manifest"], "source.json")
         self.assertEqual(sources[3]["source_pointer"], "")
 
+    async def test_update_cleans_closed_branches_without_a_current_candidate(self):
+        self.write([])
+        remote = self.root / "bare.git"
+
+        def git(*args):
+            return subprocess.check_output(
+                ["git", *args], cwd=self.root, text=True
+            ).strip()
+
+        git("init", "--quiet", "-b", "main")
+        git("init", "--quiet", "--bare", str(remote))
+        git("remote", "add", "origin", "https://github.com/owner/app")
+        git(
+            "config",
+            f"url.{remote}.insteadOf",
+            "https://x-access-token:test-token@github.com/owner/app",
+        )
+        git("config", "user.name", "Test")
+        git("config", "user.email", "test@example.org")
+        git("add", "app.json")
+        git("commit", "--quiet", "-m", "Update source")
+        tip, tree = git("rev-parse", "HEAD", "HEAD^{tree}").splitlines()
+        git("commit", "--quiet", "--allow-empty", "-m", "Maintainer edit")
+        advanced = git("rev-parse", "HEAD")
+        branches = [f"update-main-{tree[:7]}", f"update-{tree[:7]}"]
+        with (
+            patch("src.main.Github") as github,
+            patch.dict(os.environ, {"GITHUB_TOKEN": "test-token"}),
+        ):
+            repo = github.return_value.get_repo.return_value
+            repo.full_name = "owner/app"
+            repo.owner.login = "owner"
+            repo.default_branch = "main"
+            repo.get_commit.return_value.commit.tree.sha = tree
+            prs = {}
+            refs = []
+            for i, branch in enumerate(branches):
+                # Advance one head after the simulated API snapshot.
+                git(
+                    "push",
+                    "--quiet",
+                    str(remote),
+                    f"{advanced if i else tip}:refs/heads/{branch}",
+                )
+                ref = MagicMock(ref=f"refs/heads/{branch}")
+                ref.object.sha = tip
+                refs.append(ref)
+                pr = MagicMock(
+                    state="closed",
+                    body=f"{main.DISCLAIMER}\n\n<!-- fedc-head: {tip} -->",
+                    commits=1,
+                )
+                pr.is_merged.return_value = not i
+                pr.base.ref = "main"
+                pr.head.repo = repo
+                pr.head.ref = branch
+                pr.head.sha = tip
+                prs[f"owner:{branch}"] = [pr]
+            repo.get_git_matching_refs.return_value = refs
+            repo.get_pulls.side_effect = lambda *, state, head: prs[head]
+            repo.get_git_ref.return_value.object.sha = advanced
+            result, _ = await self.run_report("--update", "--never-fork")
+        self.assertEqual(result, (0, 0, False))
+        self.assertEqual(
+            git(
+                "--git-dir",
+                str(remote),
+                "for-each-ref",
+                "--format=%(objectname) %(refname)",
+            ),
+            f"{advanced} refs/heads/{branches[1]}",
+        )
+        repo.create_pull.assert_not_called()
+
+    async def test_eol_update_skips_remote_cleanup(self):
+        self.write([])
+        (self.root / "flathub.json").write_text('{"end-of-life":"archived"}')
+        with (
+            patch.dict(os.environ, {"GITHUB_TOKEN": "test-token"}),
+            patch("src.main.cleanup_closed_updates") as cleanup,
+        ):
+            _, report = await self.run_report("--update")
+            self.assertEqual(report["status"], "skipped")
+            cleanup.assert_not_called()
+
     async def test_shared_modules_exclusion_is_not_a_report_failure(self):
         subprocess.run(["git", "init", "-q", str(self.root)], check=True)
         subprocess.run(
@@ -309,7 +394,14 @@ class TestReporting(LocalHTTPTestCase):
         )
         pr.is_merged.return_value = False
         pr.merge.return_value.merged = True
+        pr.head.repo = repo
+        pr.head.ref = "update-master-1234567"
+        pr.head.sha = "a" * 40
+        pr.base.ref = "master"
+        pr.body = f"{main.DISCLAIMER}\n\n<!-- fedc-head: {pr.head.sha} -->"
+        pr.commits = 1
         commit = pr.head.repo.get_commit.return_value
+        commit.commit.tree.sha = "1234567"
         commit.get_combined_status.return_value.state = "success"
         repo.get_pulls.return_value = [pr] if existing else []
         repo.create_pull.return_value = pr
@@ -382,7 +474,7 @@ class TestReporting(LocalHTTPTestCase):
             self.assertEqual(
                 report["pull_request"], {"url": pr.html_url, "outcome": "merged"}
             )
-            pr.merge.assert_called_once_with(merge_method="rebase")
+            pr.merge.assert_called_once_with(merge_method="rebase", sha=pr.head.sha)
             pr.create_issue_comment.assert_called_once()
             push.assert_not_called()
             repo.create_pull.assert_not_called()
