@@ -57,8 +57,13 @@ from .lib.sourceupdates import SourceUpdate
 from .lib.submodules import (
     SubmoduleChecker,
     SubmoduleUpdate,
+    configured_submodules,
     git_command,
+    indexed_gitlinks,
+    is_nested_gitlink,
     local_source_paths,
+    resolve_submodule_reference,
+    submodule_reference_path,
 )
 from .lib.utils import asyncio_gather_failfast, dump_manifest, read_manifest
 
@@ -124,6 +129,7 @@ class ManifestChecker:
             self._repository, self.opts.max_manifest_size
         )
         self._submodule_paths: list[Path] | None = None
+        self._configured_submodule_paths: set[Path] = set()
 
         self._modules: dict[str, list[BuilderModule]] = {}
         self._external_data: dict[str, list[ExternalBase]]
@@ -152,7 +158,7 @@ class ManifestChecker:
 
         self._manifest_headers: dict[str, bool] = {}
         self._incomplete_manifests: list[ManifestLoadError] = []
-        self._shared_module_exclusions: set[ManifestScopeError] = set()
+        self._submodule_exclusions: set[ManifestScopeError] = set()
 
         # Top-level manifest contents
         self._root_manifest = self._read_manifest(self._root_manifest_path)
@@ -207,14 +213,56 @@ class ManifestChecker:
                 )
                 if result.returncode == 0:
                     self._submodule_paths = [
-                        self._repository / os.fsdecode(entry.split(b"\t", 1)[1])
-                        for entry in result.stdout.split(b"\0")
-                        if entry.startswith(b"160000 ")
+                        self._repository / path
+                        for path, _, _ in indexed_gitlinks(os.fsdecode(result.stdout))
                     ]
-        resolved = Path(path).resolve()
-        if self._find_repository(path) == self._repository and not any(
-            resolved.is_relative_to(submodule.resolve())
-            for submodule in self._submodule_paths
+                if self._submodule_paths:
+                    try:
+                        configured = configured_submodules(self._repository)
+                        self._configured_submodule_paths = {
+                            self._repository / path for _, path in configured
+                        }.intersection(self._submodule_paths)
+                    except (CheckerError, OSError, subprocess.TimeoutExpired):
+                        # Unreadable configuration cannot justify a scope exemption.
+                        pass
+        reference = Path(path).absolute()
+        resolved = reference.resolve()
+        repository = self._find_repository(path)
+        in_tracked_submodule = False
+        can_delegate_to_submodule_checker = False
+        escaped_submodule = False
+        for submodule in self._submodule_paths:
+            reference_parents = set(reference.parents)
+            tracked_reference = submodule_reference_path(
+                reference, submodule, alias_parents=reference_parents
+            )
+            if tracked_reference is not None:
+                escaped_submodule = (
+                    not resolved.is_relative_to(submodule)
+                    or resolve_submodule_reference(tracked_reference, submodule)
+                    != resolved
+                )
+                # An uninitialized gitlink has no repository of its own yet.
+                in_tracked_submodule = True
+                assert self._repository is not None
+                crossed = {
+                    parent.resolve()
+                    for parent in reference_parents
+                    if (parent / ".git").exists()
+                }
+                if repository is not None:
+                    crossed.add(repository)
+                crossed.difference_update(self._repository.parents)
+                crossed.discard(self._repository)
+                crossed.difference_update(self._configured_submodule_paths)
+                can_delegate_to_submodule_checker |= (
+                    submodule in self._configured_submodule_paths
+                    and all(is_nested_gitlink(submodule, parent) for parent in crossed)
+                )
+            if escaped_submodule:
+                break
+        if repository == self._repository and not (
+            in_tracked_submodule or escaped_submodule
         ):
             return False
         error = ManifestScopeError(
@@ -222,18 +270,9 @@ class ManifestChecker:
             "coverage is incomplete"
         )
         self._incomplete_manifests.append(error)
-        shared_modules = (
-            self._repository / "shared-modules"
-            if self._repository is not None
-            else None
-        )
-        if (
-            shared_modules is not None
-            and shared_modules in self._submodule_paths
-            and resolved.is_relative_to(shared_modules.resolve())
-        ):
-            self._shared_module_exclusions.add(error)
-            log.info(error)
+        if can_delegate_to_submodule_checker and not escaped_submodule:
+            self._submodule_exclusions.add(error)
+            log.info("Skipping included manifest in tracked submodule: %s", path)
         else:
             log.warning(error)
         return True
@@ -690,13 +729,13 @@ class ManifestChecker:
         ]
 
     def get_report_errors(self) -> list[Exception]:
-        """Include skipped manifest files except the shared-modules submodule."""
+        """Include skipped manifest files except tracked submodules."""
         return [
             *self.get_errors(),
             *(
                 error
                 for error in self._incomplete_manifests
-                if error not in self._shared_module_exclusions
+                if error not in self._submodule_exclusions
             ),
         ]
 

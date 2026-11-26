@@ -92,6 +92,31 @@ class TestReporting(LocalHTTPTestCase):
 
     async def test_shared_modules_exclusion_is_not_a_report_failure(self):
         subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        remote = self.root / "remote"
+        subprocess.run(["git", "init", "-q", str(remote)], check=True)
+        (remote / "source.json").write_text("[]")
+        subprocess.run(["git", "-C", str(remote), "add", "source.json"], check=True)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(remote),
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.com",
+                "commit",
+                "-qm",
+                "Pin",
+            ],
+            check=True,
+        )
+        pin = subprocess.check_output(
+            ["git", "-C", str(remote), "rev-parse", "HEAD"], text=True
+        ).strip()
+        (self.root / ".gitmodules").write_text(
+            f'[submodule "shared-modules"]\n\tpath = shared-modules\n\turl = {remote}\n'
+        )
         subprocess.run(
             [
                 "git",
@@ -101,7 +126,7 @@ class TestReporting(LocalHTTPTestCase):
                 "--add",
                 "--cacheinfo",
                 "160000",
-                "a" * 40,
+                pin,
                 "shared-modules",
             ],
             check=True,

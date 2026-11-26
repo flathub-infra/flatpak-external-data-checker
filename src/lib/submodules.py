@@ -5,7 +5,7 @@ import posixpath
 import re
 import subprocess
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 
 from gi.repository import GLib
@@ -18,6 +18,8 @@ from .utils import read_manifest
 
 log = logging.getLogger(__name__)
 
+MAX_SYMLINK_HOPS = 40
+
 
 def local_source_paths(source: Mapping[str, object]) -> list[str]:
     paths = source.get("paths", [])
@@ -26,6 +28,140 @@ def local_source_paths(source: Mapping[str, object]) -> list[str]:
         for path in [source.get("path"), *(paths if isinstance(paths, list) else [])]
         if isinstance(path, str)
     ]
+
+
+def _exit_gitlink_by_parent_path(reference: Path, base: Path) -> Path | None:
+    """Continue from an explicit parent step that leaves the gitlink."""
+    parts = reference.relative_to(base).parts
+    if ".." not in parts or base.resolve() != base:
+        return None
+    prefix = base
+    for index, part in enumerate(parts):
+        if part == "..":
+            if prefix == base:
+                return base.parent.joinpath(*parts[index + 1 :])
+            prefix = prefix.parent
+        else:
+            prefix /= part
+            if prefix.is_symlink():
+                resolved = resolve_submodule_reference(prefix, base)
+                if resolved is None:
+                    return None
+                prefix = resolved
+    return None
+
+
+def submodule_reference_path(
+    reference: Path, base: Path, *, alias_parents: set[Path] | None = None
+) -> Path | None:
+    """Follow app aliases to the gitlink, retaining the path inside it."""
+    # Follow aliases only as far as the gitlink. The pinned tree must still
+    # validate any symlinks inside it.
+    symlink_hops = 0
+    while True:
+        if reference.is_relative_to(base):
+            outside = _exit_gitlink_by_parent_path(reference, base)
+            if outside is None:
+                return reference
+            # An ordinary ".." can leave the gitlink and enter again by alias.
+            reference = outside
+            continue
+        for ancestor in [*reversed(reference.parents), reference]:
+            if ancestor.is_symlink():
+                if symlink_hops == MAX_SYMLINK_HOPS:
+                    return None
+                symlink_hops += 1
+                reference = Path(
+                    ancestor.parent,
+                    ancestor.readlink(),
+                    reference.relative_to(ancestor),
+                )
+                if alias_parents is not None:
+                    alias_parents.update(reference.parents)
+                break
+            resolved = ancestor.resolve()
+            if resolved.is_relative_to(base):
+                reference = Path(resolved, reference.relative_to(ancestor))
+                break
+        else:
+            return None
+
+
+def resolve_submodule_reference(reference: Path, base: Path) -> Path | None:
+    """Resolve a live reference without leaving the gitlink or entering another repo."""
+    symlink_hops = 0
+    unmerged: set[Path] = set()
+    inspected: set[Path] = set()
+    while True:
+        if not reference.is_relative_to(base):
+            return None
+        prefix = base
+        parts = reference.relative_to(base).parts
+        for index, part in enumerate(parts):
+            if prefix not in inspected and (prefix / ".git").exists():
+                inspected.add(prefix)
+                try:
+                    entries = git(prefix, "ls-files", "--unmerged", "-z")
+                except (CheckerError, OSError, subprocess.TimeoutExpired):
+                    return None
+                unmerged.update(
+                    prefix / path for path, _, _ in indexed_gitlinks(entries)
+                )
+            if part == "..":
+                if prefix == base:
+                    return None
+                prefix = prefix.parent
+                continue
+            prefix /= part
+            if prefix in unmerged:
+                return None
+            if prefix.is_symlink():
+                if symlink_hops == MAX_SYMLINK_HOPS:
+                    return None
+                symlink_hops += 1
+                target = prefix.parent / prefix.readlink()
+                reference = target.joinpath(*parts[index + 1 :])
+                break
+            if (prefix / ".git").exists() and not is_nested_gitlink(base, prefix):
+                return None
+        else:
+            return prefix
+
+
+def indexed_gitlinks(entries: str) -> Iterator[tuple[str, str, str]]:
+    """Yield (path, commit, stage) for each gitlink in ls-files --stage -z."""
+    for entry in entries.split("\0"):
+        if entry.startswith("160000 "):
+            metadata, path = entry.split("\t", 1)
+            _, commit, stage = metadata.split()
+            yield path, commit, stage
+
+
+def is_nested_gitlink(base: Path, path: Path) -> bool:
+    """Check every repository boundary below base against its parent's gitlinks."""
+    if not path.is_relative_to(base) or path == base:
+        return False
+    parent = base
+    nested = base
+    for part in path.relative_to(base).parts:
+        nested /= part
+        if not (nested / ".git").exists():
+            continue
+        relative = nested.relative_to(parent).as_posix()
+        try:
+            paths = configured_submodules(parent)
+            if not any(configured == relative for _, configured in paths):
+                return False
+            entries = git(parent, "ls-files", "--stage", "-z", "--", relative)
+        except (CheckerError, OSError, subprocess.TimeoutExpired):
+            return False
+        if not any(
+            path == relative and stage == "0"
+            for path, _, stage in indexed_gitlinks(entries)
+        ):
+            return False
+        parent = nested
+    return parent == path
 
 
 def git_command(directory: Path, *args: str) -> list[str]:
@@ -43,14 +179,13 @@ def git(directory: Path, *args: str) -> str:
     result = subprocess.run(
         git_command(directory, "-c", "submodule.recurse=false", *args),
         capture_output=True,
-        text=True,
-        errors="surrogateescape",
         timeout=120,
         check=False,
     )
     if result.returncode:
-        raise CheckerError(f"Git {args[0]} failed: {result.stderr.strip()}")
-    return result.stdout
+        detail = os.fsdecode(result.stderr).strip()
+        raise CheckerError(f"Git {args[0]} failed: {detail}")
+    return os.fsdecode(result.stdout)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -72,6 +207,18 @@ class SubmoduleUpdate:
         )
 
 
+def configured_submodules(root: Path) -> list[tuple[str, str]]:
+    if not (root / ".gitmodules").is_file():
+        return []
+    config = git(root, "config", "--null", "--file", ".gitmodules", "--list")
+    paths = []
+    for record in config.split("\0"):
+        key, _, path = record.partition("\n")
+        if key.startswith("submodule.") and key.endswith(".path"):
+            paths.append((key[len("submodule.") : -len(".path")], path))
+    return paths
+
+
 class SubmoduleChecker:
     def __init__(self, repository: Path | None, max_manifest_size: int) -> None:
         self.repository = repository
@@ -81,23 +228,12 @@ class SubmoduleChecker:
         self.errors: list[Exception] = []
 
     def add_reference(self, path: str, *, manifest: bool) -> None:
-        absolute = Path(os.path.abspath(path))
+        absolute = Path(path).absolute()
         self.references[absolute] = self.references.get(absolute, False) or manifest
 
     def reset(self) -> None:
         self.updates = []
         self.errors = []
-
-    @staticmethod
-    def _relative_reference(reference: Path, base: Path) -> Path | None:
-        if reference.is_relative_to(base):
-            return reference.relative_to(base)
-        # Resolve aliases into the submodule, but not symlinks within it.
-        for ancestor in [*reversed(reference.parents), reference]:
-            resolved = ancestor.resolve()
-            if resolved.is_relative_to(base):
-                return resolved.relative_to(base) / reference.relative_to(ancestor)
-        return None
 
     def _config(self, name: str, key: str) -> str:
         assert self.repository is not None
@@ -138,7 +274,11 @@ class SubmoduleChecker:
         return url
 
     def _snapshot(
-        self, checkout: Path, references: Mapping[Path, bool]
+        self,
+        checkout: Path,
+        references: list[tuple[Path, str | None]],
+        *,
+        validate_paths_only: bool = False,
     ) -> dict[str, str]:
         entries = {
             ".": "040000 tree " + git(checkout, "rev-parse", "HEAD^{tree}").strip()
@@ -148,47 +288,63 @@ class SubmoduleChecker:
                 metadata, path = entry.split("\t", 1)
                 entries[path] = metadata
         used: dict[str, str] = {}
-        visited: set[tuple[str, bool]] = set()
+        visited: set[tuple[Path, Path, str | None]] = set()
 
         def resolve(path: Path, seen: tuple[Path, ...] = ()) -> Path | None:
-            path = Path(os.path.normpath(path))
             if not path.is_relative_to(checkout):
                 raise CheckerError(f"Referenced path escapes submodule: {path}")
-            if path in seen or len(seen) > 40:
+            if path in seen or len(seen) > MAX_SYMLINK_HOPS:
                 raise CheckerError(f"Symlink loop or too many symlinks: {path}")
             prefix = checkout
-            for part in path.relative_to(checkout).parts:
+            parts = path.relative_to(checkout).parts
+            for index, part in enumerate(parts):
+                if part == "..":
+                    if prefix == checkout:
+                        raise CheckerError(f"Referenced path escapes submodule: {path}")
+                    prefix = prefix.parent
+                    continue
                 prefix /= part
                 relative = prefix.relative_to(checkout).as_posix()
                 metadata = entries.get(relative, "")
                 if metadata.startswith("160000 "):
+                    if parts[index + 1 : index + 2] == ("..",):
+                        continue
+                    if ".." in parts[index + 1 :]:
+                        raise CheckerError(
+                            "Cannot validate parent traversal inside nested submodule: "
+                            f"{relative}"
+                        )
                     log.info("Skipping nested submodule reference %s", relative)
                     return None
                 if metadata.startswith("120000 "):
                     used[relative] = metadata
                     target = prefix.parent / os.readlink(prefix)
-                    return resolve(target / path.relative_to(prefix), (*seen, path))
-            return path
+                    resolved = resolve(
+                        target.joinpath(*parts[index + 1 :]), (*seen, path)
+                    )
+                    if resolved is not None and not prefix.exists():
+                        raise CheckerError(f"Broken symlink in submodule: {relative}")
+                    return resolved
+            return prefix
 
-        def visit(path: Path, manifest: bool) -> None:
-            path = Path(os.path.normpath(path))
-            key = (path.as_posix(), manifest)
-            if key in visited:
-                return
-            visited.add(key)
+        def visit(path: Path, manifest_suffix: str | None) -> None:
             requested = path
             resolved = resolve(path)
             if resolved is None:
                 return
             path = resolved
+            key = (path, requested.parent.resolve(), manifest_suffix)
+            if key in visited:
+                return
+            visited.add(key)
             relative = path.relative_to(checkout).as_posix()
             if relative not in entries:
                 raise CheckerError(
                     f"Referenced file missing from submodule: {relative}"
                 )
             used[relative] = entries[relative]
-            if not manifest:
-                if entries[relative].startswith("040000 "):
+            if manifest_suffix is None:
+                if not validate_paths_only and entries[relative].startswith("040000 "):
                     used[relative] = "040000 tree"
                     for child, metadata in entries.items():
                         if (
@@ -196,16 +352,18 @@ class SubmoduleChecker:
                             and Path(child).is_relative_to(Path(relative))
                             and not metadata.startswith("040000 ")
                         ):
-                            visit(checkout / child, False)
+                            visit(checkout / child, None)
                 return
             if not path.is_file():
                 raise CheckerError(
                     f"Submodule manifest is not a regular file: {relative}"
                 )
+            if validate_paths_only:
+                return
             if path.stat().st_size > self.max_manifest_size:
                 raise CheckerError(f"Submodule manifest is too large: {relative}")
             try:
-                contents = read_manifest(requested)
+                contents = read_manifest(path, suffix=manifest_suffix)
             except (GLib.Error, YAMLError, ValueError) as error:
                 raise CheckerError(
                     f"Cannot read submodule manifest {relative}: {error}"
@@ -219,21 +377,21 @@ class SubmoduleChecker:
 
             def walk(node: object) -> None:
                 if isinstance(node, str):
-                    visit(requested.parent / node, True)
+                    visit(requested.parent / node, Path(node).suffix)
                 elif isinstance(node, list):
                     for child in node:
                         walk(child)
                 elif isinstance(node, dict):
                     for local in local_source_paths(node):
-                        visit(requested.parent / local, False)
+                        visit(requested.parent / local, None)
                     for key in ("modules", "sources"):
                         if key in node:
                             walk(node[key])
 
             walk(contents)
 
-        for path, manifest in references.items():
-            visit(checkout / path, manifest)
+        for path, manifest_suffix in references:
+            visit(checkout / path, manifest_suffix)
         return used
 
     def _check_submodule(
@@ -241,7 +399,7 @@ class SubmoduleChecker:
         name: str,
         path: str,
         current: str,
-        references: Mapping[Path, bool],
+        references: list[tuple[Path, str | None]],
     ) -> SubmoduleUpdate | None:
         if not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", current):
             raise CheckerError(f"Invalid submodule commit: {current}")
@@ -261,13 +419,14 @@ class SubmoduleChecker:
             candidate = git(
                 checkout, "rev-parse", "--verify", f"{ref}^{{commit}}"
             ).strip()
-            if current == candidate:
-                return None
             try:
                 git(checkout, "cat-file", "-e", f"{current}^{{commit}}")
             except CheckerError:
                 git(checkout, "fetch", "--no-tags", "--depth=1", "--", url, current)
             git(checkout, "checkout", "--detach", current)
+            if current == candidate:
+                self._snapshot(checkout, references, validate_paths_only=True)
+                return None
             old = self._snapshot(checkout, references)
             git(checkout, "checkout", "--detach", candidate)
             new = self._snapshot(checkout, references)
@@ -288,33 +447,29 @@ class SubmoduleChecker:
         if root is None or not self.references or not (root / ".gitmodules").is_file():
             return
         try:
-            paths = git(root, "config", "--null", "--file", ".gitmodules", "--list")
+            paths = configured_submodules(root)
             index: dict[str, str] = {}
-            for entry in git(root, "ls-files", "--stage", "-z").split("\0"):
-                if entry.startswith("160000 "):
-                    metadata, path = entry.split("\t", 1)
-                    _, commit, stage = metadata.split()
-                    if stage != "0":
-                        raise CheckerError(f"Unmerged submodule: {path}")
-                    index[path] = commit
-            for record in paths.split("\0"):
-                if not record:
-                    continue
-                key, _, path = record.partition("\n")
-                if not (key.startswith("submodule.") and key.endswith(".path")):
-                    continue
+            for path, commit, stage in indexed_gitlinks(
+                git(root, "ls-files", "--stage", "-z")
+            ):
+                if stage != "0":
+                    raise CheckerError(f"Unmerged submodule: {path}")
+                index[path] = commit
+            for name, path in paths:
                 base = root / path
-                references: dict[Path, bool] = {}
+                references: list[tuple[Path, str | None]] = []
                 for reference, manifest in self.references.items():
-                    relative = self._relative_reference(reference, base)
-                    if relative is not None:
-                        references[relative] = (
-                            references.get(relative, False) or manifest
-                        )
+                    tracked_reference = submodule_reference_path(reference, base)
+                    # Explicit traversal out of the gitlink is not a dependency.
+                    if tracked_reference is None:
+                        continue
+                    relative = tracked_reference.relative_to(base)
+                    references.append(
+                        (relative, reference.suffix if manifest else None)
+                    )
                 if not references or path not in index:
                     continue
                 try:
-                    name = key[len("submodule.") : -len(".path")]
                     update = self._check_submodule(name, path, index[path], references)
                     if update is not None:
                         self.updates.append(update)
