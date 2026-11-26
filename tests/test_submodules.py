@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from src import main
-from src.lib.errors import CheckerError
+from src.lib.errors import CheckerError, ManifestScopeError
 from src.lib.externaldata import ExternalData
 from src.lib.sourceupdates import format_source_updates
 from src.lib.submodules import SubmoduleChecker, git
@@ -129,6 +129,201 @@ class TestSubmodules(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(checker.submodule_checker.updates, [])
         self.assertEqual(checker.update_manifests(), [])
 
+    async def test_custom_submodule_path_preserves_reference_checks(self):
+        self.git(self.root, "mv", "shared-modules", "flathub-shared-modules")
+        (self.root / "local.json").write_text(
+            json.dumps({"name": "local", "sources": []})
+        )
+        (self.root / "alias.json").symlink_to("flathub-shared-modules/../local.json")
+        self.write_manifest(
+            {
+                "id": "org.test.App",
+                "modules": [
+                    "flathub-shared-modules/used.json",
+                    "flathub-shared-modules/../flathub-shared-modules/used.json",
+                    "alias.json",
+                ],
+            }
+        )
+        self.commit(self.root)
+        self.write_module("used.json", {"name": "new", "sources": []})
+        candidate = self.commit(self.remote)
+
+        checker = await self.checker()
+        self.assertEqual(checker.get_report_errors(), [])
+        self.assertEqual(len(checker.submodule_checker.updates), 1)
+        update = checker.submodule_checker.updates[0]
+        self.assertEqual(update.path, "flathub-shared-modules")
+        self.assertEqual(update.candidate, candidate)
+        self.assertEqual(update.files, ("used.json",))
+
+        (self.remote / "used.json").unlink()
+        self.commit(self.remote)
+        checker = ManifestChecker(str(self.manifest))
+        await checker.check()
+        errors = checker.get_report_errors()
+        self.assertEqual(len(errors), 1)
+        self.assertIn("Referenced file missing from submodule", str(errors[0]))
+        self.assertEqual(checker.submodule_checker.updates, [])
+
+    async def test_missing_reference_at_current_pin_is_reported(self):
+        self.write_manifest(
+            {"id": "org.test.App", "modules": ["shared-modules/missing.json"]}
+        )
+        checker = ManifestChecker(str(self.manifest))
+        await checker.check()
+        errors = checker.get_report_errors()
+        self.assertEqual(len(errors), 1)
+        self.assertIn(
+            "Referenced file missing from submodule: missing.json", str(errors[0])
+        )
+        self.assertEqual(checker.submodule_checker.updates, [])
+
+    async def test_unchanged_pin_does_not_parse_oversized_manifest(self):
+        checker = ManifestChecker(str(self.manifest))
+        checker.submodule_checker.max_manifest_size = 1
+        await checker.check()
+        self.assertEqual(checker.get_report_errors(), [])
+        self.assertEqual(checker.submodule_checker.updates, [])
+
+    async def test_app_alias_selects_submodule_manifest_parser(self):
+        (self.remote / "raw").write_text("name: old\nsources: []\n")
+        pin = self.commit(self.remote)
+        self.git(self.shared, "fetch")
+        self.git(self.shared, "checkout", pin)
+        (self.root / "module.yaml").symlink_to("shared-modules/raw")
+        self.write_manifest({"id": "org.test.App", "modules": ["module.yaml"]})
+        self.commit(self.root)
+        (self.remote / "raw").write_text("name: new\nsources: []\n")
+        self.commit(self.remote)
+        checker = await self.checker()
+        self.assertEqual(checker.get_report_errors(), [])
+        self.assertEqual(checker.submodule_checker.updates[0].files, ("raw",))
+
+    async def test_parent_traversal_after_submodule_symlink_checks_real_target(self):
+        (self.remote / "nested/child").mkdir(parents=True)
+        (self.remote / "nested/child/file").touch()
+        (self.remote / "alias").symlink_to("nested/child", target_is_directory=True)
+        (self.remote / "nested/fix.patch").touch()
+        (self.remote / "nested/child.yaml").symlink_to("module-data")
+        child_manifest = self.remote / "nested/module-data"
+        child_manifest.write_text("name: old-child\nsources: []\n")
+        module = {
+            "name": "old",
+            "modules": ["child/../used.json", "obsolete-dir/../child.yaml"],
+            "sources": [{"type": "patch", "path": "obsolete-dir/../fix.patch"}],
+        }
+        self.write_module("nested/used.json", module)
+        pin = self.commit(self.remote)
+        self.git(self.shared, "fetch")
+        self.git(self.shared, "checkout", pin)
+        self.write_manifest(
+            {"id": "org.test.App", "modules": ["shared-modules/alias/../used.json"]}
+        )
+        self.commit(self.root)
+        self.write_module("nested/used.json", {**module, "name": "new"})
+        child_manifest.write_text("name: new-child\nsources: []\n")
+        candidate = self.commit(self.remote)
+
+        checker = await self.checker()
+        self.assertEqual(checker.get_report_errors(), [])
+        self.assertEqual(len(checker.submodule_checker.updates), 1)
+        update = checker.submodule_checker.updates[0]
+        self.assertEqual(update.candidate, candidate)
+        self.assertEqual(update.files, ("nested/module-data", "nested/used.json"))
+
+    async def test_parent_traversal_out_of_nested_gitlink_checks_outer_file(self):
+        (self.root / "alias").symlink_to(".", target_is_directory=True)
+        self.commit(self.root)
+        self.git(self.remote, "submodule", "add", str(self.root), "nested")
+        pin = self.commit(self.remote)
+        self.git(self.shared, "fetch")
+        self.git(self.shared, "checkout", pin)
+        self.write_manifest(
+            {"id": "org.test.App", "modules": ["shared-modules/nested/app.json"]}
+        )
+        self.commit(self.root)
+        self.assertEqual((await self.checker()).get_report_errors(), [])
+        self.git(self.shared, "submodule", "update", "--init", "--", "nested")
+        self.assertEqual((await self.checker()).get_report_errors(), [])
+        nested_pin = self.git(self.shared / "nested", "rev-parse", "HEAD")
+        for initialized in (True, False):
+            with self.subTest(initialized=initialized):
+                if not initialized:
+                    self.git(self.shared, "submodule", "deinit", "--", "nested")
+                self.git(self.shared, "update-index", "--force-remove", "nested")
+                subprocess.run(
+                    ["git", "-C", str(self.shared), "update-index", "--index-info"],
+                    input=f"160000 {nested_pin} 2\tnested\n",
+                    text=True,
+                    check=True,
+                )
+                errors = ManifestChecker(str(self.manifest)).get_report_errors()
+                self.assertEqual(len(errors), 1)
+                self.assertIsInstance(errors[0], ManifestScopeError)
+                self.git(self.shared, "restore", "--staged", "--", "nested")
+        self.git(self.shared, "submodule", "update", "--init", "--", "nested")
+        self.write_manifest(
+            {
+                "id": "org.test.App",
+                "modules": [
+                    "shared-modules/nested/../used.json",
+                ],
+            }
+        )
+        self.commit(self.root)
+        self.write_module("used.json", {"name": "new", "sources": []})
+        candidate = self.commit(self.remote)
+
+        checker = await self.checker()
+        self.assertEqual(checker.get_report_errors(), [])
+        self.assertEqual(len(checker.submodule_checker.updates), 1)
+        update = checker.submodule_checker.updates[0]
+        self.assertEqual(update.candidate, candidate)
+        self.assertEqual(update.files, ("used.json",))
+
+        self.write_manifest(
+            {
+                "id": "org.test.App",
+                "modules": ["shared-modules/nested/alias/../used.json"],
+            }
+        )
+        checker = ManifestChecker(str(self.manifest))
+        await checker.check()
+        self.assertEqual(checker.submodule_checker.updates, [])
+        errors = checker.get_report_errors()
+        self.assertEqual(len(errors), 1)
+        self.assertIn(
+            "Cannot validate parent traversal inside nested submodule", str(errors[0])
+        )
+
+        self.write_manifest(
+            {"id": "org.test.App", "modules": ["shared-modules/used.json"]}
+        )
+        self.write_module(
+            "used.json", {"name": "new", "modules": ["nested/alias/../../used.json"]}
+        )
+        self.commit(self.remote)
+        checker = ManifestChecker(str(self.manifest))
+        await checker.check()
+        self.assertEqual(checker.submodule_checker.updates, [])
+        errors = checker.get_report_errors()
+        self.assertEqual(len(errors), 1)
+        self.assertIn(
+            "Cannot validate parent traversal inside nested submodule", str(errors[0])
+        )
+
+    async def test_candidate_with_broken_manifest_symlink_is_rejected(self):
+        (self.remote / "used.json").rename(self.remote / "real.json")
+        (self.remote / "used.json").symlink_to("missing/../real.json")
+        self.commit(self.remote)
+        checker = ManifestChecker(str(self.manifest))
+        await checker.check()
+        self.assertEqual(checker.submodule_checker.updates, [])
+        errors = checker.get_report_errors()
+        self.assertEqual(len(errors), 1)
+        self.assertIn("Broken symlink in submodule: used.json", str(errors[0]))
+
     def omitted_pin_remote(self, *, changed=True, missing=False):
         if missing:
             (self.remote / "used.json").unlink()
@@ -203,7 +398,7 @@ class TestSubmodules(unittest.IsolatedAsyncioTestCase):
             ):
                 with self.assertRaisesRegex(CheckerError, "Invalid submodule commit"):
                     checker._check_submodule(
-                        "shared-modules", "shared-modules", current, {}
+                        "shared-modules", "shared-modules", current, []
                     )
                 calls.assert_not_called()
 

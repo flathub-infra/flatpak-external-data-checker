@@ -904,10 +904,10 @@ def read_yaml_manifest(manifest_path: Path):
     return data, has_yaml_header
 
 
-def read_manifest(manifest_path: Path | str):
+def read_manifest(manifest_path: Path | str, *, suffix: str | None = None):
     """Reads a JSON or YAML manifest from 'manifest_path'."""
     manifest_path = Path(manifest_path)
-    if manifest_path.suffix in (".yaml", ".yml"):
+    if (manifest_path.suffix if suffix is None else suffix) in (".yaml", ".yml"):
         return read_yaml_manifest(manifest_path)
     return read_json_manifest(manifest_path)
 
