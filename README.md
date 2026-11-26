@@ -19,6 +19,9 @@ flatpak-external-data-checker MANIFEST_FILE
 
 The command reports broken or outdated sources.
 
+The checker skips apps with `end-of-life` or `end-of-life-rebase` in the
+repository's `flathub.json`. Outside a Git checkout, it looks beside the manifest.
+
 ### Offline linting
 
 Check a manifest's `x-checker-data` offline:
@@ -27,21 +30,10 @@ Check a manifest's `x-checker-data` offline:
 flatpak-external-data-checker --lint MANIFEST_FILE
 ```
 
-`--lint` checks `x-checker-data` in JSON and YAML manifests, including referenced
-module and source files. It reports invalid checker settings, regular
-expressions, jq queries, templates, and parent references.
-
-Errors include the filename and field location. The command exits with status 0
-on success or 1 on lint errors. It makes no network requests and changes no files.
-`--max-manifest-size` applies to referenced files too.
-
-Linting cannot tell whether a query matches an upstream response. It is not a full
-Flatpak manifest validator. You cannot combine `--lint` with update options or
-`--filter-type`.
-
-The checker skips apps marked with `end-of-life` or `end-of-life-rebase` in
-the repository's `flathub.json`. Outside a Git checkout, it looks beside the
-manifest.
+`--lint` checks checker settings in JSON and YAML manifests and their referenced
+files. It prints the filename and field for each error and exits with status 1
+if it finds any. It does not change files or test queries against upstream data.
+Run it without update options or `--filter-type`.
 
 ### JSON reports
 
@@ -51,30 +43,20 @@ Write a JSON report:
 flatpak-external-data-checker --report-json report.json MANIFEST_FILE
 ```
 
-Reports include failed and skipped runs. `--report-json` also works with `--lint`
-and does not change console output or exit codes. Create the destination directory
-first.
+Create the destination directory first. Reports include failed and skipped runs.
+You can also use `--report-json` with `--lint`.
 
 ### Runtime branches
 
-For manifests with `build-extension: true`, the checker fetches and checks each
-existing `branch/*` branch on `origin`, unless running in a current-checkout
-mode or linting.
+For extensions with `build-extension: true`, the checker looks for the same
+manifest path on each `branch/*` branch on `origin`. Each update pull request
+targets its own branch. The checker skips branches marked as end-of-life in
+`flathub.json` and branches whose parent runtime or SDK has reached end of life
+on all matching architectures.
 
-The checker reads the same manifest path relative to the repository root on
-each branch. Each update pull request targets that branch and keeps its runtime
-settings and version constraints. Branches marked with `end-of-life` or
-`end-of-life-rebase` in their `flathub.json` are skipped. The checker also skips
-branches whose parent runtime or SDK is EOL on all matching architectures.
-The checker does not create runtime branches or infer support status from
-runtime versions.
-
-These runtime-branch checks run in temporary worktrees and do not change your
-checkout.
-Without a Git checkout, an `origin` remote, or matching runtime branches, the
-checker processes the supplied manifest normally. If a manifest is missing or
-a branch fails, the checker reports the error and continues with the remaining
-branches.
+Linting and current-checkout modes check only the supplied manifest. The checker
+also uses that manifest when it finds no runtime branches on `origin` or runs
+outside a Git checkout.
 
 ### Git submodules
 
@@ -104,11 +86,9 @@ flatpak run --filesystem=MANIFEST_DIR org.flathub.flatpak-external-data-checker 
 
 #### Running in a container
 
-The tool is also available as an
-[OCI image](https://github.com/orgs/flathub-infra/packages/container/package/flatpak-external-data-checker)
-from GitHub Container Registry.
-
-Use `run-in-container.sh` to run the image with `podman`:
+Use `run-in-container.sh` to run the
+[container image](https://github.com/orgs/flathub-infra/packages/container/package/flatpak-external-data-checker)
+with Podman:
 
 ```bash
 ./run-in-container.sh \
@@ -120,13 +100,14 @@ Use `run-in-container.sh` to run the image with `podman`:
 
 Flathub [runs this tool periodically](https://github.com/flathub/flathub/blob/master/.github/workflows/external-data-checker.yml) for all Flatpak repos under [github.com/flathub](https://github.com/flathub).
 To receive update PRs, add `x-checker-data` [to your sources](#changes-to-flatpak-manifests).
-Flathub only checks the default branch.
+Flathub starts the checker on the default branch. For extensions, see
+[Runtime branches](#runtime-branches).
 
 To stop Flathub's tool from checking your repo, add `"disable-external-data-checker": true` to `flathub.json` in the default branch.
 
 ### Custom workflow
 
-Alternatively, you can use your own workflow, for example to update non-default branches.
+Use your own workflow to choose which branches to check.
 
 Put this YAML file in `.github/workflows/update.yaml` on the default branch.
 Replace `master` with the branches to check and `com.example.App.json` with the
@@ -213,7 +194,9 @@ See the [Flathub docs](https://docs.flathub.org/blog/linter-restricting-automati
 
 ### Formatting manifests
 
-When writing back JSON files, this tool defaults to four-space indentation, preserving or omitting a trailing newline based on the source file. If you prefer a different formatting, create and commit an `.editorconfig` file describing your preferred formatting for `.json` files. At present, this tool respects a subset of [EditorConfig](https://editorconfig.org/) settings:
+The checker writes JSON with four-space indentation and preserves the file's
+trailing newline if present. To change these defaults, commit an
+[EditorConfig](https://editorconfig.org/) file with settings for `*.json`:
 
 ```ini
 root = true
@@ -228,7 +211,8 @@ insert_final_newline = true
 The tool does not preserve `/* */` comments in JSON. You can use keys beginning
 with `//` for comments instead. `flatpak-builder` ignores these keys.
 
-For YAML files, this tool attempts to preserve existing formatting and comments automatically. `.editorconfig` is not used. We recommend you follow the [Flathub YAML Style Guide](https://github.com/flathub/flathub/wiki/YAML-Style-Guide).
+For YAML, the checker tries to preserve formatting and comments. It ignores
+`.editorconfig`. See the [Flathub YAML Style Guide](https://github.com/flathub/flathub/wiki/YAML-Style-Guide).
 
 ## Changes to Flatpak manifests
 
@@ -245,48 +229,17 @@ Set the same nonempty `update-group` in each related source's `x-checker-data`.
 A group must contain at least two distinct sources and can span referenced files
 and modules. Architectures and `parent-id` do not create groups automatically.
 
-For binaries released separately for each architecture:
+For example, add this field to both the `x86_64` and `aarch64` sources:
 
 ```yaml
-sources:
-  - type: archive
-    url: https://example.org/app-1.0-amd64.tar.gz
-    sha256: ...
-    only-arches: [x86_64]
-    x-checker-data:
-      type: json
-      url: https://example.org/releases/amd64.json
-      version-query: .version
-      url-query: .url
-      update-group: app-binaries
-  - type: archive
-    url: https://example.org/app-1.0-arm64.tar.gz
-    sha256: ...
-    only-arches: [aarch64]
-    x-checker-data:
-      type: json
-      url: https://example.org/releases/arm64.json
-      version-query: .version
-      url-query: .url
-      update-group: app-binaries
+update-group: app-binaries
 ```
 
-For an application and matching patches in separate modules, set
-`update-group: app-and-patches` on both sources. Members can use different checker
-types, but every member must report the same nonempty version string. Comparison
-is exact, so `2`, `2.0` and `v2` differ. Use version queries or patterns to
-normalize them if needed. The checker does not search for an older common release.
-
-An unchanged member counts if its check confirms the selected version. The checker
-downloads grouped files to verify their checksums even when their URLs have not
-changed. A missing candidate, unknown version, skipped or filtered-out check, or
-failed check blocks the whole group and reports an error, even in check-only mode.
-All referenced files must load. `--lint` checks metadata and membership offline.
-
-Blocked sources keep their existing fields. Other sources can still update,
-even in a shared file. Blocked sources cannot add AppStream releases or satisfy
-`--require-important-update`. A broken source in a blocked group cannot trigger
-automerge.
+Each checker must confirm the same version string. For example, `2`, `2.0`
+and `v2` differ. Use a version query or pattern if the sources spell the
+version differently. If any check fails, skips a source, or finds a different
+version, the checker reports an error and leaves the group unchanged. Sources
+outside the group can still update.
 
 ### Version constraining
 
@@ -322,9 +275,8 @@ The checker detects the latest version as follows:
   group extracts the version number. Without a capture group, the version is
   the whole match, including any URL prefix. Use `(?:...)` for additional
   grouping. Multiple capture groups are not allowed.
-* If downloads come from load-balanced URLs, the `"pattern"` regex must
-  match all URL variants otherwise identical versions may be treated as
-  updates. Eg.
+* If the download host varies, match every host in `pattern` so a host change
+  does not count as a version change. For example:
 
 ```json
 "x-checker-data": {
@@ -334,10 +286,8 @@ The checker detects the latest version as follows:
 }
 ```
 
-Some upstream vendors may add unwanted GET query parameters to
-the download URL, such as identifiers for counting unique downloads.
-This may result in URL change without change in the actual data.
-To remove GET query parameters, set `strip-query` property to `true`.
+If upstream adds a tracking query that changes on each download, set
+`strip-query` to `true` to remove the query from the URL.
 
 ### HTML checker
 
@@ -368,7 +318,7 @@ groups. The first captures the URL and the second captures the version:
 }
 ```
 
-To disable sorting and get first matched version/url, set `sort-matches` to `false`.
+Set `sort-matches` to `false` to use the first match.
 
 The [`versions`](#version-constraining) property is supported.
 
@@ -405,7 +355,7 @@ For example:
 }
 ```
 
-If the placeholder is immediately followed by an underscore, you need to add braces:
+If an underscore follows a placeholder, enclose its name in braces:
 
 ```json
 "x-checker-data": {
@@ -429,11 +379,8 @@ there is no capture group:
 }
 ```
 
-By default tags are sorted based on version number extracted from tag.
-To disable sorting and keep order from `git ls-remote`, set `sort-tags` to `false`.
-
-If the tags are just the version without anything else e.g. `1.0`, you don't need to
-specify a `tag-pattern`.
+The checker sorts tags by version. Set `sort-tags` to `false` to keep the order
+from `git ls-remote`. Omit `tag-pattern` if the tag is the version, such as `1.0`.
 
 For a tag such as `v1.2.3`, `^v[0-9.]+$` uses `v1.2.3` as the version.
 Add a capture group, `^v([0-9.]+)$`, to use `1.2.3` instead.
@@ -548,13 +495,13 @@ the same response, for example `"release-url-query": ".html_url // empty"`.
 It can use `$version` and `$tag` from earlier queries. Missing or invalid results
 do not block updates.
 
-See the [jq manual](https://stedolan.github.io/jq/manual/) for complete information about writing queries.
+See the [jq manual](https://stedolan.github.io/jq/manual/) for query syntax.
 
 #### Inheriting parent source check results
 
-If a parent source is specified, its check results will be accessible in the `$parent` variable.
-The `$parent` object has `current` and `new` properties with objects representing current and new
-parent source data, respectively. The latter is `null` if the parent check didn't get a new version.
+When you specify a parent source, use `$parent.current` for its current source
+data and `$parent.new` for its update. `$parent.new` is `null` if the parent
+has no update.
 See the [source-state schema](data/source-state.schema.json) for the available fields.
 
 ### Debian repo checker
