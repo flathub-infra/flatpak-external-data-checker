@@ -8,7 +8,7 @@ dependencies = [
     "editorconfig==0.17.1",
     "jsonschema==4.26.0",
     "lxml==6.1.3",
-    "packaging==26.3",
+    "packaging==26.4",
     "pyelftools==0.33",
     "PyGithub==2.10.0",
     "PyGObject==3.58.1",
